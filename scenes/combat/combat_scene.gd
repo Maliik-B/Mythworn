@@ -10,7 +10,11 @@ var hp_label: Label
 var energy_label: Label
 var block_label: Label
 var passion_label: Label
-var player_status_label: Label
+var _passion_popup: Control
+var player_status_prefix: Label
+var player_status_chips: HFlowContainer
+var player_powers_prefix: Label
+var player_powers_chips: HFlowContainer
 var draw_label: Button
 var discard_label: Button
 var exhaust_label: Button
@@ -36,75 +40,61 @@ const ENEMY_SPRITES = {
 	"Goblin": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
 	"Orc Brute": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
 	"Realm Guardian": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/Flight.png", 50, 54, 56, 46],
+	# Camelot regular roster (placeholder CC0 mappings; real per-enemy art is the
+	# B5 track item. Some sprites are shared as stand-ins until then.)
+	"Corrupted Knight": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
+	"Court Conspirator": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
+	"Siege Golem": ["res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/Idle.png", 12, 12, 62, 52],
+	"Realm Shade": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/Flight.png", 50, 54, 56, 46],
+	# Camelot elites + Act-1 boss (placeholder CC0; distinct per-enemy art is B5).
+	"Champion of the Usurper": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
+	"The False Prophet": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
+	"Sir Caedmon": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
 	"Hollow Warden": ["res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/Idle.png", 12, 12, 62, 52],
 	"Fable's End": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
 }
 # Card icon mapping: card_name -> full res:// path
-const _CR = "res://assets/sprites/icons/clockwork_raven/Clockwork raven - Weapons and Potions - Free pack/individual_64x64/"
-const _ITV = "res://assets/sprites/icons/in_the_void/individual/"
-const _CUS = "res://assets/sprites/icons/custom/"
-const CARD_ICONS = {
-	# Starter attacks
-	"Strike": _CR + "tile000.png",
-	"Stagger": _CR + "tile025.png",
-	"Noxious Strike": _CUS + "noxious_strike.png",
-	"Wide Arc": _CR + "tile004.png",
-	"Flame Strike": _CUS + "flame_strike.png",
-	# Generic attacks
-	"Crushing Blow": _CR + "tile008.png",
-	"Paired Strikes": _CUS + "twin_strike.png",
-	"Sweep": _CR + "tile011.png",
-	"Reckless Swing": _CR + "tile035.png",
-	"Havoc": _CR + "tile041.png",
-	"Poison Fang": _CUS + "poison_fang.png",
-	"Armor Break": _CR + "tile016.png",
-	"Wildfire": _CUS + "immolate.png",
-	"Execute": _CR + "tile012.png",
-	# Primary (Magic) attacks
-	"Soul Flare": _CUS + "soul_flare.png",
-	"Arcane Bolt": _CUS + "arcane_bolt.png",
-	"Blazing Lance": _CR + "tile020.png",
-	"Nether Flames": _CUS + "nether_flames.png",
-	"Cataclysm": _CUS + "cataclysm.png",
-	# Secondary (Physical) attacks
-	"Power Slash": _CR + "tile006.png",
-	"Quick Jab": _CR + "tile005.png",
-	"Rampage": _CR + "tile050.png",
-	"Devastating Blow": _CR + "tile030.png",
-	# Starter skills
-	"Defend": _ITV + "shield.png",
-	"Meditate": _CUS + "meditate.png",
-	# Generic skills
-	"Retaliate": _ITV + "gem_blue.png",
-	"Shield Bash": _ITV + "gauntlet.png",
-	"Battle Cry": _CUS + "battle_cry.png",
-	"Bolster": _ITV + "helmet.png",
-	"Dark Pact": _CUS + "dark_pact.png",
-	"Inner Fire": _CUS + "inner_fire.png",
-	"Weaken": _ITV + "scroll_red.png",
-	"Second Wind": _CR + "tile083.png",
-	"Phantom Guard": _CUS + "apparition.png",
-	# Primary (Magic) skills
-	"Spirit Ward": _CUS + "spirit_ward.png",
-	"Hex": _ITV + "scroll_purple.png",
-	"Soul Sacrifice": _CUS + "soul_sacrifice.png",
-	# Secondary (Physical) skills
-	"Brace": _ITV + "chestplate.png",
-	"Iron Curtain": _CUS + "iron_curtain.png",
-	"Riposte": _CR + "tile009.png",
-	"Bulwark": _ITV + "shield.png",
-}
+# Card art icons live in CardVisuals (single source, shared with the reward screen
+# and the deck / Passion full-card renders).
 var _hp_trail_bars: Dictionary = {} # ProgressBar -> trail ProgressBar
 var _damage_flash: ColorRect
 var _dragging_card: CardData = null
 var _drag_panel: PanelContainer = null
 var _drag_offset := Vector2.ZERO
+var _drag_line: Line2D = null       # aim line from the card's origin to the cursor
+var _drag_hint: Label = null        # "right-click to cancel" affordance during a drag
+var _drag_origin := Vector2.ZERO    # where the dragged card started (line anchor)
 
 
 func _ready() -> void:
 	_build_ui()
 	_connect_events()
 	_start_combat()
+
+
+func _input(event: InputEvent) -> void:
+	# While a card is mid-drag, own motion + release HERE (before GUI routing) so the
+	# drop always resolves. If the mouse-up falls through to _unhandled_input instead,
+	# any card/enemy Control under the cursor can swallow it — leaving _dragging_card
+	# set and soft-locking the turn (every card bails on `if _dragging_card`). See #7.
+	if not (_dragging_card and _drag_panel):
+		return
+	if event is InputEventMouseMotion:
+		_drag_panel.global_position = event.global_position - _drag_offset
+		_update_drag_target_highlight(event.global_position)
+		if _drag_line:
+			_drag_line.set_point_position(1, event.global_position)
+			var over := _enemy_at(event.global_position) != null
+			_drag_line.default_color = Color(1.0, 0.4, 0.3, 0.9) if over else Color(0.9, 0.85, 0.5, 0.6)
+		if _drag_hint:
+			_drag_hint.global_position = event.global_position + Vector2(20, 16)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		_complete_drag(event.global_position)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		_cancel_drag()
+		get_viewport().set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -129,28 +119,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-	# Right-click to deselect card
+	# Right-click to deselect a click-selected card (drag cancel is handled in _input).
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		if selected_card:
 			selected_card = null
 			_update_card_highlights()
-			get_viewport().set_input_as_handled()
-			return
-		if _dragging_card:
-			_cancel_drag()
-			get_viewport().set_input_as_handled()
-			return
-
-	# Drag: mouse motion while dragging
-	if event is InputEventMouseMotion and _dragging_card and _drag_panel:
-		_drag_panel.global_position = event.global_position - _drag_offset
-		get_viewport().set_input_as_handled()
-		return
-
-	# Drag: mouse up to complete drag
-	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _dragging_card and _drag_panel:
-			_complete_drag(event.global_position)
 			get_viewport().set_input_as_handled()
 			return
 
@@ -300,6 +273,19 @@ func _build_player_bar() -> PanelContainer:
 	bar.add_theme_constant_override("separation", 40)
 	panel.add_child(bar)
 
+	# Character POWERS slot — anchored at the left (character) end, ahead of the
+	# resource stats, and visually distinct (gold) from the status chips. Persistent
+	# powers read as "who I am this fight." Hidden until a POWER is active.
+	player_powers_prefix = _make_stat_label(Color(0.9, 0.78, 0.4))
+	player_powers_prefix.text = "Powers:"
+	player_powers_prefix.visible = false
+	bar.add_child(player_powers_prefix)
+
+	player_powers_chips = HFlowContainer.new()
+	player_powers_chips.add_theme_constant_override("h_separation", 6)
+	player_powers_chips.add_theme_constant_override("v_separation", 4)
+	bar.add_child(player_powers_chips)
+
 	hp_label = _make_stat_label(Color(0.9, 0.3, 0.3))
 	bar.add_child(hp_label)
 
@@ -310,13 +296,65 @@ func _build_player_bar() -> PanelContainer:
 	bar.add_child(energy_label)
 
 	passion_label = _make_stat_label(Color(0.9, 0.5, 0.2))
+	passion_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	passion_label.mouse_entered.connect(_show_passion_infographic)
+	passion_label.mouse_exited.connect(_hide_passion_infographic)
+	passion_label.gui_input.connect(_on_passion_label_input)
 	bar.add_child(passion_label)
 
-	player_status_label = _make_stat_label(Color(0.8, 0.8, 0.6))
-	player_status_label.add_theme_font_size_override("font_size", 18)
-	bar.add_child(player_status_label)
+	# Status effects live on this readout as individual, hover-describable chips.
+	# A small "Effects:" caption names the area (both hidden when nothing's active).
+	player_status_prefix = _make_stat_label(Color(0.7, 0.7, 0.55))
+	player_status_prefix.text = "Effects:"
+	player_status_prefix.visible = false
+	bar.add_child(player_status_prefix)
+
+	player_status_chips = HFlowContainer.new()
+	player_status_chips.add_theme_constant_override("h_separation", 6)
+	player_status_chips.add_theme_constant_override("v_separation", 4)
+	bar.add_child(player_status_chips)
 
 	return panel
+
+
+## Hovering the Passion readout pops a quick OVERVIEW above the bar: the five tiers
+## with thresholds + effects and where you stand. Non-interactive (ignores the
+## mouse) so it never eats input; it clears when the pointer leaves the readout.
+## Clicking the readout opens the full page (see _on_passion_label_input).
+func _show_passion_infographic() -> void:
+	if _passion_popup or not RunManager.passion:
+		return
+	_passion_popup = PassionInfographic.build_overview_panel()
+	_passion_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_passion_popup.z_index = 60
+	add_child(_passion_popup)
+	_position_passion_popup.call_deferred()
+
+
+## Click the Passion readout → the full zone page (hover a zone to see your matching
+## cards as full renders). Dismiss the hover overview first so they don't overlap.
+func _on_passion_label_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT and RunManager.passion:
+		_hide_passion_infographic()
+		PassionInfographic.open_modal(self)
+
+
+func _position_passion_popup() -> void:
+	if not _passion_popup:
+		return
+	var lbl := passion_label.global_position
+	var sz := _passion_popup.size
+	var x := lbl.x + passion_label.size.x / 2.0 - sz.x / 2.0
+	x = clampf(x, 10.0, 1920.0 - sz.x - 10.0)
+	var y := lbl.y - sz.y - 12.0
+	_passion_popup.global_position = Vector2(x, maxf(10.0, y))
+
+
+func _hide_passion_infographic() -> void:
+	if _passion_popup:
+		_passion_popup.queue_free()
+		_passion_popup = null
 
 
 func _build_bottom_area() -> HBoxContainer:
@@ -375,10 +413,15 @@ func _make_hp_bar(width: int, height: int) -> Control:
 	# Container holds trail bar behind main bar
 	var container = Control.new()
 	container.custom_minimum_size = Vector2(width, height)
+	# Keep the bar a fixed width, centered, so every enemy's HP bar is uniform. A
+	# plain Control in a VBox otherwise stretches to the widest sibling, so a long
+	# name ("Champion of the Usurper") blew the bar frame out past its 180px fill,
+	# leaving a dark gap that misread as ~65% HP.
+	container.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	var trail = ProgressBar.new()
 	trail.custom_minimum_size = Vector2(width, height)
-	trail.size = Vector2(width, height)
+	trail.set_anchors_preset(Control.PRESET_FULL_RECT)
 	trail.show_percentage = false
 	trail.max_value = 100
 	trail.value = 100
@@ -394,7 +437,7 @@ func _make_hp_bar(width: int, height: int) -> Control:
 
 	var bar = ProgressBar.new()
 	bar.custom_minimum_size = Vector2(width, height)
-	bar.size = Vector2(width, height)
+	bar.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bar.show_percentage = false
 	bar.max_value = 100
 	bar.value = 100
@@ -576,9 +619,12 @@ func _connect_events() -> void:
 	Events.card_exhausted.connect(_on_card_exhausted)
 	Events.player_turn_started.connect(_on_player_turn_started)
 	Events.enemy_turn_started.connect(_on_enemy_turn_started)
+	Events.enemy_action_started.connect(_on_enemy_action_started)
+	Events.enemy_stunned.connect(_on_enemy_stunned)
 	Events.player_damaged.connect(_on_player_damaged)
 	Events.enemy_damaged.connect(_on_enemy_damaged)
 	Events.enemy_died.connect(_on_enemy_died)
+	Events.enemy_phase_changed.connect(_on_enemy_phase_changed)
 	Events.block_gained.connect(_on_block_gained)
 	Events.passion_changed.connect(_on_passion_changed)
 	Events.status_applied.connect(_on_status_applied)
@@ -621,8 +667,8 @@ func _create_test_character() -> CharacterData:
 	c.character_name = "Emo Hybrid Caster"
 	c.max_health = 80
 	c.passion_volatility = 1.0
-	c.passion_thresholds.assign([80, 60, 40, 20])
-	c.primary_personality = "Magic"
+	c.passion_thresholds.assign([50, 18, -18, -50])
+	c.primary_personality = "Water"
 	c.secondary_personality = "Physical"
 
 	var strike = _make_card("Strike", 1, CardData.CardType.ATTACK,
@@ -633,9 +679,10 @@ func _create_test_character() -> CharacterData:
 		CardData.TargetType.SINGLE_ENEMY, [_make_damage(8), _make_status(StatusEffects.VULNERABLE, 2)])
 	var noxious = _make_card("Noxious Strike", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, [_make_damage(4), _make_status(StatusEffects.POISON, 3)])
-	var flame_strike = _make_card("Flame Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_make_damage(10), _make_passion(-3)])
+	var flame_strike = _make_card("Outpouring", 1, CardData.CardType.ATTACK,
+		CardData.TargetType.SINGLE_ENEMY, [_make_damage(9), _make_passion(3)])
 	flame_strike.personality = CardData.PersonalityType.PRIMARY
+	flame_strike.flavor_text = "He lets it pour out of him. For a moment, the ache goes with it."
 	var meditate = _make_card("Meditate", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, [_make_block(4), _make_passion(3)])
 
@@ -644,7 +691,7 @@ func _create_test_character() -> CharacterData:
 	for i in 2:
 		c.starting_deck.append(defend)
 	var cleave = _make_card("Wide Arc", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.ALL_ENEMIES, [_make_damage(4)])
+		CardData.TargetType.ALL_ENEMIES, [_make_damage(6)])
 	c.starting_deck.append(bash)
 	c.starting_deck.append(noxious)
 	c.starting_deck.append(cleave)
@@ -758,6 +805,8 @@ func _make_passion(amount: int) -> PassionEffect:
 
 
 func _get_personality_label(pers: CardData.PersonalityType) -> String:
+	if pers == CardData.PersonalityType.NEGATIVE:
+		return "Curse"
 	if RunManager.current_character:
 		if pers == CardData.PersonalityType.PRIMARY:
 			return RunManager.current_character.primary_personality
@@ -775,7 +824,74 @@ func _get_personality_color(pers: CardData.PersonalityType) -> Color:
 		return Color(0.9, 0.5, 0.2) # Warm orange for magic
 	if pers == CardData.PersonalityType.SECONDARY:
 		return Color(0.4, 0.6, 0.9) # Cool blue for physical
+	if pers == CardData.PersonalityType.NEGATIVE:
+		return Color(0.6, 0.35, 0.7) # Sickly purple for curses
 	return Color(0.6, 0.6, 0.6)
+
+
+func _personality_sigil(pers: CardData.PersonalityType) -> String:
+	# A persistent identity glyph: rippling water for the Water pole, crossed blades
+	# for Physical. The water glyph also distinguishes the pole from the ✦ used by
+	# the Sword-in-the-Stone map node.
+	if pers == CardData.PersonalityType.PRIMARY:
+		return "≈"  # water ripples
+	if pers == CardData.PersonalityType.SECONDARY:
+		return "⚔"  # ⚔
+	return ""
+
+
+## Live resonance of a card against the current Passion tier:
+## 1 = resonant (+25%), -1 = dissonant (-25%), 0 = neutral card or the flat middle.
+func _card_resonance(card: CardData) -> int:
+	if card.personality == CardData.PersonalityType.NEUTRAL:
+		return 0
+	if CombatEngine.zone_bonus_active(card.personality):
+		return 1
+	if CombatEngine.is_zone_penalized(card.personality):
+		return -1
+	return 0
+
+
+## The corner badge: the personality sigil, glowing when the card is resonant at your
+## current Passion and dimmed when dissonant. Returns null for neutral cards.
+func _make_resonance_sigil(card: CardData) -> Label:
+	var glyph := _personality_sigil(card.personality)
+	if glyph == "":
+		return null
+	var lbl := Label.new()
+	lbl.text = glyph
+	var col := _get_personality_color(card.personality)
+	var state := _card_resonance(card)
+	var pers_name := _get_personality_label(card.personality)
+	match state:
+		1:
+			# Resonant: bright, large, a strong colored outline glow, and a subtle
+			# breathing pulse so it draws the eye without being noisy.
+			lbl.add_theme_font_size_override("font_size", 30)
+			lbl.add_theme_color_override("font_color", col.lightened(0.4))
+			lbl.add_theme_constant_override("outline_size", 11)
+			lbl.add_theme_color_override("font_outline_color", Color(col.r, col.g, col.b, 0.85))
+			lbl.tooltip_text = "%s — Resonant: +25%% damage at your current Passion." % pers_name
+			# Pulse via modulate brightness (no pivot math needed). The tween is bound
+			# to the label, so it stops cleanly when the hand rebuilds.
+			var pulse := lbl.create_tween().set_loops()
+			pulse.tween_property(lbl, "modulate", Color(1.35, 1.35, 1.35, 1.0), 0.65) \
+				.set_trans(Tween.TRANS_SINE)
+			pulse.tween_property(lbl, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.65) \
+				.set_trans(Tween.TRANS_SINE)
+		-1:
+			# Dissonant: greyed and faded.
+			lbl.add_theme_font_size_override("font_size", 22)
+			lbl.add_theme_color_override("font_color", col.lerp(Color(0.45, 0.45, 0.45), 0.6))
+			lbl.modulate.a = 0.55
+			lbl.tooltip_text = "%s — Dissonant: -25%% damage at your current Passion." % pers_name
+		_:
+			# Flat middle (no extreme committed): the identity color, muted.
+			lbl.add_theme_font_size_override("font_size", 22)
+			lbl.add_theme_color_override("font_color", col)
+			lbl.modulate.a = 0.8
+			lbl.tooltip_text = "%s card. Commit to its Passion pole for +25%% damage." % pers_name
+	return lbl
 
 
 # ============================================================
@@ -809,6 +925,13 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	if card.upgraded:
 		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
 
+	# Unplayable curses read as sickly and dead: you can't play them, they just
+	# clog a hand slot for the fight.
+	if card.unplayable:
+		style.bg_color = Color(0.16, 0.1, 0.18)
+		style.border_color = Color(0.5, 0.32, 0.55)
+		panel.modulate = Color(0.85, 0.85, 0.85)
+
 	panel.add_theme_stylebox_override("panel", style)
 
 	var vbox = VBoxContainer.new()
@@ -833,7 +956,18 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
 	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cost_container.add_child(cost_lbl)
-	vbox.add_child(cost_container)
+
+	# Top row: energy cost pinned left, resonance sigil pinned right (a corner badge).
+	var top_row = HBoxContainer.new()
+	top_row.add_child(cost_container)
+	var top_spacer = Control.new()
+	top_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_row.add_child(top_spacer)
+	var sigil = _make_resonance_sigil(card)
+	if sigil:
+		sigil.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		top_row.add_child(sigil)
+	vbox.add_child(top_row)
 
 	# Card name
 	var name_lbl = Label.new()
@@ -886,7 +1020,7 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 			art_style.set_border_width_all(1)
 			art_style.border_color = Color(0.65, 0.5, 0.1, 0.5)
 	art_frame.add_theme_stylebox_override("panel", art_style)
-	var icon_file = CARD_ICONS.get(card.card_name, "")
+	var icon_file = CardVisuals.icon_path(card.card_name)
 	if icon_file != "":
 		var art_icon = TextureRect.new()
 		art_icon.texture = load(icon_file)
@@ -914,6 +1048,7 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 
 	# Description (show modified values if in combat)
 	var desc_lbl = Label.new()
+	desc_lbl.name = "CardDesc"
 	if combat_engine and combat_engine.player_stats:
 		desc_lbl.text = card.get_modified_description(combat_engine.player_stats)
 	else:
@@ -922,6 +1057,9 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(desc_lbl)
+
+	# Optional flavor text — italicized, smaller, dimmer
+	_add_flavor_label(vbox, card)
 
 	# Make all children pass clicks through to the panel
 	_ignore_mouse_recursive(vbox)
@@ -932,17 +1070,17 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	panel.pivot_offset = Vector2(80, 110)
 
-	# Hover animation + detail popup
+	# Hover animation only. The old detail popup was removed: the hand card is already
+	# fully legible, and the popup floated up over the enemies' intents. A card at rest
+	# still shows everything; the enlarge-on-hover is enough of an affordance.
 	panel.mouse_entered.connect(func():
 		if panel.modulate != Color(0.5, 0.5, 0.5):
 			var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 			t.tween_property(panel, "scale", Vector2(1.08, 1.08), 0.12)
-			_show_card_hover(card, panel)
 	)
 	panel.mouse_exited.connect(func():
 		var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 		t.tween_property(panel, "scale", Vector2.ONE, 0.12)
-		_hide_card_hover()
 	)
 
 	return panel
@@ -953,6 +1091,24 @@ func _ignore_mouse_recursive(control: Control) -> void:
 	for child in control.get_children():
 		if child is Control:
 			_ignore_mouse_recursive(child)
+
+
+## Appends an italicized flavor line beneath the description, if the card has one.
+## Used by both the in-hand card render and the larger hover popup so flavor
+## styling stays consistent. Skipped when the card has no flavor text set.
+func _add_flavor_label(parent: Control, card: CardData) -> void:
+	if card.flavor_text == "":
+		return
+	var flavor_lbl = Label.new()
+	flavor_lbl.text = card.flavor_text
+	flavor_lbl.add_theme_font_size_override("font_size", 11)
+	flavor_lbl.add_theme_color_override("font_color", Color(0.62, 0.58, 0.52))
+	flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	# Subtle italic via font (no proper italic font in the project — letterspacing
+	# substitutes as a soft visual cue without requiring a new font asset).
+	flavor_lbl.add_theme_constant_override("outline_size", 0)
+	parent.add_child(flavor_lbl)
 
 
 func _on_card_input(event: InputEvent, card: CardData) -> void:
@@ -977,10 +1133,15 @@ func _on_card_input(event: InputEvent, card: CardData) -> void:
 		CardData.TargetType.ALL_ENEMIES:
 			_play_selected_card(null)
 		CardData.TargetType.SINGLE_ENEMY:
-			# Click-select + click-enemy, or drag to target
-			_start_drag(card, event)
-			_update_card_highlights()
-			_log("Drag to target or click an enemy...")
+			var living := _living_enemies()
+			if living.size() == 1:
+				# Only one possible target — no need to aim. Play it straight away.
+				_play_selected_card(living[0].stats)
+			else:
+				# Multiple targets: drag onto one; right-click cancels.
+				_start_drag(card, event)
+				_update_card_highlights()
+				_log("Drag onto an enemy, or right-click to cancel...")
 
 
 func _play_selected_card(target: CombatantStats) -> void:
@@ -1058,10 +1219,33 @@ func _start_drag(card: CardData, event: InputEvent) -> void:
 	panel.modulate = Color(1.3, 1.3, 1.0, 0.9)
 	_drag_panel = panel
 
+	# Aim line from the card's origin up to the cursor, so it's unambiguous what the
+	# player is pulling toward. It brightens to a "confirm" red over a valid enemy.
+	_drag_origin = start_pos + panel.size / 2.0
+	_drag_line = Line2D.new()
+	_drag_line.width = 4.0
+	_drag_line.default_color = Color(0.9, 0.85, 0.5, 0.6)
+	_drag_line.z_index = 34
+	_drag_line.add_point(_drag_origin)
+	_drag_line.add_point(_drag_origin)
+	add_child(_drag_line)
+
+	# Right-click cancel affordance, following the cursor.
+	_drag_hint = Label.new()
+	_drag_hint.text = "⊘ right-click to cancel"
+	_drag_hint.add_theme_font_size_override("font_size", 14)
+	_drag_hint.add_theme_color_override("font_color", Color(0.95, 0.72, 0.72))
+	_drag_hint.add_theme_constant_override("outline_size", 4)
+	_drag_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	_drag_hint.z_index = 41
+	_drag_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_drag_hint)
+
 
 func _complete_drag(drop_pos: Vector2) -> void:
 	if not _dragging_card or not _drag_panel:
 		return
+	_clear_drag_visuals()
 	var card = _dragging_card
 	var target_enemy: EnemyCombatState = null
 	for enemy in combat_engine.enemies:
@@ -1095,11 +1279,60 @@ func _complete_drag(drop_pos: Vector2) -> void:
 
 
 func _cancel_drag() -> void:
+	_clear_drag_visuals()
 	if _drag_panel:
 		_drag_panel.queue_free()
 	_dragging_card = null
 	_drag_panel = null
 	_refresh_ui()
+
+
+func _clear_drag_visuals() -> void:
+	if _drag_line:
+		_drag_line.queue_free()
+		_drag_line = null
+	if _drag_hint:
+		_drag_hint.queue_free()
+		_drag_hint = null
+
+
+## The living enemy whose panel is under the given screen position, or null.
+func _enemy_at(pos: Vector2) -> EnemyCombatState:
+	for enemy in combat_engine.enemies:
+		if enemy.stats.is_dead():
+			continue
+		var epanel: PanelContainer = enemy_nodes.get(enemy)
+		if epanel and Rect2(epanel.global_position, epanel.size).has_point(pos):
+			return enemy
+	return null
+
+
+func _living_enemies() -> Array:
+	var out := []
+	for enemy in combat_engine.enemies:
+		if not enemy.stats.is_dead():
+			out.append(enemy)
+	return out
+
+
+## During a drag, tint the enemy currently under the cursor so the player can see
+## exactly who they are about to hit. Reset on the next hand/enemy rebuild.
+## Also live-updates the dragged card's damage bracket against that enemy, so
+## target-side modifiers (Vulnerable ×1.5, composing with Weak) show the real
+## number the moment the card is over them, and revert when it's pulled away.
+func _update_drag_target_highlight(pos: Vector2) -> void:
+	var hovered_enemy := _enemy_at(pos)
+	for enemy in combat_engine.enemies:
+		var epanel: PanelContainer = enemy_nodes.get(enemy)
+		if not epanel:
+			continue
+		epanel.modulate = Color(1.4, 1.2, 0.6) if enemy == hovered_enemy else Color.WHITE
+
+	if _drag_panel and _dragging_card and combat_engine.player_stats:
+		var desc_lbl: Label = _drag_panel.find_child("CardDesc", true, false)
+		if desc_lbl:
+			var target_stats = hovered_enemy.stats if hovered_enemy else null
+			desc_lbl.text = _dragging_card.get_modified_description(combat_engine.player_stats, target_stats)
 
 
 # ============================================================
@@ -1109,6 +1342,10 @@ func _cancel_drag() -> void:
 func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(220, 220)
+	# Size to content instead of stretching to fill the tall enemy area, so the
+	# card border ends near its content and leaves a clean gap above the player
+	# readout — that gap is where the turn banner sits (see _show_turn_banner).
+	panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.2, 0.15, 0.25)
@@ -1211,13 +1448,14 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	block_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hp_vbox.add_child(block_lbl)
 
-	var status_lbl = Label.new()
-	status_lbl.name = "Statuses"
-	status_lbl.add_theme_font_size_override("font_size", 13)
-	status_lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.6))
-	status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	hp_vbox.add_child(status_lbl)
+	# Enemy statuses as the same hover-describable chips as the player's, centered
+	# and wrapping under the HP bar.
+	var status_chips = HFlowContainer.new()
+	status_chips.name = "Statuses"
+	status_chips.alignment = FlowContainer.ALIGNMENT_CENTER
+	status_chips.add_theme_constant_override("h_separation", 5)
+	status_chips.add_theme_constant_override("v_separation", 4)
+	hp_vbox.add_child(status_chips)
 
 	# Spacer between HP and intent
 	var hp_intent_spacer = Control.new()
@@ -1239,12 +1477,29 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	intent_panel.add_theme_stylebox_override("panel", intent_style)
 	vbox.add_child(intent_panel)
 
+	# PanelContainer only renders one child, so the current/next intent labels
+	# live inside a VBox to stack vertically.
+	var intent_vbox = VBoxContainer.new()
+	intent_vbox.name = "IntentVBox"
+	intent_vbox.add_theme_constant_override("separation", 2)
+	intent_panel.add_child(intent_vbox)
+
 	var intent_lbl = Label.new()
 	intent_lbl.name = "Intent"
 	intent_lbl.add_theme_font_size_override("font_size", 16)
 	intent_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.5))
 	intent_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intent_panel.add_child(intent_lbl)
+	intent_vbox.add_child(intent_lbl)
+
+	# Sight mode peek — only rendered when player has Excalibur in Sight mode.
+	# Sits below the current intent in a dimmer color: "Then: <move>".
+	var next_intent_lbl = Label.new()
+	next_intent_lbl.name = "NextIntent"
+	next_intent_lbl.add_theme_font_size_override("font_size", 12)
+	next_intent_lbl.add_theme_color_override("font_color", Color(0.65, 0.55, 0.8))
+	next_intent_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	next_intent_lbl.visible = false
+	intent_vbox.add_child(next_intent_lbl)
 
 	# Click to target
 	panel.gui_input.connect(_on_enemy_input.bind(enemy))
@@ -1273,18 +1528,85 @@ func _on_enemy_input(event: InputEvent, enemy: EnemyCombatState) -> void:
 		_play_selected_card(enemy.stats)
 
 
+## True if an enemy move pushes the player's Passion — a flat PassionEffect (Whisper,
+## Hollowing Gaze) or the Prophet's multiplicative PassionCenterEffect. Drives the
+## dedicated passion intent glyph so identity attacks read differently from HP/stat ones.
+func _intent_affects_passion(move: EnemyMove) -> bool:
+	for e in move.effects:
+		if e is PassionEffect or e is PassionCenterEffect:
+			return true
+	return false
+
+
+## Short readout for a passion intent: the signed shift for a flat drain, or a
+## "toward center" note for the Prophet's multiplicative pull.
+func _passion_intent_readout(move: EnemyMove) -> String:
+	for e in move.effects:
+		if e is PassionEffect:
+			return " Passion %d" % e.value
+		if e is PassionCenterEffect:
+			return " Passion → center"
+	return " Passion"
+
+
+## Short single-line summary of an EnemyMove for the Sight-mode "Then:" preview.
+## Strips the modifier-aware bracket form used in current-intent rendering —
+## the next move hasn't resolved yet, so showing modified values is misleading.
+func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String:
+	var icon := "•"
+	var value_str := ""
+	match move.intent_type:
+		EnemyMove.IntentType.ATTACK:
+			icon = "⚔"
+			for effect in move.effects:
+				if effect is DamageEffect:
+					value_str = " %d" % effect.value
+					break
+		EnemyMove.IntentType.DEFEND:
+			icon = "◆"
+		EnemyMove.IntentType.ATTACK_DEBUFF:
+			icon = "⚔☠"
+			for effect in move.effects:
+				if effect is DamageEffect:
+					value_str = " %d" % effect.value
+					break
+		EnemyMove.IntentType.DEBUFF:
+			icon = "☠"
+			for effect in move.effects:
+				if effect is StatusApplyEffect:
+					value_str = " %s" % effect.status_effect.effect_name
+					break
+		EnemyMove.IntentType.BUFF:
+			icon = "★"
+			for effect in move.effects:
+				if effect is StatusApplyEffect:
+					value_str = " %s" % effect.status_effect.effect_name
+					break
+		EnemyMove.IntentType.UNKNOWN:
+			icon = "?"
+	# Name first, then the icon+value readout (kept inline for the compact "Then:" peek).
+	return "%s %s%s" % [move.move_name, icon, value_str]
+
+
 func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 	var panel: PanelContainer = enemy_nodes.get(enemy)
 	if not panel:
+		return
+	# A dead enemy's panel belongs to _animate_enemy_death (fade + shrink + remove).
+	# Never touch it here — otherwise each refresh resets its modulate/HP bar and the
+	# corpse flickers back to life or churns size as more cards are played.
+	if enemy.stats.is_dead():
 		return
 
 	var vbox = panel.get_child(0)
 	var hp_panel: PanelContainer = vbox.get_node("HPPanel")
 	var hp_vbox = hp_panel.get_child(0)
 	var block_lbl: Label = hp_vbox.get_node("Block")
-	var status_lbl: Label = hp_vbox.get_node("Statuses")
+	var status_chips: HFlowContainer = hp_vbox.get_node("Statuses")
 	var intent_panel: PanelContainer = vbox.get_node("IntentPanel")
-	var intent_lbl: Label = intent_panel.get_node("Intent")
+	var intent_vbox: VBoxContainer = intent_panel.get_node("IntentVBox")
+	var intent_lbl: Label = intent_vbox.get_node("Intent")
+	var next_intent_lbl: Label = intent_vbox.get_node("NextIntent")
 
 	var hp_container = hp_vbox.get_node_or_null("HPBarContainer")
 	if hp_container:
@@ -1309,9 +1631,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 		block_lbl.text = ""
 		block_lbl.visible = false
 
-	status_lbl.text = _format_statuses(enemy.stats)
-	status_lbl.tooltip_text = _format_status_tooltips(enemy.stats)
-	status_lbl.visible = status_lbl.text != ""
+	_populate_status_chips(status_chips, enemy.stats)
 
 	if enemy.current_intent:
 		var icon := ""
@@ -1358,10 +1678,29 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 					if effect is StatusApplyEffect:
 						value_str = " %s" % effect.status_effect.effect_name
 						break
+		# Passion pressure is its own threat category — an attack on your identity, not
+		# your HP or your stats. Override the generic (usually DEBUFF) readout with a
+		# distinct spark glyph + violet color so it reads as a different kind of threat.
+		if _intent_affects_passion(enemy.current_intent):
+			icon = "✧"
+			intent_color = Color(0.66, 0.52, 0.96)
+			value_str = _passion_intent_readout(enemy.current_intent)
 		intent_lbl.add_theme_color_override("font_color", intent_color)
-		intent_lbl.text = "%s %s%s" % [icon, enemy.current_intent.move_name, value_str]
+		# Move name on top (flavor), the icon+value readout on its own line below, so
+		# the number never reads as part of the name ("Vanguard Strike 7" -> variant 7).
+		intent_lbl.text = "%s\n%s%s" % [enemy.current_intent.move_name, icon, value_str]
 	else:
 		intent_lbl.text = ""
+
+	# Sight mode: render the next-turn intent below the current one. Hidden when
+	# the player doesn't hold Excalibur or has it set to Sword mode.
+	var sight_active = RunManager.has_excalibur() \
+		and RunManager.excalibur_mode == RunManager.ExcaliburMode.SIGHT
+	if sight_active and enemy.next_intent and not enemy.stats.is_dead():
+		next_intent_lbl.text = "Then: %s" % _format_intent_preview(enemy.next_intent, enemy)
+		next_intent_lbl.visible = true
+	else:
+		next_intent_lbl.visible = false
 
 	panel.modulate = Color(0.4, 0.4, 0.4, 0.5) if enemy.stats.is_dead() else Color.WHITE
 
@@ -1399,8 +1738,11 @@ func _refresh_ui() -> void:
 	else:
 		passion_label.text = "Passion: --"
 
-	player_status_label.text = _format_statuses(combat_engine.player_stats)
-	player_status_label.tooltip_text = _format_status_tooltips(combat_engine.player_stats)
+	_populate_status_chips(player_status_chips, combat_engine.player_stats)
+	player_status_prefix.visible = player_status_chips.get_child_count() > 0
+
+	_populate_power_chips(player_powers_chips, combat_engine.player_stats)
+	player_powers_prefix.visible = player_powers_chips.get_child_count() > 0
 
 	# Piles
 	draw_label.text = "Draw: %d" % combat_engine.piles.draw_pile.size()
@@ -1443,22 +1785,99 @@ func _refresh_ui() -> void:
 # COMBAT LOG
 # ============================================================
 
-func _format_statuses(stats: CombatantStats) -> String:
-	var parts: PackedStringArray = []
-	for effect in stats.statuses:
-		var stacks = stats.statuses[effect]
-		if stacks > 0:
-			parts.append("%s(%d)" % [effect.effect_name, stacks])
-	return "  ".join(parts)
+# Small glyphs for statuses that have an obvious, well-supported symbol; the rest
+# rely on the name + buff/debuff coloring. Kept to glyphs the game font already
+# renders elsewhere (☠ ❄).
+const STATUS_ICONS := {
+	"Poison": "☠",
+	"Frozen": "❄",
+}
 
 
-func _format_status_tooltips(stats: CombatantStats) -> String:
-	var lines: PackedStringArray = []
+## Rebuilds `container` with one hover-describable chip per active status on `stats`.
+## Replaces the old single merged label so each effect can be inspected on its own.
+func _populate_status_chips(container: Node, stats: CombatantStats) -> void:
+	for child in container.get_children():
+		child.queue_free()
 	for effect in stats.statuses:
-		var stacks = stats.statuses[effect]
+		var stacks: int = stats.statuses[effect]
 		if stacks > 0:
-			lines.append("%s (%d): %s" % [effect.effect_name, stacks, effect.description])
-	return "\n".join(lines) if lines.size() > 0 else ""
+			container.add_child(_make_status_chip(effect, stacks))
+
+
+## Rebuilds `container` with one chip per active character POWER. Distinct gold look
+## from the status chips so persistent powers read apart from transient combat state.
+func _populate_power_chips(container: Node, stats: CombatantStats) -> void:
+	for child in container.get_children():
+		child.queue_free()
+	for power in stats.powers:
+		var stacks: int = stats.powers[power]
+		if stacks > 0:
+			container.add_child(_make_power_chip(power, stacks))
+
+
+func _make_power_chip(power: PowerData, stacks: int) -> PanelContainer:
+	var chip = PanelContainer.new()
+	var accent := Color(0.92, 0.78, 0.38)  # heraldic gold — the "power" color
+	var style = StyleBoxFlat.new()
+	style.set_corner_radius_all(6)
+	style.set_border_width_all(2)
+	style.border_color = accent
+	style.bg_color = accent.darkened(0.68)
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 3
+	style.content_margin_bottom = 3
+	chip.add_theme_stylebox_override("panel", style)
+
+	var lbl = Label.new()
+	lbl.text = ("✦ %s ×%d" % [power.power_name, stacks]) if stacks > 1 else ("✦ %s" % power.power_name)
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", accent.lightened(0.5))
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(lbl)
+
+	chip.tooltip_text = "%s  (Power ×%d)\n%s" % [power.power_name, stacks, power.description]
+	chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	chip.mouse_entered.connect(func(): chip.modulate = Color(1.25, 1.25, 1.25))
+	chip.mouse_exited.connect(func(): chip.modulate = Color.WHITE)
+	return chip
+
+
+## One status chip: name (+ optional glyph) and stack count, tinted green for buffs
+## and red for debuffs, with a rich tooltip (kind · stacks, what it does, how it
+## fades) and a subtle hover-highlight so it reads as inspectable.
+func _make_status_chip(effect: StatusEffectData, stacks: int) -> PanelContainer:
+	var chip = PanelContainer.new()
+	var accent := Color(0.4, 0.75, 0.45) if effect.is_buff else Color(0.82, 0.4, 0.4)
+	var style = StyleBoxFlat.new()
+	style.set_corner_radius_all(6)
+	style.set_border_width_all(1)
+	style.border_color = accent.darkened(0.1)
+	style.bg_color = accent.darkened(0.72)
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 3
+	style.content_margin_bottom = 3
+	chip.add_theme_stylebox_override("panel", style)
+
+	var lbl = Label.new()
+	var glyph: String = STATUS_ICONS.get(effect.effect_name, "")
+	lbl.text = ("%s %s %d" % [glyph, effect.effect_name, stacks]) if glyph != "" \
+		else ("%s %d" % [effect.effect_name, stacks])
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", accent.lightened(0.45))
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(lbl)
+
+	chip.tooltip_text = "%s  (%d) · %s\n%s\n%s" % [
+		effect.effect_name, stacks, effect.kind_label(),
+		effect.description, effect.decay_note()]
+	chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# Subtle hover pop so it reads as individually inspectable.
+	chip.mouse_entered.connect(func(): chip.modulate = Color(1.25, 1.25, 1.25))
+	chip.mouse_exited.connect(func(): chip.modulate = Color.WHITE)
+	return chip
 
 
 func _log(msg: String) -> void:
@@ -1506,18 +1925,77 @@ func _on_player_turn_started() -> void:
 func _on_enemy_turn_started() -> void:
 	_log("[color=orange]--- Enemy Turn ---[/color]")
 	_show_turn_banner("Enemy Turn", Color(0.9, 0.4, 0.3))
-	for enemy in combat_engine.enemies:
-		if not enemy.stats.is_dead() and enemy.current_intent:
-			_log("%s uses [color=white]%s[/color]!" % [
-				enemy.enemy_data.enemy_name, enemy.current_intent.move_name])
+	# Per-enemy "X uses Y" is announced as each one acts, in _on_enemy_action_started.
 	_refresh_ui()
 
 
+## Each enemy's beat: announce the move, lunge the model, then (0.35s later, from the
+## engine) the effect lands. Makes the enemy turn play out readably.
+func _on_enemy_action_started(enemy, move) -> void:
+	if enemy == null or move == null:
+		return
+	_log("%s uses [color=white]%s[/color]!" % [enemy.enemy_data.enemy_name, move.move_name])
+	var epanel: Control = enemy_nodes.get(enemy)
+	if epanel:
+		# Wind-up lunge: a quick scale punch (works inside the enemy container, which
+		# manages position/size but not scale).
+		epanel.pivot_offset = epanel.size / 2.0
+		var t = create_tween()
+		t.tween_property(epanel, "scale", Vector2(1.12, 1.12), 0.16) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(epanel, "scale", Vector2(1.0, 1.0), 0.20).set_trans(Tween.TRANS_QUAD)
+		_float_move_callout(epanel, move.move_name)
+
+
+## A Frozen enemy forfeits its turn. Mirror the move-callout beat with a "Frozen!"
+## float and a soft blue shiver so the skip reads clearly instead of a silent gap.
+func _on_enemy_stunned(enemy) -> void:
+	if enemy == null:
+		return
+	_log("%s is [color=aqua]Frozen[/color] and skips its turn." % enemy.enemy_data.enemy_name)
+	var epanel: Control = enemy_nodes.get(enemy)
+	if epanel:
+		epanel.pivot_offset = epanel.size / 2.0
+		var t = create_tween()
+		t.tween_property(epanel, "modulate", Color(0.6, 0.85, 1.15, 1.0), 0.18)
+		t.tween_property(epanel, "modulate", Color(1, 1, 1, 1.0), 0.35)
+		_float_move_callout(epanel, "Frozen!")
+
+
+## Floats the move name up above the enemy and fades it — the visible "X uses Y" beat.
+func _float_move_callout(epanel: Control, text: String) -> void:
+	var lbl = Label.new()
+	lbl.text = text
+	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+	lbl.add_theme_constant_override("outline_size", 5)
+	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	lbl.z_index = 45
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(lbl)
+	var start := epanel.global_position + Vector2(epanel.size.x / 2.0 - text.length() * 5.5, -6)
+	lbl.global_position = start
+	var t = create_tween()
+	t.set_parallel(true)
+	t.tween_property(lbl, "global_position:y", start.y - 42, 0.9).set_ease(Tween.EASE_OUT)
+	t.tween_property(lbl, "modulate:a", 0.0, 0.9).set_delay(0.35)
+	t.chain().tween_callback(lbl.queue_free)
+
+
 func _on_player_damaged(amount: int, new_hp: int) -> void:
+	if amount <= 0:
+		# The attack was fully absorbed by block — no HP lost. Give a soft "absorbed"
+		# cue (blue, no screen shake) instead of the misleading red damage flash.
+		_log("[color=aqua]Absorbed.[/color]")
+		_flash_absorb_overlay()
+		_refresh_ui()
+		return
 	_log("[color=red]You take %d damage! (HP: %d)[/color]" % [amount, new_hp])
 	RunManager.run_stats["damage_taken"] = RunManager.run_stats.get("damage_taken", 0) + amount
-	_screen_shake(10.0, 0.25)
-	_flash_damage_overlay()
+	# Scale the reaction to the hit so a chip reads differently from a haymaker.
+	var mag := clampf(float(amount) / 18.0, 0.4, 1.6)
+	_screen_shake(10.0 * mag, 0.25)
+	_flash_damage_overlay(mag)
 	_refresh_ui()
 
 
@@ -1535,6 +2013,65 @@ func _on_enemy_died(enemy) -> void:
 	RunManager.run_stats["enemies_killed"] = RunManager.run_stats.get("enemies_killed", 0) + 1
 	_animate_enemy_death(enemy)
 	_refresh_ui()
+
+
+## A multi-phase boss crossed into a new phase: its bar refilled and its moveset
+## swapped. Flash the model, float a speech bubble with the transition line, and
+## refresh so the new HP bar + intent read immediately.
+func _on_enemy_phase_changed(enemy, _phase_index: int, line: String) -> void:
+	_log("[color=violet]%s changes![/color]" % enemy.enemy_data.enemy_name)
+	var panel: Control = enemy_nodes.get(enemy)
+	if panel:
+		panel.pivot_offset = panel.size / 2.0
+		var t = create_tween()
+		t.tween_property(panel, "modulate", Color(1.4, 0.7, 1.4, 1.0), 0.15)
+		t.tween_property(panel, "modulate", Color(1, 1, 1, 1.0), 0.4)
+		_screen_shake(8.0, 0.3)
+		if line != "":
+			_show_enemy_speech(panel, line)
+	_refresh_ui()
+
+
+## A transient speech bubble anchored above an enemy's model — used for boss
+## phase-transition lines. Auto-fades so it never blocks the board for long.
+func _show_enemy_speech(panel: Control, text: String) -> void:
+	var bubble := PanelContainer.new()
+	bubble.z_index = 60
+	bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.08, 0.14, 0.96)
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(2)
+	style.border_color = Color(0.75, 0.55, 0.95)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	bubble.add_theme_stylebox_override("panel", style)
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	lbl.custom_minimum_size.x = 320
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 17)
+	lbl.add_theme_color_override("font_color", Color(0.93, 0.88, 0.98))
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bubble.add_child(lbl)
+	add_child(bubble)
+	# Anchor above the model, kept on-screen.
+	await get_tree().process_frame  # let the bubble size itself before positioning
+	if not is_instance_valid(bubble) or not is_instance_valid(panel):
+		if is_instance_valid(bubble):
+			bubble.queue_free()
+		return
+	var target := panel.global_position + Vector2(panel.size.x / 2.0 - bubble.size.x / 2.0, -bubble.size.y - 12)
+	bubble.global_position = Vector2(clampf(target.x, 10, 1920 - bubble.size.x - 10), maxf(10, target.y))
+	bubble.modulate.a = 0.0
+	var t := create_tween()
+	t.tween_property(bubble, "modulate:a", 1.0, 0.25)
+	t.tween_interval(2.8)
+	t.tween_property(bubble, "modulate:a", 0.0, 0.5)
+	t.tween_callback(bubble.queue_free)
 
 
 func _on_block_gained(target, amount: int) -> void:
@@ -1587,14 +2124,22 @@ func _show_turn_banner(text: String, color: Color) -> void:
 	var banner = Label.new()
 	banner.text = text
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner.add_theme_font_size_override("font_size", 36)
+	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	banner.add_theme_font_size_override("font_size", 34)
 	banner.add_theme_color_override("font_color", color)
 	banner.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	banner.add_theme_constant_override("outline_size", 6)
-	banner.set_anchors_preset(Control.PRESET_CENTER)
-	banner.modulate.a = 0.0
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.z_index = 20
-	banner.position.y = -20
+	# Full width so the text is truly screen-centered, placed in the gap between the
+	# (now shorter) enemy cards and the player readout — computed, not hardcoded.
+	banner.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	var gap_y := enemy_container.global_position.y + enemy_container.size.y - 50
+	banner.offset_left = 0
+	banner.offset_right = 0
+	banner.offset_top = gap_y
+	banner.offset_bottom = gap_y + 46
+	banner.modulate.a = 0.0
 	add_child(banner)
 	var t = create_tween()
 	t.tween_property(banner, "modulate:a", 1.0, 0.15)
@@ -1667,8 +2212,41 @@ func _on_combat_lost() -> void:
 func _on_end_turn_pressed() -> void:
 	if combat_engine.phase == CombatEngine.Phase.PLAYER_TURN:
 		AudioManager.play_sfx("button_click")
+		if _dragging_card:
+			_cancel_drag()
 		selected_card = null
+		_animate_hand_discard()
 		combat_engine.end_player_turn()
+
+
+## Flies the non-retained hand cards to the discard-pile indicator (a quick fading,
+## shrinking stagger) so the end-of-turn discard reads as intentional instead of the
+## hand popping empty during the (now paced) enemy turn. The panels are reparented
+## out of the hand first so the imminent _refresh_ui hand rebuild can't free them
+## mid-flight; retained cards are left in hand.
+func _animate_hand_discard() -> void:
+	var target := discard_label.global_position + discard_label.size / 2.0
+	var i := 0
+	for card in card_nodes.keys():
+		if card.retain:
+			continue
+		var panel: Control = card_nodes[card]
+		if not is_instance_valid(panel):
+			continue
+		var start_pos: Vector2 = panel.global_position
+		panel.get_parent().remove_child(panel)
+		add_child(panel)
+		panel.global_position = start_pos
+		panel.z_index = 25
+		panel.pivot_offset = panel.size / 2.0
+		var delay := i * 0.035
+		var t = create_tween().set_parallel(true)
+		t.tween_property(panel, "global_position", target, 0.32).set_delay(delay) \
+			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		t.tween_property(panel, "scale", Vector2(0.25, 0.25), 0.32).set_delay(delay)
+		t.tween_property(panel, "modulate:a", 0.0, 0.26).set_delay(delay + 0.08)
+		t.chain().tween_callback(panel.queue_free)
+		i += 1
 
 
 func _show_continue_button(text: String, callback: Callable) -> void:
@@ -1682,6 +2260,12 @@ func _show_continue_button(text: String, callback: Callable) -> void:
 
 
 func _on_continue_pressed() -> void:
+	# The Sword-in-the-Stone guardian fight skips the normal reward — victory routes
+	# to the "beast unmade" beat, which grants Excalibur itself.
+	if RunManager.pending_guardian_fight:
+		RunManager.pending_guardian_fight = false
+		SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
+		return
 	if RunManager.pending_relic_reward:
 		# Check if relics are actually available before showing relic screen
 		var owned = RunManager.get_owned_relic_names()
@@ -1812,7 +2396,7 @@ func _show_card_hover(card: CardData, source_panel: PanelContainer) -> void:
 		CardData.CardType.POWER:
 			art_s.bg_color = Color(0.35, 0.28, 0.06)
 	art.add_theme_stylebox_override("panel", art_s)
-	var icon_file2 = CARD_ICONS.get(card.card_name, "")
+	var icon_file2 = CardVisuals.icon_path(card.card_name)
 	if icon_file2 != "":
 		var art_icon = TextureRect.new()
 		art_icon.texture = load(icon_file2)
@@ -1843,6 +2427,16 @@ func _show_card_hover(card: CardData, source_panel: PanelContainer) -> void:
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(desc)
+
+	# Optional flavor text (hover popup uses larger font for legibility)
+	if card.flavor_text != "":
+		var flavor = Label.new()
+		flavor.text = card.flavor_text
+		flavor.add_theme_font_size_override("font_size", 13)
+		flavor.add_theme_color_override("font_color", Color(0.65, 0.6, 0.54))
+		flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		flavor.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(flavor)
 
 	# Exhaust tag
 	if card.exhaust:
@@ -1914,12 +2508,24 @@ func _spawn_victory_particles() -> void:
 # DAMAGE FLASH
 # ============================================================
 
-func _flash_damage_overlay() -> void:
+func _flash_damage_overlay(intensity: float = 1.0) -> void:
 	if not _damage_flash:
 		return
-	_damage_flash.color.a = 0.35
+	_damage_flash.color = Color(0.8, 0.05, 0.05, clampf(0.35 * intensity, 0.12, 0.55))
 	var t = create_tween()
 	t.tween_property(_damage_flash, "color:a", 0.0, 0.3).set_ease(Tween.EASE_OUT)
+
+
+## Soft blue "absorbed" pulse for a fully-blocked hit — distinct from the red
+## damage flash, and no screen shake, so block reads as safe rather than as a hit.
+func _flash_absorb_overlay() -> void:
+	if not _damage_flash:
+		return
+	_damage_flash.color = Color(0.3, 0.6, 0.95, 0.16)
+	var t = create_tween()
+	t.tween_property(_damage_flash, "color:a", 0.0, 0.25).set_ease(Tween.EASE_OUT)
+	# Restore the red base so the next real hit flashes red, not blue.
+	t.tween_callback(func(): _damage_flash.color = Color(0.8, 0.05, 0.05, 0.0))
 
 
 # ============================================================
@@ -1947,11 +2553,16 @@ func _animate_enemy_death(enemy: EnemyCombatState) -> void:
 		t.tween_property(p, "position", target_pos, randf_range(0.4, 0.8)).set_ease(Tween.EASE_OUT)
 		t.tween_property(p, "modulate:a", 0.0, 0.6).set_delay(0.2)
 		t.chain().tween_callback(p.queue_free)
-	# Fade and shrink the enemy panel
+	# Fade and shrink the panel, then remove it cleanly. Detach it from enemy_nodes
+	# up front so any refresh in the same frame can't re-touch the corpse, and free it
+	# once the animation ends so it never lingers to skew multi-enemy layout.
 	panel.pivot_offset = panel.size / 2.0
-	var t = create_tween().set_parallel(true)
+	enemy_nodes.erase(enemy)
+	var t = create_tween()
+	t.set_parallel(true)
 	t.tween_property(panel, "modulate:a", 0.0, 0.5)
 	t.tween_property(panel, "scale", Vector2(0.3, 0.3), 0.5).set_ease(Tween.EASE_IN)
+	t.chain().tween_callback(panel.queue_free)
 
 
 # ============================================================

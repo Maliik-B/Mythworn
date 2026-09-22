@@ -6,7 +6,6 @@ Story choices shape gameplay. A passion system shifts characters between dual pe
 
 ![Godot 4.4](https://img.shields.io/badge/Godot-4.4-478CBF?logo=godotengine&logoColor=white)
 ![GDScript](https://img.shields.io/badge/GDScript-478CBF?logo=godotengine&logoColor=white)
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
 ---
 
@@ -112,14 +111,16 @@ docs/            Game design doc, architecture rationale, implementation guide
 
 ## Status
 
-**Early development -- core scaffolding.**
+**Systems complete; in content + polish toward a commercial Steam release.**
 
-The full gameplay loop is functional: title > character select > map navigation > combat > rewards > shop > rest > events > boss > act transitions > victory. One playable character (Emo Hybrid Caster) with 34+ cards, 18 relics, and 8 narrative events. Audio, visual polish, and UX are in place.
+The full gameplay loop is functional: title > character select > map navigation > combat > rewards > shop > rest > events > boss > act transitions > victory. One complete character (Emo Hybrid Caster) with 34+ cards, 18 relics, and 8 narrative events. Audio, visual polish, and UX are in place.
 
-Still ahead: two additional characters, narrative content (visual novel segments, realm configuration), balance tuning, perks system UI, and real art/audio assets.
+**Release plan (Steam):** a free **Demo** (a tight Camelot + Emo Hybrid slice, the Steam Next Fest vehicle) converts to a paid **1.0** launch (3 realms: Camelot, Yggdrasil, Journey to the West; 2 characters: Emo Hybrid + Hotheaded Mage).
+
+Still ahead for 1.0: the second character (Hotheaded Mage), the Yggdrasil and Journey to the West realm content, balance tuning, perks UI, and commissioned art (the Steam capsule + a handful of VN illustration panels — see `docs/ART_PIPELINE.md`).
 
 ---
 
 ## License
 
-[MIT](LICENSE)
+All rights reserved. Versions published before November 2026 were under the MIT License; see [LICENSE](LICENSE).

@@ -54,8 +54,14 @@ func discard_card(card: CardData) -> void:
 
 
 func discard_hand() -> void:
-	discard_pile.append_array(hand)
-	hand.clear()
+	# Retained cards persist into the next turn; everything else goes to discard.
+	var kept: Array[CardData] = []
+	for card in hand:
+		if card.retain:
+			kept.append(card)
+		else:
+			discard_pile.append(card)
+	hand.assign(kept)
 
 
 func exhaust_card(card: CardData) -> void:
@@ -67,3 +73,18 @@ func reshuffle_discard_into_draw() -> void:
 	draw_pile.append_array(discard_pile)
 	discard_pile.clear()
 	shuffle_draw_pile()
+
+
+## Shuffles a card into the draw pile at a random position (deterministic via
+## deck_rng). Used by enemies that pollute your deck mid-combat (Realm Shade's
+## Corruption). The card is per-combat only; it never touches the run deck.
+func add_card_to_draw(card: CardData) -> void:
+	var pos = RngManager.deck_rng.randi_range(0, draw_pile.size())
+	draw_pile.insert(pos, card)
+
+
+## Drops a card onto the discard pile. Used by Anger-style self-replication
+## (Inner Fire): the fresh copy waits in discard until the next reshuffle rather
+## than immediately re-entering the draw pile.
+func add_card_to_discard(card: CardData) -> void:
+	discard_pile.append(card)

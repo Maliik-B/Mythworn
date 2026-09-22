@@ -7,6 +7,10 @@ const NODE_SPACING_X := 130
 const NODE_SPACING_Y := 90
 const MAP_MARGIN_X := 80
 const MAP_MARGIN_Y := 60
+# Extra top margin so the top row (boss) never rides up under the realm sigil /
+# legend / act title, and stays out of the darkest top-of-map effects. The
+# always-readable header text tolerates the effects; the node icons should not.
+const MAP_MARGIN_TOP := 165
 const NODE_SIZE := 50
 
 # UI references
@@ -18,15 +22,19 @@ var gold_label: Label
 var passion_label: Label
 var relic_btn: Button
 var deck_btn: Button
+var titles_btn: Button
+var excalibur_btn: Button  # Only visible when player holds Excalibur (Camelot quest reward)
 var timer_label: Label
 var seed_label: Label
 var info_label: Label
 var popup_overlay: PanelContainer
+var card_detail_overlay: Control
 
 
 var _timer_accum := 0.0
 var _pulse_time := 0.0
 var _available_nodes: Array = []
+var _map_x_offset := 0.0  # horizontal centering shift for the node graph
 
 func _ready() -> void:
 	if not RunManager.run_active:
@@ -34,7 +42,8 @@ func _ready() -> void:
 		RunManager.start_run(character)
 
 	if not RunManager.current_map:
-		RunManager.current_map = MapGenerator.generate(RngManager.map_rng)
+		RunManager.current_map = MapGenerator.generate(RngManager.map_rng,
+			RunManager.current_realm_id, RunManager.current_act)
 
 	_build_ui()
 	_create_map_display()
@@ -42,6 +51,536 @@ func _ready() -> void:
 	_update_bottom_bar()
 	_scroll_to_player.call_deferred()
 	AudioManager.play_music("map")
+
+	# Refresh the bottom bar's title counter when titles change while on the map.
+	# (The popup that announces a new title fires from this scene, so we need
+	# to react locally rather than waiting for a scene reload.)
+	Events.title_earned.connect(_on_title_state_changed_locally)
+	Events.title_equipped.connect(_on_title_state_changed_locally)
+
+
+func _on_title_state_changed_locally(_a = null, _b = null, _c = null) -> void:
+	# Variadic shim — the two signals have different signatures.
+	_update_bottom_bar()
+
+
+## Builds the realm header that floats above the map scroll area. Has a vertical
+## fade-out gradient so map nodes scrolling underneath remain partially visible.
+## Mouse input passes through so the player can still click nodes behind the
+## header without scrolling them out from under it.
+func _build_floating_header(realm_name: String, realm_tagline: String,
+		accent: Color, sigil_path: String) -> void:
+	const HEADER_HEIGHT := 160
+	const SIGIL_SIZE := 140
+
+	# Outer container — anchored to the top, no input capture.
+	var header = Control.new()
+	header.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	header.offset_bottom = HEADER_HEIGHT
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(header)
+
+	# Gradient backdrop — opaque at top, transparent at bottom.
+	var grad = ColorRect.new()
+	grad.set_anchors_preset(Control.PRESET_FULL_RECT)
+	grad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat = ShaderMaterial.new()
+	var shader = Shader.new()
+	shader.code = """
+shader_type canvas_item;
+uniform vec4 base : source_color = vec4(0.06, 0.05, 0.10, 1.0);
+void fragment() {
+	// Solid in the top ~50%, smooth fade to transparent across the bottom.
+	float alpha = 1.0 - smoothstep(0.45, 1.0, UV.y);
+	COLOR = vec4(base.rgb, alpha * 0.92);
+}
+"""
+	mat.shader = shader
+	grad.material = mat
+	# Blend a touch of realm accent into the base so the header reads as part of the realm.
+	var header_base := Color(0.06, 0.05, 0.10).lerp(accent, 0.18).darkened(0.35)
+	mat.set_shader_parameter("base", Vector4(header_base.r, header_base.g, header_base.b, 1.0))
+	header.add_child(grad)
+
+	# Realm sigil — corner badge in the top-left. Only rendered if the realm
+	# has authored sigil art; absent for stub realms.
+	if sigil_path != "" and ResourceLoader.exists(sigil_path):
+		var sigil_tex: Texture2D = load(sigil_path)
+		if sigil_tex:
+			var sigil = TextureRect.new()
+			sigil.texture = sigil_tex
+			sigil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			sigil.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			sigil.custom_minimum_size = Vector2(SIGIL_SIZE, SIGIL_SIZE)
+			sigil.size = Vector2(SIGIL_SIZE, SIGIL_SIZE)
+			sigil.position = Vector2(28, 12)
+			sigil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			header.add_child(sigil)
+
+	# Content (text labels + legend), positioned with a top inset.
+	var inset = MarginContainer.new()
+	inset.set_anchors_preset(Control.PRESET_FULL_RECT)
+	inset.add_theme_constant_override("margin_left", 20)
+	inset.add_theme_constant_override("margin_right", 20)
+	inset.add_theme_constant_override("margin_top", 10)
+	inset.add_theme_constant_override("margin_bottom", 12)
+	inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(inset)
+
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_BEGIN
+	vbox.add_theme_constant_override("separation", 2)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inset.add_child(vbox)
+
+	if realm_name != "":
+		var realm_lbl = Label.new()
+		realm_lbl.text = realm_name
+		realm_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		realm_lbl.add_theme_font_size_override("font_size", 32)
+		realm_lbl.add_theme_color_override("font_color", accent.lightened(0.15))
+		realm_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(realm_lbl)
+
+		if realm_tagline != "":
+			var tagline_lbl = Label.new()
+			tagline_lbl.text = realm_tagline
+			tagline_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			tagline_lbl.add_theme_font_size_override("font_size", 12)
+			tagline_lbl.add_theme_color_override("font_color", Color(0.6, 0.58, 0.55))
+			tagline_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			vbox.add_child(tagline_lbl)
+
+	# Act / boss line, paired with the hover info label
+	var boss_names = {1: "Sir Caedmon", 2: "Hollow Warden", 3: "Fable's End"}
+	var boss_name = boss_names.get(RunManager.current_act, "???")
+	var title = Label.new()
+	title.text = "Act %d  —  %s" % [RunManager.current_act, boss_name]
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(title)
+
+	info_label = Label.new()
+	info_label.text = "Choose your path"
+	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	info_label.add_theme_font_size_override("font_size", 14)
+	info_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	info_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(info_label)
+
+	# Legend
+	var legend = HBoxContainer.new()
+	legend.alignment = BoxContainer.ALIGNMENT_CENTER
+	legend.add_theme_constant_override("separation", 18)
+	legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(legend)
+
+	var legend_types = [
+		[MapNode.NodeType.COMBAT, "Combat"],
+		[MapNode.NodeType.ELITE, "Elite"],
+		[MapNode.NodeType.REST, "Rest"],
+		[MapNode.NodeType.SHOP, "Shop"],
+		[MapNode.NodeType.EVENT, "Event"],
+		[MapNode.NodeType.MYSTERY, "Mystery"],
+		[MapNode.NodeType.BOSS, "Boss"],
+	]
+	for entry in legend_types:
+		var lbl = Label.new()
+		lbl.text = "%s %s" % [MapNode.type_label(entry[0]), entry[1]]
+		lbl.add_theme_font_size_override("font_size", 13)
+		lbl.add_theme_color_override("font_color", MapNode.type_color(entry[0]))
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		legend.add_child(lbl)
+
+
+## Renders a sky body (moon, aurora) in the upper portion of the screen.
+## Sits between the realm motif and the drift particles in the layer stack —
+## visible behind the map nodes but in front of the base bg.
+func _add_sky_body(kind: int, _accent: Color) -> void:
+	if kind == RealmData.SkyBody.NONE:
+		return
+
+	var realm: RealmData = RunManager.get_current_realm()
+	var act: int = RunManager.current_act
+
+	# MOON uses a generated texture (guaranteed round disc, modulate for tint).
+	# AURORA stays as an animated shader since the wave motion is its identity.
+	if kind == RealmData.SkyBody.MOON:
+		var moon_tint := Color(0.92, 0.95, 0.88, 1.0)
+		if realm:
+			moon_tint = realm.get_sky_body_color_for_act(act)
+		var tex = _make_moon_texture(160)
+		var moon = TextureRect.new()
+		moon.texture = tex
+		moon.modulate = moon_tint
+		moon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		moon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		moon.custom_minimum_size = Vector2(160, 160)
+		moon.size = Vector2(160, 160)
+		moon.position = Vector2(1500, 100)  # upper-right area
+		moon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(moon)
+		return
+
+	# AURORA — shader-driven animated bands
+	var sky = ColorRect.new()
+	sky.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	sky.offset_bottom = 540
+	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat = ShaderMaterial.new()
+	var shader = Shader.new()
+
+	match kind:
+		RealmData.SkyBody.AURORA:
+			# Wavy color bands across the upper sky — two bands of customizable
+			# color so we can shift them per act (peaceful green/violet for
+			# Act 1, deeper for Act 2, blood-red for Act 3).
+			shader.code = """
+shader_type canvas_item;
+uniform float time_scale = 0.10;
+uniform vec4 band_color_lower : source_color = vec4(0.30, 0.85, 0.55, 1.0);
+uniform vec4 band_color_upper : source_color = vec4(0.55, 0.40, 0.85, 1.0);
+uniform float intensity = 0.55;
+void fragment() {
+	vec2 uv = UV;
+	float t = TIME * time_scale;
+	float w1 = 0.55 + sin(uv.x * 6.0 + t * 0.8) * 0.06
+	             + sin(uv.x * 13.0 + t * 1.6) * 0.025;
+	float band1 = exp(-pow((uv.y - w1) * 12.0, 2.0));
+	float w2 = 0.32 + sin(uv.x * 5.0 - t * 1.2) * 0.08
+	             + sin(uv.x * 11.0 + t * 0.7) * 0.03;
+	float band2 = exp(-pow((uv.y - w2) * 14.0, 2.0));
+	vec3 col = band_color_lower.rgb * band1 + band_color_upper.rgb * band2;
+	float a = (band1 + band2 * 0.85) * intensity;
+	a *= smoothstep(0.0, 0.18, uv.y);
+	COLOR = vec4(col, a);
+}
+"""
+		_:
+			return
+
+	mat.shader = shader
+	# AURORA — apply per-act color shift
+	if kind == RealmData.SkyBody.AURORA and realm:
+		var aurora_lower = realm.get_aurora_lower_for_act(act)
+		var aurora_upper = realm.get_aurora_upper_for_act(act)
+		mat.set_shader_parameter("band_color_lower",
+				Vector4(aurora_lower.r, aurora_lower.g, aurora_lower.b, 1.0))
+		mat.set_shader_parameter("band_color_upper",
+				Vector4(aurora_upper.r, aurora_upper.g, aurora_upper.b, 1.0))
+	sky.material = mat
+	add_child(sky)
+
+
+## Builds a soft circular moon texture (white + halo) at the given pixel radius.
+## The TextureRect using it gets tinted via `modulate` for per-realm color.
+func _make_moon_texture(radius_px: int) -> Texture2D:
+	var s := radius_px * 2 + 80  # extra padding for halo
+	var img := Image.create(s, s, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var cx := s / 2.0
+	var cy := s / 2.0
+	# Core radius in pixels
+	var core_r := float(radius_px) * 0.42
+	var halo_r := float(radius_px)
+	for y in range(s):
+		for x in range(s):
+			var dx := x - cx
+			var dy := y - cy
+			var d := sqrt(dx * dx + dy * dy)
+			# Core disc — soft round edge
+			var disc_t := clampf((core_r * 1.15 - d) / (core_r * 0.30), 0.0, 1.0)
+			# Halo — wide soft falloff
+			var halo_t := clampf((halo_r - d) / (halo_r * 0.55), 0.0, 1.0)
+			halo_t = halo_t * halo_t  # ease toward edge
+			var a := maxf(disc_t * 0.95, halo_t * 0.22)
+			if a > 0.0:
+				img.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	return ImageTexture.create_from_image(img)
+
+
+## Adds ambient drift particles matching the realm's atmosphere.
+## Two layered emitters per realm for depth — small fast "far" particles and
+## larger slow "near" particles. Sits above the horizon, below the map nodes.
+func _add_drift_particles(kind: int, _accent: Color) -> void:
+	if kind == RealmData.DriftKind.NONE:
+		return
+
+	# Tunables per drift kind. (color, alpha, size_min, size_max, count_near,
+	# count_far, vel_y_near, vel_y_far, vel_x_jitter, lifetime)
+	# Counts and sizes increased after first pass — particles need to read as
+	# ambient atmosphere, not isolated stars.
+	var spec: Dictionary
+	match kind:
+		RealmData.DriftKind.DUST:
+			# Warm dawn/dusk fireflies drifting slowly upward — sparse, glowing, and
+			# twinkling, for that golden-hour-with-fireflies feeling. Fewer + bigger +
+			# brighter than dust so each reads as a distinct point of light.
+			spec = {
+				"color": Color(0.99, 0.83, 0.42),
+				"alpha": 0.62,
+				"size_min": 3.5, "size_max": 8.5,
+				"count_near": 42, "count_far": 66,
+				"vel_y_near": -11.0, "vel_y_far": -5.0,
+				"vel_x_jitter": 16.0,
+				"lifetime": 16.0,
+				"shape": "circle",
+				"twinkle": true,
+			}
+		RealmData.DriftKind.SNOW:
+			# Pale snowflakes falling slowly — cold mountain air
+			# Smaller max size than v1 so they read as distant snowfall rather
+			# than huge bokeh blobs.
+			spec = {
+				"color": Color(0.92, 0.95, 1.0),
+				"alpha": 0.65,
+				"size_min": 3.0, "size_max": 7.0,
+				"count_near": 110, "count_far": 180,
+				"vel_y_near": 32.0, "vel_y_far": 16.0,
+				"vel_x_jitter": 18.0,
+				"lifetime": 14.0,
+				"shape": "circle",
+			}
+		RealmData.DriftKind.MIST:
+			# Pale jade cloud wisps drifting horizontally — mountain mist
+			spec = {
+				"color": Color(0.82, 0.92, 0.85),
+				"alpha": 0.35,
+				"size_min": 24.0, "size_max": 60.0,
+				"count_near": 18, "count_far": 32,
+				"vel_y_near": 2.0, "vel_y_far": 1.0,
+				"vel_x_jitter": 60.0,
+				"lifetime": 28.0,
+				"shape": "wisp",
+			}
+		RealmData.DriftKind.LANTERN:
+			# Warm red-orange lantern lights drifting slowly upward — a sense
+			# of nearby festival or pilgrims carrying lights. Pairs with MIST.
+			spec = {
+				"color": Color(0.95, 0.55, 0.30),
+				"alpha": 0.70,
+				"size_min": 4.0, "size_max": 9.0,
+				"count_near": 18, "count_far": 25,
+				"vel_y_near": -10.0, "vel_y_far": -5.0,
+				"vel_x_jitter": 8.0,
+				"lifetime": 16.0,
+				"shape": "circle",
+			}
+		RealmData.DriftKind.SPIRIT_WISP:
+			# Pale icy-blue spirit-wisps drifting slowly upward — Norse
+			# will-o'-the-wisp / ancestor-light. Pairs with SNOW.
+			spec = {
+				"color": Color(0.75, 0.90, 1.0),
+				"alpha": 0.55,
+				"size_min": 5.0, "size_max": 11.0,
+				"count_near": 14, "count_far": 22,
+				"vel_y_near": -8.0, "vel_y_far": -4.0,
+				"vel_x_jitter": 10.0,
+				"lifetime": 18.0,
+				"shape": "circle",
+			}
+		_:
+			return
+
+	# Two layers for parallax depth — far (small, faint, slower) then near (larger, brighter)
+	add_child(_make_drift_emitter(spec, false))
+	add_child(_make_drift_emitter(spec, true))
+
+
+## Build a single GPUParticles2D emitter for one drift layer (near or far).
+## Positioned at viewport center so the EMISSION_SHAPE_BOX covers the whole screen.
+func _make_drift_emitter(spec: Dictionary, near: bool) -> GPUParticles2D:
+	var emitter = GPUParticles2D.new()
+	# GPUParticles2D is a Node2D, not a Control — use position, not anchors.
+	# Place the emitter at the viewport center so the emission box (extents
+	# 960x540) covers the full 1920x1080 viewport.
+	emitter.position = Vector2(960, 540)
+	emitter.amount = spec["count_near"] if near else spec["count_far"]
+	emitter.lifetime = spec["lifetime"]
+	emitter.preprocess = spec["lifetime"]  # spawn particles already aged so the screen isn't empty at scene-load
+	emitter.visibility_rect = Rect2(-960, -540, 1920, 1080)  # local space; emitter is at viewport center
+
+	var mat = ParticleProcessMaterial.new()
+	# Emit randomly across the full viewport — emission box in LOCAL space,
+	# centered on the emitter position.
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	mat.emission_box_extents = Vector3(960, 540, 0)
+
+	var vel_y: float = spec["vel_y_near"] if near else spec["vel_y_far"]
+	var vx_jit: float = spec["vel_x_jitter"]
+	mat.direction = Vector3(0, sign(vel_y), 0) if vel_y != 0.0 else Vector3(1, 0, 0)
+	mat.initial_velocity_min = abs(vel_y) * 0.7
+	mat.initial_velocity_max = abs(vel_y) * 1.3
+	mat.spread = 25.0  # cone width around the direction
+	mat.gravity = Vector3(0, 0, 0)
+	mat.linear_accel_min = 0.0
+	mat.linear_accel_max = 0.0
+	# Horizontal jitter via tangential acceleration
+	mat.tangential_accel_min = -vx_jit
+	mat.tangential_accel_max = vx_jit
+
+	# Particle scale (size in pixels)
+	var size_min: float = spec["size_min"] * (1.0 if near else 0.55)
+	var size_max: float = spec["size_max"] * (1.0 if near else 0.55)
+	mat.scale_min = size_min / 8.0  # divided by texture base size
+	mat.scale_max = size_max / 8.0
+
+	# Color + alpha (with simple alpha curve so particles fade in/out)
+	var col: Color = spec["color"]
+	var alpha_mult := 0.6 if not near else 1.0
+	col.a = spec["alpha"] * alpha_mult
+	mat.color = col
+	var alpha_curve := Curve.new()
+	if spec.get("twinkle", false):
+		# Firefly blink: fade in, pulse a few times over the life, fade out.
+		alpha_curve.add_point(Vector2(0.0, 0.0))
+		alpha_curve.add_point(Vector2(0.12, 1.0))
+		alpha_curve.add_point(Vector2(0.28, 0.32))
+		alpha_curve.add_point(Vector2(0.45, 1.0))
+		alpha_curve.add_point(Vector2(0.62, 0.28))
+		alpha_curve.add_point(Vector2(0.80, 1.0))
+		alpha_curve.add_point(Vector2(1.0, 0.0))
+	else:
+		alpha_curve.add_point(Vector2(0.0, 0.0))
+		alpha_curve.add_point(Vector2(0.15, 1.0))
+		alpha_curve.add_point(Vector2(0.85, 1.0))
+		alpha_curve.add_point(Vector2(1.0, 0.0))
+	var alpha_tex := CurveTexture.new()
+	alpha_tex.curve = alpha_curve
+	mat.alpha_curve = alpha_tex
+
+	emitter.process_material = mat
+	emitter.texture = _make_drift_texture(spec)
+	# Don't capture mouse — ambient layer only
+	# (GPUParticles2D doesn't take input by default, but if wrapped in CanvasItem this matters)
+	return emitter
+
+
+## Build a small white texture for the drift particle.
+## - "circle": soft round dot
+## - "wisp": elongated horizontal soft ellipse
+func _make_drift_texture(spec: Dictionary) -> Texture2D:
+	var w := 32
+	var h := 32 if spec.get("shape", "circle") == "circle" else 16
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var cx := w / 2.0
+	var cy := h / 2.0
+	var max_r := minf(cx, cy)
+	for y in range(h):
+		for x in range(w):
+			var dx := (x - cx) / max_r
+			var dy := (y - cy) / max_r
+			if spec.get("shape", "circle") == "wisp":
+				# Stretch horizontally — squash y in the distance calc
+				dy *= 2.5
+			var d := sqrt(dx * dx + dy * dy)
+			if d > 1.0:
+				continue
+			var a := smoothstep(1.0, 0.0, d)
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	return ImageTexture.create_from_image(img)
+
+
+## Adds a subtle full-screen motif overlay based on the realm's visual style.
+## Each style uses a small shader fragment for the pattern; all sit at low alpha
+## so the map's nodes and connections stay the visual focus.
+func _add_realm_motif(style: int, accent: Color) -> void:
+	var shader_code: String = ""
+	match style:
+		RealmData.VisualStyle.HERALDIC:
+			# Faint diagonal chevron bands — knightly heraldry. Kept subtle and cleared
+			# from the top so it never competes with the legend / act title, and tinted
+			# gold (below) rather than the loud red act accent.
+			shader_code = """
+shader_type canvas_item;
+uniform vec4 tint : source_color = vec4(1.0);
+void fragment() {
+	vec2 uv = UV;
+	float band = abs(fract((uv.x + uv.y) * 5.0) - 0.5);
+	float chevron = smoothstep(0.44, 0.5, band);
+	float top_clear = smoothstep(0.16, 0.36, uv.y);
+	float depth = 0.55 + 0.45 * uv.y;
+	COLOR = vec4(tint.rgb, chevron * 0.045 * top_clear * depth);
+}
+"""
+		RealmData.VisualStyle.RUNIC:
+			# Faint runic rings — much more subtle than v1 so they don't compete
+			# with the actual map nodes (which are also circles). Larger cell
+			# size = fewer rings overall, and lower alpha so they read as
+			# subtle background texture rather than UI elements.
+			shader_code = """
+shader_type canvas_item;
+uniform vec4 tint : source_color = vec4(1.0);
+void fragment() {
+	vec2 uv = UV * vec2(5.0, 3.0);
+	vec2 cell = fract(uv) - 0.5;
+	float d = length(cell);
+	float ring = smoothstep(0.38, 0.40, d) - smoothstep(0.42, 0.44, d);
+	// Concentrate in the upper half so the bottom (horizon area) stays clean
+	float fade = 0.6 * smoothstep(1.0, 0.0, UV.y);
+	COLOR = vec4(tint.rgb, ring * 0.06 * fade);
+}
+"""
+		RealmData.VisualStyle.SCROLL:
+			# Horizontal scroll-paper striations.
+			shader_code = """
+shader_type canvas_item;
+uniform vec4 tint : source_color = vec4(1.0);
+void fragment() {
+	vec2 uv = UV;
+	float wave = sin(uv.y * 40.0 + uv.x * 1.5) * 0.5 + 0.5;
+	float stripe = smoothstep(0.7, 1.0, wave);
+	float fade = 0.4 + 0.6 * (1.0 - abs(uv.y - 0.5) * 1.4);
+	COLOR = vec4(tint.rgb, stripe * 0.06 * fade);
+}
+"""
+		_:
+			# NEUTRAL or unknown — no motif. Leaving the layer absent keeps
+			# the cost at zero and the look clean.
+			return
+
+	var motif = ColorRect.new()
+	motif.set_anchors_preset(Control.PRESET_FULL_RECT)
+	motif.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat = ShaderMaterial.new()
+	var shader = Shader.new()
+	shader.code = shader_code
+	mat.shader = shader
+	# Motif follows the realm accent, which now ramps gold -> crimson -> blood per act,
+	# so the faint heraldry warms in peace and reddens under strife on its own.
+	mat.set_shader_parameter("tint", Vector4(accent.r, accent.g, accent.b, 1.0))
+	motif.material = mat
+	add_child(motif)
+
+
+## A warm dawn glow rising from the horizon — "the coming of day." Sits behind the
+## castle silhouette so the skyline is backlit, and warms toward the right where the
+## light source sits. Gives the map a golden-hour dawn/dusk mood.
+func _add_dawn_glow(accent: Color) -> void:
+	var glow = ColorRect.new()
+	glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat = ShaderMaterial.new()
+	var shader = Shader.new()
+	shader.code = """
+shader_type canvas_item;
+uniform vec4 warm : source_color = vec4(1.0);
+void fragment() {
+	float up = smoothstep(0.0, 0.9, UV.y);   // 0 at top -> 1 at the horizon (bottom)
+	float side = mix(1.0, 0.5, UV.x);          // warmer toward the left (sun rising, opposite the moon)
+	float g = pow(up, 1.7) * side;
+	COLOR = vec4(warm.rgb, g * 0.30);
+}
+"""
+	mat.shader = shader
+	# Warm amber dawn light, nudged toward the realm accent so it stays "of this place."
+	var dawn := Color(0.99, 0.66, 0.30).lerp(accent, 0.22)
+	mat.set_shader_parameter("warm", Vector4(dawn.r, dawn.g, dawn.b, 1.0))
+	glow.material = mat
+	add_child(glow)
 
 
 func _process(delta: float) -> void:
@@ -64,101 +603,150 @@ func _process(delta: float) -> void:
 # ============================================================
 
 func _build_ui() -> void:
+	# Pull realm theming if available — fall back to neutral palette if not.
+	# Accent is act-aware so the realm sky shifts as the run progresses (Act 1
+	# warm dusk → Act 2 deeper night → Act 3 corrupted/dramatic).
+	var realm: RealmData = RunManager.get_current_realm()
+	var accent: Color = Color(0.55, 0.5, 0.4)
+	var visual_style: int = RealmData.VisualStyle.NEUTRAL
+	var realm_name: String = ""
+	var realm_tagline: String = ""
+	if realm:
+		accent = realm.get_accent_for_act(RunManager.current_act)
+		visual_style = realm.visual_style
+		realm_name = realm.display_name
+		realm_tagline = realm.theme_description
+
+	# Base background — neutral dark mixed lightly with the realm accent.
+	# Subtle enough that gameplay nodes stay readable, distinct enough that
+	# you know which realm you're in at a glance.
 	var bg = ColorRect.new()
-	bg.color = Color(0.07, 0.06, 0.15)
+	bg.color = Color(0.07, 0.06, 0.15).lerp(accent, 0.14).darkened(0.45)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	# Vignette
+	# Realm motif overlay — drawn by a shader so it scales cleanly and needs
+	# no image assets. Patterns differ per visual style.
+	_add_realm_motif(visual_style, accent)
+	# Camelot leans into a dawn/dusk mood: a warm glow rising behind the skyline.
+	if visual_style == RealmData.VisualStyle.HERALDIC:
+		_add_dawn_glow(accent)
+
+	# Horizon silhouette — wide painted-in-Cairo strip anchored to the bottom
+	# of the screen. Gives the map real depth (castle skyline / mountain peaks
+	# receding into haze) instead of just flat tinted color.
+	# The horizon spans 500px from the bottom, so the silhouette occupies the
+	# lower third of the viewport — enough to read as a landscape, low enough
+	# that the map nodes mostly sit ABOVE it rather than overlapping.
+	# Stretches to viewport width to avoid black bars.
+	if realm and realm.horizon_path != "" and ResourceLoader.exists(realm.horizon_path):
+		var horizon_tex: Texture2D = load(realm.horizon_path)
+		if horizon_tex:
+			var horizon = TextureRect.new()
+			horizon.texture = horizon_tex
+			horizon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			horizon.stretch_mode = TextureRect.STRETCH_SCALE
+			horizon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+			horizon.offset_top = -500
+			horizon.offset_left = 0
+			horizon.offset_right = 0
+			horizon.offset_bottom = -50  # leave the bottom bar visible above the silhouette's foreground
+			horizon.modulate = Color(1.0, 1.0, 1.0, 1.0)
+			horizon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(horizon)
+
+	# Sky body — moon, aurora, etc. Painted in the upper portion of the
+	# screen, behind everything else atmospheric. Sits between the motif and
+	# the drift particles for layered depth.
+	if realm:
+		_add_sky_body(realm.sky_body, accent)
+
+	# Particle drift — ambient motion for the realm (dust, snow, mist, etc.).
+	# Primary layer, then optional secondary (e.g., lanterns pairing with mist).
+	# Sits above the horizon but below the map nodes, low opacity so it
+	# doesn't compete for attention.
+	if realm:
+		_add_drift_particles(realm.drift_kind, accent)
+		if realm.secondary_drift_kind != RealmData.DriftKind.NONE:
+			_add_drift_particles(realm.secondary_drift_kind, accent)
+
+	# Vignette — tinted with a darker version of the realm accent so the edges
+	# read as "of this place" rather than generic black.
 	var vignette = ColorRect.new()
 	vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var mat = ShaderMaterial.new()
 	var shader = Shader.new()
 	shader.code = """
 shader_type canvas_item;
+uniform vec4 tint : source_color = vec4(0.0);
 void fragment() {
 	vec2 uv = UV - 0.5;
 	float dist = length(uv) * 1.4;
 	float vig = smoothstep(0.3, 1.0, dist);
-	COLOR = vec4(0.0, 0.0, 0.0, vig * 0.5);
+	COLOR = vec4(tint.rgb, vig * 0.6);
 }
 """
 	mat.shader = shader
 	vignette.material = mat
+	var vignette_tint := accent.darkened(0.85)
+	mat.set_shader_parameter("tint", Vector4(vignette_tint.r, vignette_tint.g, vignette_tint.b, 1.0))
 	add_child(vignette)
 
-	var vbox = VBoxContainer.new()
-	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var margin = MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", 15)
-	margin.add_theme_constant_override("margin_bottom", 15)
-	add_child(margin)
-	margin.add_child(vbox)
+	# Bottom bar — anchored to the bottom of the screen. Built first so we know
+	# how much vertical space to reserve for the scroll area above it.
+	const BOTTOM_BAR_HEIGHT := 50
+	_build_bottom_bar_anchored(BOTTOM_BAR_HEIGHT)
 
-	# Title
-	var boss_names = {1: "Realm Guardian", 2: "Hollow Warden", 3: "Fable's End"}
-	var boss_name = boss_names.get(RunManager.current_act, "???")
-	var title = Label.new()
-	title.text = "Act %d  —  %s" % [RunManager.current_act, boss_name]
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 28)
-	title.add_theme_color_override("font_color", Color(0.9, 0.8, 0.6))
-	vbox.add_child(title)
-
-	# Info label (shows node info on hover)
-	info_label = Label.new()
-	info_label.text = "Choose your path"
-	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info_label.add_theme_font_size_override("font_size", 18)
-	info_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	vbox.add_child(info_label)
-
-	# Legend
-	var legend = HBoxContainer.new()
-	legend.alignment = BoxContainer.ALIGNMENT_CENTER
-	legend.add_theme_constant_override("separation", 20)
-	vbox.add_child(legend)
-
-	var legend_types = [
-		[MapNode.NodeType.COMBAT, "Combat"],
-		[MapNode.NodeType.ELITE, "Elite"],
-		[MapNode.NodeType.REST, "Rest"],
-		[MapNode.NodeType.SHOP, "Shop"],
-		[MapNode.NodeType.EVENT, "Event"],
-		[MapNode.NodeType.MYSTERY, "Mystery"],
-		[MapNode.NodeType.BOSS, "Boss"],
-	]
-	for entry in legend_types:
-		var lbl = Label.new()
-		lbl.text = "%s %s" % [MapNode.type_label(entry[0]), entry[1]]
-		lbl.add_theme_font_size_override("font_size", 14)
-		lbl.add_theme_color_override("font_color", MapNode.type_color(entry[0]))
-		legend.add_child(lbl)
-
-	# Scroll container for the map
+	# Map scroll area — anchored to fill the whole screen except the bottom bar.
+	# The header floats on TOP of this with a fade-out gradient so map nodes
+	# can scroll all the way to the top of the screen, passing under the header
+	# rather than being cut off by it.
 	scroll_container = ScrollContainer.new()
-	scroll_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll_container.offset_bottom = -BOTTOM_BAR_HEIGHT
 	scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	vbox.add_child(scroll_container)
+	add_child(scroll_container)
 
-	# Map canvas — holds lines and node buttons
 	var map = RunManager.current_map
-	var canvas_w = MAP_MARGIN_X * 2 + (MapGenerator.MAP_WIDTH - 1) * NODE_SPACING_X + NODE_SIZE
-	var canvas_h = MAP_MARGIN_Y * 2 + (map.floor_count - 1) * NODE_SPACING_Y + NODE_SIZE
-
+	var graph_w = MAP_MARGIN_X * 2 + (MapGenerator.MAP_WIDTH - 1) * NODE_SPACING_X + NODE_SIZE
+	var canvas_h = MAP_MARGIN_TOP + MAP_MARGIN_Y + (map.floor_count - 1) * NODE_SPACING_Y + NODE_SIZE
+	# Centre the graph in the viewport instead of hugging the left: the stretch mode
+	# keeps a fixed base-width coordinate space, so shift every node right by half the
+	# slack. Fills the previously-empty right side and puts the boss on screen centre.
+	var viewport_w: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1920)
+	_map_x_offset = maxf(0.0, (viewport_w - graph_w) / 2.0)
 	map_canvas = Control.new()
-	map_canvas.custom_minimum_size = Vector2(canvas_w, canvas_h)
+	map_canvas.custom_minimum_size = Vector2(maxf(graph_w, viewport_w), canvas_h)
 	scroll_container.add_child(map_canvas)
 
-	# Bottom bar
-	_build_bottom_bar(vbox)
+	# Floating header overlay — sits above the scroll area at the top of the
+	# screen with a vertical fade-out gradient. Text is solid at the top, the
+	# bottom edge of the header fades into transparency so map nodes scrolling
+	# behind it remain partially visible. Mouse input passes through so the
+	# player can still click nodes that pass behind the header.
+	var sigil_path: String = realm.sigil_path if realm else ""
+	_build_floating_header(realm_name, realm_tagline, accent, sigil_path)
 
 
+## Anchored variant — attaches the bottom bar to the bottom edge of the screen
+## directly rather than to a parent VBox. Used by the new floating-header layout.
+func _build_bottom_bar_anchored(height: int) -> void:
+	var panel = PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_top = -height
+	add_child(panel)
+	_populate_bottom_bar(panel)
+
+
+## Legacy entry point — kept for any callers that still hand in a VBox parent.
 func _build_bottom_bar(parent: VBoxContainer) -> void:
 	var panel = PanelContainer.new()
+	parent.add_child(panel)
+	_populate_bottom_bar(panel)
+
+
+## Builds the bottom bar's contents into the given PanelContainer.
+func _populate_bottom_bar(panel: PanelContainer) -> void:
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.1, 0.18, 0.9)
 	style.set_corner_radius_all(6)
@@ -167,7 +755,6 @@ func _build_bottom_bar(parent: VBoxContainer) -> void:
 	style.content_margin_top = 10
 	style.content_margin_bottom = 10
 	panel.add_theme_stylebox_override("panel", style)
-	parent.add_child(panel)
 
 	var bar = HBoxContainer.new()
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -207,6 +794,28 @@ func _build_bottom_bar(parent: VBoxContainer) -> void:
 	deck_btn.pressed.connect(_on_deck_clicked)
 	bar.add_child(deck_btn)
 
+	titles_btn = Button.new()
+	titles_btn.flat = true
+	titles_btn.add_theme_font_size_override("font_size", 20)
+	titles_btn.add_theme_color_override("font_color", Color(0.9, 0.8, 0.45))
+	titles_btn.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.6))
+	titles_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	titles_btn.pressed.connect(_on_titles_clicked)
+	bar.add_child(titles_btn)
+
+	# Excalibur mode toggle — only shown when the player holds Excalibur.
+	# Gold styling matches the Sword in the Stone node color so it reads as
+	# "this is the Camelot quest reward you're managing."
+	excalibur_btn = Button.new()
+	excalibur_btn.flat = true
+	excalibur_btn.add_theme_font_size_override("font_size", 20)
+	excalibur_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35))
+	excalibur_btn.add_theme_color_override("font_hover_color", Color(1.0, 0.95, 0.55))
+	excalibur_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	excalibur_btn.pressed.connect(_on_excalibur_toggle_clicked)
+	excalibur_btn.visible = false
+	bar.add_child(excalibur_btn)
+
 	timer_label = Label.new()
 	timer_label.add_theme_font_size_override("font_size", 18)
 	timer_label.add_theme_color_override("font_color", Color(0.55, 0.55, 0.55))
@@ -228,8 +837,28 @@ func _update_bottom_bar() -> void:
 
 	relic_btn.text = "Relics: %d" % RunManager.relics.size()
 	deck_btn.text = "Deck: %d" % RunManager.current_deck.size()
+	# Filled/total title SLOTS (not equipped/earned, which read like a progress bar).
+	# The click-through popup shows the full earned list + which are equipped.
+	titles_btn.text = "Titles: %d/%d slots" % [
+		_count_equipped_titles(), RunManager.active_title_slots.size()]
+
+	if RunManager.has_excalibur():
+		excalibur_btn.visible = true
+		var mode_label := "⚔ Sword" if RunManager.excalibur_mode == RunManager.ExcaliburMode.SWORD else "◉ Sight"
+		excalibur_btn.text = "Excalibur: %s" % mode_label
+		excalibur_btn.tooltip_text = ("Click to toggle. Sword adds a power card to each combat;"
+			+ " Sight reveals enemy intent one turn ahead.")
+	else:
+		excalibur_btn.visible = false
+
 	timer_label.text = RunManager.get_run_time_string()
 	seed_label.text = "Seed: %d" % RngManager.run_seed
+
+
+func _on_excalibur_toggle_clicked() -> void:
+	AudioManager.play_sfx("button_click")
+	RunManager.toggle_excalibur_mode()
+	_update_bottom_bar()
 
 
 # ============================================================
@@ -250,6 +879,182 @@ func _on_deck_clicked() -> void:
 		popup_overlay = null
 		return
 	_show_deck_popup()
+
+
+func _on_titles_clicked() -> void:
+	if popup_overlay:
+		popup_overlay.queue_free()
+		popup_overlay = null
+		return
+	_show_titles_popup()
+
+
+## Counts how many of the two title slots have a title equipped (0-2).
+func _count_equipped_titles() -> int:
+	var n := 0
+	for slot_id in RunManager.active_title_slots:
+		if slot_id != &"":
+			n += 1
+	return n
+
+
+## Build the titles popup: a header summarizing slots + per-slot card showing
+## the equipped title (or "empty slot" placeholder) with its current tier and effect.
+func _show_titles_popup() -> void:
+	var earned_count: int = RunManager.earned_title_ids.size()
+	popup_overlay = _create_popup_panel("Titles (%d/%d slots filled — %d earned)" % [
+		_count_equipped_titles(), RunManager.TITLE_SLOT_COUNT, earned_count])
+	var content: VBoxContainer = popup_overlay.get_meta("content")
+
+	if earned_count == 0:
+		var empty = Label.new()
+		empty.text = "No titles yet. Major decisions in each realm grant titles\nthat shape your reputation and identity."
+		empty.add_theme_font_size_override("font_size", 16)
+		empty.add_theme_color_override("font_color", Color(0.55, 0.55, 0.55))
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		content.add_child(empty)
+		add_child(popup_overlay)
+		return
+
+	# Active slots row
+	var slots_label = Label.new()
+	slots_label.text = "─── Equipped ───"
+	slots_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	slots_label.add_theme_font_size_override("font_size", 14)
+	slots_label.add_theme_color_override("font_color", Color(0.55, 0.5, 0.4))
+	content.add_child(slots_label)
+
+	var slot_row = HBoxContainer.new()
+	slot_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	slot_row.add_theme_constant_override("separation", 16)
+	content.add_child(slot_row)
+
+	for slot in range(RunManager.TITLE_SLOT_COUNT):
+		slot_row.add_child(_build_title_card_for_slot(slot))
+
+	# Earned-but-unequipped section
+	var unequipped: Array = []
+	for id in RunManager.earned_title_ids:
+		if not (id in RunManager.active_title_slots):
+			unequipped.append(id)
+	if unequipped.size() > 0:
+		var divider = Label.new()
+		divider.text = "─── Earned (not equipped) ───"
+		divider.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		divider.add_theme_font_size_override("font_size", 14)
+		divider.add_theme_color_override("font_color", Color(0.55, 0.5, 0.4))
+		content.add_child(divider)
+
+		var bench_row = HBoxContainer.new()
+		bench_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		bench_row.add_theme_constant_override("separation", 12)
+		content.add_child(bench_row)
+
+		for id in unequipped:
+			bench_row.add_child(_build_title_card_for_id(id, false))
+
+	add_child(popup_overlay)
+
+
+## Build a slot display card. Empty slots show a placeholder; filled slots show
+## the equipped title's current tier, description, and an unequip hint.
+func _build_title_card_for_slot(slot: int) -> PanelContainer:
+	var id: StringName = RunManager.active_title_slots[slot]
+	if id == &"":
+		return _build_empty_slot_card(slot)
+	return _build_title_card_for_id(id, true)
+
+
+func _build_empty_slot_card(slot: int) -> PanelContainer:
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(240, 130)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.09, 0.14)
+	style.set_corner_radius_all(6)
+	style.set_border_width_all(2)
+	style.border_color = Color(0.25, 0.22, 0.3)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel.add_child(vbox)
+
+	var slot_label = Label.new()
+	slot_label.text = "Slot %d" % (slot + 1)
+	slot_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	slot_label.add_theme_font_size_override("font_size", 14)
+	slot_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.45))
+	vbox.add_child(slot_label)
+
+	var empty = Label.new()
+	empty.text = "— empty —"
+	empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	empty.add_theme_font_size_override("font_size", 18)
+	empty.add_theme_color_override("font_color", Color(0.35, 0.35, 0.4))
+	vbox.add_child(empty)
+
+	return panel
+
+
+## Build a card showing a title's current tier name, description, and effect value.
+## When `equipped` is true, uses the equipped styling (brighter border, full opacity).
+func _build_title_card_for_id(id: StringName, equipped: bool) -> PanelContainer:
+	var data: TitleData = TitlePool.get_title(id)
+	var tier: TitleData.Tier = RunManager.get_title_tier(id)
+
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(240, 130)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.12, 0.1, 0.18, 1.0 if equipped else 0.7)
+	style.set_corner_radius_all(6)
+	style.set_border_width_all(2 if equipped else 1)
+	style.border_color = data.accent_color if equipped else data.accent_color.darkened(0.4)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	panel.add_child(vbox)
+
+	# Name (uses tier-appropriate name)
+	var name_lbl = Label.new()
+	name_lbl.text = data.get_name_for_tier(tier)
+	name_lbl.add_theme_font_size_override("font_size", 17)
+	name_lbl.add_theme_color_override("font_color", data.accent_color if equipped else data.accent_color.darkened(0.3))
+	vbox.add_child(name_lbl)
+
+	# Tier label (only show for realm titles where tier matters)
+	if data.is_realm_title():
+		var tier_str := ""
+		match tier:
+			TitleData.Tier.ORIGINAL:
+				tier_str = "● ORIGINAL"
+			TitleData.Tier.DEGRADED:
+				tier_str = "○ DEGRADED"
+			TitleData.Tier.RETURNING:
+				tier_str = "◐ RETURNING"
+		var tier_lbl = Label.new()
+		tier_lbl.text = tier_str
+		tier_lbl.add_theme_font_size_override("font_size", 11)
+		tier_lbl.add_theme_color_override("font_color", Color(0.55, 0.5, 0.6))
+		vbox.add_child(tier_lbl)
+
+	# Description (tier-appropriate)
+	var desc_lbl = Label.new()
+	desc_lbl.text = data.get_description_for_tier(tier)
+	desc_lbl.add_theme_font_size_override("font_size", 12)
+	desc_lbl.add_theme_color_override("font_color", Color(0.75, 0.72, 0.68) if equipped else Color(0.5, 0.48, 0.45))
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(desc_lbl)
+
+	return panel
 
 
 func _show_relic_popup() -> void:
@@ -335,6 +1140,16 @@ func _show_deck_popup() -> void:
 	stats_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	content.add_child(stats_lbl)
 
+	# Passion zones — see which of these cards your current Passion is buffing.
+	var passion_btn = Button.new()
+	passion_btn.text = "⚡ Passion Zones"
+	passion_btn.custom_minimum_size = Vector2(220, 40)
+	passion_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	passion_btn.add_theme_font_size_override("font_size", 16)
+	passion_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	passion_btn.pressed.connect(func(): PassionInfographic.open_modal(self))
+	content.add_child(passion_btn)
+
 	# Sort cards by type then name
 	var sorted_deck = RunManager.current_deck.duplicate()
 	sorted_deck.sort_custom(func(a, b):
@@ -399,9 +1214,210 @@ func _show_deck_popup() -> void:
 		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 		vb.add_child(desc_lbl)
 
+		# Click a mini-card to blow it up to full size with an upgrade toggle.
+		_ignore_mouse_recursive(vb)
+		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		panel.gui_input.connect(_on_deck_card_clicked.bind(card))
+
 		grid.add_child(panel)
 
 	add_child(popup_overlay)
+
+
+func _ignore_mouse_recursive(control: Control) -> void:
+	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in control.get_children():
+		if child is Control:
+			_ignore_mouse_recursive(child)
+
+
+func _on_deck_card_clicked(event: InputEvent, card: CardData) -> void:
+	if not (event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	_show_card_detail(card)
+
+
+## Blows a deck card up to a readable full-size render on a dim backdrop. For an
+## un-upgraded card a toggle previews what upgrading would do (green-tinted);
+## an already-upgraded card shows as upgraded with a badge. Rebuilds itself on
+## toggle (show_upgrade), which is simplest and cheap for a single card.
+func _show_card_detail(card: CardData, show_upgrade: bool = false) -> void:
+	if card_detail_overlay:
+		card_detail_overlay.queue_free()
+		card_detail_overlay = null
+
+	var overlay = Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(overlay)
+	card_detail_overlay = overlay
+
+	var dim = ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.78)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_close_card_detail())
+	overlay.add_child(dim)
+
+	# CenterContainer is transparent to picking so clicks off the card hit the dim;
+	# its interactive children (toggle / close) still receive input.
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(center)
+
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 14)
+	center.add_child(vbox)
+
+	var is_upgraded := card.upgraded
+	var display_card := card
+	var green := is_upgraded
+	if not is_upgraded and show_upgrade:
+		display_card = card.duplicate_card()
+		display_card.upgrade_card()
+		green = true
+
+	vbox.add_child(_render_full_card(display_card, green))
+
+	# State caption under the card.
+	var state = Label.new()
+	if is_upgraded:
+		state.text = "✦ Upgraded"
+		state.add_theme_color_override("font_color", Color(0.4, 0.9, 0.45))
+	elif show_upgrade:
+		state.text = "Upgrade preview"
+		state.add_theme_color_override("font_color", Color(0.4, 0.9, 0.45))
+	else:
+		state.text = "Current"
+		state.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	state.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(state)
+
+	# Only un-upgraded cards have a meaningful "other" side to compare against.
+	if not is_upgraded:
+		var toggle = Button.new()
+		toggle.text = "◂ Show Current" if show_upgrade else "Preview Upgrade ▸"
+		toggle.custom_minimum_size = Vector2(220, 42)
+		toggle.add_theme_font_size_override("font_size", 16)
+		toggle.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		toggle.pressed.connect(func(): _show_card_detail(card, not show_upgrade))
+		vbox.add_child(toggle)
+
+	var close = Button.new()
+	close.text = "Close"
+	close.custom_minimum_size = Vector2(160, 40)
+	close.add_theme_font_size_override("font_size", 16)
+	close.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	close.pressed.connect(_close_card_detail)
+	vbox.add_child(close)
+
+
+func _close_card_detail() -> void:
+	if card_detail_overlay:
+		card_detail_overlay.queue_free()
+		card_detail_overlay = null
+
+
+## Full-size, legible render of a single card for the deck detail view. Mirrors
+## the in-combat card layout (cost badge, name, type/rarity, art glyph, text,
+## flavor). `green_tint` marks an upgraded / upgrade-preview card.
+func _render_full_card(card: CardData, green_tint: bool) -> PanelContainer:
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(240, 340)
+
+	var style = StyleBoxFlat.new()
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(3)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	match card.card_type:
+		CardData.CardType.ATTACK:
+			style.bg_color = Color(0.28, 0.1, 0.08)
+			style.border_color = Color(0.8, 0.2, 0.18)
+		CardData.CardType.SKILL:
+			style.bg_color = Color(0.08, 0.12, 0.28)
+			style.border_color = Color(0.2, 0.38, 0.8)
+		CardData.CardType.POWER:
+			style.bg_color = Color(0.28, 0.24, 0.08)
+			style.border_color = Color(0.8, 0.65, 0.15)
+	if green_tint:
+		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.55)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vb = VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	panel.add_child(vb)
+
+	var cost_lbl = Label.new()
+	cost_lbl.text = "%d ◆" % card.energy_cost
+	cost_lbl.add_theme_font_size_override("font_size", 22)
+	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
+	vb.add_child(cost_lbl)
+
+	var name_lbl = Label.new()
+	name_lbl.text = card.card_name
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_lbl.add_theme_font_size_override("font_size", 24)
+	name_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.4))
+	vb.add_child(name_lbl)
+
+	var type_names = ["Attack", "Skill", "Power"]
+	var rarity_names = ["Starter", "Common", "Uncommon", "Rare"]
+	var type_lbl = Label.new()
+	type_lbl.text = "%s - %s" % [type_names[card.card_type], rarity_names[card.rarity]]
+	type_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	type_lbl.add_theme_font_size_override("font_size", 13)
+	type_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	vb.add_child(type_lbl)
+
+	# Art glyph frame — type-colored, matching the combat placeholder language.
+	var art_frame = PanelContainer.new()
+	art_frame.custom_minimum_size = Vector2(0, 90)
+	var art_style = StyleBoxFlat.new()
+	art_style.set_corner_radius_all(6)
+	art_style.bg_color = style.bg_color.lightened(0.06)
+	art_style.set_border_width_all(1)
+	art_style.border_color = style.border_color.darkened(0.2)
+	art_frame.add_theme_stylebox_override("panel", art_style)
+	var art_lbl = Label.new()
+	match card.card_type:
+		CardData.CardType.ATTACK: art_lbl.text = "⚔"
+		CardData.CardType.SKILL: art_lbl.text = "◆"
+		CardData.CardType.POWER: art_lbl.text = "★"
+	art_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	art_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	art_lbl.add_theme_font_size_override("font_size", 40)
+	art_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.3))
+	art_frame.add_child(art_lbl)
+	vb.add_child(art_frame)
+
+	var desc_lbl = Label.new()
+	desc_lbl.text = card.get_generated_description()
+	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_lbl.add_theme_font_size_override("font_size", 16)
+	desc_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vb.add_child(desc_lbl)
+
+	if card.flavor_text != "":
+		var flavor_lbl = Label.new()
+		flavor_lbl.text = card.flavor_text
+		flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		flavor_lbl.add_theme_font_size_override("font_size", 12)
+		flavor_lbl.add_theme_color_override("font_color", Color(0.62, 0.58, 0.52))
+		flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vb.add_child(flavor_lbl)
+
+	return panel
 
 
 func _create_popup_panel(title: String) -> PanelContainer:
@@ -457,10 +1473,11 @@ func _create_popup_panel(title: String) -> PanelContainer:
 # ============================================================
 
 func _get_node_center(node: MapNode) -> Vector2:
-	# Floor 0 at bottom, boss at top
+	# Floor 0 at bottom, boss at top. x_jitter/y_jitter are cosmetic sub-cell
+	# offsets from the generator so the graph reads as organic, not a lattice.
 	var map = RunManager.current_map
-	var x = MAP_MARGIN_X + node.column * NODE_SPACING_X + NODE_SIZE / 2.0
-	var y = MAP_MARGIN_Y + (map.floor_count - 1 - node.floor_num) * NODE_SPACING_Y + NODE_SIZE / 2.0
+	var x = _map_x_offset + MAP_MARGIN_X + (node.column + node.x_jitter) * NODE_SPACING_X + NODE_SIZE / 2.0
+	var y = MAP_MARGIN_TOP + (map.floor_count - 1 - node.floor_num + node.y_jitter) * NODE_SPACING_Y + NODE_SIZE / 2.0
 	return Vector2(x, y)
 
 
@@ -511,6 +1528,34 @@ func _create_node_button(node: MapNode) -> Button:
 	var pressed_style = style.duplicate()
 	pressed_style.bg_color = MapNode.type_color(node.node_type).darkened(0.6)
 
+	# The Sword in the Stone is the signature quest node — make it louder than a
+	# regular map dot: bigger glyph, thicker and brighter gold ring. (It also gets
+	# the availability pulse from _process, so no competing tween here.)
+	if node.node_type == MapNode.NodeType.SWORD_IN_STONE:
+		btn.add_theme_font_size_override("font_size", 30)
+		var gold := MapNode.type_color(node.node_type)
+		style.bg_color = gold.darkened(0.35)
+		style.set_border_width_all(5)
+		style.border_color = gold.lightened(0.25)
+		hover_style.bg_color = gold.darkened(0.15)
+		hover_style.set_border_width_all(5)
+		hover_style.border_color = gold.lightened(0.4)
+		pressed_style.set_border_width_all(5)
+
+	# The boss is the act's threat — bold, vivid, and resilient to the map's darkening
+	# effects (bright bg + thick bright border) so it always reads even in the dim
+	# upper map. Its locked-state dimming is also softened in _update_node_states.
+	if node.node_type == MapNode.NodeType.BOSS:
+		btn.add_theme_font_size_override("font_size", 32)
+		var bc := MapNode.type_color(node.node_type)
+		style.bg_color = bc.darkened(0.15)
+		style.set_border_width_all(5)
+		style.border_color = bc.lightened(0.35)
+		hover_style.bg_color = bc.darkened(0.0)
+		hover_style.set_border_width_all(5)
+		hover_style.border_color = bc.lightened(0.5)
+		pressed_style.set_border_width_all(5)
+
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", hover_style)
 	btn.add_theme_stylebox_override("pressed", pressed_style)
@@ -526,6 +1571,7 @@ func _create_node_button(node: MapNode) -> Button:
 		MapNode.NodeType.EVENT: "A narrative encounter with choices",
 		MapNode.NodeType.MYSTERY: "Unknown — could be anything",
 		MapNode.NodeType.BOSS: "Defeat the act boss to advance",
+		MapNode.NodeType.SWORD_IN_STONE: "An ancient blade waits in stone…",
 	}
 	btn.tooltip_text = tooltip_map.get(node.node_type, "")
 
@@ -553,10 +1599,19 @@ func _update_node_states() -> void:
 			btn.modulate = Color.WHITE
 			btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		elif node.visited:
-			btn.modulate = Color(0.5, 0.5, 0.5, 0.7)
+			# Dimmed but mostly opaque so the icon reads against the warm bg (was too
+			# transparent and clashed with the background colour).
+			btn.modulate = Color(0.55, 0.55, 0.55, 0.92)
 			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		else:
-			btn.modulate = Color(0.3, 0.3, 0.3, 0.5)
+			# Landmark nodes (boss, the Sword) stay bright even when locked so they
+			# survive the map's darkening effects and always read; ordinary future
+			# nodes dim to show they're out of reach.
+			if node.node_type == MapNode.NodeType.BOSS \
+					or node.node_type == MapNode.NodeType.SWORD_IN_STONE:
+				btn.modulate = Color(0.9, 0.9, 0.9, 1.0)
+			else:
+				btn.modulate = Color(0.42, 0.42, 0.42, 0.85)
 			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
 
 
@@ -576,7 +1631,7 @@ func _on_node_hover(node: MapNode) -> void:
 		MapNode.NodeType.ELITE:
 			info_label.text = "Elite Combat — %s (Relic reward)" % floor_str
 		MapNode.NodeType.BOSS:
-			var boss_names = {1: "Realm Guardian", 2: "Hollow Warden", 3: "Fable's End"}
+			var boss_names = {1: "Sir Caedmon", 2: "Hollow Warden", 3: "Fable's End"}
 			var boss_name = boss_names.get(RunManager.current_act, "???")
 			info_label.text = "Boss: %s — %s" % [boss_name, floor_str]
 		MapNode.NodeType.REST:
@@ -602,9 +1657,9 @@ func _enter_node(node: MapNode) -> void:
 
 	match node.node_type:
 		MapNode.NodeType.COMBAT:
-			_start_combat(_combat_encounter(node.floor_num), 10 + node.floor_num * 2)
+			_start_combat(_combat_encounter(node.floor_num), 16 + node.floor_num * 2)
 		MapNode.NodeType.ELITE:
-			_start_combat(_elite_encounter(), 25 + node.floor_num * 2, true, false)
+			_start_combat(_elite_encounter(), 34 + node.floor_num * 2, true, false)
 		MapNode.NodeType.BOSS:
 			RunManager.pending_act_complete = true
 			_start_combat(_boss_encounter(), 50 + node.floor_num * 2, true, true)
@@ -615,6 +1670,12 @@ func _enter_node(node: MapNode) -> void:
 		MapNode.NodeType.SHOP:
 			SceneTransition.change_scene("res://scenes/shop/shop_scene.tscn")
 		MapNode.NodeType.EVENT:
+			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
+		MapNode.NodeType.SWORD_IN_STONE:
+			# Reuse the event scene with a flag — Excalibur is a one-shot event
+			# routed through a special path. event_scene reads the flag and renders
+			# the Sword-in-the-Stone content instead of pulling from EventPool.
+			RunManager.pending_special_event = &"sword_in_stone"
 			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 
 
@@ -685,28 +1746,21 @@ func _scale_dmg(base: int) -> int:
 
 
 func _combat_encounter(floor_num: int) -> Array[EnemyData]:
-	var result: Array[EnemyData] = []
-	if floor_num <= 3:
-		if RngManager.event_rng.randf() < 0.5:
-			result.append(_make_slime(_scale_hp(35 + floor_num * 3)))
-		else:
-			result.append(_make_goblin(_scale_hp(20 + floor_num * 2)))
-	elif floor_num <= 8:
-		result.append(_make_slime(_scale_hp(40 + floor_num * 2)))
-		result.append(_make_goblin(_scale_hp(22 + floor_num * 2)))
-	else:
-		result.append(_make_slime(_scale_hp(48 + floor_num)))
-		result.append(_make_goblin(_scale_hp(28 + floor_num)))
-	return result
+	# Camelot's regular roster + encounter pairings now live in EnemyPool. The
+	# difficulty_mult argument is where the A2 realm-config (court vs common folk)
+	# will hook in; until then it defaults to neutral.
+	return EnemyPool.get_combat_encounter(floor_num)
 
 
 func _elite_encounter() -> Array[EnemyData]:
-	var result: Array[EnemyData] = []
-	result.append(_make_elite())
-	return result
+	return EnemyPool.get_elite_encounter()
 
 
 func _boss_encounter() -> Array[EnemyData]:
+	# Act 1 is Sir Caedmon (EnemyPool). Acts 2-3 are out of demo scope and keep
+	# their legacy placeholder bosses until those acts get built.
+	if RunManager.current_act <= 1:
+		return EnemyPool.get_boss()
 	var result: Array[EnemyData] = []
 	result.append(_make_boss())
 	return result
@@ -901,45 +1955,9 @@ func _fx_self_status(effect: StatusEffectData, stacks: int) -> StatusApplyEffect
 # ============================================================
 
 func _create_test_character() -> CharacterData:
-	var c = CharacterData.new()
-	c.character_name = "Emo Hybrid Caster"
-	c.max_health = 80
-	c.passion_volatility = 1.0
-	c.passion_thresholds.assign([80, 60, 40, 20])
-	c.primary_personality = "Magic"
-	c.secondary_personality = "Physical"
-
-	var strike = _make_card("Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(6)])
-	var defend = _make_card("Defend", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, [_fx_block(5)])
-	var bash = _make_card("Stagger", 2, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(8), _fx_status(StatusEffects.VULNERABLE, 2)])
-	var noxious = _make_card("Noxious Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(4), _fx_status(StatusEffects.POISON, 3)])
-	var cleave = _make_card("Wide Arc", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.ALL_ENEMIES, [_fx_damage(4)])
-	var flame = _make_card("Flame Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(10), _fx_passion(-3)])
-	flame.personality = CardData.PersonalityType.PRIMARY
-	var meditate = _make_card("Meditate", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, [_fx_block(4), _fx_passion(3)])
-
-	for i in 2:
-		c.starting_deck.append(strike)
-	for i in 2:
-		c.starting_deck.append(defend)
-	c.starting_deck.append(bash)
-	c.starting_deck.append(noxious)
-	c.starting_deck.append(cleave)
-	c.starting_deck.append(flame)
-	c.starting_deck.append(meditate)
-
-	# Personality card pools for tier-based rewards
-	c.primary_cards = CardPool.build_emo_primary_pool()
-	c.secondary_cards = CardPool.build_emo_secondary_pool()
-
-	return c
+	# Same character the real game builds, so poking the map scene standalone shows
+	# the actual starting deck (single source of truth).
+	return CharacterPool.build_emo_hybrid()
 
 
 func _make_card(card_name: String, cost: int, type: CardData.CardType,

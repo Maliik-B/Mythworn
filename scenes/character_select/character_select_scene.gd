@@ -106,18 +106,6 @@ func _build_ui() -> void:
 			"symbol_color": Color(0.95, 0.5, 0.2),
 			"locked": true,
 		},
-		{
-			"name": "Pensive Ranger",
-			"hp": 75,
-			"primary": "Utility",
-			"secondary": "Safety",
-			"cards": 9,
-			"symbol": "P",
-			"portrait_bg": Color(0.08, 0.25, 0.12),
-			"portrait_border": Color(0.3, 0.7, 0.35),
-			"symbol_color": Color(0.4, 0.85, 0.45),
-			"locked": true,
-		},
 	]
 
 	for i in characters.size():
@@ -396,46 +384,8 @@ func _on_select_character() -> void:
 # ============================================================
 
 func _create_emo_hybrid() -> CharacterData:
-	var c = CharacterData.new()
-	c.character_name = "Emo Hybrid Caster"
-	c.max_health = 80
-	c.passion_volatility = 1.0
-	c.passion_thresholds.assign([80, 60, 40, 20])
-	c.primary_personality = "Magic"
-	c.secondary_personality = "Physical"
-
-	# Build deck
-	var strike = _make_card("Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(6)])
-	var defend = _make_card("Defend", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, [_fx_block(5)])
-	var bash = _make_card("Stagger", 2, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(8), _fx_status(StatusEffects.VULNERABLE, 2)])
-	var noxious = _make_card("Noxious Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(4), _fx_status(StatusEffects.POISON, 3)])
-	var cleave = _make_card("Wide Arc", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.ALL_ENEMIES, [_fx_damage(4)])
-	var flame = _make_card("Flame Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_fx_damage(10), _fx_passion(-3)])
-	flame.personality = CardData.PersonalityType.PRIMARY
-	var meditate = _make_card("Meditate", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, [_fx_block(4), _fx_passion(3)])
-
-	for i in 2:
-		c.starting_deck.append(strike)
-	for i in 2:
-		c.starting_deck.append(defend)
-	c.starting_deck.append(bash)
-	c.starting_deck.append(noxious)
-	c.starting_deck.append(cleave)
-	c.starting_deck.append(flame)
-	c.starting_deck.append(meditate)
-
-	# Personality card pools for tier-based rewards
-	c.primary_cards = CardPool.build_emo_primary_pool()
-	c.secondary_cards = CardPool.build_emo_secondary_pool()
-
-	return c
+	# Single source of truth (game, map-test, and balance harnesses all use this).
+	return CharacterPool.build_emo_hybrid()
 
 
 # -- Card / effect factory helpers --
@@ -452,9 +402,10 @@ func _make_card(card_name: String, cost: int, type: CardData.CardType,
 	return c
 
 
-func _fx_damage(v: int) -> DamageEffect:
+func _fx_damage(v: int, hits: int = 1) -> DamageEffect:
 	var e = DamageEffect.new()
 	e.value = v
+	e.hits = hits
 	return e
 
 

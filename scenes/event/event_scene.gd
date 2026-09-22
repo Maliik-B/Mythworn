@@ -11,10 +11,93 @@ var follow_up_container: VBoxContainer
 
 
 func _ready() -> void:
-	event = EventPool.get_random_event(RngManager.event_rng)
+	# Realm-signature events are hand-authored and route through this same scene
+	# via RunManager.pending_special_event. The flag is consumed here so that
+	# subsequent regular event nodes pull from the normal pool again.
+	if RunManager.pending_special_event != &"":
+		event = _build_special_event(RunManager.pending_special_event)
+		RunManager.pending_special_event = &""
+	else:
+		event = EventPool.get_random_event(RngManager.event_rng)
 	_build_ui()
 	_show_choices()
 	AudioManager.play_music("rest")
+
+
+## Build a hand-authored event by id. New ids should be added here, not to EventPool
+## (the pool is for randomly-drawn narrative events; signature quests have unique
+## map placement and shouldn't be in the random rotation).
+func _build_special_event(id: StringName) -> EventData:
+	match id:
+		&"sword_in_stone":
+			return _build_sword_in_stone_event()
+		&"sword_guardian_won":
+			return _build_sword_guardian_won_event()
+		_:
+			push_warning("Unknown special event id: %s" % id)
+			return EventPool.get_random_event(RngManager.event_rng)
+
+
+func _build_sword_in_stone_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Sword in the Stone"
+	e.description = ("A blade stands in a block of worn granite, sunk to the hilt. Something is hunched "
+		+ "over it, and it raises its head as you come near. A champion, once. You can still read the "
+		+ "heraldry on the ruined surcoat, under everything that has grown over it since.\n\nThe chaos "
+		+ "has gone all through him. Black veins climb his throat. One arm has swollen to near twice "
+		+ "the size of the other. His eyes have filmed over to a flat white, and he does not so much "
+		+ "stand as brace, like a man holding a door shut from the inside. When he sees you, he "
+		+ "snarls.\n\nThe sword's hilt catches the light, then goes dull. The metal settles deeper "
+		+ "into the stone, the way a hand draws back from a thing it will not touch. The blade has "
+		+ "not chosen him. It has been waiting.")
+
+	var fight = EventData.EventChoice.new()
+	fight.text = "Face the beast."
+	fight.starts_combat = &"sword_guardian"
+	e.choices.append(fight)
+
+	var walk = EventData.EventChoice.new()
+	walk.text = "Leave it to its vigil. The blade is not worth dying for."
+	walk.result_text = ("You step back into the trees. Behind you the beast settles over its stone "
+		+ "again, guarding a thing that will never answer to it. The choice not to reach is also a "
+		+ "kind of weight — and you find you can carry it.")
+	walk.passion_change = 3
+	e.choices.append(walk)
+
+	return e
+
+
+## The follow-up beat after the guardian falls. The corruption lifts, he names the
+## boss's nature (a hint at Sir Caedmon's compelled will, pointing at the Act-2 Puppeteer),
+## and Excalibur frees itself from the stone.
+func _build_sword_guardian_won_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Beast Unmade"
+	e.description = ("As the last blow lands, the chaos goes out of him. The black veins fade back "
+		+ "under the skin. The swollen arm eases. For one borrowed breath a man is left where the "
+		+ "beast was, clear-eyed and frightened.\n\n\"Caedmon.\" He gets the name out like it costs "
+		+ "him. \"I went to face Sir Caedmon. I had put down better men than him. I thought it would "
+		+ "be quick.\" A wet laugh. \"But he does not fight like a man. Halfway through, something "
+		+ "took the reins of him. His guard just dropped. He came at me like a thing with no fear "
+		+ "left, and no one behind the eyes. Whatever has hold of him, it does not care if the body "
+		+ "breaks getting to you.\"\n\nHis hand finds your arm. \"That is how it got into me. Through "
+		+ "him. Through every wound he opened. Do not stand there trading blows with the puppet. Wear "
+		+ "his own will down first, until the thing moving him has to show itself. Then you put the "
+		+ "sword in that.\"\n\nHe sags back against the stone. \"The blade would not have me. Maybe it "
+		+ "was only ever waiting for you.\" He goes still. Behind you the granite gives, with a sound "
+		+ "like a long-held breath let go, and Excalibur lifts free of the stone. It settles into "
+		+ "your hand, impossibly light.")
+
+	var take = EventData.EventChoice.new()
+	take.text = "Take up Excalibur."
+	take.result_text = ("It weighs almost nothing in your hand. Already you can feel that it will "
+		+ "answer to how you hold it: as an edge, or as an eye.")
+	take.granted_relic_id = &"Excalibur"
+	take.awarded_title_id = &"swords_bearer"
+	take.passion_change = 3
+	e.choices.append(take)
+
+	return e
 
 
 # ============================================================
@@ -84,6 +167,19 @@ void fragment() {
 	main_vbox.add_child(info_label)
 	_update_info()
 
+	# Unobtrusive read-only map peek — stays available through the whole event and
+	# never consumes it.
+	var map_row = HBoxContainer.new()
+	map_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_vbox.add_child(map_row)
+	var map_btn = Button.new()
+	map_btn.text = "View Map"
+	map_btn.custom_minimum_size = Vector2(150, 34)
+	map_btn.add_theme_font_size_override("font_size", 14)
+	map_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	map_btn.pressed.connect(_on_view_map)
+	map_row.add_child(map_btn)
+
 	# Choice buttons container
 	choice_container = VBoxContainer.new()
 	choice_container.add_theme_constant_override("separation", 12)
@@ -99,6 +195,10 @@ void fragment() {
 func _update_info() -> void:
 	info_label.text = "HP: %d / %d    Gold: %d" % [
 		RunManager.current_hp, RunManager.max_hp, RunManager.gold]
+
+
+func _on_view_map() -> void:
+	MapPreviewOverlay.open(self)
 
 
 # ============================================================
@@ -158,6 +258,13 @@ func _make_choice_button(choice: EventData.EventChoice, index: int) -> Button:
 func _on_choice_selected(index: int) -> void:
 	AudioManager.play_sfx("button_click")
 	var choice = event.choices[index]
+
+	# A choice can launch a scripted fight instead of resolving in-scene (the
+	# Sword-in-the-Stone guardian). Combat victory routes to the follow-up beat.
+	if choice.starts_combat != &"":
+		_start_event_combat(choice.starts_combat)
+		return
+
 	_apply_effects(choice)
 	choice_container.visible = false
 
@@ -178,6 +285,26 @@ func _on_choice_selected(index: int) -> void:
 		_show_card_removal()
 	else:
 		_show_done()
+
+
+## Launches a scripted event fight. The Sword-in-the-Stone guardian is the Champion
+## of the Usurper (thematically a champion who went to fight Caedmon and was corrupted).
+## Combat victory routes back to the "beast unmade" beat via pending_guardian_fight +
+## pending_special_event; the player gets no normal reward — Excalibur IS the reward.
+func _start_event_combat(key: StringName) -> void:
+	match key:
+		&"sword_guardian":
+			RunManager.pending_enemies.clear()
+			RunManager.pending_enemies.append(EnemyPool.champion_of_the_usurper())
+			RunManager.pending_gold_reward = 0
+			RunManager.pending_relic_reward = false
+			RunManager.pending_relic_is_boss = false
+			RunManager.pending_guardian_fight = true
+			RunManager.pending_special_event = &"sword_guardian_won"
+			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
+		_:
+			push_warning("Unknown event combat key: %s" % key)
+			_show_done()
 
 
 # ============================================================
@@ -203,6 +330,14 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.passion_change != 0:
 		RunManager.change_passion(choice.passion_change)
 
+	if choice.awarded_title_id != &"":
+		RunManager.award_title(choice.awarded_title_id)
+
+	if choice.granted_relic_id != &"":
+		var relic = RelicPool.get_relic_by_name(String(choice.granted_relic_id))
+		if relic and not RunManager.has_relic(relic.relic_name):
+			RunManager.add_relic(relic)
+
 
 func _show_effect_summary(choice: EventData.EventChoice) -> void:
 	var parts: PackedStringArray = []
@@ -222,6 +357,15 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 		parts.append("+%d Passion" % choice.passion_change)
 	elif choice.passion_change < 0:
 		parts.append("%d Passion" % choice.passion_change)
+	if choice.awarded_title_id != &"":
+		var title_data := TitlePool.get_title(choice.awarded_title_id)
+		if title_data:
+			parts.append("Earned title: %s" % title_data.original_name)
+
+	if choice.granted_relic_id != &"":
+		var rel = RelicPool.get_relic_by_name(String(choice.granted_relic_id))
+		if rel:
+			parts.append("Acquired: %s" % rel.relic_name)
 
 	if parts.size() > 0:
 		var summary = Label.new()

@@ -2,7 +2,7 @@ class_name MapNode
 extends RefCounted
 ## A single node on the act map. Holds type, position, and connections.
 
-enum NodeType { COMBAT, ELITE, REST, SHOP, EVENT, MYSTERY, BOSS }
+enum NodeType { COMBAT, ELITE, REST, SHOP, EVENT, MYSTERY, BOSS, SWORD_IN_STONE }
 
 var id: int = 0
 var floor_num: int = 0
@@ -10,6 +10,12 @@ var column: int = 0
 var node_type: NodeType = NodeType.COMBAT
 var next_nodes: Array[int] = [] # IDs of connected nodes on the next floor
 var visited: bool = false
+# Purely-cosmetic sub-cell offsets (in fractions of a cell) so the rendered graph
+# looks organically placed instead of a rigid lattice. Set by MapGenerator; the
+# grid column/floor still drive connectivity, balance, and layout — jitter never
+# changes which nodes exist or connect.
+var x_jitter: float = 0.0
+var y_jitter: float = 0.0
 
 
 static func type_label(t: NodeType) -> String:
@@ -21,6 +27,7 @@ static func type_label(t: NodeType) -> String:
 		NodeType.EVENT: return "!"
 		NodeType.MYSTERY: return "?"
 		NodeType.BOSS: return "★"
+		NodeType.SWORD_IN_STONE: return "✦"
 	return "?"
 
 
@@ -33,6 +40,7 @@ static func type_name(t: NodeType) -> String:
 		NodeType.EVENT: return "Event"
 		NodeType.MYSTERY: return "Mystery"
 		NodeType.BOSS: return "Boss"
+		NodeType.SWORD_IN_STONE: return "The Sword in the Stone"
 	return "???"
 
 
@@ -45,4 +53,5 @@ static func type_color(t: NodeType) -> Color:
 		NodeType.EVENT: return Color(0.8, 0.55, 0.9)
 		NodeType.MYSTERY: return Color(0.55, 0.55, 0.55)
 		NodeType.BOSS: return Color(0.95, 0.15, 0.15)
+		NodeType.SWORD_IN_STONE: return Color(1.0, 0.85, 0.35)  # heraldic gold
 	return Color.WHITE

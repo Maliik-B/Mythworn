@@ -152,7 +152,7 @@ func _on_card_exhausted(_card: CardData) -> void:
 
 func _on_combat_started() -> void:
 	if RunManager.pending_act_complete:
-		play_music("boss")
+		play_music("boss", -9.0)  # the boss WAV is mastered hotter; pull it down to ~match combat
 	else:
 		play_music("combat")
 

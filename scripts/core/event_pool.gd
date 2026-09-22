@@ -37,6 +37,7 @@ static func _wounded_traveler() -> EventData:
 	c1.hp_change = -5
 	c1.gold_change = 30
 	c1.passion_change = 3
+	c1.awarded_title_id = &"the_merciful"
 
 	var c2 = EventData.EventChoice.new()
 	c2.text = "Take their pouch and leave"
@@ -75,6 +76,7 @@ static func _ancient_shrine() -> EventData:
 	c3.text = "Study the runes carefully"
 	c3.result_text = "The runes reveal forgotten knowledge. A new technique crystallizes in your mind."
 	c3.card_reward = true
+	c3.awarded_title_id = &"the_calculating"
 
 	e.choices.append(c1)
 	e.choices.append(c2)
@@ -149,6 +151,7 @@ static func _wandering_spirit() -> EventData:
 	c1.result_text = "The spirit shares a tale of love and loss. As it fades, you feel your resolve harden."
 	c1.max_hp_change = 3
 	c1.passion_change = 4
+	c1.awarded_title_id = &"the_merciful"
 
 	var c2 = EventData.EventChoice.new()
 	c2.text = "Ask them to share their power"
@@ -217,6 +220,7 @@ static func _suspicious_chest() -> EventData:
 	c3.text = "Leave it alone"
 	c3.result_text = "Wisdom is knowing when not to act. You walk on, unscathed."
 	c3.passion_change = 2
+	c3.awarded_title_id = &"the_calculating"
 
 	e.choices.append(c1)
 	e.choices.append(c2)

@@ -2,6 +2,33 @@ class_name RelicPool
 ## Builds and returns relic choices filtered by rarity.
 
 
+## Returns the relic with the given name from either the rewards pool or the
+## quest-only pool. Used by events that grant a specific named relic
+## (e.g. Camelot's Sword in the Stone grants Excalibur).
+static func get_relic_by_name(name: String) -> RelicData:
+	for relic in _build_pool():
+		if relic.relic_name == name:
+			return relic
+	for relic in _build_quest_pool():
+		if relic.relic_name == name:
+			return relic
+	return null
+
+
+## Quest-only relics — granted by specific narrative events, NEVER appear in
+## shop wares or post-combat rewards. Excalibur is the central example: it
+## comes from the Sword in the Stone node and has dual-mode behavior managed
+## by RunManager + CombatEngine + map UI rather than the generic relic effect
+## system.
+static func _build_quest_pool() -> Array[RelicData]:
+	var pool: Array[RelicData] = []
+	pool.append(_relic("Excalibur",
+		"A blade that adheres to its wielder. Toggle between Sword (adds a power card to each combat) and Sight (reveals enemy intent one turn ahead) between battles.",
+		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_PICKUP,
+		RelicData.RelicEffect.NONE, 0))
+	return pool
+
+
 static func get_reward_choices(rng: RandomNumberGenerator, count: int = 3,
 		exclude_names: PackedStringArray = []) -> Array[RelicData]:
 	var pool = _build_pool()
@@ -111,7 +138,7 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.DRAW_CARDS, 2))
 
-	pool.append(_relic("Flame Pendant", "Gain 3 Passion at the start of combat.",
+	pool.append(_relic("Spring Charm", "Gain 3 Passion at the start of combat.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_PASSION, 3))
 
@@ -120,7 +147,7 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 5))
 
-	pool.append(_relic("Ember of Resolve", "Gain 1 Passion at the start of each turn.",
+	pool.append(_relic("Wellspring of Resolve", "Gain 1 Passion at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_PASSION, 1))
 

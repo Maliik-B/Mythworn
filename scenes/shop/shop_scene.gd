@@ -5,6 +5,8 @@ extends Control
 const CARD_REMOVE_COST := 50
 const CARD_COUNT := 5
 const RELIC_COUNT := 2
+## Stacking cap for shop discounts from titles + future relics. See § Titles in GAME_DESIGN.md.
+const SHOP_DISCOUNT_CAP := 50
 
 # Card icon mapping (shared with combat/reward scenes)
 const _CR = "res://assets/sprites/icons/clockwork_raven/Clockwork raven - Weapons and Potions - Free pack/individual_64x64/"
@@ -13,25 +15,20 @@ const _CUS = "res://assets/sprites/icons/custom/"
 const CARD_ICONS = {
 	"Strike": _CR + "tile000.png", "Stagger": _CR + "tile025.png",
 	"Noxious Strike": _CUS + "noxious_strike.png", "Wide Arc": _CR + "tile004.png",
-	"Flame Strike": _CUS + "flame_strike.png",
+	# Outpouring (Water starter) + the Water pool use the neutral card frame until Water art lands.
 	"Crushing Blow": _CR + "tile008.png", "Paired Strikes": _CUS + "twin_strike.png",
 	"Sweep": _CR + "tile011.png", "Reckless Swing": _CR + "tile035.png",
 	"Havoc": _CR + "tile041.png", "Poison Fang": _CUS + "poison_fang.png",
-	"Armor Break": _CR + "tile016.png", "Wildfire": _CUS + "immolate.png",
+	"Armor Break": _CR + "tile016.png",
 	"Execute": _CR + "tile012.png",
-	"Soul Flare": _CUS + "soul_flare.png", "Arcane Bolt": _CUS + "arcane_bolt.png",
-	"Blazing Lance": _CR + "tile020.png", "Nether Flames": _CUS + "nether_flames.png",
-	"Cataclysm": _CUS + "cataclysm.png",
 	"Power Slash": _CR + "tile006.png", "Quick Jab": _CR + "tile005.png",
 	"Rampage": _CR + "tile050.png", "Devastating Blow": _CR + "tile030.png",
 	"Defend": _ITV + "shield.png", "Meditate": _CUS + "meditate.png",
-	"Retaliate": _ITV + "gem_blue.png", "Shield Bash": _ITV + "gauntlet.png",
+	"Bracing Blow": _ITV + "gem_blue.png", "Shield Bash": _ITV + "gauntlet.png",
 	"Battle Cry": _CUS + "battle_cry.png", "Bolster": _ITV + "helmet.png",
 	"Dark Pact": _CUS + "dark_pact.png", "Inner Fire": _CUS + "inner_fire.png",
 	"Weaken": _ITV + "scroll_red.png", "Second Wind": _CR + "tile083.png",
 	"Phantom Guard": _CUS + "apparition.png",
-	"Spirit Ward": _CUS + "spirit_ward.png", "Hex": _ITV + "scroll_purple.png",
-	"Soul Sacrifice": _CUS + "soul_sacrifice.png",
 	"Brace": _ITV + "chestplate.png", "Iron Curtain": _CUS + "iron_curtain.png",
 	"Riposte": _CR + "tile009.png", "Bulwark": _ITV + "shield.png",
 }
@@ -65,30 +62,52 @@ func _ready() -> void:
 
 
 func _generate_shop() -> void:
+	var discount := _get_shop_discount_percent()
+
 	shop_cards = CardPool.get_reward_choices(RngManager.loot_rng, CARD_COUNT)
 	for card in shop_cards:
+		var base := 50
 		match card.rarity:
 			CardData.CardRarity.COMMON:
-				card_prices[card] = 40 + RngManager.loot_rng.randi_range(-5, 5)
+				base = 40 + RngManager.loot_rng.randi_range(-5, 5)
 			CardData.CardRarity.UNCOMMON:
-				card_prices[card] = 60 + RngManager.loot_rng.randi_range(-5, 10)
+				base = 60 + RngManager.loot_rng.randi_range(-5, 10)
 			CardData.CardRarity.RARE:
-				card_prices[card] = 90 + RngManager.loot_rng.randi_range(-5, 15)
-			_:
-				card_prices[card] = 50
+				base = 90 + RngManager.loot_rng.randi_range(-5, 15)
+		card_prices[card] = _apply_discount(base, discount)
 
 	var owned = RunManager.get_owned_relic_names()
 	shop_relics = RelicPool.get_reward_choices(RngManager.loot_rng, RELIC_COUNT, owned)
 	for relic in shop_relics:
+		var base := 110
 		match relic.rarity:
 			RelicData.RelicRarity.COMMON:
-				relic_prices[relic] = 100 + RngManager.loot_rng.randi_range(-10, 10)
+				base = 75 + RngManager.loot_rng.randi_range(-10, 10)
 			RelicData.RelicRarity.UNCOMMON:
-				relic_prices[relic] = 150 + RngManager.loot_rng.randi_range(-10, 15)
+				base = 110 + RngManager.loot_rng.randi_range(-10, 15)
 			RelicData.RelicRarity.RARE:
-				relic_prices[relic] = 200 + RngManager.loot_rng.randi_range(-10, 20)
-			_:
-				relic_prices[relic] = 150
+				base = 150 + RngManager.loot_rng.randi_range(-10, 20)
+		relic_prices[relic] = _apply_discount(base, discount)
+
+
+## Aggregates discount from all sources (titles, future relics) and applies the
+## stacking cap. Returns an integer percentage in [0, SHOP_DISCOUNT_CAP].
+func _get_shop_discount_percent() -> int:
+	var total := RunManager.get_title_passive_total(TitleData.EffectType.SHOP_DISCOUNT_PERCENT)
+	return clampi(total, 0, SHOP_DISCOUNT_CAP)
+
+
+## Applies a percentage discount to a base price. Floors result to a minimum of 1 gold
+## so generosity never produces free items.
+func _apply_discount(base: int, percent: int) -> int:
+	if percent <= 0:
+		return base
+	return maxi(1, base - int(round(base * percent / 100.0)))
+
+
+## The effective cost of removing a card, after discount.
+func _effective_remove_cost() -> int:
+	return _apply_discount(CARD_REMOVE_COST, _get_shop_discount_percent())
 
 
 # ============================================================
@@ -156,6 +175,16 @@ void fragment() {
 	info_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
 	_main_vbox.add_child(info_label)
 
+	# Discount notice — visible only when titles grant a shop discount.
+	var discount := _get_shop_discount_percent()
+	if discount > 0:
+		var discount_label = Label.new()
+		discount_label.text = "✦ Favor of your titles: %d%% off all prices ✦" % discount
+		discount_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		discount_label.add_theme_font_size_override("font_size", 15)
+		discount_label.add_theme_color_override("font_color", Color(0.85, 0.78, 0.45))
+		_main_vbox.add_child(discount_label)
+
 	# ── Section: Wares ──
 	_add_section_header("Wares", Color(0.9, 0.7, 0.3))
 
@@ -196,9 +225,13 @@ void fragment() {
 	btn_row.add_theme_constant_override("separation", 30)
 	_main_vbox.add_child(btn_row)
 
-	var remove_btn = _make_gold_button("Remove a Card  (%d gold)" % CARD_REMOVE_COST, Vector2(280, 52))
+	var remove_btn = _make_gold_button("Remove a Card  (%d gold)" % _effective_remove_cost(), Vector2(280, 52))
 	remove_btn.pressed.connect(_on_remove_pressed)
 	btn_row.add_child(remove_btn)
+
+	var map_btn = _make_gold_button("View Map", Vector2(180, 52))
+	map_btn.pressed.connect(_on_view_map)
+	btn_row.add_child(map_btn)
 
 	var leave_btn = _make_gold_button("Leave Shop", Vector2(200, 52))
 	leave_btn.pressed.connect(_on_leave)
@@ -540,6 +573,16 @@ func _create_shop_card(card: CardData, price: int) -> PanelContainer:
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(desc_lbl)
 
+	# ── Optional flavor text ──
+	if card.flavor_text != "":
+		var flavor_lbl = Label.new()
+		flavor_lbl.text = card.flavor_text
+		flavor_lbl.add_theme_font_size_override("font_size", 10)
+		flavor_lbl.add_theme_color_override("font_color", Color(0.6, 0.56, 0.5))
+		flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(flavor_lbl)
+
 	# ── Exhaust tag ──
 	if card.exhaust:
 		var ex_lbl = Label.new()
@@ -727,8 +770,9 @@ func _on_remove_pressed() -> void:
 		info_label.text = "Click a card or relic to purchase"
 		return
 
-	if RunManager.gold < CARD_REMOVE_COST:
-		info_label.text = "Not enough gold! (Need %d)" % CARD_REMOVE_COST
+	var cost := _effective_remove_cost()
+	if RunManager.gold < cost:
+		info_label.text = "Not enough gold! (Need %d)" % cost
 		return
 
 	if RunManager.current_deck.size() <= 1:
@@ -741,7 +785,7 @@ func _on_remove_pressed() -> void:
 func _show_deck_for_removal() -> void:
 	deck_visible = true
 	deck_section.visible = true
-	info_label.text = "Click a card to remove it (%d gold)" % CARD_REMOVE_COST
+	info_label.text = "Click a card to remove it (%d gold)" % _effective_remove_cost()
 
 	for child in deck_section.get_children():
 		child.queue_free()
@@ -816,7 +860,7 @@ func _on_cancel_remove() -> void:
 
 func _on_remove_card(index: int) -> void:
 	var card = RunManager.current_deck[index]
-	RunManager.add_gold(-CARD_REMOVE_COST)
+	RunManager.add_gold(-_effective_remove_cost())
 	RunManager.remove_card_from_deck(index)
 	AudioManager.play_sfx("card_exhaust")
 	info_label.text = "Removed %s!" % card.card_name
@@ -852,6 +896,11 @@ func _get_personality_color(pers: CardData.PersonalityType) -> Color:
 func _on_leave() -> void:
 	AudioManager.play_sfx("button_click")
 	SceneTransition.change_scene("res://scenes/map/map_scene.tscn")
+
+
+## Read-only map peek — doesn't leave the shop.
+func _on_view_map() -> void:
+	MapPreviewOverlay.open(self)
 
 
 func _ignore_mouse_recursive(control: Control) -> void:

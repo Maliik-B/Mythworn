@@ -1,34 +1,8 @@
 extends Control
 ## Shows gold reward and 3 card choices after combat victory. Player picks one or skips.
 
-const _CR = "res://assets/sprites/icons/clockwork_raven/Clockwork raven - Weapons and Potions - Free pack/individual_64x64/"
-const _ITV = "res://assets/sprites/icons/in_the_void/individual/"
-const _CUS = "res://assets/sprites/icons/custom/"
-const CARD_ICONS = {
-	"Strike": _CR + "tile000.png", "Stagger": _CR + "tile025.png",
-	"Noxious Strike": _CUS + "noxious_strike.png", "Wide Arc": _CR + "tile004.png",
-	"Flame Strike": _CUS + "flame_strike.png",
-	"Crushing Blow": _CR + "tile008.png", "Paired Strikes": _CUS + "twin_strike.png",
-	"Sweep": _CR + "tile011.png", "Reckless Swing": _CR + "tile035.png",
-	"Havoc": _CR + "tile041.png", "Poison Fang": _CUS + "poison_fang.png",
-	"Armor Break": _CR + "tile016.png", "Wildfire": _CUS + "immolate.png",
-	"Execute": _CR + "tile012.png",
-	"Soul Flare": _CUS + "soul_flare.png", "Arcane Bolt": _CUS + "arcane_bolt.png",
-	"Blazing Lance": _CR + "tile020.png", "Nether Flames": _CUS + "nether_flames.png",
-	"Cataclysm": _CUS + "cataclysm.png",
-	"Power Slash": _CR + "tile006.png", "Quick Jab": _CR + "tile005.png",
-	"Rampage": _CR + "tile050.png", "Devastating Blow": _CR + "tile030.png",
-	"Defend": _ITV + "shield.png", "Meditate": _CUS + "meditate.png",
-	"Retaliate": _ITV + "gem_blue.png", "Shield Bash": _ITV + "gauntlet.png",
-	"Battle Cry": _CUS + "battle_cry.png", "Bolster": _ITV + "helmet.png",
-	"Dark Pact": _CUS + "dark_pact.png", "Inner Fire": _CUS + "inner_fire.png",
-	"Weaken": _ITV + "scroll_red.png", "Second Wind": _CR + "tile083.png",
-	"Phantom Guard": _CUS + "apparition.png",
-	"Spirit Ward": _CUS + "spirit_ward.png", "Hex": _ITV + "scroll_purple.png",
-	"Soul Sacrifice": _CUS + "soul_sacrifice.png",
-	"Brace": _ITV + "chestplate.png", "Iron Curtain": _CUS + "iron_curtain.png",
-	"Riposte": _CR + "tile009.png", "Bulwark": _ITV + "shield.png",
-}
+# Card art icons live in CardVisuals (single source, shared with combat + the
+# deck / Passion full-card renders).
 
 var card_choices: Array[CardData] = []
 var card_panels: Dictionary = {} # CardData -> PanelContainer
@@ -41,7 +15,12 @@ func _ready() -> void:
 	RunManager.add_gold(gold_earned)
 	RunManager.pending_gold_reward = 0
 
-	card_choices = CardPool.get_reward_choices(RngManager.loot_rng)
+	# Boss rewards (pending_act_complete is set on boss nodes) get the richer offer:
+	# a guaranteed rare + uncommon-or-better, instead of the tier-split hallway reward.
+	if RunManager.pending_act_complete:
+		card_choices = CardPool.get_boss_reward_choices(RngManager.loot_rng)
+	else:
+		card_choices = CardPool.get_reward_choices(RngManager.loot_rng)
 	_build_ui()
 
 
@@ -282,7 +261,7 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 			art_style.set_border_width_all(1)
 			art_style.border_color = Color(0.65, 0.5, 0.1, 0.5)
 	art_frame.add_theme_stylebox_override("panel", art_style)
-	var icon_file = CARD_ICONS.get(card.card_name, "")
+	var icon_file = CardVisuals.icon_path(card.card_name)
 	if icon_file != "":
 		var art_icon = TextureRect.new()
 		art_icon.texture = load(icon_file)
@@ -315,6 +294,17 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(desc_lbl)
+
+	# Optional flavor text — players see this when choosing rewards, so it
+	# carries the most narrative weight here.
+	if card.flavor_text != "":
+		var flavor_lbl = Label.new()
+		flavor_lbl.text = card.flavor_text
+		flavor_lbl.add_theme_font_size_override("font_size", 12)
+		flavor_lbl.add_theme_color_override("font_color", Color(0.62, 0.58, 0.52))
+		flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(flavor_lbl)
 
 	# Exhaust tag
 	if card.exhaust:
@@ -391,6 +381,12 @@ func _get_personality_color(pers: CardData.PersonalityType) -> Color:
 
 func _return_to_map() -> void:
 	if RunManager.pending_act_complete:
-		SceneTransition.change_scene("res://scenes/act/act_transition_scene.tscn")
+		# Camelot act bosses with Excalibur in hand trigger the Crown decision
+		# before standard act progression. Other realms (and Camelot without
+		# Excalibur) skip straight to the act transition.
+		if RunManager.current_realm_id == &"camelot" and RunManager.has_excalibur():
+			SceneTransition.change_scene("res://scenes/camelot/crown_decision_scene.tscn")
+		else:
+			SceneTransition.change_scene("res://scenes/act/act_transition_scene.tscn")
 	else:
 		SceneTransition.change_scene("res://scenes/map/map_scene.tscn")

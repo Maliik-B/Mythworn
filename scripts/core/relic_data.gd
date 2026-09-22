@@ -23,6 +23,8 @@ enum RelicEffect {
 	APPLY_WEAK_ALL,
 	DRAW_CARDS,
 	GAIN_PASSION,
+	NONE,  # No automatic effect. Used by relics whose behavior is driven externally
+	       # (e.g. Excalibur — Sword/Sight modes handled by CombatEngine + map UI).
 }
 
 @export var relic_name: String = ""

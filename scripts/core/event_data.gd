@@ -16,3 +16,14 @@ class EventChoice extends RefCounted:
 	var passion_change: int = 0
 	var card_reward: bool = false  # Offer 3 cards to pick from
 	var remove_card: bool = false  # Offer to remove a card from deck
+	## If non-empty, awards this title when the choice is taken. The TitleEarnedPopup
+	## autoload renders the celebration card automatically via Events.title_earned.
+	## Silently no-ops if the title is unknown or already earned.
+	var awarded_title_id: StringName = &""
+	## If non-empty, grants this relic via RunManager.acquire_relic when chosen.
+	## Used for one-shot quest events (e.g. Camelot's Sword in the Stone grants Excalibur).
+	var granted_relic_id: StringName = &""
+	## If non-empty, this choice LAUNCHES A SCRIPTED FIGHT (by key) instead of resolving
+	## normally: event_scene sets up the encounter and routes to combat, and combat
+	## victory routes to the follow-up beat. Used by the Sword-in-the-Stone guardian.
+	var starts_combat: StringName = &""

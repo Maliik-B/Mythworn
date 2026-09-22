@@ -8,9 +8,12 @@ extends Resource
 
 # Passion configuration
 @export var passion_volatility: float = 1.0 # Multiplier for all passion changes
-## Breakpoints between tiers: [blazing_min, inspired_min, steady_min, wavering_min]
-## Values below wavering_min are Hollow.
-@export var passion_thresholds: Array[int] = [80, 60, 40, 20]
+## Breakpoints between tiers on the signed axis: [blazing_min, inspired_min,
+## steady_min, wavering_min]. Values below wavering_min are Hollow. Symmetric
+## around 0 so the two poles mirror each other (+ = primary, - = secondary).
+## Tightened from ±60/±20 to ±50/±18 in the Passion-amplification pass so a demo
+## player actually reaches the committed extremes (where the zone modifier bites).
+@export var passion_thresholds: Array[int] = [50, 18, -18, -50]
 
 # Personality descriptions
 @export var primary_personality: String = "" # e.g. "Magic"

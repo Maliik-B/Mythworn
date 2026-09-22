@@ -11,12 +11,20 @@ enum PersonalityType { PRIMARY, SECONDARY, NEUTRAL, NEGATIVE }
 @export var card_name: String = ""
 @export var energy_cost: int = 1
 @export_multiline var description: String = ""
+@export_multiline var flavor_text: String = ""  # Italicized lore beneath the description; optional
 @export var card_type: CardType = CardType.ATTACK
 @export var rarity: CardRarity = CardRarity.COMMON
 @export var target_type: TargetType = TargetType.SINGLE_ENEMY
 @export var personality: PersonalityType = PersonalityType.NEUTRAL
 @export var effects: Array[CardEffect] = []
 @export var exhaust: bool = false
+## Unplayable cards (curses / status) sit dead in hand: they can't be played, they
+## just clog your options. Enemies like Realm Shade inject these mid-combat, and the
+## Act-3 mirror-curses will reuse the same flag.
+@export var unplayable: bool = false
+## Retained cards stay in hand at end of turn instead of being discarded (StS-style
+## "Retain"). The end-turn discard + its fly-to-pile animation both skip these.
+@export var retain: bool = false
 @export var card_art: Texture2D
 
 # Upgrade tracking
@@ -31,11 +39,14 @@ func duplicate_card() -> CardData:
 	copy.card_name = card_name
 	copy.energy_cost = energy_cost
 	copy.description = description
+	copy.flavor_text = flavor_text
 	copy.card_type = card_type
 	copy.rarity = rarity
 	copy.target_type = target_type
 	copy.personality = personality
 	copy.exhaust = exhaust
+	copy.unplayable = unplayable
+	copy.retain = retain
 	copy.card_art = card_art
 	copy.upgraded = upgraded
 
@@ -90,21 +101,34 @@ func get_generated_description() -> String:
 		if desc != "":
 			parts.append(desc)
 	var text = " ".join(parts)
+	# Cards with no effect text (e.g. an unplayable curse) fall back to their
+	# authored description so the panel isn't blank.
+	if text == "" and description != "":
+		text = description
 	if target_type == TargetType.ALL_ENEMIES:
 		text += " Hits all enemies."
 	return text
 
 
-## Generates description with combat modifiers (Strength, Weak, Dexterity) applied.
-func get_modified_description(source: CombatantStats) -> String:
+## Generates description with combat modifiers applied. When `target` is supplied
+## (e.g. an enemy the card is being dragged onto), target-side modifiers like
+## Vulnerable are folded into the damage brackets too.
+func get_modified_description(source: CombatantStats, target: CombatantStats = null) -> String:
 	var parts: PackedStringArray = []
 	for effect in get_active_effects():
-		var desc = effect.get_modified_description(source)
+		var desc = effect.get_modified_description(source, target)
 		if desc != "":
 			parts.append(desc)
 	var text = " ".join(parts)
+	# Cards with no effect text (e.g. an unplayable curse) fall back to their
+	# authored description so the panel isn't blank.
+	if text == "" and description != "":
+		text = description
 	if target_type == TargetType.ALL_ENEMIES:
 		text += " Hits all enemies."
-	if CombatEngine.is_zone_penalized(personality):
-		text += " [Zone Penalty: -25% dmg]"
+	var zm := CombatEngine.zone_multiplier(personality)
+	if zm < 1.0:
+		text += " [Zone Penalty: -%d%% dmg]" % roundi((1.0 - zm) * 100.0)
+	elif zm > 1.0:
+		text += " [Zone Bonus: +%d%% dmg]" % roundi((zm - 1.0) * 100.0)
 	return text

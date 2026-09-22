@@ -7,6 +7,10 @@ var current_hp: int
 var max_hp: int
 var block: int = 0
 var statuses: Dictionary = {} # StatusEffectData -> int (stacks)
+# Character powers — persistent, character-defining effects granted by POWER cards
+# (StS-style). Kept separate from statuses so they read as "who I am this fight"
+# rather than transient combat state, and get their own slot on the battle bar.
+var powers: Dictionary = {} # PowerData -> int (stacks)
 
 
 func _init(hp: int = 1, hp_max: int = -1) -> void:
@@ -54,6 +58,20 @@ func has_status(effect: StatusEffectData) -> bool:
 
 func get_status_stacks(effect: StatusEffectData) -> int:
 	return statuses.get(effect, 0)
+
+
+# -- Powers --
+
+func add_power(power: PowerData, stacks: int = 1) -> void:
+	powers[power] = powers.get(power, 0) + stacks
+
+
+func has_power(power: PowerData) -> bool:
+	return power in powers
+
+
+func get_power_stacks(power: PowerData) -> int:
+	return powers.get(power, 0)
 
 
 ## Direct HP loss, bypassing block. Used for Poison and similar effects.
