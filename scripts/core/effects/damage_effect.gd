@@ -18,7 +18,7 @@ func apply(source, target, battle_state) -> void:
 
 func get_description() -> String:
 	if hits > 1:
-		return "Deal %d damage %d times." % [value, hits]
+		return "Deal %d damage %d times (%d total)." % [value, hits, value * hits]
 	return "Deal %d damage." % value
 
 
@@ -36,6 +36,6 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 	modified = maxi(0, modified)
 	if modified != value:
 		if hits > 1:
-			return "Deal %d [%d] damage %d times." % [value, modified, hits]
+			return "Deal %d [%d] damage %d times (%d total)." % [value, modified, hits, modified * hits]
 		return "Deal %d [%d] damage." % [value, modified]
 	return get_description()

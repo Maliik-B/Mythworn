@@ -34,7 +34,7 @@ const CARD_ICONS := {
 	"Meditate": _CUS + "meditate.png",
 	# Generic skills
 	"Bracing Blow": _ITV + "gem_blue.png",
-	"Shield Bash": _ITV + "gauntlet.png",
+	"Shield Wall": _ITV + "gauntlet.png",
 	"Battle Cry": _CUS + "battle_cry.png",
 	"Bolster": _ITV + "helmet.png",
 	"Dark Pact": _CUS + "dark_pact.png",

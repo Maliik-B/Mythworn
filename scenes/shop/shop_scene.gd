@@ -24,7 +24,7 @@ const CARD_ICONS = {
 	"Power Slash": _CR + "tile006.png", "Quick Jab": _CR + "tile005.png",
 	"Rampage": _CR + "tile050.png", "Devastating Blow": _CR + "tile030.png",
 	"Defend": _ITV + "shield.png", "Meditate": _CUS + "meditate.png",
-	"Bracing Blow": _ITV + "gem_blue.png", "Shield Bash": _ITV + "gauntlet.png",
+	"Bracing Blow": _ITV + "gem_blue.png", "Shield Wall": _ITV + "gauntlet.png",
 	"Battle Cry": _CUS + "battle_cry.png", "Bolster": _ITV + "helmet.png",
 	"Dark Pact": _CUS + "dark_pact.png", "Inner Fire": _CUS + "inner_fire.png",
 	"Weaken": _ITV + "scroll_red.png", "Second Wind": _CR + "tile083.png",
@@ -217,8 +217,8 @@ void fragment() {
 	divider.add_theme_stylebox_override("separator", _make_divider_style())
 	_main_vbox.add_child(divider)
 
-	# ── Section: Services ──
-	_add_section_header("Services", Color(0.5, 0.75, 0.6))
+	# ── Section: Actions ──
+	_add_section_header("Actions", Color(0.5, 0.75, 0.6))
 
 	var btn_row = HBoxContainer.new()
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER

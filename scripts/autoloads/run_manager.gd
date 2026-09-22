@@ -193,6 +193,9 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 		seed_value = RngManager.generate_seed()
 	RngManager.setup_run(seed_value)
 
+	# Fresh encounter memory so this run's elite bag doesn't inherit the last run's state.
+	EnemyPool.reset_encounter_state()
+
 	Events.run_started.emit(character)
 
 

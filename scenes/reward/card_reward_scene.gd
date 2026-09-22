@@ -89,11 +89,13 @@ void fragment() {
 		gold_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.3))
 		vbox.add_child(gold_lbl)
 
-	# Subtitle with passion tier info
+	# Subtitle with passion value + tier (the value drives which pole the reward split
+	# favors, so surface the number, not just the tier name).
 	var subtitle = Label.new()
 	var tier = RunManager.get_passion_tier()
 	var tier_name = PassionState.tier_name(tier)
-	subtitle.text = "Choose a card — Passion: %s" % tier_name
+	var passion_value := RunManager.passion.current_value if RunManager.passion else 0
+	subtitle.text = "Choose a card — Passion: %d (%s)" % [passion_value, tier_name]
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 20)
 	subtitle.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))

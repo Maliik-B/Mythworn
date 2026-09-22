@@ -58,6 +58,9 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	enemies.clear()
 	for data in enemy_datas:
 		var enemy = EnemyCombatState.new(data)
+		# Statuses the enemy starts armed with (e.g. an Enraged-retaliation elite).
+		for pair in data.starting_statuses:
+			enemy.stats.apply_status(pair[0], pair[1])
 		enemy.select_intent()
 		enemies.append(enemy)
 

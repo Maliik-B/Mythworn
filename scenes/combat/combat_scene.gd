@@ -31,6 +31,7 @@ var enemy_nodes: Dictionary = {} # EnemyCombatState -> PanelContainer
 var continue_btn: Button
 var _main_container: MarginContainer
 var _hover_popup: PanelContainer
+var _status_pin: PanelContainer  # click-pinned status/effect description (see _show_status_pin)
 var _is_animating_card := false
 
 # Sprite portrait mapping: enemy_name -> [sprite_path, region_x, region_y, region_w, region_h]
@@ -73,6 +74,22 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# Status-chip click, resolved before GUI routing. Clicking a status/effect chip pins
+	# its description (immediate, and it stays until the next click elsewhere); clicking
+	# anywhere else dismisses an open pin. Manual hit-testing (rather than the chip's
+	# gui_input) because the chips live in PASS-filtered flow containers that don't
+	# reliably deliver gui_input, and consuming the event here stops an enemy-side chip
+	# click from also targeting the enemy behind it.
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT and not _dragging_card:
+		var chip := _status_chip_at(event.global_position)
+		if chip:
+			_show_status_pin(chip, chip.get_meta("status_effect"), chip.get_meta("status_stacks"))
+			get_viewport().set_input_as_handled()
+			return
+		if _status_pin:
+			_hide_status_pin()
+
 	# While a card is mid-drag, own motion + release HERE (before GUI routing) so the
 	# drop always resolves. If the mouse-up falls through to _unhandled_input instead,
 	# any card/enemy Control under the cursor can swallow it — leaving _dragging_card
@@ -1484,9 +1501,20 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	intent_vbox.add_theme_constant_override("separation", 2)
 	intent_panel.add_child(intent_vbox)
 
+	# Two-part readout: the move name identifies the move on top; the icon+value below
+	# is the intent-colored threat readout. The name is kept at least as large as the
+	# readout (it's what the player reads first) and the value leans on color + the icon
+	# rather than size for its emphasis, so the number never reads as part of the name.
+	var intent_name_lbl = Label.new()
+	intent_name_lbl.name = "IntentName"
+	intent_name_lbl.add_theme_font_size_override("font_size", 20)
+	intent_name_lbl.add_theme_color_override("font_color", Color(0.9, 0.86, 0.72))
+	intent_name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	intent_vbox.add_child(intent_name_lbl)
+
 	var intent_lbl = Label.new()
 	intent_lbl.name = "Intent"
-	intent_lbl.add_theme_font_size_override("font_size", 16)
+	intent_lbl.add_theme_font_size_override("font_size", 18)
 	intent_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.5))
 	intent_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intent_vbox.add_child(intent_lbl)
@@ -1605,6 +1633,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 	var status_chips: HFlowContainer = hp_vbox.get_node("Statuses")
 	var intent_panel: PanelContainer = vbox.get_node("IntentPanel")
 	var intent_vbox: VBoxContainer = intent_panel.get_node("IntentVBox")
+	var intent_name_lbl: Label = intent_vbox.get_node("IntentName")
 	var intent_lbl: Label = intent_vbox.get_node("Intent")
 	var next_intent_lbl: Label = intent_vbox.get_node("NextIntent")
 
@@ -1648,7 +1677,15 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 						if enemy.stats.has_status(StatusEffects.WEAK):
 							modified = int(modified * 0.75)
 						modified = maxi(0, modified)
-						if modified != effect.value:
+						var hits: int = effect.hits
+						if hits > 1:
+							# Multi-hit: show per-hit (base [modified]) plus the real total, so
+							# "⚔ 6×3 (18)" never reads as a single 6-damage poke.
+							if modified != effect.value:
+								value_str = " %d [%d]×%d (%d)" % [effect.value, modified, hits, modified * hits]
+							else:
+								value_str = " %d×%d (%d)" % [effect.value, hits, effect.value * hits]
+						elif modified != effect.value:
 							value_str = " %d [%d]" % [effect.value, modified]
 						else:
 							value_str = " %d" % effect.value
@@ -1685,11 +1722,15 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 			icon = "✧"
 			intent_color = Color(0.66, 0.52, 0.96)
 			value_str = _passion_intent_readout(enemy.current_intent)
+		# Name stays a muted constant color (flavor); the emphasized value carries the
+		# intent color so the threat category reads from the big number, not the name.
 		intent_lbl.add_theme_color_override("font_color", intent_color)
-		# Move name on top (flavor), the icon+value readout on its own line below, so
-		# the number never reads as part of the name ("Vanguard Strike 7" -> variant 7).
-		intent_lbl.text = "%s\n%s%s" % [enemy.current_intent.move_name, icon, value_str]
+		intent_name_lbl.text = enemy.current_intent.move_name
+		intent_name_lbl.visible = true
+		intent_lbl.text = "%s%s" % [icon, value_str]
 	else:
+		intent_name_lbl.text = ""
+		intent_name_lbl.visible = false
 		intent_lbl.text = ""
 
 	# Sight mode: render the next-turn intent below the current one. Hidden when
@@ -1870,14 +1911,83 @@ func _make_status_chip(effect: StatusEffectData, stacks: int) -> PanelContainer:
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(lbl)
 
-	chip.tooltip_text = "%s  (%d) · %s\n%s\n%s" % [
-		effect.effect_name, stacks, effect.kind_label(),
-		effect.description, effect.decay_note()]
+	# Hover = the normal delayed engine tooltip (auto-hides). Click = show the same text
+	# immediately and PIN it. The click is caught by manual hit-testing in _input (the
+	# chips sit in PASS-filtered flow containers that don't reliably deliver gui_input),
+	# so we expose the effect + stacks via group membership + metadata for that lookup.
+	chip.tooltip_text = _status_desc_text(effect, stacks)
 	chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	chip.add_to_group("status_chip")
+	chip.set_meta("status_effect", effect)
+	chip.set_meta("status_stacks", stacks)
 	# Subtle hover pop so it reads as individually inspectable.
 	chip.mouse_entered.connect(func(): chip.modulate = Color(1.25, 1.25, 1.25))
 	chip.mouse_exited.connect(func(): chip.modulate = Color.WHITE)
 	return chip
+
+
+## Shared rich description for a status effect: "Name (n) · kind\nwhat it does\nhow it
+## fades". Used verbatim by both the hover tooltip and the click-pinned popup.
+func _status_desc_text(effect: StatusEffectData, stacks: int) -> String:
+	return "%s  (%d) · %s\n%s\n%s" % [
+		effect.effect_name, stacks, effect.kind_label(),
+		effect.description, effect.decay_note()]
+
+
+## The topmost visible status chip under `pos` (viewport space), or null. Backs the
+## click-to-pin hit-test in _input. Chips register in the "status_chip" group.
+func _status_chip_at(pos: Vector2) -> Control:
+	for node in get_tree().get_nodes_in_group("status_chip"):
+		if node is Control and node.is_visible_in_tree() and node.get_global_rect().has_point(pos):
+			return node
+	return null
+
+
+## Click-pinned status description. Unlike the hover tooltip (delayed, auto-hiding),
+## this appears instantly on click and stays put until the player clicks elsewhere
+## (dismiss hook lives at the top of _input). Positioned just above the clicked chip.
+func _show_status_pin(anchor: Control, effect: StatusEffectData, stacks: int) -> void:
+	_hide_status_pin()
+	_status_pin = PanelContainer.new()
+	_status_pin.z_index = 60
+	_status_pin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var accent := Color(0.4, 0.75, 0.45) if effect.is_buff else Color(0.82, 0.4, 0.4)
+	var style = StyleBoxFlat.new()
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(2)
+	style.border_color = accent
+	style.bg_color = Color(0.09, 0.08, 0.14, 0.98)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 9
+	style.content_margin_bottom = 9
+	_status_pin.add_theme_stylebox_override("panel", style)
+
+	var lbl = Label.new()
+	lbl.text = _status_desc_text(effect, stacks)
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", Color(0.93, 0.9, 0.85))
+	lbl.custom_minimum_size.x = 230
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_pin.add_child(lbl)
+
+	add_child(_status_pin)
+	await get_tree().process_frame
+	if not is_instance_valid(anchor) or not is_instance_valid(_status_pin):
+		_hide_status_pin()
+		return
+	var pos = anchor.global_position
+	_status_pin.global_position = Vector2(
+		clampf(pos.x - 8, 10, 1920 - _status_pin.size.x - 10),
+		maxf(10, pos.y - _status_pin.size.y - 8)
+	)
+
+
+func _hide_status_pin() -> void:
+	if _status_pin:
+		_status_pin.queue_free()
+		_status_pin = null
 
 
 func _log(msg: String) -> void:

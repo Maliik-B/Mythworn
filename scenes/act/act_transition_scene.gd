@@ -67,6 +67,42 @@ void fragment() {
 		_build_act_complete(vbox)
 
 
+## The between-acts beat. A keeper's place in a realm is a loan: when the work is done,
+## a double steps into your outline and F.A.B.L.E. holds you at the Waystation boundary —
+## an interval it can't control, which is why the realm has moved on when you return. The
+## opening vignette reflects the Act-1 Camelot crown outcome (took / refused / abdicated),
+## keyed off the earned title since philosophy_id isn't set until Reign Phase 2. Later
+## acts (and other realms) get the shared frame alone. Abdication exists but is out of
+## demo scope.
+func _waystation_text() -> String:
+	var tail := ("You make your report: the work in the realm is done. This is how it ends "
+		+ "for a keeper, every time. Your place was only ever a loan, and a double steps into "
+		+ "your outline to keep the story warm once your part is played.\n\n"
+		+ "F.A.B.L.E. holds the boundary here at the Waystation. They do not hold the time. "
+		+ "Whatever passes while you wait, they cannot account for it. When the way opens, you "
+		+ "step back into a realm that has gone on without you.")
+
+	var vignette := ""
+	if RunManager.current_act == 1 and RunManager.current_realm_id == &"camelot":
+		if RunManager.has_abdicated:
+			vignette = ("You set the crown down where they could all watch you do it, and "
+				+ "walked. No double follows you out; there is no role left to keep warm, only a "
+				+ "throne you emptied on your way to the door. You feel the realm's regard cool "
+				+ "at your back.")
+		elif RunManager.earned_title_ids.has(&"king_of_camelot"):
+			vignette = ("You leave the coronation to carry itself. Out of the royal apartments, "
+				+ "out of the king's mantle, down a servants' stair, and behind you your double "
+				+ "is already easing into the chamber, into the crown, into the reign. It will "
+				+ "wear your face better than you did.")
+		elif RunManager.earned_title_ids.has(&"camelots_champion"):
+			vignette = ("You are gone before the court can turn to name a king. Head down, "
+				+ "through the market crowd, into the cool shadow of a borough wall, and you wait "
+				+ "for the noise to thin. When you look up, the street is not there. The "
+				+ "Waystation is.")
+
+	return tail if vignette == "" else vignette + "\n\n" + tail
+
+
 func _build_act_complete(vbox: VBoxContainer) -> void:
 	var title = Label.new()
 	title.text = "Act %d Complete" % RunManager.current_act
@@ -76,10 +112,13 @@ func _build_act_complete(vbox: VBoxContainer) -> void:
 	vbox.add_child(title)
 
 	var desc = Label.new()
-	desc.text = "The realm shifts as you press deeper..."
+	desc.text = _waystation_text()
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc.add_theme_font_size_override("font_size", 20)
-	desc.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	desc.custom_minimum_size = Vector2(900, 0)
+	desc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	desc.add_theme_font_size_override("font_size", 18)
+	desc.add_theme_color_override("font_color", Color(0.78, 0.76, 0.68))
 	vbox.add_child(desc)
 
 	# Stats summary

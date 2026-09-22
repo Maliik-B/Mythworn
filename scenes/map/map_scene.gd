@@ -1732,19 +1732,6 @@ func _scroll_to_player() -> void:
 # ENCOUNTER GENERATION
 # ============================================================
 
-## Returns a scaling multiplier based on the current act.
-func _act_scale() -> float:
-	return 1.0 + (RunManager.current_act - 1) * 0.4
-
-
-func _scale_hp(base: int) -> int:
-	return int(base * _act_scale())
-
-
-func _scale_dmg(base: int) -> int:
-	return int(base * (1.0 + (RunManager.current_act - 1) * 0.25))
-
-
 func _combat_encounter(floor_num: int) -> Array[EnemyData]:
 	# Camelot's regular roster + encounter pairings now live in EnemyPool. The
 	# difficulty_mult argument is where the A2 realm-config (court vs common folk)
@@ -1770,109 +1757,14 @@ func _boss_encounter() -> Array[EnemyData]:
 # ENEMY TEMPLATES
 # ============================================================
 
-func _make_slime(hp: int) -> EnemyData:
-	var e = EnemyData.new()
-	e.enemy_name = "Slime"
-	e.max_health = hp
-	var m1 = EnemyMove.new()
-	m1.move_name = "Tackle"
-	m1.intent_type = EnemyMove.IntentType.ATTACK
-	m1.effects.assign([_fx_damage(_scale_dmg(6))])
-	m1.weight = 2.0
-	var m2 = EnemyMove.new()
-	m2.move_name = "Harden"
-	m2.intent_type = EnemyMove.IntentType.DEFEND
-	m2.effects.assign([_fx_block(_scale_dmg(5))])
-	m2.weight = 1.0
-	var m3 = EnemyMove.new()
-	m3.move_name = "Slam"
-	m3.intent_type = EnemyMove.IntentType.ATTACK
-	m3.effects.assign([_fx_damage(_scale_dmg(12))])
-	m3.weight = 0.5
-	var m4 = EnemyMove.new()
-	m4.move_name = "Spit"
-	m4.intent_type = EnemyMove.IntentType.DEBUFF
-	m4.effects.assign([_fx_status(StatusEffects.WEAK, 1)])
-	m4.weight = 1.0
-	e.moves.assign([m1, m2, m3, m4])
-	return e
-
-
-func _make_goblin(hp: int) -> EnemyData:
-	var e = EnemyData.new()
-	e.enemy_name = "Goblin"
-	e.max_health = hp
-	var m1 = EnemyMove.new()
-	m1.move_name = "Stab"
-	m1.intent_type = EnemyMove.IntentType.ATTACK
-	m1.effects.assign([_fx_damage(_scale_dmg(4))])
-	m1.weight = 2.0
-	var m2 = EnemyMove.new()
-	m2.move_name = "Slash"
-	m2.intent_type = EnemyMove.IntentType.ATTACK
-	m2.effects.assign([_fx_damage(_scale_dmg(8))])
-	m2.weight = 1.0
-	var m3 = EnemyMove.new()
-	m3.move_name = "Poison Dart"
-	m3.intent_type = EnemyMove.IntentType.ATTACK
-	m3.effects.assign([_fx_damage(_scale_dmg(2)), _fx_status(StatusEffects.POISON, 2)])
-	m3.weight = 0.7
-	e.moves.assign([m1, m2, m3])
-	return e
-
-
-func _make_elite() -> EnemyData:
-	var e = EnemyData.new()
-	e.enemy_name = "Orc Brute"
-	e.max_health = _scale_hp(70)
-	var m1 = EnemyMove.new()
-	m1.move_name = "Crush"
-	m1.intent_type = EnemyMove.IntentType.ATTACK
-	m1.effects.assign([_fx_damage(_scale_dmg(10))])
-	m1.weight = 2.0
-	var m2 = EnemyMove.new()
-	m2.move_name = "War Cry"
-	m2.intent_type = EnemyMove.IntentType.BUFF
-	m2.effects.assign([_fx_self_status(StatusEffects.STRENGTH, 2)])
-	m2.weight = 1.0
-	var m3 = EnemyMove.new()
-	m3.move_name = "Smash"
-	m3.intent_type = EnemyMove.IntentType.ATTACK
-	m3.effects.assign([_fx_damage(_scale_dmg(16)), _fx_status(StatusEffects.VULNERABLE, 2)])
-	m3.weight = 0.5
-	e.moves.assign([m1, m2, m3])
-	return e
-
-
 func _make_boss() -> EnemyData:
+	# Placeholder bosses for Acts 2-3 (out of demo scope). Act 1 is Sir Caedmon,
+	# built in EnemyPool and routed via _boss_encounter, so this is never called
+	# for act <= 1.
 	var act = RunManager.current_act
 	var e = EnemyData.new()
 
-	if act <= 1:
-		e.enemy_name = "Realm Guardian"
-		e.max_health = 120
-		var m1 = EnemyMove.new()
-		m1.move_name = "Sweep"
-		m1.intent_type = EnemyMove.IntentType.ATTACK
-		m1.effects.assign([_fx_damage(8)])
-		m1.weight = 2.0
-		var m2 = EnemyMove.new()
-		m2.move_name = "Bolster"
-		m2.intent_type = EnemyMove.IntentType.DEFEND
-		m2.effects.assign([_fx_block(12), _fx_self_status(StatusEffects.STRENGTH, 1)])
-		m2.weight = 1.0
-		var m3 = EnemyMove.new()
-		m3.move_name = "Devastate"
-		m3.intent_type = EnemyMove.IntentType.ATTACK
-		m3.effects.assign([_fx_damage(22)])
-		m3.weight = 0.4
-		var m4 = EnemyMove.new()
-		m4.move_name = "Drain Spirit"
-		m4.intent_type = EnemyMove.IntentType.DEBUFF
-		m4.effects.assign([_fx_status(StatusEffects.WEAK, 2), _fx_status(StatusEffects.VULNERABLE, 1)])
-		m4.weight = 0.8
-		e.moves.assign([m1, m2, m3, m4])
-	elif act == 2:
+	if act == 2:
 		e.enemy_name = "Hollow Warden"
 		e.max_health = 180
 		var m1 = EnemyMove.new()
@@ -1958,20 +1850,3 @@ func _create_test_character() -> CharacterData:
 	# Same character the real game builds, so poking the map scene standalone shows
 	# the actual starting deck (single source of truth).
 	return CharacterPool.build_emo_hybrid()
-
-
-func _make_card(card_name: String, cost: int, type: CardData.CardType,
-		target: CardData.TargetType, card_effects: Array) -> CardData:
-	var c = CardData.new()
-	c.card_name = card_name
-	c.energy_cost = cost
-	c.card_type = type
-	c.target_type = target
-	for e in card_effects:
-		c.effects.append(e)
-	return c
-
-func _fx_passion(v: int) -> PassionEffect:
-	var e = PassionEffect.new()
-	e.value = v
-	return e

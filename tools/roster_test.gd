@@ -18,6 +18,8 @@ func _ready() -> void:
 	_setup_run_state()
 	_test_opener()
 	_test_elite_and_boss_identity()
+	_test_elite_rotation()
+	_test_conspirator_rally()
 	_test_caedmon_phase_gate()
 	_test_caedmon_transition()
 	_test_passion_pull()
@@ -64,12 +66,43 @@ func _test_opener() -> void:
 
 
 func _test_elite_and_boss_identity() -> void:
+	var elite_names := ["Champion of the Usurper", "The False Prophet", "The Iron Verdict"]
 	var elite := EnemyPool.get_elite_encounter()
-	_check("elite is Champion or False Prophet",
-		elite.size() == 1 and elite[0].enemy_name in ["Champion of the Usurper", "The False Prophet"])
+	_check("elite is one of the three Camelot elites",
+		elite.size() == 1 and elite[0].enemy_name in elite_names)
 	var boss := EnemyPool.get_boss()
 	_check("act-1 boss is Sir Caedmon",
 		boss.size() == 1 and boss[0].enemy_name == "Sir Caedmon")
+
+
+## The shuffle-bag guarantees a run sees all three elites once before any repeat (a path
+## can hold up to 3 elite nodes). Iron Verdict is armed with Enraged from turn 1.
+func _test_elite_rotation() -> void:
+	EnemyPool.reset_encounter_state()
+	var seen := {}
+	for i in 3:
+		var e := EnemyPool.get_elite_encounter()
+		seen[e[0].enemy_name] = seen.get(e[0].enemy_name, 0) + 1
+	_check("3 elite draws are all distinct (no same-run repeat)", seen.size() == 3)
+
+	var verdict := EnemyPool.iron_verdict()
+	var armed := false
+	for pair in verdict.starting_statuses:
+		if pair[0] == StatusEffects.ENRAGED and pair[1] >= 1:
+			armed = true
+	_check("Iron Verdict starts armed with Enraged", armed)
+
+	# End-to-end: start_combat applies starting_statuses, so the elite retaliates from
+	# the first hit rather than needing a setup turn.
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 60, 60, [EnemyPool.iron_verdict()])
+	var live_enraged: int = eng.enemies[0].stats.get_status_stacks(StatusEffects.ENRAGED)
+	var hp_before := eng.player_stats.current_hp
+	eng.deal_damage(eng.enemies[0].stats, 5, eng.player_stats)
+	_check("Iron Verdict is Enraged in combat and lashes back on the first hit",
+		live_enraged >= 1 and eng.player_stats.current_hp == hp_before - live_enraged)
+	eng.free()
 
 
 func _test_caedmon_phase_gate() -> void:
@@ -99,6 +132,26 @@ func _test_caedmon_phase_gate() -> void:
 		if st.current_intent.move_name not in phase2:
 			p2_ok = false
 	_check("Caedmon phase 2 uses only compelled moves", p2_ok)
+
+
+## The Court Conspirator rallies the group: a BUFF that hands Strength to every living
+## enemy (self + allies) via the new StatusApplyEffect.apply_to_allies path.
+func _test_conspirator_rally() -> void:
+	var consp := EnemyPool.court_conspirator()
+	var has_rally := false
+	for m in consp.moves:
+		if m.move_name == "Rally the Court":
+			has_rally = true
+	_check("Court Conspirator has a Rally the Court move", has_rally)
+
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [EnemyPool.court_conspirator(), _dummy_attacker()])
+	EnemyPool._ally_status(StatusEffects.STRENGTH, 1).apply(eng.enemies[0].stats, eng.player_stats, eng)
+	_check("Rally buffs all allies (both enemies gain Strength)",
+		eng.enemies[0].stats.get_status_stacks(StatusEffects.STRENGTH) == 1
+		and eng.enemies[1].stats.get_status_stacks(StatusEffects.STRENGTH) == 1)
+	eng.free()
 
 
 ## End-to-end: the engine transitions (not kills) when a non-final phase is depleted,
@@ -287,7 +340,10 @@ func _test_scene_scripts_compile() -> void:
 	# never touches them. load() here (autoloads present) forces a full compile,
 	# catching errors in the resonance-sigil edits and the encounter wiring.
 	for path in ["res://scenes/combat/combat_scene.gd", "res://scenes/map/map_scene.gd",
-			"res://scenes/reward/card_reward_scene.gd", "res://scenes/event/event_scene.gd"]:
+			"res://scenes/reward/card_reward_scene.gd", "res://scenes/event/event_scene.gd",
+			"res://scenes/character_select/character_select_scene.gd",
+			"res://scenes/shop/shop_scene.gd",
+			"res://scenes/act/act_transition_scene.gd"]:
 		var scr = load(path)
 		_check("compiles: %s" % path, scr != null and scr is GDScript)
 

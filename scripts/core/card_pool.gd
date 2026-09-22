@@ -237,7 +237,7 @@ static func _build_generic_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		[_damage(5), _block(5)]))
 
-	pool.append(_card("Shield Bash", 1, CardData.CardType.SKILL,
+	pool.append(_card("Shield Wall", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.COMMON,
 		[_block(8)]))
 
@@ -284,7 +284,7 @@ static func _build_generic_pool() -> Array[CardData]:
 	# cycle (their AddCardEffect just shares this prototype), so they free normally.
 	var inner_fire = _card("Inner Fire", 0, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
-		[_passion(5)])
+		[_block(5), _passion(5)])
 	var inner_fire_copy = AddCardEffect.new()
 	inner_fire_copy.card_to_add = inner_fire
 	inner_fire_copy.to_discard = true

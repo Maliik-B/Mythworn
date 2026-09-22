@@ -126,25 +126,48 @@ static func _compose(key: String, mult: float) -> Array[EnemyData]:
 	return result
 
 
-## The last elite handed out, so we alternate the two rather than repeat one.
-static var _last_elite: String = ""
+## Shuffle-bag of the three elites, drawn without replacement so a run meets each once
+## before any repeat (a path can hold up to MAX_ELITES_PER_PATH=3 elite nodes, so a full
+## bag exactly covers the worst case). Reset per run by reset_encounter_state().
+static var _elite_bag: Array[String] = []
 
 
-## One elite for an elite node. Alternates Champion (adaptability) and False Prophet
-## (the Passion crucible). difficulty_mult is the A2 realm-config hook.
+## One elite for an elite node. The three test different axes: Champion (adaptability /
+## HP-band phases), False Prophet (the Passion crucible), Iron Verdict (retaliation —
+## punishes chip/multi-hit, rewards big single hits). difficulty_mult is the A2 hook.
 static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData]:
 	var mult := _act_mult() * difficulty_mult
-	var pick := ""
-	if _last_elite == "champion":
-		pick = "prophet"
-	elif _last_elite == "prophet":
-		pick = "champion"
-	else:
-		pick = "champion" if RngManager.enemy_rng.randf() < 0.5 else "prophet"
-	_last_elite = pick
+	if _elite_bag.is_empty():
+		_elite_bag = ["champion", "prophet", "verdict"]
+		_shuffle_bag(_elite_bag)
+	var pick: String = _elite_bag.pop_back()
 	var result: Array[EnemyData] = []
-	result.append(champion_of_the_usurper(mult) if pick == "champion" else false_prophet(mult))
+	match pick:
+		"prophet":
+			result.append(false_prophet(mult))
+		"verdict":
+			result.append(iron_verdict(mult))
+		_:
+			result.append(champion_of_the_usurper(mult))
 	return result
+
+
+## Deterministic Fisher-Yates using the run-seeded enemy RNG (Array.shuffle() would use
+## the global RNG and break run reproducibility).
+static func _shuffle_bag(arr: Array) -> void:
+	for i in range(arr.size() - 1, 0, -1):
+		var j := RngManager.enemy_rng.randi_range(0, i)
+		var tmp = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
+
+
+## Clears per-run encounter memory — the elite shuffle-bag and the last-combat key — so
+## a fresh run's elites don't repeat and it doesn't inherit the prior run's anti-repeat
+## state. Called from RunManager.start_run.
+static func reset_encounter_state() -> void:
+	_elite_bag.clear()
+	_last_key = ""
 
 
 ## The Act-1 boss: Sir Caedmon. (Acts 2-3 are out of demo scope; map_scene still
@@ -193,6 +216,11 @@ static func court_conspirator(mult := 1.0) -> EnemyData:
 		# pressure, not damage). Weak rides along so ignoring it also costs tempo.
 		_move("Whisper", EnemyMove.IntentType.DEBUFF,
 			[_passion(-4), _status(StatusEffects.WEAK, 1)], 2.2, 3),
+		# The coordinator: he's usually fought alongside a bruiser (Knight/Golem), and
+		# Rally the Court hands Strength to the whole group (himself included). Makes him
+		# a priority kill — leave him up and the pairing snowballs. Cooldown paces it.
+		_move("Rally the Court", EnemyMove.IntentType.BUFF,
+			[_ally_status(StatusEffects.STRENGTH, 1)], 1.1, 2),
 	]
 	return _enemy("Court Conspirator", _scale(26, mult), moves)
 
@@ -284,6 +312,37 @@ static func false_prophet(mult := 1.0) -> EnemyData:
 	return _enemy("The False Prophet", _scale(110, mult), moves)
 
 
+## The Iron Verdict (High effective HP via block). The retaliation test: a corrupt
+## executioner-knight who begins ARMED with Enraged (strikes back per hit) and escalates
+## it with Retribution, while turtling behind heavy block. Chip / multi-hit decks bleed
+## themselves out on him; the counterplay is fewer, bigger hits landed when his guard is
+## down — so he pulls toward the Physical/secondary pole the way the Prophet pulls toward
+## center. Enraged ignores block and fires per hit (see combat_engine.deal_damage), so it
+## specifically punishes the multi-hit Water build. Numbers are a harness-calibration target.
+static func iron_verdict(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		# Filler pressure so stalling him out isn't free — you have to engage, and
+		# engaging is what the retaliation punishes.
+		_move("Backhand", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(9, mult))], 1.6),
+		# Heavy block windows. Hitting into this wastes hits AND (fully blocked) denies
+		# your own tempo; the read is to burst when the guard is down instead.
+		_move("Iron Bulwark", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(14, mult))], 1.2),
+		# Escalating retaliation: the longer the fight drags, the more each hit costs you.
+		# Cooldown so it ramps as a rhythm (2 -> 3 -> 4 ...) rather than spiking.
+		_move("Retribution", EnemyMove.IntentType.BUFF,
+			[_self_status(StatusEffects.ENRAGED, 1)], 1.0, 2),
+		# The telegraphed heavy — the strike-around / block-now moment.
+		_move("Cleaving Sentence", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(17, mult))], 1.3, 2),
+	]
+	var e := _enemy("The Iron Verdict", _scale(92, mult), moves)
+	# Armed from turn 1 so the retaliation puzzle is live before he can be rushed.
+	e.starting_statuses = [[StatusEffects.ENRAGED, 2]]
+	return e
+
+
 # ============================================================
 # CAMELOT ACT-1 BOSS — Sir Caedmon, the Hollow Champion
 # ============================================================
@@ -325,7 +384,7 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	e.phase_hps.assign([_scale(70, mult), _scale(70, mult)])
 	e.phase_movesets = [phase1, phase2]
 	e.phase_lines.assign(["",
-		"No— please, not again. I'll do whatever you ask. Just— don't make me—"])
+		"No... please, not again. I'll do whatever you ask. Just... don't make me..."])
 	# Phase-2 anti-burst: the compulsion seizes him. A one-time LASH at the player + a
 	# Strength jump on transition — both pace-independent, so reaching his second bar
 	# costs HP no matter how fast you burst it. (Enraged/retaliation is intentionally NOT
@@ -400,6 +459,15 @@ static func _self_status(effect: StatusEffectData, stacks: int) -> StatusApplyEf
 	e.status_effect = effect
 	e.value = stacks
 	e.apply_to_source = true
+	return e
+
+
+## Buffs every living enemy (self + allies) — support moves like the Conspirator's rally.
+static func _ally_status(effect: StatusEffectData, stacks: int) -> StatusApplyEffect:
+	var e := StatusApplyEffect.new()
+	e.status_effect = effect
+	e.value = stacks
+	e.apply_to_allies = true
 	return e
 
 

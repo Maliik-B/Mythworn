@@ -73,8 +73,8 @@ func _build_sword_in_stone_event() -> EventData:
 func _build_sword_guardian_won_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Beast Unmade"
-	e.description = ("As the last blow lands, the chaos goes out of him. The black veins fade back "
-		+ "under the skin. The swollen arm eases. For one borrowed breath a man is left where the "
+	e.description = ("As the last blow lands, the chaos within him seems to ebb. The black veins fade "
+		+ "back under his skin. His swollen arm eases. For one borrowed breath a man is left where the "
 		+ "beast was, clear-eyed and frightened.\n\n\"Caedmon.\" He gets the name out like it costs "
 		+ "him. \"I went to face Sir Caedmon. I had put down better men than him. I thought it would "
 		+ "be quick.\" A wet laugh. \"But he does not fight like a man. Halfway through, something "
@@ -84,14 +84,15 @@ func _build_sword_guardian_won_event() -> EventData:
 		+ "him. Through every wound he opened. Do not stand there trading blows with the puppet. Wear "
 		+ "his own will down first, until the thing moving him has to show itself. Then you put the "
 		+ "sword in that.\"\n\nHe sags back against the stone. \"The blade would not have me. Maybe it "
-		+ "was only ever waiting for you.\" He goes still. Behind you the granite gives, with a sound "
-		+ "like a long-held breath let go, and Excalibur lifts free of the stone. It settles into "
-		+ "your hand, impossibly light.")
+		+ "will have you.\" He goes still. Behind you the granite gives, with a sound like a long-held "
+		+ "breath let go, and the sword shifts in its seat. It sits loose in the stone now, waiting to "
+		+ "be taken.")
 
 	var take = EventData.EventChoice.new()
 	take.text = "Take up Excalibur."
-	take.result_text = ("It weighs almost nothing in your hand. Already you can feel that it will "
-		+ "answer to how you hold it: as an edge, or as an eye.")
+	take.result_text = ("You close your hand on the grip and pull. Excalibur comes free surprisingly "
+		+ "easily, sliding out of the stone. It settles into your hand, impossibly light. Already you "
+		+ "can feel it will answer to how you hold it: as an edge, or as an eye.")
 	take.granted_relic_id = &"Excalibur"
 	take.awarded_title_id = &"swords_bearer"
 	take.passion_change = 3
@@ -395,15 +396,17 @@ func _show_card_reward() -> void:
 
 	var cards = CardPool.get_reward_choices(RngManager.loot_rng, 3)
 
-	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size.y = 200
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	follow_up_container.add_child(scroll)
+	# The 3 reward cards always fit, so center them across the full width. (A
+	# ScrollContainer here pinned the row to the left, since it sizes its child to
+	# content rather than stretching it — a CenterContainer that fills the width
+	# centers the row to match the header above.)
+	var center = CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	follow_up_container.add_child(center)
 
 	var row = HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 20)
-	scroll.add_child(row)
+	center.add_child(row)
 
 	for card in cards:
 		var panel = _create_card_panel(card)

@@ -7,6 +7,11 @@ extends Resource
 @export var moves: Array[EnemyMove] = []
 @export var sprite: Texture2D
 
+## Statuses the enemy begins combat with, as [StatusEffectData, stacks] pairs. Lets an
+## enemy be "armed" from turn 1 (e.g. an Enraged-retaliation elite) without having to
+## roll a setup move first. Built in code by EnemyPool, so left untyped.
+var starting_statuses: Array = []
+
 ## Multi-phase bosses (separate HP bars). Leave empty for a normal single-phase
 ## enemy. When set, `phase_hps[i]` is phase i's own lifebar and `phase_movesets[i]`
 ## its move list; depleting a phase's HP transitions to the next phase (refill HP +
