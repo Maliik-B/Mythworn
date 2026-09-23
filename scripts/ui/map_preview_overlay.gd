@@ -30,6 +30,11 @@ static func open(host: Node) -> MapPreviewOverlay:
 
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Match the viewport right away. Anchor-based full-rect sizing only resolves on the
+	# next layout pass; until then the overlay is a zero-size box in the corner, which
+	# confines the dim backdrop and the (anchor-centered) panel there too. Setting the
+	# size explicitly makes both fill/centre correctly the moment the overlay opens.
+	size = get_viewport_rect().size
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 	# Dim backdrop — clicking it closes the preview.
@@ -42,7 +47,21 @@ func _build() -> void:
 
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(760, 620)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	# Center reliably. The panel is built the same frame the overlay is added, before
+	# it has been laid out, so a PRESET_CENTER bakes its offsets against a zero-size
+	# parent and lands the panel in the corner. Anchoring to the middle (0.5) with
+	# fixed half-size offsets lets the engine recompute the rect correctly once the
+	# parent takes its real size.
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -380.0
+	panel.offset_top = -310.0
+	panel.offset_right = 380.0
+	panel.offset_bottom = 310.0
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.08, 0.07, 0.12, 0.98)
 	panel_style.set_corner_radius_all(10)

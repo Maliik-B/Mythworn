@@ -11,6 +11,7 @@ var energy_label: Label
 var block_label: Label
 var passion_label: Label
 var _passion_popup: Control
+var _map_overlay: MapPreviewOverlay = null  # read-only route peek (see _on_view_map)
 var player_status_prefix: Label
 var player_status_chips: HFlowContainer
 var player_powers_prefix: Label
@@ -74,6 +75,12 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# The map-peek overlay is modal (own dim backdrop + Close). Since _input runs
+	# before GUI routing, a click here would otherwise hit-test status chips behind
+	# the overlay and swallow the event before its backdrop/Close could. Yield to it.
+	if is_instance_valid(_map_overlay):
+		return
+
 	# Status-chip click, resolved before GUI routing. Clicking a status/effect chip pins
 	# its description (immediate, and it stays until the next click elsewhere); clicking
 	# anywhere else dismisses an open pin. Manual hit-testing (rather than the chip's
@@ -241,6 +248,18 @@ void fragment() {
 func _build_top_bar() -> HBoxContainer:
 	var bar = HBoxContainer.new()
 
+	# Map peek — glance at your route / what's ahead without leaving combat. Sits at
+	# the far left (map-in-the-corner), set apart from the pile counts on the right.
+	var map_btn = _make_pile_button(Color(0.82, 0.72, 0.42))
+	map_btn.text = "Map ▸"
+	map_btn.tooltip_text = "Peek the map — your route so far and what lies ahead"
+	map_btn.pressed.connect(_on_view_map)
+	bar.add_child(map_btn)
+
+	var map_spacer = Control.new()
+	map_spacer.custom_minimum_size.x = 34
+	bar.add_child(map_spacer)
+
 	draw_label = _make_pile_button(Color(0.5, 0.7, 0.9))
 	draw_label.pressed.connect(_on_pile_clicked.bind("draw"))
 	bar.add_child(draw_label)
@@ -372,6 +391,18 @@ func _hide_passion_infographic() -> void:
 	if _passion_popup:
 		_passion_popup.queue_free()
 		_passion_popup = null
+
+
+## Map peek: opens the shared read-only route overlay over combat (reused from
+## rest/shop/event). Dismiss the transient passion popup + status pin first so they
+## don't linger under it, and raise it above combat's z-indexed FX so it reads clean.
+func _on_view_map() -> void:
+	if is_instance_valid(_map_overlay):
+		return
+	_hide_passion_infographic()
+	_hide_status_pin()
+	_map_overlay = MapPreviewOverlay.open(self)
+	_map_overlay.z_index = 100
 
 
 func _build_bottom_area() -> HBoxContainer:

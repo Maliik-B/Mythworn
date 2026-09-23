@@ -229,6 +229,10 @@ void fragment() {
 	remove_btn.pressed.connect(_on_remove_pressed)
 	btn_row.add_child(remove_btn)
 
+	var artifacts_btn = _make_gold_button("Your Artifacts", Vector2(200, 52))
+	artifacts_btn.pressed.connect(_on_view_artifacts)
+	btn_row.add_child(artifacts_btn)
+
 	var map_btn = _make_gold_button("View Map", Vector2(180, 52))
 	map_btn.pressed.connect(_on_view_map)
 	btn_row.add_child(map_btn)
@@ -901,6 +905,12 @@ func _on_leave() -> void:
 ## Read-only map peek — doesn't leave the shop.
 func _on_view_map() -> void:
 	MapPreviewOverlay.open(self)
+
+
+## Read-only artifact review — the relics + titles you already carry, for purchase
+## planning. Doesn't leave the shop or mutate anything.
+func _on_view_artifacts() -> void:
+	ArtifactsOverlay.open(self)
 
 
 func _ignore_mouse_recursive(control: Control) -> void:
