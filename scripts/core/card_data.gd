@@ -18,6 +18,10 @@ enum PersonalityType { PRIMARY, SECONDARY, NEUTRAL, NEGATIVE }
 @export var personality: PersonalityType = PersonalityType.NEUTRAL
 @export var effects: Array[CardEffect] = []
 @export var exhaust: bool = false
+## X-cost card (StS "X"): on play it spends ALL remaining energy, and its x_scaled
+## effects repeat once per energy spent (X = energy on cast). energy_cost stays 0 so
+## can_play_card always admits it; the engine reads the live energy as X. UI shows "X".
+@export var x_cost: bool = false
 ## Unplayable cards (curses / status) sit dead in hand: they can't be played, they
 ## just clog your options. Enemies like Realm Shade inject these mid-combat, and the
 ## Act-3 mirror-curses will reuse the same flag.
@@ -45,6 +49,7 @@ func duplicate_card() -> CardData:
 	copy.target_type = target_type
 	copy.personality = personality
 	copy.exhaust = exhaust
+	copy.x_cost = x_cost
 	copy.unplayable = unplayable
 	copy.retain = retain
 	copy.card_art = card_art
@@ -84,6 +89,12 @@ func upgrade_card() -> void:
 				effect.value += 1
 			else:
 				effect.value -= 1
+
+
+## The energy cost to display: "X" for X-cost cards (which spend all energy on cast),
+## otherwise the numeric cost. Single source so every cost ornament reads the same.
+func cost_label() -> String:
+	return "X" if x_cost else str(energy_cost)
 
 
 ## Returns the currently active effects (base or upgraded).

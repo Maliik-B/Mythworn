@@ -142,14 +142,23 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_PASSION, 3))
 
+	# -- Swing gear (design pass Sep 2026): dedicated relics that swing Passion HARDER,
+	# so a build-around player commits to a pole in ~1 fight instead of the base ~2,
+	# while the plain deck's ramp is unchanged. One per direction so BOTH poles get gear.
+	# Wellspring also folds in #22: it was a Rare +1/turn that lost to Demon's Horn's
+	# +1 Strength/turn — now Uncommon and +2/turn, a real Blazing accelerant.
+	pool.append(_relic("Wellspring of Resolve", "Gain 2 Passion at the start of each turn (surges you toward Blazing).",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
+		RelicData.RelicEffect.GAIN_PASSION, 2))
+
+	pool.append(_relic("Leaden Vow", "Lose 2 Passion at the start of each turn (settles you toward Hollow).",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
+		RelicData.RelicEffect.GAIN_PASSION, -2))
+
 	# -- RARE --
 	pool.append(_relic("Guardian's Sigil", "Gain 5 Block at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 5))
-
-	pool.append(_relic("Wellspring of Resolve", "Gain 1 Passion at the start of each turn.",
-		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
-		RelicData.RelicEffect.GAIN_PASSION, 1))
 
 	pool.append(_relic("Thread of Fate", "Draw 1 additional card at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,

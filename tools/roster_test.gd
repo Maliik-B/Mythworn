@@ -26,6 +26,9 @@ func _ready() -> void:
 	_test_cooldown()
 	_test_curse()
 	_test_water_rework()
+	_test_new_regulars()
+	_test_xcost_maelstrom()
+	_test_swing_relics()
 	_test_boss_reward()
 	await _test_frozen_skips()
 	_test_scene_scripts_compile()
@@ -282,6 +285,80 @@ func _test_water_rework() -> void:
 	_check("Deep Freeze applies Frozen + Vulnerable and pushes Passion +", freeze_ok)
 
 
+## The three new Sep-2026 regulars (#18 roster thickening): each exists with its
+## signature move, and the two debuff signatures actually apply to the PLAYER (Squire's
+## Vulnerable, Acolyte's Weak) — the new "throttle you" threats.
+func _test_new_regulars() -> void:
+	var maa := EnemyPool.man_at_arms()
+	_check("Man-at-Arms exists with Overhead Chop",
+		maa.enemy_name == "Man-at-Arms" and _has_move(maa, "Overhead Chop"))
+
+	var squire := EnemyPool.corrupted_squire()
+	_check("Corrupted Squire exists with Expose Weakness",
+		squire.enemy_name == "Corrupted Squire" and _has_move(squire, "Expose Weakness"))
+
+	var acolyte := EnemyPool.prophets_acolyte()
+	_check("Prophet's Acolyte exists with Sap Will",
+		acolyte.enemy_name == "Prophet's Acolyte" and _has_move(acolyte, "Sap Will"))
+
+	# End-to-end: the two debuffs land on the player (not self), via the real engine.
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [EnemyPool.corrupted_squire()])
+	_move_by_name(squire, "Expose Weakness").effects[0].apply(
+		eng.enemies[0].stats, eng.player_stats, eng)
+	_check("Squire's Expose Weakness puts Vulnerable on the player",
+		eng.player_stats.has_status(StatusEffects.VULNERABLE))
+	_move_by_name(acolyte, "Sap Will").effects[0].apply(
+		eng.enemies[0].stats, eng.player_stats, eng)
+	_check("Acolyte's Sap Will puts Weak on the player",
+		eng.player_stats.get_status_stacks(StatusEffects.WEAK) == 2)
+	eng.free()
+
+
+## Maelstrom is the X-cost torrent (#21): x_cost card carrying an x_scaled DamageEffect,
+## and end-to-end it strikes once per energy spent (5 x 3 = 15 at full energy, zeroing it).
+func _test_xcost_maelstrom() -> void:
+	var mael: CardData = null
+	for c in CardPool.build_emo_primary_pool():
+		if c.card_name == "Maelstrom":
+			mael = c
+	var flagged := mael != null and mael.x_cost
+	var x_eff := false
+	if mael:
+		for e in mael.effects:
+			if e is DamageEffect and e.x_scaled:
+				x_eff = true
+	_check("Maelstrom is an x_cost card with an x_scaled DamageEffect", flagged and x_eff)
+
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [_dummy_attacker()])  # 100-HP dummy, 0 block
+	var shot := mael.duplicate_card()
+	eng.piles.hand.append(shot)
+	eng.energy = 3  # X = 3
+	var hp_before := eng.enemies[0].stats.current_hp
+	eng.play_card(shot, eng.enemies[0].stats)
+	_check("Maelstrom spends all energy and strikes 5x3=15 at X=3",
+		eng.enemies[0].stats.current_hp == hp_before - 15 and eng.energy == 0)
+	eng.free()
+
+
+## The swing gear (Q2): Wellspring surges Passion + each turn (uncommon after the #22
+## rarity nerf), Leaden Vow settles it − each turn — one relic per pole so a build-around
+## player can commit fast in either direction.
+func _test_swing_relics() -> void:
+	var well := RelicPool.get_relic_by_name("Wellspring of Resolve")
+	_check("Wellspring is Uncommon and +2 Passion/turn (toward Blazing)",
+		well != null and well.rarity == RelicData.RelicRarity.UNCOMMON
+		and well.trigger == RelicData.RelicTrigger.ON_TURN_START
+		and well.effect == RelicData.RelicEffect.GAIN_PASSION and well.value == 2)
+	var vow := RelicPool.get_relic_by_name("Leaden Vow")
+	_check("Leaden Vow is −2 Passion/turn (toward Hollow)",
+		vow != null and vow.trigger == RelicData.RelicTrigger.ON_TURN_START
+		and vow.effect == RelicData.RelicEffect.GAIN_PASSION and vow.value == -2)
+
+
 ## Boss card reward: must offer a full 3, include at least one RARE, and never a
 ## common/starter (uncommon-or-better) — the "3 commons off a boss" fix.
 func _test_boss_reward() -> void:
@@ -333,6 +410,17 @@ func _dummy_attacker() -> EnemyData:
 	move.effects.append(dmg)
 	e.moves.append(move)
 	return e
+
+
+func _has_move(data: EnemyData, move_name: String) -> bool:
+	return _move_by_name(data, move_name) != null
+
+
+func _move_by_name(data: EnemyData, move_name: String) -> EnemyMove:
+	for m in data.moves:
+		if m.move_name == move_name:
+			return m
+	return null
 
 
 func _test_scene_scripts_compile() -> void:

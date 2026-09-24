@@ -160,7 +160,8 @@ func _encounter(node: String, floor_num: int) -> Array[EnemyData]:
 
 
 ## A relic reward after an elite/boss (the real reward flow offers 3; we take the
-## first offered = average luck, not best-case, so sustain isn't over-modelled).
+## first offered = average luck, not best-case, so sustain isn't over-modelled) —
+## skipping only a relic that would fight the modeled build's pole (see below).
 func _award_relic(is_boss: bool) -> void:
 	var owned := RunManager.get_owned_relic_names()
 	var choices: Array[RelicData]
@@ -168,8 +169,21 @@ func _award_relic(is_boss: bool) -> void:
 		choices = RelicPool.get_boss_reward_choices(RngManager.loot_rng, owned)
 	else:
 		choices = RelicPool.get_reward_choices(RngManager.loot_rng, 3, owned)
+	for c in choices:
+		if not _relic_against_commit(c):
+			RunManager.add_relic(c)
+			return
 	if choices.size() > 0:
 		RunManager.add_relic(choices[0])
+
+
+## True if a relic swings Passion the WRONG way for the modeled Water-commit build (an
+## ON_TURN_START −Passion relic like Leaden Vow). A real Water player would never draft
+## it, so the model shouldn't either — otherwise the swing gear pollutes the passion arc.
+func _relic_against_commit(r: RelicData) -> bool:
+	return r.trigger == RelicData.RelicTrigger.ON_TURN_START \
+		and r.effect == RelicData.RelicEffect.GAIN_PASSION \
+		and signi(r.value) != signi(COMMIT_TARGET)
 
 
 ## Post-combat gold, mirroring map_scene's scaling.
@@ -219,6 +233,8 @@ func _shop_action() -> int:
 	var spent := 0
 	var owned := RunManager.get_owned_relic_names()
 	for r in RelicPool.get_reward_choices(RngManager.loot_rng, 2, owned):
+		if _relic_against_commit(r):
+			continue
 		var rp := _relic_price(r)
 		if RunManager.gold >= rp:
 			RunManager.gold -= rp
@@ -312,7 +328,19 @@ func _card_score(c: CardData) -> int:
 		s += 100    # commit to Water
 	elif c.personality == CardData.PersonalityType.SECONDARY:
 		s -= 40     # off-pole
+	elif _grants_block(c):
+		s += 55     # glass Water still values a little neutral defense to survive
 	return s
+
+
+## True if a card grants any Block — the survival floor a committed Water drafter still
+## reaches for (Shield Wall / Bolster / Phantom Guard / Bracing Blow), since the Water
+## pole itself no longer carries block.
+func _grants_block(c: CardData) -> bool:
+	for e in c.get_active_effects():
+		if e is BlockEffect:
+			return true
+	return false
 
 
 func _card_price(c: CardData) -> int:

@@ -258,7 +258,10 @@ func _mid_deck() -> Array[CardData]:
 	var d := _fresh_deck()
 	var prim := CardPool.build_emo_primary_pool()
 	var sec := CardPool.build_emo_secondary_pool()
-	for name in ["Tidal Strike", "Chillbrand", "Maelstrom", "Riverstep", "Deep Freeze"]:
+	# Water-leaning spread post-redesign (Riverstep/Poise is gone — the pole no longer
+	# borrows Physical's turf). Undertow exercises the debuff/soak lane; Maelstrom is now
+	# the X-cost torrent so it also exercises the new X path.
+	for name in ["Tidal Strike", "Chillbrand", "Maelstrom", "Undertow", "Deep Freeze"]:
 		var c := _find(prim, name)
 		if c != null:
 			d.append(c)

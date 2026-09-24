@@ -92,7 +92,7 @@ static func render_full(card: CardData, dmg_mult: float = 1.0, green_tint: bool 
 	panel.add_child(vb)
 
 	var cost := Label.new()
-	cost.text = "%d ◆" % card.energy_cost
+	cost.text = "%s ◆" % card.cost_label()
 	cost.add_theme_font_size_override("font_size", 19)
 	cost.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
 	vb.add_child(cost)

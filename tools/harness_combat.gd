@@ -71,6 +71,18 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 		var blk := _cheapest(playable.filter(_gives_block))
 		if blk != null:
 			return blk
+		# A glass Water deck has no block — its defense is EVASION and CONTROL. Model
+		# that so the pole isn't read as far more fragile than a real player would run it:
+		# Intangible (Soulstep) negates the whole incoming turn, and a Freeze deletes the
+		# biggest attacker's action. Reserve both for a genuine spike (they're scarce /
+		# exhausting), not routine chip.
+		if biggest >= SPIKE:
+			var intang := _cheapest(playable.filter(_gives_intangible))
+			if intang != null:
+				return intang
+			var freeze := _cheapest(playable.filter(_freezes))
+			if freeze != null:
+				return freeze
 
 	# 2) Hold the pole: spend one Passion card to move toward the committed target.
 	# Signed, so this validates BOTH poles: a positive target (Water) plays a
@@ -148,7 +160,12 @@ func _card_est_damage(eng: CombatEngine, card: CardData) -> int:
 			if pweak:
 				per = int(per * 0.75)
 			per = _zone_adjust(per, card.personality)
-			total += maxi(0, per) * e.hits
+			# X-cost torrent (Maelstrom): strikes once per energy on cast, so value it at
+			# the energy it would spend right now, not a flat single hit.
+			var reps: int = e.hits
+			if e.x_scaled:
+				reps = eng.energy
+			total += maxi(0, per) * reps
 	return total
 
 
@@ -171,6 +188,24 @@ func _applies_vuln(c: CardData) -> bool:
 	for e in c.get_active_effects():
 		if e is StatusApplyEffect and not e.apply_to_source \
 				and e.status_effect == StatusEffects.VULNERABLE:
+			return true
+	return false
+
+
+## Grants the player Intangible (all incoming reduced to 1) — Water's evasion defense.
+func _gives_intangible(c: CardData) -> bool:
+	for e in c.get_active_effects():
+		if e is StatusApplyEffect and e.apply_to_source \
+				and e.status_effect == StatusEffects.INTANGIBLE:
+			return true
+	return false
+
+
+## Applies Frozen to an enemy (skips its next action) — Water's control defense.
+func _freezes(c: CardData) -> bool:
+	for e in c.get_active_effects():
+		if e is StatusApplyEffect and not e.apply_to_source \
+				and e.status_effect == StatusEffects.STUN:
 			return true
 	return false
 

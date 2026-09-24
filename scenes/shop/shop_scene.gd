@@ -484,7 +484,7 @@ func _create_shop_card(card: CardData, price: int) -> PanelContainer:
 	cost_style.content_margin_bottom = 2
 	cost_container.add_theme_stylebox_override("panel", cost_style)
 	var cost_lbl = Label.new()
-	cost_lbl.text = str(card.energy_cost)
+	cost_lbl.text = card.cost_label()
 	cost_lbl.add_theme_font_size_override("font_size", 20)
 	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
 	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

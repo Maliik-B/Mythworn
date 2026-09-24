@@ -40,6 +40,14 @@ const _COMBAT_POOL := [
 	["golem_conspirator", 0.8],
 	["knight_shade", 1.0],
 	["knight_solo", 0.5], # still possible later, just deliberately lighter
+	# New Sep-2026 compositions (roster thickened, #18): a bruiser body + the two new
+	# debuff threats (Weak-caster Acolyte, Vulnerable-setter Squire), so back-to-back
+	# fights feel distinct and the pool isn't ~6 recycled pairings.
+	["manatarms_acolyte", 1.0],   # sustained damage + your offense throttled by Weak
+	["knight_squire", 0.9],       # Strength snowball + Vulnerable-on-you setup
+	["acolyte_shade", 0.9],       # Weak + curse pollution (annoyance/attrition)
+	["manatarms_solo", 0.6],      # a lone clean bruiser
+	["two_squires", 0.7],         # double glass harasser — stacking Vulnerable, low HP
 ]
 
 
@@ -121,6 +129,20 @@ static func _compose(key: String, mult: float) -> Array[EnemyData]:
 		"knight_shade":
 			result.append(corrupted_knight(mult))
 			result.append(realm_shade(mult))
+		"manatarms_acolyte":
+			result.append(man_at_arms(mult))
+			result.append(prophets_acolyte(mult))
+		"knight_squire":
+			result.append(corrupted_knight(mult))
+			result.append(corrupted_squire(mult))
+		"acolyte_shade":
+			result.append(prophets_acolyte(mult))
+			result.append(realm_shade(mult))
+		"manatarms_solo":
+			result.append(man_at_arms(mult))
+		"two_squires":
+			result.append(corrupted_squire(mult))
+			result.append(corrupted_squire(mult))
 		_:
 			result.append(corrupted_knight(mult))
 	return result
@@ -261,6 +283,63 @@ static func realm_shade(mult := 1.0) -> EnemyData:
 	return _enemy("Realm Shade", _scale(34, mult), moves)
 
 
+## Man-at-Arms (Med HP). A plain, honest bruiser — steady sustained damage, an
+## occasional shield-up, and a telegraphed overhead on a 2-turn rhythm. No status
+## gimmick: he's the clean new hallway BODY that pairs with the debuff/support enemies
+## for fresh compositions (added Sep 2026 to thicken the thin roster, #18). The damage
+## race — block his rhythm or out-pace him.
+static func man_at_arms(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Halberd Swing", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(9, mult))], 2.0),
+		_move("Raise Shield", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(8, mult))], 1.0),
+		# The telegraphed heavy — the block-now beat. Cooldown paces it as a rhythm.
+		_move("Overhead Chop", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(14, mult))], 1.4, 2),
+	]
+	return _enemy("Man-at-Arms", _scale(44, mult), moves)
+
+
+## Corrupted Squire (Low HP). A fast, fragile harasser whose signature Expose Weakness
+## puts VULNERABLE on the PLAYER — so his own follow-ups (and any bruiser he's paired
+## with) hit much harder. The priority-kill puzzle made about damage instead of Passion:
+## drop him before the Vulnerable stacks turn a partner's hit into a spike (added Sep 2026,
+## #18). Glass — a couple of good hits end him, so the tension is whether you can spare them.
+static func corrupted_squire(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Harry", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(5, mult))], 1.6),
+		# Sets Vulnerable on YOU. Cooldown so it can't chain you into a permanent 1.5x.
+		_move("Expose Weakness", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.VULNERABLE, 1)], 1.4, 2),
+		# The payoff hit — bigger, and nastier if you let the Vulnerable land first.
+		_move("Reckless Charge", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(11, mult))], 1.1, 2),
+	]
+	return _enemy("Corrupted Squire", _scale(24, mult), moves)
+
+
+## Prophet's Acolyte (Med HP). A low-damage cultist — one of the False Prophet's
+## followers — whose signature Sap Will lays WEAK on the player, blunting your offense.
+## The "your damage is throttled" threat: it rewards decks that can still push through
+## (Water trades its own control, Physical leans on its raw floor), and punishes a
+## fragile all-in. Chips and shields itself otherwise (added Sep 2026, #18). Ties the
+## regular roster to the False Prophet elite thematically.
+static func prophets_acolyte(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Censure", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(6, mult))], 1.5),
+		# The signature: 2 Weak on the player, on a cooldown so your offense recovers
+		# between throttles. Weak is a flat identity pressure, unscaled by difficulty.
+		_move("Sap Will", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.WEAK, 2)], 1.3, 2),
+		_move("Wane", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(6, mult)), _dmg(_scale(4, mult))], 1.2),
+	]
+	return _enemy("Prophet's Acolyte", _scale(34, mult), moves)
+
+
 # ============================================================
 # CAMELOT ELITES
 # ============================================================
@@ -376,22 +455,32 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 		_move("Puppet's Fervor", EnemyMove.IntentType.BUFF,
 			[_self_status(StatusEffects.STRENGTH, 3)], 1.2, 1),
 	]
-	# Two ~70-HP bars (≈ the old 130 total, split). phase-0 HP + moves seed the base
-	# fields so single-phase code paths still read something sane.
-	var e := _enemy("Sir Caedmon", _scale(70, mult), phase1)
+	# Two 72-HP bars (144 total, ~the original 140). #24 lesson (harness-driven): the old
+	# fight was 2-round burst for ~no damage taken, but inflating his HP/damage just turned
+	# him into a 9-turn attrition meatgrinder (~67 HP-lost at 170) that also wiped the
+	# low-HP run-arrival decks — WRONG fix. The RIGHT fix is purely the guaranteed
+	# transition cost below: you literally cannot reach + fell bar 2 without eating the
+	# lash + Enraged retaliation, no matter how fast you burst. So his raw stats stay ~as
+	# they were (a fair boss for a normal deck) and only the burst gets taxed.
+	# phase-0 HP + moves seed the base fields so single-phase code paths still read sane.
+	# Harness-calibration target (docs/BALANCE_SNAPSHOTS.md).
+	var e := _enemy("Sir Caedmon", _scale(72, mult), phase1)
 	# .assign() (not `=`) for the typed Array[int]/Array[String] exports — a raw literal
 	# is an untyped Array and debug builds break on the assignment (see docs pitfalls).
-	e.phase_hps.assign([_scale(70, mult), _scale(70, mult)])
+	e.phase_hps.assign([_scale(72, mult), _scale(72, mult)])
 	e.phase_movesets = [phase1, phase2]
 	e.phase_lines.assign(["",
 		"No... please, not again. I'll do whatever you ask. Just... don't make me..."])
-	# Phase-2 anti-burst: the compulsion seizes him. A one-time LASH at the player + a
-	# Strength jump on transition — both pace-independent, so reaching his second bar
-	# costs HP no matter how fast you burst it. (Enraged/retaliation is intentionally NOT
-	# used here: it fires per hit, which punishes chip decks more than burst — wrong tool.
-	# The engine keeps it for future "don't chip me" enemies.) Harness-calibration target.
-	e.phase_enter_damage.assign([0, _scale(12, mult)])
+	# Phase-2 anti-burst (#24): the compulsion seizes him. On transition he deals an
+	# unavoidable LASH, jumps in Strength, AND gains Enraged. All three are pace-
+	# independent, so reaching + felling his second bar costs HP no matter how fast you
+	# burst. Enraged (per-hit retaliation) is now the RIGHT tool, not the wrong one: the
+	# redesigned Water pole wins through multi-hit torrents (Maelstrom / Riptide / Ripple /
+	# Overflow), so per-hit retaliation punishes exactly the burst that used to trivialize
+	# him — thematically, the puppet flailing at everything within reach.
+	e.phase_enter_damage.assign([0, _scale(14, mult)])
 	e.phase_enter_self_strength.assign([0, 2])
+	e.phase_enter_enraged.assign([0, 1])
 	return e
 
 

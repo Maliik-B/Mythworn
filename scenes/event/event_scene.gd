@@ -452,7 +452,7 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	panel.add_child(vbox)
 
 	var cost_lbl = Label.new()
-	cost_lbl.text = str(card.energy_cost)
+	cost_lbl.text = card.cost_label()
 	cost_lbl.add_theme_font_size_override("font_size", 22)
 	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
 	vbox.add_child(cost_lbl)
@@ -566,7 +566,7 @@ func _create_removal_panel(card: CardData, index: int) -> PanelContainer:
 	panel.add_child(vbox)
 
 	var cost_lbl = Label.new()
-	cost_lbl.text = str(card.energy_cost)
+	cost_lbl.text = card.cost_label()
 	cost_lbl.add_theme_font_size_override("font_size", 20)
 	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
 	vbox.add_child(cost_lbl)

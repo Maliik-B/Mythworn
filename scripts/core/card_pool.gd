@@ -207,7 +207,12 @@ static func _build_character_pool(templates: Array[CardData]) -> Array[CardData]
 	return pool
 
 
-## Generic card pool — personality-neutral cards available to all characters.
+## Generic card pool — personality-neutral cards available to all characters. These are
+## the "Steady / generalist" draft: flexible, never zone-modified, no Passion cost. Their
+## CEILINGS are deliberately trimmed (design pass Sep 2026 — "soften center") so a
+## committed pole deck out-spikes the neutral pool. Staying Steady stays a valid,
+## low-variance option; it is no longer the strictly-best line. See docs/GAME_DESIGN.md
+## § Zone Rewards and docs/BALANCE_SNAPSHOTS.md.
 static func _build_generic_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
@@ -216,9 +221,12 @@ static func _build_generic_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		[_damage(13)]))
 
+	# Paired Strikes: buffed 3x2 -> 4x2 (#9 — it was a dead pick at 6 for 1). The
+	# neutral chip that fits any plan and scales cleanly with Vulnerable. (#16 card-tier:
+	# this is the "flexible weak-1" common — see Bracing Blow for the dmg-OR-block twin.)
 	pool.append(_card("Paired Strikes", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
-		[_damage(3, 2)]))
+		[_damage(4, 2)]))
 
 	# Sweep is the dedicated crowd tool: pricier than the cheap Wide Arc starter, but
 	# its Weak-to-all is a real multi-enemy advantage (blunts a whole group's damage)
@@ -233,6 +241,11 @@ static func _build_generic_pool() -> Array[CardData]:
 		[_damage(5)]))
 
 	# -- COMMON SKILLS --
+	# #16 card-intensity tiers: Bracing Blow and Shield Wall are the deliberate
+	# "weak-1 / weak-2" pair. Bracing Blow is the FLEXIBLE one — 5 dmg + 5 block fits
+	# either an offense or a defense turn, so it's never dead but never spikes. Shield
+	# Wall is the COMMITTED one — pure 8 block, better for the plan it fits, worse
+	# otherwise. Same rarity, different purpose: the draft has texture, not dominance.
 	pool.append(_card("Bracing Blow", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		[_damage(5), _block(5)]))
@@ -248,9 +261,12 @@ static func _build_generic_pool() -> Array[CardData]:
 		[_block(3), _draw(1)]))
 
 	# -- UNCOMMON ATTACKS --
+	# Trimmed 18 -> 15 ("soften center"): an 18-for-2 neutral stat-stick out-classed the
+	# pole rares and made staying Steady the default. Still a solid reliable hit, just no
+	# longer the best card in the game for zero commitment.
 	pool.append(_card("Havoc", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
-		[_damage(18)]))
+		[_damage(15)]))
 
 	pool.append(_card("Poison Fang", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
@@ -303,9 +319,11 @@ static func _build_generic_pool() -> Array[CardData]:
 		CardData.TargetType.ALL_ENEMIES, CardData.CardRarity.RARE,
 		[_damage(14)]))
 
+	# Trimmed 8x3 -> 7x3 (21, "soften center"): still the neutral Vulnerable-synergy
+	# finisher, but no longer a flat 24 that beats the committed pole nukes for free.
 	pool.append(_card("Execute", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
-		[_damage(8, 3)]))
+		[_damage(7, 3)]))
 
 	# -- RARE SKILLS --
 	# Exhausts: a one-shot burst of tempo (net +2 energy, +2 cards) that leaves the
@@ -336,40 +354,47 @@ static func _build_generic_pool() -> Array[CardData]:
 
 # ============================================================
 # EMO HYBRID CASTER — PRIMARY (WATER) POOL
-# Barriers, chill-control, Strength soak, multi-hit torrents
+# High-risk / high-reward SWING: DoT, chill-control, evasion, X-cost torrents
 # ============================================================
 
-## Emo Hybrid's Water pool. The primary pole reads as flowing water: block and
-## barriers, water-shoes Dexterity, enemy Strength/Weak soak, a high-cost Freeze,
-## and multi-hit torrents. Per the affinity rubric, pure water cards push Passion
-## strongly toward the primary pole (+), while water cards that borrow the physical
-## pole's turf (Block, Dexterity) push only a little. Magnitudes are the calibration
-## baseline the combat harness tunes. See docs/WATER_REWORK.md and
-## docs/GAME_DESIGN.md § Characters.
+## Emo Hybrid's Water pool — the high-variance SWING pole (design pass Sep 2026,
+## "full re-identity split"). Water is glass: it NEVER grants plain Block or Poise
+## (that is the Physical pole's home now) — its survival tools are evasion (Intangible),
+## control (Weak / Freeze / Vulnerable), and racing the enemy down with poison and
+## scaling torrents. So committing to Water is a real choice with a real ceiling and a
+## real floor, not a re-skin of the Physical toolkit. Per the affinity rubric every card
+## pushes Passion + toward Blazing (the pole's payoff). Magnitudes are the combat
+## harness's calibration baseline. See docs/WATER_REWORK.md, docs/GAME_DESIGN.md
+## § Characters, and docs/BALANCE_SNAPSHOTS.md.
 static func build_emo_primary_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
 	# -- COMMON --
+	# The clean on-ramp attack: pure offense, no defensive rider (the Water tell — a
+	# Physical attack of this size would carry Block).
 	var tidal := _pcard("Tidal Strike", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		CardData.PersonalityType.PRIMARY,
-		[_damage(9), _passion(3)])
+		[_damage(9), _passion(4)])
 	tidal.flavor_text = "The water answers before he asks. It always did."
 	pool.append(tidal)
 
 	var ripple := _pcard("Ripple", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.ALL_ENEMIES, CardData.CardRarity.COMMON,
 		CardData.PersonalityType.PRIMARY,
-		[_damage(4), _passion(3)])
+		[_damage(5), _passion(3)])
 	ripple.flavor_text = "One motion outward, and the whole room feels it."
 	pool.append(ripple)
 
-	var mistveil := _pcard("Mistveil", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, CardData.CardRarity.COMMON,
+	# Creeping Tide replaces the old Mistveil (a plain 9-Block card that lived on
+	# Physical's turf). Water's answer to a skill slot is a damage-over-time seed, not a
+	# wall: it rewards racing / stalling with control rather than turtling.
+	var creeping := _pcard("Creeping Tide", 1, CardData.CardType.SKILL,
+		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		CardData.PersonalityType.PRIMARY,
-		[_block(9), _passion(2)])
-	mistveil.flavor_text = "He steps behind the fog and lets it hold him."
-	pool.append(mistveil)
+		[_status(StatusEffects.POISON, 4), _passion(3)])
+	creeping.flavor_text = "It gets into everything. You only notice once it's everywhere."
+	pool.append(creeping)
 
 	# -- UNCOMMON --
 	var chillbrand := _pcard("Chillbrand", 1, CardData.CardType.ATTACK,
@@ -386,25 +411,33 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	undertow.flavor_text = "The pull is quiet. By the time they feel it, they're already tired."
 	pool.append(undertow)
 
-	var riverstep := _pcard("Riverstep", 1, CardData.CardType.SKILL,
+	# Soulstep replaces the old Riverstep (which granted Poise — block-adjacent, i.e.
+	# Physical's turf). Water's defensive answer is EVASION, not armor: one turn where
+	# every hit is reduced to 1, then it's gone. Exhausts, so it's a one-shot panic read,
+	# not a repeatable wall — the high-variance identity in a single card.
+	var soulstep := _pcard("Soulstep", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.PRIMARY,
-		[_status_self(StatusEffects.DEXTERITY, 3), _passion(2)])
-	riverstep.flavor_text = "Feet like a current — never quite where the blow lands."
-	pool.append(riverstep)
+		[_status_self(StatusEffects.INTANGIBLE, 2), _passion(4)], true)
+	soulstep.flavor_text = "For a breath he isn't quite there. The blow passes through the ache."
+	pool.append(soulstep)
 
 	# -- RARE --
 	var deep_freeze := _pcard("Deep Freeze", 2, CardData.CardType.SKILL,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
 		CardData.PersonalityType.PRIMARY,
-		[_status(StatusEffects.STUN, 1), _status(StatusEffects.VULNERABLE, 1), _passion(5)])
+		[_status(StatusEffects.STUN, 1), _status(StatusEffects.VULNERABLE, 1), _passion(6)])
 	deep_freeze.flavor_text = "For one long breath, the world stops moving. So does the enemy."
 	pool.append(deep_freeze)
 
-	var maelstrom := _pcard("Maelstrom", 2, CardData.CardType.ATTACK,
+	# Maelstrom is now the X-cost torrent (#21): dump all your energy, strike once per
+	# point. The all-in Water finisher — scales with tempo, snowballs with Vulnerable, and
+	# gains an extra strike per stack of Overflow while Blazing.
+	var maelstrom := _pcard("Maelstrom", 0, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
 		CardData.PersonalityType.PRIMARY,
-		[_damage(5, 3), _passion(5)])
+		[_xdamage(5), _passion(6)])
+	maelstrom.x_cost = true
 	maelstrom.flavor_text = "He opens his hands and does not close them until it's over."
 	pool.append(maelstrom)
 
@@ -420,13 +453,16 @@ static func build_emo_primary_pool() -> Array[CardData]:
 
 # ============================================================
 # EMO HYBRID CASTER — SECONDARY (PHYSICAL) POOL
-# Consistent block/damage
+# The steady FLOOR: block, reliable single-hit damage, Strength
 # ============================================================
 
-## Physical pole. Per the affinity rubric these push Passion toward the secondary
-## pole (−): pure block / pure strikes shift strongly, cards with cross-pole utility
-## (draw, self-buff) shift less. Magnitudes mirror the Water pool's scale and are the
-## harness's calibration baseline.
+## Physical pole — the low-variance FLOOR, and now the SOLE home of Block/defense and
+## reliable single-hit damage (design pass Sep 2026, "full re-identity split"). It is
+## deliberately ORTHOGONAL to Water: no control statuses (Weak/Vulnerable/Freeze), no
+## poison, no multi-hit torrents — just armor, dependable strikes, and self-Strength.
+## You are never naked and never spiky; you trade Water's ceiling for a floor. Every
+## card pushes Passion − toward Hollow (its payoff tier). Magnitudes mirror the Water
+## pool's scale and are the harness's calibration baseline.
 static func build_emo_secondary_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
@@ -447,10 +483,14 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		[_damage(4), _passion(-3)]))
 
 	# -- UNCOMMON --
-	pool.append(_pcard("Rampage", 2, CardData.CardType.ATTACK,
+	# Rampage is now a single reliable heavy (was a 7x2 multi-hit — multi-hit is Water's
+	# torrent identity now). Physical's mid-cost attack is just a dependable big number.
+	var rampage := _pcard("Rampage", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.SECONDARY,
-		[_damage(7, 2), _passion(-4)]))
+		[_damage(14), _passion(-4)])
+	rampage.flavor_text = "No trick to it. He winds up, and it lands where he means it to."
+	pool.append(rampage)
 
 	pool.append(_pcard("Iron Curtain", 2, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
@@ -534,6 +574,15 @@ static func _damage(amount: int, hit_count: int = 1) -> DamageEffect:
 	var e = DamageEffect.new()
 	e.value = amount
 	e.hits = hit_count
+	return e
+
+
+## X-scaled damage: strikes once per energy the X-cost card spent. Pair with
+## CardData.x_cost on the owning card (see Maelstrom).
+static func _xdamage(amount: int) -> DamageEffect:
+	var e = DamageEffect.new()
+	e.value = amount
+	e.x_scaled = true
 	return e
 
 

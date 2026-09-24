@@ -1194,7 +1194,7 @@ func _show_deck_popup() -> void:
 		panel.add_child(vb)
 
 		var name_lbl = Label.new()
-		name_lbl.text = "[%d] %s" % [card.energy_cost, card.card_name]
+		name_lbl.text = "[%s] %s" % [card.cost_label(), card.card_name]
 		name_lbl.add_theme_font_size_override("font_size", 15)
 		name_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.4))
 		vb.add_child(name_lbl)
@@ -1358,7 +1358,7 @@ func _render_full_card(card: CardData, green_tint: bool) -> PanelContainer:
 	panel.add_child(vb)
 
 	var cost_lbl = Label.new()
-	cost_lbl.text = "%d ◆" % card.energy_cost
+	cost_lbl.text = "%s ◆" % card.cost_label()
 	cost_lbl.add_theme_font_size_override("font_size", 22)
 	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
 	vb.add_child(cost_lbl)

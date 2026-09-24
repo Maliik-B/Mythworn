@@ -314,7 +314,7 @@ func _create_upgrade_card(card: CardData, index: int) -> PanelContainer:
 
 	# Cost
 	var cost_lbl = Label.new()
-	cost_lbl.text = str(card.energy_cost)
+	cost_lbl.text = card.cost_label()
 	cost_lbl.add_theme_font_size_override("font_size", 24)
 	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
 	vbox.add_child(cost_lbl)

@@ -3,13 +3,20 @@ extends CardEffect
 ## Deals damage to the target. Respects block and damage modifiers (Vulnerable, Weak).
 
 @export var hits: int = 1 # For multi-hit attacks
+## X-scaled: the hit count is X (the energy an X-cost card spent this cast) instead of
+## `hits`. The engine supplies X via current_x(); pairs with CardData.x_cost. A torrent
+## that strikes once per energy — synergises with Overflow and Vulnerable.
+@export var x_scaled: bool = false
 
 
 func apply(source, target, battle_state) -> void:
 	var total_hits := hits
+	if x_scaled and battle_state:
+		total_hits = battle_state.current_x()
 	# Overflow power: at Blazing, the player's multi-hit attacks strike extra times.
-	# (Enemies never hold powers, so this is a no-op for their attacks.)
-	if hits > 1 and source and source.has_power(Powers.OVERFLOW) \
+	# (Enemies never hold powers, so this is a no-op for their attacks.) Applies to
+	# X-scaled torrents too once they're already striking more than once.
+	if total_hits > 1 and source and source.has_power(Powers.OVERFLOW) \
 			and RunManager.get_passion_tier() == PassionState.Tier.BLAZING:
 		total_hits += source.get_power_stacks(Powers.OVERFLOW)
 	for i in total_hits:
@@ -17,6 +24,8 @@ func apply(source, target, battle_state) -> void:
 
 
 func get_description() -> String:
+	if x_scaled:
+		return "Deal %d damage X times (X = energy spent)." % value
 	if hits > 1:
 		return "Deal %d damage %d times (%d total)." % [value, hits, value * hits]
 	return "Deal %d damage." % value
@@ -35,6 +44,8 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 		modified = int(modified * 1.5)
 	modified = maxi(0, modified)
 	if modified != value:
+		if x_scaled:
+			return "Deal %d [%d] damage X times (X = energy spent)." % [value, modified]
 		if hits > 1:
 			return "Deal %d [%d] damage %d times (%d total)." % [value, modified, hits, modified * hits]
 		return "Deal %d [%d] damage." % [value, modified]

@@ -23,6 +23,9 @@ var player_stats: CombatantStats
 var enemies: Array[EnemyCombatState] = []
 var piles: PileManager
 var _current_card: CardData = null # Set during card resolution for zone penalty
+## Energy spent by the X-cost card currently resolving (X). Read by x_scaled effects
+## so a torrent repeats once per energy; 0 outside an X-cost resolution.
+var _current_x: int = 0
 
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
 ## synchronously. The balance harness (tools/combat_harness) sets this so it can
@@ -328,7 +331,13 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 	if not can_play_card(card):
 		return false
 
-	energy -= card.energy_cost
+	# X-cost cards spend ALL remaining energy; _current_x is the amount spent (X),
+	# read by x_scaled effects. Normal cards just pay their fixed cost.
+	if card.x_cost:
+		_current_x = energy
+		energy = 0
+	else:
+		energy -= card.energy_cost
 	piles.hand.erase(card)
 
 	# Track current card for zone penalty in deal_damage
@@ -347,6 +356,7 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 				effect.apply(player_stats, target, self)
 
 	_current_card = null
+	_current_x = 0
 	Events.card_played.emit(card, target)
 
 	if card.card_type == CardData.CardType.POWER:
@@ -365,6 +375,12 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 
 
 # -- Methods called by CardEffect subclasses --
+
+## X for the X-cost card currently resolving (energy it spent). x_scaled effects
+## read this to repeat once per energy. 0 when no X-cost card is mid-resolution.
+func current_x() -> int:
+	return _current_x
+
 
 func deal_damage(target: CombatantStats, base_amount: int,
 		source: CombatantStats = null) -> void:
