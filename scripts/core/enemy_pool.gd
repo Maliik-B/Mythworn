@@ -449,7 +449,7 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# block); Hollowing Gaze is the Passion-drain climax; Fervor is the soft enrage.
 	var phase2: Array[EnemyMove] = [
 		_move("Compelled Onslaught", EnemyMove.IntentType.ATTACK,
-			[_dmg_x(_scale(6, mult), 3)], 2.0),
+			[_dmg_x(_scale(7, mult), 3)], 2.0),
 		_move("Hollowing Gaze", EnemyMove.IntentType.DEBUFF,
 			[_passion(-6), _status(StatusEffects.WEAK, 2)], 1.6, 2),
 		_move("Puppet's Fervor", EnemyMove.IntentType.BUFF,
@@ -464,10 +464,10 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# they were (a fair boss for a normal deck) and only the burst gets taxed.
 	# phase-0 HP + moves seed the base fields so single-phase code paths still read sane.
 	# Harness-calibration target (docs/BALANCE_SNAPSHOTS.md).
-	var e := _enemy("Sir Caedmon", _scale(72, mult), phase1)
+	var e := _enemy("Sir Caedmon", _scale(78, mult), phase1)
 	# .assign() (not `=`) for the typed Array[int]/Array[String] exports — a raw literal
 	# is an untyped Array and debug builds break on the assignment (see docs pitfalls).
-	e.phase_hps.assign([_scale(72, mult), _scale(72, mult)])
+	e.phase_hps.assign([_scale(78, mult), _scale(78, mult)])
 	e.phase_movesets = [phase1, phase2]
 	e.phase_lines.assign(["",
 		"No... please, not again. I'll do whatever you ask. Just... don't make me..."])
@@ -478,7 +478,7 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# redesigned Water pole wins through multi-hit torrents (Maelstrom / Riptide / Ripple /
 	# Overflow), so per-hit retaliation punishes exactly the burst that used to trivialize
 	# him — thematically, the puppet flailing at everything within reach.
-	e.phase_enter_damage.assign([0, _scale(14, mult)])
+	e.phase_enter_damage.assign([0, _scale(16, mult)])
 	e.phase_enter_self_strength.assign([0, 2])
 	e.phase_enter_enraged.assign([0, 1])
 	return e
