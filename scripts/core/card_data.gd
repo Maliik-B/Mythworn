@@ -143,8 +143,15 @@ func get_generated_description() -> String:
 ## Vulnerable are folded into the damage brackets too.
 func get_modified_description(source: CombatantStats, target: CombatantStats = null) -> String:
 	var parts: PackedStringArray = []
+	# The zone multiplier is folded into damage brackets AND shown as a tag — but both only
+	# apply to attack damage, so compute it once and gate the tag on whether the card has a
+	# damage effect (a block/Strength/control skill is unaffected by the zone).
+	var zm := CombatEngine.zone_multiplier(personality)
+	var has_damage := false
 	for effect in get_active_effects():
-		var desc = effect.get_modified_description(source, target)
+		if effect is DamageEffect:
+			has_damage = true
+		var desc = effect.get_modified_description(source, target, zm)
 		if desc != "":
 			parts.append(desc)
 	var text = " ".join(parts)
@@ -154,9 +161,9 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 		text = description
 	if target_type == TargetType.ALL_ENEMIES:
 		text += " Hits all enemies."
-	var zm := CombatEngine.zone_multiplier(personality)
-	if zm < 1.0:
-		text += " [Zone Penalty: -%d%% dmg]" % roundi((1.0 - zm) * 100.0)
-	elif zm > 1.0:
-		text += " [Zone Bonus: +%d%% dmg]" % roundi((zm - 1.0) * 100.0)
+	if has_damage:
+		if zm < 1.0:
+			text += " [Zone Penalty: -%d%% dmg]" % roundi((1.0 - zm) * 100.0)
+		elif zm > 1.0:
+			text += " [Zone Bonus: +%d%% dmg]" % roundi((zm - 1.0) * 100.0)
 	return text

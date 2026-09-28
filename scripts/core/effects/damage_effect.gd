@@ -34,12 +34,19 @@ func get_description() -> String:
 ## Returns description with combat modifiers shown as base [modified]. Includes the
 ## target's Vulnerable (×1.5) when a target is supplied — e.g. while dragging the card
 ## onto an enemy — so the bracket shows the real number, composing with Strength/Weak.
-func get_modified_description(source: CombatantStats, target: CombatantStats = null) -> String:
+func get_modified_description(source: CombatantStats, target: CombatantStats = null,
+		zone_mult: float = 1.0) -> String:
 	var modified = value
 	if source:
 		modified += source.get_status_stacks(StatusEffects.STRENGTH)
 		if source.has_status(StatusEffects.WEAK):
 			modified = int(modified * 0.75)
+	# Passion zone multiplier, folded in at the SAME point CombatEngine.deal_damage applies
+	# it (after Strength/Weak, before Vulnerable) so the bracket equals the real hit. Without
+	# this the preview showed the pre-zone number while a "[Zone Bonus]" tag claimed +25% —
+	# under-reporting damage at a committed extreme.
+	if zone_mult != 1.0:
+		modified = int(modified * zone_mult)
 	if target and target.has_status(StatusEffects.VULNERABLE):
 		modified = int(modified * 1.5)
 	modified = maxi(0, modified)

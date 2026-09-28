@@ -15,5 +15,9 @@ func get_description() -> String:
 	return ""
 
 
-func get_modified_description(_source: CombatantStats, _target: CombatantStats = null) -> String:
+## `zone_mult` is the Passion zone damage multiplier for the owning card's personality
+## (1.0 = no zone). Only damage effects use it; block/status effects ignore it, since the
+## zone modifies attack damage only. Threaded from CardData.get_modified_description.
+func get_modified_description(_source: CombatantStats, _target: CombatantStats = null,
+		_zone_mult: float = 1.0) -> String:
 	return get_description()
