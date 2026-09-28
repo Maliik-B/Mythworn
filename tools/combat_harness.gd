@@ -260,8 +260,9 @@ func _mid_deck() -> Array[CardData]:
 	var sec := CardPool.build_emo_secondary_pool()
 	# Water-leaning spread post-redesign (Riverstep/Poise is gone — the pole no longer
 	# borrows Physical's turf). Undertow exercises the debuff/soak lane; Maelstrom is now
-	# the X-cost torrent so it also exercises the new X path.
-	for name in ["Tidal Strike", "Chillbrand", "Maelstrom", "Undertow", "Deep Freeze"]:
+	# the X-cost torrent so it also exercises the new X path; Cascade (content pass #2) is
+	# the y≥3 multi a committed Water player would draft, so the boss is tuned against it.
+	for name in ["Tidal Strike", "Chillbrand", "Maelstrom", "Undertow", "Deep Freeze", "Cascade"]:
 		var c := _find(prim, name)
 		if c != null:
 			d.append(c)

@@ -19,6 +19,10 @@ Resynced 2026-09-24 to the balance pass (docs/BALANCE_SNAPSHOTS.md):
   - current enemy roster incl. the 3 new regulars + Iron Verdict, and Caedmon as two
     separate 78-HP bars with the anti-burst transition (lash + Enraged + Strength).
 
+Updated 2026-09-28 for the pool multi-hit content pass (#2/#3): Water's Cascade (y>=3 multi,
+now in the mid-deck), Deep Freeze's Vulnerable->Weak swap, Physical's Twin Strike + Whetstone
+(defined; not in the mirrored decks), and Caedmon's Compelled Onslaught retune.
+
 Run: python tools/combat_sim.py
 """
 
@@ -221,7 +225,7 @@ ENEMIES = {
     "Sir Caedmon": dict(
         phase_hps=[78, 78],
         # phase-enter effects, index by phase (phase 1 entry = index 1): lash + Str + Enraged
-        phase_enter=dict(dmg=[0, 16], str=[0, 2], enraged=[0, 1]),
+        phase_enter=dict(dmg=[0, 18], str=[0, 2], enraged=[0, 1]),
         phases=[
             [  # phase 1: disciplined
                 M("Vanguard Strike", 2.0, [("dmg", 10)]),
@@ -229,7 +233,7 @@ ENEMIES = {
                 M("Rallying Blow", 1.4, [("dmg", 20)], cd=3),
             ],
             [  # phase 2: compelled, guard dropped
-                M("Compelled Onslaught", 2.0, [("dmg_x", 7, 3)]),
+                M("Compelled Onslaught", 2.0, [("dmg_x", 6, 3)]),
                 M("Hollowing Gaze", 1.6, [("passion", -6), ("weak", 2)], cd=2),
                 M("Puppet's Fervor", 1.2, [("str", 3)], cd=1),
             ],
@@ -334,9 +338,10 @@ def C(name, cost, kind, effects, pers=NEUTRAL, exhaust=False, x_cost=False):
                 exhaust=exhaust, x_cost=x_cost)
 
 
-# Starter (CharacterPool.emo_starting_deck) — 10 cards: leaned neutral backbone (Strike -1,
-# Defend +1) + 3 self-scaling cards per pole (Water: multi-hit x control; Physical: Strength
-# ramp via Tempered Strike). See GAME_DESIGN "Starting deck — iteration log".
+# Starter (CharacterPool.emo_starting_deck) — 11 cards: leaned neutral backbone (Strike -1 x2,
+# Defend +1 x2) + a self-scaling core per pole (Water: Outpouring/Riptide/Ebb — multi-hit x
+# control; Physical: Measured Blow/Tempered Strike/Sunder/Guard — the Strength ramp + Vuln
+# enabler). See GAME_DESIGN "Starting deck — iteration log".
 STRIKE   = C("Strike", 1, "atk", [("dmg", 6), ("self_passion", -1)])
 DEFEND   = C("Defend", 1, "blk", [("block", 5), ("self_passion", 1)])
 OUTPOUR  = C("Outpouring", 1, "atk", [("dmg", 7), ("self_passion", 3)], PRIMARY)
@@ -351,8 +356,11 @@ GUARD    = C("Guard", 1, "blk", [("block", 8), ("self_passion", -3)], SECONDARY)
 TIDAL     = C("Tidal Strike", 1, "atk", [("dmg", 9), ("self_passion", 4)], PRIMARY)
 CHILLBRAND= C("Chillbrand", 1, "atk", [("dmg", 6), ("weak", 2), ("self_passion", 4)], PRIMARY)
 UNDERTOW  = C("Undertow", 1, "skl", [("weak", 2), ("str_target", -2), ("self_passion", 4)], PRIMARY)
-DEEPFREEZE= C("Deep Freeze", 2, "skl", [("stun", 1), ("vuln", 1), ("self_passion", 6)], PRIMARY)
+DEEPFREEZE= C("Deep Freeze", 2, "skl", [("stun", 1), ("weak", 2), ("self_passion", 6)], PRIMARY)  # content pass #2: Vuln->Weak (Vuln is Physical's alone)
 MAELSTROM = C("Maelstrom", 0, "atk", [("dmg_x_energy", 5), ("self_passion", 6)], PRIMARY, x_cost=True)
+# Cascade (content pass #2): Water's y>=3 single-target multi — the Overflow home. Rides
+# extra hits, never Strength (Water has no Strength), keeping it orthogonal to Twin Strike.
+CASCADE   = C("Cascade", 1, "atk", [("dmg_x", 4, 3), ("self_passion", 4)], PRIMARY)
 # (Soulstep / Creeping Tide exist in the pool but aren't in the harness mid-deck.)
 
 # Physical (Secondary) pool — the block/steady floor. Mirrors build_emo_secondary_pool.
@@ -361,6 +369,10 @@ RAMPAGE   = C("Rampage", 2, "atk", [("dmg", 14), ("self_passion", -4)], SECONDAR
 BRACE     = C("Brace", 1, "blk", [("block", 9), ("self_passion", -3)], SECONDARY)
 IRONCURT  = C("Iron Curtain", 2, "blk", [("block", 16), ("self_passion", -4)], SECONDARY)
 DEVASTATE = C("Devastating Blow", 3, "atk", [("dmg", 28), ("self_passion", -5)], SECONDARY)
+# Twin Strike / Whetstone (content pass #2): Physical's Strength-riding 2-hit + its dedicated
+# Strength engine. Defined for completeness; like Soulstep they aren't in the mirrored decks.
+TWINSTRIKE= C("Twin Strike", 1, "atk", [("dmg_x", 6, 2), ("self_passion", -3)], SECONDARY)
+WHETSTONE = C("Whetstone", 1, "skl", [("self_str", 2), ("self_passion", -3)], SECONDARY)
 
 EXCALIBUR = C("Excalibur", 2, "atk", [("dmg", 14)])   # Sword-mode injected card
 
@@ -369,8 +381,9 @@ FRESH_DECK = [STRIKE] * 2 + [DEFEND] * 2 + [OUTPOUR, RIPTIDE, EBB, MEASURED, TEM
 
 
 def mid_deck():
-    # Mirrors combat_harness._mid_deck: starter + a Water-leaning spread + 2 Physical.
-    return FRESH_DECK[:] + [TIDAL, CHILLBRAND, MAELSTROM, UNDERTOW, DEEPFREEZE,
+    # Mirrors combat_harness._mid_deck: starter + a Water-leaning spread (incl. the content
+    # pass #2 Cascade a committed Water player would draft) + 2 Physical.
+    return FRESH_DECK[:] + [TIDAL, CHILLBRAND, MAELSTROM, UNDERTOW, DEEPFREEZE, CASCADE,
                             POWERSLSH, RAMPAGE]
 
 

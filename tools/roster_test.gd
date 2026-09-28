@@ -26,6 +26,7 @@ func _ready() -> void:
 	_test_cooldown()
 	_test_curse()
 	_test_water_rework()
+	_test_multihit_wave()
 	_test_new_regulars()
 	_test_xcost_maelstrom()
 	_test_swing_relics()
@@ -249,23 +250,24 @@ func _sum_passion(card: CardData) -> int:
 ## toward the primary pole (+); every secondary (Physical) card pushes toward the
 ## secondary pole (−). Also checks the new Frozen status wiring on Deep Freeze.
 func _test_water_rework() -> void:
-	# Water pool = 8 attack/skill + the Overflow POWER (9). Every card still pushes
-	# Passion toward the primary pole and is tagged PRIMARY (Overflow carries a
-	# +Passion nudge toward Blazing, where it pays off).
+	# Water pool = 9 attack/skill + the Overflow POWER (10 after content pass #2 added
+	# Cascade). Every card still pushes Passion toward the primary pole and is tagged
+	# PRIMARY (Overflow carries a +Passion nudge toward Blazing, where it pays off).
 	var prim := CardPool.build_emo_primary_pool()
-	var prim_ok := prim.size() == 9
+	var prim_ok := prim.size() == 10
 	for c in prim:
 		if _sum_passion(c) <= 0 or c.personality != CardData.PersonalityType.PRIMARY:
 			prim_ok = false
-	_check("all 9 Water cards push Passion + and are PRIMARY", prim_ok)
+	_check("all 10 Water cards push Passion + and are PRIMARY", prim_ok)
 
-	# Physical pool = 8 + the Grounded POWER (9), all pushing Passion − and SECONDARY.
+	# Physical pool = 10 + the Grounded POWER (11 after content pass #2 added Twin Strike
+	# + Whetstone), all pushing Passion − and SECONDARY.
 	var sec := CardPool.build_emo_secondary_pool()
-	var sec_ok := sec.size() == 9
+	var sec_ok := sec.size() == 11
 	for c in sec:
 		if _sum_passion(c) >= 0 or c.personality != CardData.PersonalityType.SECONDARY:
 			sec_ok = false
-	_check("all 9 Physical cards push Passion - and are SECONDARY", sec_ok)
+	_check("all 11 Physical cards push Passion - and are SECONDARY", sec_ok)
 
 	_check("Frozen status is registered", StatusEffects.STUN != null)
 
@@ -277,7 +279,8 @@ func _test_water_rework() -> void:
 	_check("Frozen does not stack past 1 (DURATION)",
 		dummy.get_status_stacks(StatusEffects.STUN) == 1)
 
-	# Deep Freeze applies both Frozen and Vulnerable, and reads as a big + shift.
+	# Deep Freeze applies both Frozen and Weak (content pass #2 swapped its old Vulnerable
+	# rider → Weak so Vulnerable stays Physical-only), and reads as a big + shift.
 	var freeze: CardData = null
 	for c in prim:
 		if c.card_name == "Deep Freeze":
@@ -285,14 +288,84 @@ func _test_water_rework() -> void:
 	var freeze_ok := freeze != null
 	if freeze_ok:
 		var has_stun := false
-		var has_vuln := false
+		var has_weak := false
 		for e in freeze.effects:
 			if e is StatusApplyEffect and e.status_effect == StatusEffects.STUN:
 				has_stun = true
-			if e is StatusApplyEffect and e.status_effect == StatusEffects.VULNERABLE:
-				has_vuln = true
-		freeze_ok = has_stun and has_vuln and _sum_passion(freeze) > 0
-	_check("Deep Freeze applies Frozen + Vulnerable and pushes Passion +", freeze_ok)
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.WEAK:
+				has_weak = true
+		freeze_ok = has_stun and has_weak and _sum_passion(freeze) > 0
+	_check("Deep Freeze applies Frozen + Weak and pushes Passion +", freeze_ok)
+
+	# Orthogonality guard: Water is glass CONTROL, so NO Water card may apply Vulnerable
+	# to an enemy (Vulnerable is exclusively Physical's big-hit enabler now). Buff-self
+	# statuses don't count — this only bans debuffing the target with Vulnerable.
+	var water_vuln := false
+	for c in prim:
+		for e in c.effects:
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.VULNERABLE \
+					and not e.apply_to_source:
+				water_vuln = true
+	_check("no Water card applies Vulnerable (Vuln is Physical's alone)", not water_vuln)
+
+
+## Content pass #2 — the pole multi-hit wave. Verifies the two new multi-hit identities
+## stay ORTHOGONAL: Water's Cascade is a high-count (y≥3) multi that rides Overflow, never
+## Strength; Physical's Twin Strike is a low-count (2-hit) multi that RIDES Strength; and
+## Whetstone is the pool Strength engine that feeds it.
+func _test_multihit_wave() -> void:
+	var prim := CardPool.build_emo_primary_pool()
+	var sec := CardPool.build_emo_secondary_pool()
+
+	# Cascade: Water's y≥3 single-target multi (PRIMARY).
+	var cascade := _card_by_name(prim, "Cascade")
+	var cascade_hits := 0
+	if cascade:
+		for e in cascade.effects:
+			if e is DamageEffect:
+				cascade_hits = e.hits
+	_check("Cascade is a Water y≥3 multi-hit (PRIMARY, hits >= 3)",
+		cascade != null and cascade.personality == CardData.PersonalityType.PRIMARY
+		and cascade_hits >= 3)
+
+	# Twin Strike: Physical's 2-hit (SECONDARY).
+	var twin := _card_by_name(sec, "Twin Strike")
+	var twin_hits := 0
+	if twin:
+		for e in twin.effects:
+			if e is DamageEffect:
+				twin_hits = e.hits
+	_check("Twin Strike is a Physical 2-hit (SECONDARY, hits == 2)",
+		twin != null and twin.personality == CardData.PersonalityType.SECONDARY
+		and twin_hits == 2)
+
+	# Whetstone: the pool's Strength engine (self-Strength, SECONDARY).
+	var whet := _card_by_name(sec, "Whetstone")
+	var whet_str := false
+	if whet:
+		for e in whet.effects:
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.STRENGTH \
+					and e.apply_to_source and e.value >= 2:
+				whet_str = true
+	_check("Whetstone builds Strength (self +2, SECONDARY)",
+		whet != null and whet_str and whet.personality == CardData.PersonalityType.SECONDARY)
+
+	# End-to-end: Twin Strike RIDES Strength. Strength is added per hit, so at +3 Strength a
+	# 6×2 attack lands for 2×(6+3)=18. Passion pinned to Steady so the zone modifier is flat.
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [_dummy_attacker()])  # 100-HP dummy, 0 block
+	RunManager.passion.current_value = 0
+	eng.player_stats.apply_status(StatusEffects.STRENGTH, 3)
+	var shot := twin.duplicate_card()
+	eng.piles.hand.append(shot)
+	eng.energy = 3
+	var hp_before := eng.enemies[0].stats.current_hp
+	eng.play_card(shot, eng.enemies[0].stats)
+	_check("Twin Strike rides Strength (2×(6+3) = 18 at +3 Strength)",
+		eng.enemies[0].stats.current_hp == hp_before - 18)
+	eng.free()
+	RunManager.passion.current_value = 0
 
 
 ## The three new Sep-2026 regulars (#18 roster thickening): each exists with its
@@ -540,6 +613,13 @@ func _dummy_attacker() -> EnemyData:
 	move.effects.append(dmg)
 	e.moves.append(move)
 	return e
+
+
+func _card_by_name(pool: Array[CardData], card_name: String) -> CardData:
+	for c in pool:
+		if c.card_name == card_name:
+			return c
+	return null
 
 
 func _has_move(data: EnemyData, move_name: String) -> bool:

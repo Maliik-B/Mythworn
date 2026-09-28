@@ -450,7 +450,7 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# block); Hollowing Gaze is the Passion-drain climax; Fervor is the soft enrage.
 	var phase2: Array[EnemyMove] = [
 		_move("Compelled Onslaught", EnemyMove.IntentType.ATTACK,
-			[_dmg_x(_scale(7, mult), 3)], 2.0),
+			[_dmg_x(_scale(6, mult), 3)], 2.0),
 		_move("Hollowing Gaze", EnemyMove.IntentType.DEBUFF,
 			[_passion(-6), _status(StatusEffects.WEAK, 2)], 1.6, 2),
 		_move("Puppet's Fervor", EnemyMove.IntentType.BUFF,
@@ -479,7 +479,10 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# redesigned Water pole wins through multi-hit torrents (Maelstrom / Riptide / Ripple /
 	# Overflow), so per-hit retaliation punishes exactly the burst that used to trivialize
 	# him — thematically, the puppet flailing at everything within reach.
-	e.phase_enter_damage.assign([0, _scale(16, mult)])
+	# Lash 16→18 (content pass #3): the recenter lever alongside Onslaught 7×3→6×3. The
+	# Onslaught softening alone overshot (harness 76%→86%); this pace-independent +2 trims
+	# it back to the ~82% target midpoint without touching the per-turn phase-2 numbers.
+	e.phase_enter_damage.assign([0, _scale(18, mult)])
 	e.phase_enter_self_strength.assign([0, 2])
 	e.phase_enter_enraged.assign([0, 1])
 	return e

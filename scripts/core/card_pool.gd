@@ -443,11 +443,26 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	soulstep.flavor_text = "For a breath he isn't quite there. The blow passes through the ache."
 	pool.append(soulstep)
 
+	# Cascade — Water's signature y≥3 multi-hit (content pass #2). Strikes three times, so
+	# it's the natural home for the Overflow power (Blazing → an extra strike per stack) and
+	# scales with per-hit reach rather than one big number. Distinct from Physical's 2-hit:
+	# Water's multi is higher-count and rides Overflow, never Strength (Water has no Strength).
+	var cascade := _pcard("Cascade", 1, CardData.CardType.ATTACK,
+		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
+		CardData.PersonalityType.PRIMARY,
+		[_damage(4, 3), _passion(4)])
+	cascade.flavor_text = "It falls in stages — each wave a little heavier than the last."
+	pool.append(cascade)
+
 	# -- RARE --
+	# Deep Freeze is Water's control climax: skip their turn (Frozen) + soften the turn
+	# after (Weak). Its old Vulnerable rider was the ONE Vulnerable leak on the Water pole —
+	# swapped to Weak (content pass #2) so Vulnerable is now exclusively Physical's enabler
+	# and the two poles' debuff kits stay orthogonal (Water controls, Physical exposes).
 	var deep_freeze := _pcard("Deep Freeze", 2, CardData.CardType.SKILL,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
 		CardData.PersonalityType.PRIMARY,
-		[_status(StatusEffects.STUN, 1), _status(StatusEffects.VULNERABLE, 1), _passion(6)])
+		[_status(StatusEffects.STUN, 1), _status(StatusEffects.WEAK, 2), _passion(6)])
 	deep_freeze.flavor_text = "For one long breath, the world stops moving. So does the enemy."
 	pool.append(deep_freeze)
 
@@ -522,6 +537,30 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.SECONDARY,
 		[_block(6), _status_self(StatusEffects.STRENGTH, 1), _passion(-3)]))
+
+	# Twin Strike — Physical's Strength-riding 2-hit (content pass #2). Two hits means every
+	# stack of Strength is counted TWICE, so the pole's Strength ramp (Whetstone / Riposte /
+	# the starter's Tempered Strike) pays off harder here than on a single big hit. This is
+	# the deliberate ORTHOGONAL counterpart to Water's Cascade: Physical's multi is low-count
+	# and rides Strength; Water's is high-count and rides Overflow.
+	var twin := _pcard("Twin Strike", 1, CardData.CardType.ATTACK,
+		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
+		CardData.PersonalityType.SECONDARY,
+		[_damage(6, 2), _passion(-3)])
+	twin.flavor_text = "Once to open the guard, once to end it."
+	pool.append(twin)
+
+	# Whetstone — the Physical pool's dedicated Strength engine (content pass #2). Before this
+	# pass only Riposte built Strength in the pool; the pole needed a clean source so "big
+	# singles + a 2-hit that RIDES Strength" actually has Strength to ride. Persists for the
+	# combat (Strength doesn't decay), so it's the setup that makes Twin Strike and the heavy
+	# singles snowball over a fight — the Physical ramp fantasy.
+	var whetstone := _pcard("Whetstone", 1, CardData.CardType.SKILL,
+		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
+		CardData.PersonalityType.SECONDARY,
+		[_status_self(StatusEffects.STRENGTH, 2), _passion(-3)])
+	whetstone.flavor_text = "He works the edge back into it, slow and certain, before it's needed."
+	pool.append(whetstone)
 
 	# -- RARE --
 	pool.append(_pcard("Devastating Blow", 3, CardData.CardType.ATTACK,
