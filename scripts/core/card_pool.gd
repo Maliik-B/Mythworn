@@ -355,6 +355,21 @@ static func _build_generic_pool() -> Array[CardData]:
 	pool.append(_power_card("Whiplash", 1, CardData.CardRarity.UNCOMMON,
 		Powers.WHIPLASH, "Every lurch of feeling hands him something new."))
 
+	# School (which pole SYMBOL each card wears) follows its Passion lean, since the generic
+	# pool's lane == lean: a Water-lane card leans + (→ PRIMARY / ≈), a Physical-lane card leans
+	# − (→ SECONDARY / ⚔). The flat-center picks (0 lean: Bracing Blow, Second Wind, the powers)
+	# stay school-less = no symbol. These cards are personality-NEUTRAL, so the symbol renders
+	# FLAT (identity only, no zone glow/coin) — see combat_scene._make_resonance_sigil.
+	for c in pool:
+		var lean := 0
+		for e in c.effects:
+			if e is PassionEffect:
+				lean += e.value
+		if lean > 0:
+			c.school = CardData.PersonalityType.PRIMARY
+		elif lean < 0:
+			c.school = CardData.PersonalityType.SECONDARY
+
 	return pool
 
 
