@@ -34,6 +34,7 @@ func _ready() -> void:
 	_report_poles()
 	_report_prophet()
 	_report_boss()
+	_report_physical()
 
 	print("\n== harness done ==\n")
 	get_tree().quit()
@@ -105,6 +106,28 @@ func _report_boss() -> void:
 		["Wavering, realistic", _boss_deck(), -30, true],
 	]:
 		var r := _run(row[1], ["caedmon"], row[2], true, COMMIT_TARGET, row[3])
+		print("  %-24s win %5.1f%%  turns %4.1f  HP-lost avg %4.1f p90 %3.0f  end-Passion %.1f (%s)" % [
+			row[0], r["winrate"], r["turns_mean"], r["hp_lost_mean"], r["hp_lost_p90"],
+			r["passion_mean"], _tier_name(int(round(r["passion_mean"])))])
+
+
+## Content-pass-#2 feel-test: the same fights measured against a committed PHYSICAL build
+## (sinks to Hollow, commit_target -50), whose deck carries the new Whetstone (Strength
+## engine) + Twin Strike (Strength-riding 2-hit) alongside Sunder's Vulnerable and block.
+## The Water boss number (82.3%) was tuned against a Water build; this checks the pole we
+## just beefed survives Caedmon's Enraged transition too. Physical has block (Guardian's
+## Sigil helps) and Iron Quill's +1 Strength feeds the ride — a fair "realistic" loadout.
+func _report_physical() -> void:
+	print("\n=== PHYSICAL POLE — content pass #2 (committed Hollow build) ===")
+	print("ELITE — Champion of the Usurper (physical mid deck):")
+	_bar("Champion (Physical)", _run(_physical_mid_deck(), ["champion"], -50, true, -50))
+	print("\nBOSS — Sir Caedmon vs a committed PHYSICAL build (Whetstone/Twin Strike/Sunder + block):")
+	for row in [
+		["Hollow, bare mid deck", _physical_mid_deck(), -50, false],
+		["Hollow, realistic", _physical_boss_deck(), -50, true],
+		["Wavering, realistic", _physical_boss_deck(), -30, true],
+	]:
+		var r := _run(row[1], ["caedmon"], row[2], true, -50, row[3])
 		print("  %-24s win %5.1f%%  turns %4.1f  HP-lost avg %4.1f p90 %3.0f  end-Passion %.1f (%s)" % [
 			row[0], r["winrate"], r["turns_mean"], r["hp_lost_mean"], r["hp_lost_p90"],
 			r["passion_mean"], _tier_name(int(round(r["passion_mean"])))])
@@ -300,6 +323,34 @@ func _boss_deck() -> Array[CardData]:
 		if upgraded >= 2:
 			break
 		if c.card_name in ["Maelstrom", "Deep Freeze", "Chillbrand", "Tidal Strike"]:
+			c.upgrade_card()
+			upgraded += 1
+	return d
+
+
+## The Physical analog of _mid_deck: the block/heavy-single spread PLUS the content-pass-#2
+## Strength kit (Whetstone engine + Twin Strike rider) and a second Strength source
+## (Riposte), so the new cards actually get exercised. Sunder (Vulnerable) is already in the
+## shared starter, so the Vuln->Strength-2-hit burst chain is present end-to-end.
+func _physical_mid_deck() -> Array[CardData]:
+	var d := _physical_deck()
+	var sec := CardPool.build_emo_secondary_pool()
+	for name in ["Whetstone", "Twin Strike", "Riposte"]:
+		var c := _find(sec, name)
+		if c != null:
+			d.append(c)
+	return d
+
+
+## The Physical boss deck: the physical mid deck with a couple of rest-site upgrades on the
+## heaviest hitters (mirrors _boss_deck's two-upgrade rule for the Water build).
+func _physical_boss_deck() -> Array[CardData]:
+	var d := _physical_mid_deck()
+	var upgraded := 0
+	for c in d:
+		if upgraded >= 2:
+			break
+		if c.card_name in ["Devastating Blow", "Rampage", "Twin Strike"]:
 			c.upgrade_card()
 			upgraded += 1
 	return d
