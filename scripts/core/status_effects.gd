@@ -10,6 +10,7 @@ static var DEXTERITY: StatusEffectData
 static var INTANGIBLE: StatusEffectData
 static var STUN: StatusEffectData
 static var ENRAGED: StatusEffectData
+static var ZEALOTRY: StatusEffectData
 
 
 static func _static_init() -> void:
@@ -35,6 +36,11 @@ static func _static_init() -> void:
 	# Enraged: a retaliation buff. When the owner takes attack damage, it strikes the
 	# attacker back for `stacks`. Pace-independent, so it makes even a burst-kill cost HP.
 	ENRAGED = _make("Enraged", "Strikes back at attackers for damage equal to stacks.", true,
+		StatusEffectData.StackType.INTENSITY, StatusEffectData.Decay.PERSISTS)
+	# Zealotry: the False Prophet's escalating fervor. Persists + stacks each turn it preaches;
+	# its center-pull grows with the stacks (see PassionCenterEffect), so the longer it lives
+	# the harder it strips your Passion — a race to silence it.
+	ZEALOTRY = _make("Zealotry", "Each stack strengthens this enemy's Passion pull toward center.", true,
 		StatusEffectData.StackType.INTENSITY, StatusEffectData.Decay.PERSISTS)
 
 

@@ -27,6 +27,7 @@ var pile_popup: PanelContainer
 var selected_card: CardData = null
 var card_nodes: Dictionary = {} # CardData -> PanelContainer
 var enemy_nodes: Dictionary = {} # EnemyCombatState -> PanelContainer
+var _hand_coins: Dictionary = {} # CardData -> halo-coin Panel (pole cards only), for threshold fades
 
 
 var continue_btn: Button
@@ -888,58 +889,103 @@ func _personality_sigil(pers: CardData.PersonalityType) -> String:
 	return ""
 
 
-## Live resonance of a card against the current Passion tier:
-## 1 = resonant (+25%), -1 = dissonant (-25%), 0 = neutral card or the flat middle.
-func _card_resonance(card: CardData) -> int:
-	if card.personality == CardData.PersonalityType.NEUTRAL:
-		return 0
-	if CombatEngine.zone_bonus_active(card.personality):
-		return 1
-	if CombatEngine.is_zone_penalized(card.personality):
-		return -1
-	return 0
-
-
-## The corner badge: the personality sigil, glowing when the card is resonant at your
-## current Passion and dimmed when dissonant. Returns null for neutral cards.
-func _make_resonance_sigil(card: CardData) -> Label:
-	var glyph := _personality_sigil(card.personality)
+## The corner badge: the pool SIGIL (≈ Water / ⚔ Physical) the card wears via its SCHOOL. For a
+## true pole card it reflects the live zone: FAVORED = an empowered glyph (brighter + a breathing
+## pulse), and at the DEEP end (+25% extreme) the glyph sits on a glowing HALO coin — the coin is
+## the at-a-glance tell that separates a fresh +12% lean from a deep +25% extreme, and it FADES in/
+## out when you cross the extreme threshold (see _fade_coin_transitions). DISFAVORED = greyed +
+## faded (uniform across −12% / −25%). A NEUTRAL-personality card that merely wears a school symbol
+## never rides the zone, so it stays flat + muted (no coin). Returns null for a school-less card.
+func _make_resonance_sigil(card: CardData) -> Control:
+	var pole := card.symbol_pole()
+	var glyph := _personality_sigil(pole)
 	if glyph == "":
 		return null
+	var col := _get_personality_color(pole)
+	var pole_name := _get_personality_label(pole)
+	# Only a true pole card rides the zone; a neutral-schooled card just wears a flat symbol.
+	var rides_zone := card.personality == CardData.PersonalityType.PRIMARY \
+		or card.personality == CardData.PersonalityType.SECONDARY
+	var zm := CombatEngine.zone_multiplier(card.personality) if rides_zone else 1.0
+
 	var lbl := Label.new()
 	lbl.text = glyph
-	var col := _get_personality_color(card.personality)
-	var state := _card_resonance(card)
-	var pers_name := _get_personality_label(card.personality)
-	match state:
-		1:
-			# Resonant: bright, large, a strong colored outline glow, and a subtle
-			# breathing pulse so it draws the eye without being noisy.
-			lbl.add_theme_font_size_override("font_size", 30)
-			lbl.add_theme_color_override("font_color", col.lightened(0.4))
-			lbl.add_theme_constant_override("outline_size", 11)
-			lbl.add_theme_color_override("font_outline_color", Color(col.r, col.g, col.b, 0.85))
-			lbl.tooltip_text = "%s — Resonant: +25%% damage at your current Passion." % pers_name
-			# Pulse via modulate brightness (no pivot math needed). The tween is bound
-			# to the label, so it stops cleanly when the hand rebuilds.
-			var pulse := lbl.create_tween().set_loops()
-			pulse.tween_property(lbl, "modulate", Color(1.35, 1.35, 1.35, 1.0), 0.65) \
-				.set_trans(Tween.TRANS_SINE)
-			pulse.tween_property(lbl, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.65) \
-				.set_trans(Tween.TRANS_SINE)
-		-1:
-			# Dissonant: greyed and faded.
-			lbl.add_theme_font_size_override("font_size", 22)
-			lbl.add_theme_color_override("font_color", col.lerp(Color(0.45, 0.45, 0.45), 0.6))
-			lbl.modulate.a = 0.55
-			lbl.tooltip_text = "%s — Dissonant: -25%% damage at your current Passion." % pers_name
-		_:
-			# Flat middle (no extreme committed): the identity color, muted.
-			lbl.add_theme_font_size_override("font_size", 22)
-			lbl.add_theme_color_override("font_color", col)
-			lbl.modulate.a = 0.8
-			lbl.tooltip_text = "%s card. Commit to its Passion pole for +25%% damage." % pers_name
-	return lbl
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	if zm > 1.0:
+		# FAVORED — an empowered glyph, styled the SAME at the lean and extreme tiers: the halo
+		# COIN (below, pole cards only) is what marks the deep +25%, so the glyph itself doesn't
+		# have to carry the lean/extreme distinction.
+		lbl.add_theme_font_size_override("font_size", 28)
+		lbl.add_theme_color_override("font_color", col.lightened(0.34))
+		lbl.add_theme_constant_override("outline_size", 5)
+		lbl.add_theme_color_override("font_outline_color", Color(col.r, col.g, col.b, 0.85))
+		lbl.tooltip_text = "%s — Resonant: +%d%% damage at your current Passion." \
+			% [pole_name, roundi((zm - 1.0) * 100.0)]
+		var pulse := lbl.create_tween().set_loops()
+		pulse.tween_property(lbl, "modulate", Color(1.18, 1.18, 1.18, 1.0), 0.65) \
+			.set_trans(Tween.TRANS_SINE)
+		pulse.tween_property(lbl, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.65) \
+			.set_trans(Tween.TRANS_SINE)
+	elif zm < 1.0:
+		# Disfavored: greyed + faded, uniform across the −12% / −25% tiers.
+		lbl.add_theme_font_size_override("font_size", 22)
+		lbl.add_theme_color_override("font_color", col.lerp(Color(0.45, 0.45, 0.45), 0.6))
+		lbl.modulate.a = 0.55
+		lbl.tooltip_text = "%s — Dissonant: -%d%% damage at your current Passion." \
+			% [pole_name, roundi((1.0 - zm) * 100.0)]
+	else:
+		# Flat: the identity colour, muted. A NEUTRAL card wearing a school symbol (never rides
+		# the zone) OR an uncommitted pole card at Steady. Tooltip tells them apart.
+		lbl.add_theme_font_size_override("font_size", 22)
+		lbl.add_theme_color_override("font_color", col)
+		lbl.modulate.a = 0.8
+		if card.personality == CardData.PersonalityType.NEUTRAL:
+			lbl.tooltip_text = "%s-aligned — a neutral card, so no zone bonus or penalty." % pole_name
+		else:
+			lbl.tooltip_text = "%s card. Commit to its Passion pole for +25%% damage." % pole_name
+
+	# A neutral-schooled card never rides the zone → no coin; a bare glyph is enough.
+	if not rides_zone:
+		return lbl
+
+	# A pole card sits in a fixed 42×42 holder (so the glyph never shifts across tiers) over a halo
+	# COIN that is only opaque at the extreme (+25%). The coin is kept present-but-transparent at
+	# every tier so it can FADE in/out on a threshold crossing. Disc + glyph are click-through so
+	# the card panel keeps its hover; the holder carries the tooltip.
+	var extreme := zm >= (CombatEngine.ZONE_LEAN_BONUS + CombatEngine.ZONE_EXTREME_BONUS) * 0.5
+	var holder := Control.new()
+	holder.custom_minimum_size = Vector2(42, 42)
+	holder.tooltip_text = lbl.tooltip_text
+	var disc := Panel.new()
+	disc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ds := StyleBoxFlat.new()
+	ds.bg_color = Color(col.r, col.g, col.b, 0.30)
+	ds.set_corner_radius_all(21)
+	ds.shadow_color = Color(col.r, col.g, col.b, 0.5)
+	ds.shadow_size = 8
+	disc.add_theme_stylebox_override("panel", ds)
+	disc.modulate.a = 1.0 if extreme else 0.0
+	holder.add_child(disc)
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The ⚔ glyph's ink sits high in its font box; nudge it down so it centres inside the coin.
+	var nudge := _sigil_v_nudge(pole)
+	lbl.offset_top = nudge
+	lbl.offset_bottom = nudge
+	holder.add_child(lbl)
+	holder.set_meta("halo_disc", disc)
+	return holder
+
+
+## The ⚔ (Physical) glyph's ink sits high in its font box, so plain vertical-centring leaves it
+## near the top of the halo coin; nudge it down. ≈ (Water) is already close to centred.
+func _sigil_v_nudge(pole: CardData.PersonalityType) -> int:
+	if pole == CardData.PersonalityType.SECONDARY:
+		return 4
+	return 1
 
 
 # ============================================================
@@ -1015,6 +1061,8 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	if sigil:
 		sigil.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		top_row.add_child(sigil)
+		if sigil.has_meta("halo_disc"):
+			_hand_coins[card] = sigil.get_meta("halo_disc")
 	vbox.add_child(top_row)
 
 	# Card name
@@ -1160,6 +1208,9 @@ func _add_flavor_label(parent: Control, card: CardData) -> void:
 
 
 func _on_card_input(event: InputEvent, card: CardData) -> void:
+	# No engine (e.g. the card manifest reuses this render outside combat) → not interactive.
+	if combat_engine == null:
+		return
 	if not (event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT):
 		return
@@ -1825,6 +1876,7 @@ func _refresh_ui() -> void:
 	for child in hand_container.get_children():
 		child.queue_free()
 	card_nodes.clear()
+	_hand_coins.clear()
 
 	var hand = combat_engine.piles.hand
 	var card_count = hand.size()
@@ -2237,6 +2289,41 @@ func _on_passion_changed(old_value: int, new_value: int) -> void:
 	else:
 		_log("[color=orange]Passion %d (%d)[/color]" % [diff, new_value])
 	_refresh_ui()
+	_fade_coin_transitions(old_value, new_value)
+
+
+## Cross a Passion threshold → the halo coin doesn't pop, it ebbs. The hand was just rebuilt with
+## each coin at its NEW-Passion alpha; for any in-hand pole card whose EXTREME-favored state flipped
+## between the old and new Passion, rewind its coin to the OLD alpha and tween back — so the coin
+## fades IN as you sink into the deep zone and OUT as you leave it.
+func _fade_coin_transitions(old_value: int, new_value: int) -> void:
+	for card in _hand_coins:
+		var disc: Panel = _hand_coins[card]
+		if not is_instance_valid(disc):
+			continue
+		var was := _is_extreme_favored(card.personality, old_value)
+		var now := _is_extreme_favored(card.personality, new_value)
+		if was == now:
+			continue
+		disc.modulate.a = 1.0 if was else 0.0
+		var tw := disc.create_tween()
+		tw.tween_property(disc, "modulate:a", 1.0 if now else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+
+
+## Would this card's pole sit at its EXTREME favored tier (Blazing for Water / Hollow for Physical)
+## at the given Passion value? Drives the halo-coin fade exactly on the threshold crossing, without
+## depending on the live-Passion globals that zone_multiplier reads.
+func _is_extreme_favored(personality: CardData.PersonalityType, passion_value: int) -> bool:
+	if not RunManager.current_character:
+		return false
+	var t = RunManager.current_character.passion_thresholds
+	if t.size() < 4:
+		return false
+	if personality == CardData.PersonalityType.PRIMARY:
+		return passion_value >= t[0]
+	if personality == CardData.PersonalityType.SECONDARY:
+		return passion_value < t[3]
+	return false
 
 
 func _on_status_applied(target, effect: StatusEffectData, stacks: int) -> void:

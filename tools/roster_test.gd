@@ -29,6 +29,9 @@ func _ready() -> void:
 	_test_new_regulars()
 	_test_xcost_maelstrom()
 	_test_swing_relics()
+	_test_prophet_escalation()
+	_test_starter_deck()
+	_test_map_planarity()
 	_test_boss_reward()
 	await _test_frozen_skips()
 	_test_scene_scripts_compile()
@@ -202,6 +205,13 @@ func _test_passion_pull() -> void:
 	_check("-80 is Hollow", RunManager.get_passion_tier() == PassionState.Tier.HOLLOW)
 	RunManager.passion.current_value = 0
 	_check("0 is Steady", RunManager.get_passion_tier() == PassionState.Tier.STEADY)
+	# Passion caps at ±60 now (tight band so mechanics can bite).
+	RunManager.passion.current_value = 0
+	RunManager.change_passion(200)
+	_check("passion caps at +60", RunManager.passion.current_value == 60)
+	RunManager.change_passion(-400)
+	_check("passion caps at -60", RunManager.passion.current_value == -60)
+	RunManager.passion.current_value = 0
 
 
 func _test_curse() -> void:
@@ -357,6 +367,126 @@ func _test_swing_relics() -> void:
 	_check("Leaden Vow is −2 Passion/turn (toward Hollow)",
 		vow != null and vow.trigger == RelicData.RelicTrigger.ON_TURN_START
 		and vow.effect == RelicData.RelicEffect.GAIN_PASSION and vow.value == -2)
+
+
+## The False Prophet's escalating pull (design pass Sep 2026): it builds Zealotry each
+## sermon, and PassionCenterEffect multiplies its pull by the source's Zealotry — so a
+## longer fight strips your pole harder (race to silence it).
+func _test_prophet_escalation() -> void:
+	var prophet := EnemyPool.false_prophet()
+	var builds := false
+	for m in prophet.moves:
+		for e in m.effects:
+			if e is StatusApplyEffect and e.apply_to_source \
+					and e.status_effect == StatusEffects.ZEALOTRY:
+				builds = true
+	_check("Prophet builds Zealotry each sermon", builds)
+
+	# The pull escalates with the source's Zealotry: same base strength pulls HARDER with
+	# stacks (leaves you closer to center).
+	var eff = load("res://scripts/core/effects/passion_center_effect.gd").new()
+	eff.strength = 0.2
+	var src := CombatantStats.new(100, 100)
+	RunManager.passion.current_value = 60
+	eff.apply(src, null, null)                    # 0 Zealotry → mild pull
+	var base_after: int = RunManager.passion.current_value
+	RunManager.passion.current_value = 60
+	src.apply_status(StatusEffects.ZEALOTRY, 5)
+	eff.apply(src, null, null)                    # 5 Zealotry → stronger pull
+	_check("Prophet pull escalates with Zealotry (stronger with stacks)",
+		RunManager.passion.current_value < base_after)
+	RunManager.passion.current_value = 0
+
+
+## The 10-card self-scaling starter (design pass Sep 2026): leaned neutrals (Strike −1 /
+## Defend +1, both NEUTRAL so no zone penalty), Water's Ebb applies Weak (its control/early
+## defense), Physical's Tempered Strike gains Strength (the ramp / damage buff).
+func _test_starter_deck() -> void:
+	var deck := CharacterPool.emo_starting_deck()
+	_check("starter deck is 11 cards", deck.size() == 11)
+	var by_name := {}
+	for c in deck:
+		by_name[c.card_name] = c
+
+	# The strongest single-target base attack must be Physical (big singles = Physical lane).
+	var strongest: CardData = null
+	var strongest_dmg := -1
+	for c in deck:
+		for e in c.effects:
+			if e is DamageEffect and e.hits == 1 and e.value > strongest_dmg:
+				strongest_dmg = e.value
+				strongest = c
+	_check("strongest single-target starter attack is Physical",
+		strongest != null and strongest.personality == CardData.PersonalityType.SECONDARY)
+
+	# Physical Vulnerable enabler (Sunder) — the big-hit setup.
+	var sunder: CardData = by_name.get("Sunder")
+	var sunder_vuln := false
+	if sunder:
+		for e in sunder.effects:
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.VULNERABLE \
+					and not e.apply_to_source:
+				sunder_vuln = true
+	_check("Sunder is a Physical Vulnerable enabler (SECONDARY)",
+		sunder != null and sunder_vuln and sunder.personality == CardData.PersonalityType.SECONDARY)
+	var strike: CardData = by_name.get("Strike")
+	var defend: CardData = by_name.get("Defend")
+	_check("Strike is NEUTRAL with a −1 Passion lean (toward Physical)",
+		strike != null and strike.personality == CardData.PersonalityType.NEUTRAL
+		and _sum_passion(strike) == -1)
+	_check("Defend is NEUTRAL with a +1 Passion lean (toward Water)",
+		defend != null and defend.personality == CardData.PersonalityType.NEUTRAL
+		and _sum_passion(defend) == 1)
+	var ebb: CardData = by_name.get("Ebb")
+	var ebb_weak := false
+	if ebb:
+		for e in ebb.effects:
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.WEAK \
+					and not e.apply_to_source:
+				ebb_weak = true
+	_check("Ebb (Water seed) applies Weak and is PRIMARY",
+		ebb != null and ebb_weak and ebb.personality == CardData.PersonalityType.PRIMARY)
+	var temp: CardData = by_name.get("Tempered Strike")
+	var temp_str := false
+	if temp:
+		for e in temp.effects:
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.STRENGTH \
+					and e.apply_to_source:
+				temp_str = true
+	_check("Tempered Strike (Physical ramp) gains Strength and is SECONDARY",
+		temp != null and temp_str and temp.personality == CardData.PersonalityType.SECONDARY)
+
+
+## Map readability: the generated graph must be planar (no two edges cross) after the
+## _remove_edge_crossings straightening pass. Checks grid columns over many seeds — the
+## cosmetic jitter is too small to reorder columns, so grid-planarity == drawn-planarity.
+func _test_map_planarity() -> void:
+	var crossed := 0
+	for s in range(30):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = s
+		var map := MapGenerator.generate(rng, &"camelot", 1)
+		if _map_has_crossing(map):
+			crossed += 1
+	_check("map is planar — no crossing edges over 30 seeds", crossed == 0)
+
+
+## True if any two edges on a floor-pair cross. Edges (c1→c2) and (c3→c4) cross iff their
+## column orders disagree at start vs end, i.e. (c1−c3)·(c2−c4) < 0. Shared endpoints
+## (fan-in/out, incl. the boss merge) give a 0 product, correctly not a crossing.
+func _map_has_crossing(map: MapData) -> bool:
+	for f in range(0, map.floor_count - 1):
+		var edges := []
+		for node in map.get_nodes_on_floor(f):
+			for nid in node.next_nodes:
+				var t: MapNode = map.nodes[nid]
+				if t.floor_num == f + 1:
+					edges.append([node.column, t.column])
+		for i in range(edges.size()):
+			for j in range(i + 1, edges.size()):
+				if (edges[i][0] - edges[j][0]) * (edges[i][1] - edges[j][1]) < 0:
+					return true
+	return false
 
 
 ## Boss card reward: must offer a full 3, include at least one RARE, and never a

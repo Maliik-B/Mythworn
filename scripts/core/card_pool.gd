@@ -207,74 +207,80 @@ static func _build_character_pool(templates: Array[CardData]) -> Array[CardData]
 	return pool
 
 
-## Generic card pool — personality-neutral cards available to all characters. These are
-## the "Steady / generalist" draft: flexible, never zone-modified, no Passion cost. Their
-## CEILINGS are deliberately trimmed (design pass Sep 2026 — "soften center") so a
-## committed pole deck out-spikes the neutral pool. Staying Steady stays a valid,
-## low-variance option; it is no longer the strictly-best line. See docs/GAME_DESIGN.md
-## § Zone Rewards and docs/BALANCE_SNAPSHOTS.md.
+## Generic card pool — personality-neutral cards available to all characters. NEUTRAL
+## personality (never zone-modified), but each carries a small Passion LEAN toward the pole
+## whose lane it fits (card-rewards "passion treatment", Sep 2026), so drafting/playing a
+## generic commits you instead of pinning you to dead-center — the same rule as the starter
+## backbone, just a bit heavier (±2) since these are deliberate draft picks:
+##   • big single hits / aggressive chip / Vulnerable setup → −Passion (Physical's lane)
+##   • AoE / multi≥3 / DoT / Weak-control / block-utility → +Passion (Water's lane)
+##   • genuinely flexible cards (Bracing Blow, Second Wind) stay 0.
+## CEILINGS are also trimmed ("soften center") so a committed pole out-spikes the neutral
+## pool. Steady stays a valid low-variance option, not the strictly-best line. See
+## docs/GAME_DESIGN.md § Zone Rewards and docs/BALANCE_SNAPSHOTS.md.
 static func _build_generic_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
 	# -- COMMON ATTACKS --
+	# Crushing Blow: a big single hit → −2 (Physical's lane; Strength/Vuln reward it).
 	pool.append(_card("Crushing Blow", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
-		[_damage(13)]))
+		[_damage(13), _passion(-2)]))
 
 	# Paired Strikes: buffed 3x2 -> 4x2 (#9 — it was a dead pick at 6 for 1). The
-	# neutral chip that fits any plan and scales cleanly with Vulnerable. (#16 card-tier:
-	# this is the "flexible weak-1" common — see Bracing Blow for the dmg-OR-block twin.)
+	# single-target 2-hit chip that scales cleanly with Vulnerable. (#16 card-tier: the
+	# "flexible weak-1" common — see Bracing Blow for the dmg-OR-block twin.) Leans −2
+	# (single-target multi is Physical's lane, and Strength rewards the 2 hits).
 	pool.append(_card("Paired Strikes", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
-		[_damage(4, 2)]))
+		[_damage(4, 2), _passion(-2)]))
 
-	# Sweep is the dedicated crowd tool: pricier than the cheap Wide Arc starter, but
-	# its Weak-to-all is a real multi-enemy advantage (blunts a whole group's damage)
-	# rather than just out-damaging Wide Arc by a point. Its upgrade is the direct
-	# high-damage clear that used to be Wildfire's job.
+	# Sweep is the dedicated crowd tool: its Weak-to-all blunts a whole group's damage.
+	# Leans +2 (AoE + Weak control is Water's lane).
 	pool.append(_card("Sweep", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.ALL_ENEMIES, CardData.CardRarity.COMMON,
-		[_damage(9), _status(StatusEffects.WEAK, 1)]))
+		[_damage(9), _status(StatusEffects.WEAK, 1), _passion(2)]))
 
 	pool.append(_card("Reckless Swing", 0, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
-		[_damage(5)]))
+		[_damage(5), _passion(-2)]))
 
 	# -- COMMON SKILLS --
 	# #16 card-intensity tiers: Bracing Blow and Shield Wall are the deliberate
 	# "weak-1 / weak-2" pair. Bracing Blow is the FLEXIBLE one — 5 dmg + 5 block fits
-	# either an offense or a defense turn, so it's never dead but never spikes. Shield
-	# Wall is the COMMITTED one — pure 8 block, better for the plan it fits, worse
-	# otherwise. Same rarity, different purpose: the draft has texture, not dominance.
+	# either an offense or a defense turn, so it's never dead but never spikes. It stays
+	# Passion-NEUTRAL (0) on purpose: it's the one true generalist, the flat-center pick.
+	# Shield Wall is the COMMITTED block → leans +2 (block-utility is glass-Water's floor).
 	pool.append(_card("Bracing Blow", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		[_damage(5), _block(5)]))
 
 	pool.append(_card("Shield Wall", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.COMMON,
-		[_block(8)]))
+		[_block(8), _passion(2)]))
 
-	# Free to play: cycles itself (draw 1) for a little block, so it smooths a hand
-	# without costing tempo. The draw keeps it card-neutral, not card-advantage.
+	# Free to play: cycles itself (draw 1) for a little block. Leans +2 (block-utility,
+	# Water's floor).
 	pool.append(_card("Battle Cry", 0, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.COMMON,
-		[_block(3), _draw(1)]))
+		[_block(3), _draw(1), _passion(2)]))
 
 	# -- UNCOMMON ATTACKS --
-	# Trimmed 18 -> 15 ("soften center"): an 18-for-2 neutral stat-stick out-classed the
-	# pole rares and made staying Steady the default. Still a solid reliable hit, just no
-	# longer the best card in the game for zero commitment.
+	# Havoc: the biggest neutral single hit → −2 (squarely Physical's big-single lane).
+	# Trimmed 18 -> 15 ("soften center") so it doesn't out-class the committed pole rares.
 	pool.append(_card("Havoc", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
-		[_damage(15)]))
+		[_damage(15), _passion(-2)]))
 
+	# Poison Fang: a DoT → +2 (poison/damage-over-time is Water's lane).
 	pool.append(_card("Poison Fang", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
-		[_damage(3), _status(StatusEffects.POISON, 4)]))
+		[_damage(3), _status(StatusEffects.POISON, 4), _passion(2)]))
 
+	# Armor Break: applies Vulnerable → −2 (Vuln is Physical's big-hit enabler now).
 	pool.append(_card("Armor Break", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
-		[_damage(8), _status(StatusEffects.VULNERABLE, 1)]))
+		[_damage(8), _status(StatusEffects.VULNERABLE, 1), _passion(-2)]))
 
 	# -- UNCOMMON SKILLS --
 	# Nudged 12 -> 10 block so it isn't a strictly-better Defend-at-uncommon. Its
@@ -307,23 +313,22 @@ static func _build_generic_pool() -> Array[CardData]:
 	inner_fire.effects.append(inner_fire_copy)
 	pool.append(inner_fire)
 
+	# Weaken: pure Weak control → +2 (Water's lane).
 	pool.append(_card("Weaken", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
-		[_status(StatusEffects.WEAK, 2)]))
+		[_status(StatusEffects.WEAK, 2), _passion(2)]))
 
 	# -- RARE ATTACKS --
-	# Whirlwind: the direct high-damage AoE, formerly "Wildfire" — same 2e/14-to-all,
-	# just re-skinned off fire (a spinning strike, not flames) to fit the Water build.
-	# Sweep owns the control-AoE niche (Weak); this is the raw-clear rare.
+	# Whirlwind: the direct high-damage AoE. Leans +2 (AoE spread is Water's lane).
 	pool.append(_card("Whirlwind", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.ALL_ENEMIES, CardData.CardRarity.RARE,
-		[_damage(14)]))
+		[_damage(14), _passion(2)]))
 
-	# Trimmed 8x3 -> 7x3 (21, "soften center"): still the neutral Vulnerable-synergy
-	# finisher, but no longer a flat 24 that beats the committed pole nukes for free.
+	# Execute: a 3-hit finisher (y=3) → +2 (high-coefficient multi is Water's lane).
+	# Trimmed 8x3 -> 7x3 (21, "soften center") so it doesn't beat the pole nukes for free.
 	pool.append(_card("Execute", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
-		[_damage(7, 3)]))
+		[_damage(7, 3), _passion(2)]))
 
 	# -- RARE SKILLS --
 	# Exhausts: a one-shot burst of tempo (net +2 energy, +2 cards) that leaves the
@@ -333,9 +338,10 @@ static func _build_generic_pool() -> Array[CardData]:
 		CardData.TargetType.SELF, CardData.CardRarity.RARE,
 		[_energy(2), _draw(2)], true))
 
+	# Phantom Guard: big block + draw → +2 (block-utility, Water's floor).
 	pool.append(_card("Phantom Guard", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.RARE,
-		[_block(16), _draw(1)], true))
+		[_block(16), _draw(1), _passion(2)], true))
 
 	# -- POWERS (universal; pole-specific powers live in the character pools) --
 	# StS-style: play → persistent effect in the powers slot for the rest of combat.

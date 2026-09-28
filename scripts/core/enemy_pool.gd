@@ -374,15 +374,16 @@ static func champion_of_the_usurper(mult := 1.0) -> EnemyData:
 ## own Passion cards. This is the reference enemy for tuning card Passion values.
 static func false_prophet(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
-		# Pull strengths are a harness-calibration target (tools/combat_harness). Tracks
-		# the card-Passion scale: when the ~10-turns-to-pole re-tune roughly halved card
-		# Passion, the pull halved too (0.42/0.26 → 0.22/0.14) so the crucible dynamic
-		# holds — a passive player still gets centered, a committed one can still hold
-		# Blazing. The Prophet is the only user of this effect, so no HP/damage band moves.
+		# ESCALATING PULL (design pass Sep 2026): both preaching moves build a stack of
+		# Zealotry, and PassionCenterEffect multiplies its pull by the Prophet's Zealotry —
+		# so the longer it lives, the harder it strips your pole (a race to silence it),
+		# rather than a flat tanky pull. Base pull also bumped (0.22/0.14 → 0.26/0.18) to bite
+		# against the tighter ±60 cap. Harness-calibration target (tools/combat_harness).
 		_move("False Sermon", EnemyMove.IntentType.DEBUFF,
-			[_passion_center(0.22), _status(StatusEffects.WEAK, 1)], 2.6, 2),
+			[_passion_center(0.26), _status(StatusEffects.WEAK, 1),
+			_self_status(StatusEffects.ZEALOTRY, 1)], 2.6, 2),
 		_move("Doubt", EnemyMove.IntentType.DEBUFF,
-			[_passion_center(0.14)], 2.4),
+			[_passion_center(0.18), _self_status(StatusEffects.ZEALOTRY, 1)], 2.4),
 		_move("Condemn", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(10, mult)), _status(StatusEffects.VULNERABLE, 1)], 1.1),
 		_move("Zealot's Ward", EnemyMove.IntentType.DEFEND,

@@ -20,25 +20,44 @@ static func build_emo_hybrid() -> CharacterData:
 	return c
 
 
-## Pole-defined starting deck (8 cards), fresh instances each call. A neutral
-## backbone that never moves Passion, plus a couple of cards down EACH pole with a
-## distinct playstyle, so from turn 1 the player can commit to Water (swing toward
-## Blazing) or Physical (settle toward Hollow). See GAME_DESIGN — "Starting decks
-## path both poles."
+## Pole-defined starting deck (11 cards), fresh instances each call. Design pass Sep 2026
+## (self-scaling poles + probability-planned density): a leaned neutral backbone (4) plus
+## a self-sufficient in-fight ENGINE per pole (Water 3 / Physical 4) so you can "forge your
+## path" and win on one pole without splashing the other:
+##   • Water (Primary) self-scales via multi-hit + control (Weak) + the +Passion climb to
+##     Blazing. Glass — no block; Weak is its early defense; single hits stay MODEST.
+##   • Physical (Secondary) self-scales via STRENGTH stacking (the damage buff) and OWNS
+##     the big single hits + the Vulnerable enabler (Vuln ×1.5 pays off a big hit cheaply):
+##     it starts under Water's flat numbers but out-scales them, and spikes off Vuln.
+## The neutral backbone is LEANED (±1 Passion, opposite-pole rule) so tempo plays commit
+## you instead of centering you, matched to natural usage (glass-Water leans on Defend →
+## +Water; Physical attacks with Strike → −Physical). Density: 10 cards / 5-card hand fully
+## cycles by turn 2, so copy counts (2 neutral, 1 per pole card) tune opening-hand odds —
+## see GAME_DESIGN "Starting deck — iteration log" and docs/BALANCE_SNAPSHOTS.md.
 static func emo_starting_deck() -> Array[CardData]:
 	var deck: Array[CardData] = []
 
-	# Neutral backbone — safe filler, no Passion shift.
+	# Neutral backbone — LEANED per the "a helps-both card carries an opposite-pole Passion
+	# cost" rule. Personality stays NEUTRAL (no zone effect); each wears its fitting SCHOOL
+	# symbol but leans toward the OTHER pole, so its pips read "away" from the symbol:
+	#   • Strike (offense → Water school) leans −Passion → pips point AWAY from ≈ (toward Physical).
+	#   • Defend (block → Physical school) leans +Passion → pips point AWAY from ⚔ (toward Water).
 	for i in 2:
-		deck.append(_card("Strike", 1, CardData.CardType.ATTACK,
-			CardData.TargetType.SINGLE_ENEMY, [_dmg(6)]))
+		var strike := _card("Strike", 1, CardData.CardType.ATTACK,
+			CardData.TargetType.SINGLE_ENEMY, [_dmg(6), _pas(-1)])
+		strike.school = CardData.PersonalityType.PRIMARY
+		deck.append(strike)
 	for i in 2:
-		deck.append(_card("Defend", 1, CardData.CardType.SKILL,
-			CardData.TargetType.SELF, [_blk(5)]))
+		var defend := _card("Defend", 1, CardData.CardType.SKILL,
+			CardData.TargetType.SELF, [_blk(5), _pas(1)])
+		defend.school = CardData.PersonalityType.SECONDARY
+		deck.append(defend)
 
-	# Water (Primary) — swingy offense; each play ramps Passion toward Blazing.
+	# Water (Primary) — self-scales via multi-hit × control + the +Passion climb. Its
+	# single-target hit (Outpouring) is deliberately MODEST — big single hits are the
+	# Physical pole's domain now; Water's ceiling is the multi-hit torrent, not the nuke.
 	var outpouring := _card("Outpouring", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_dmg(9), _pas(3)])
+		CardData.TargetType.SINGLE_ENEMY, [_dmg(7), _pas(3)])
 	outpouring.personality = CardData.PersonalityType.PRIMARY
 	outpouring.flavor_text = "He lets it pour out of him. For a moment, the ache goes with it."
 	deck.append(outpouring)
@@ -49,12 +68,43 @@ static func emo_starting_deck() -> Array[CardData]:
 	riptide.flavor_text = "It pulls once, then drags back for a second."
 	deck.append(riptide)
 
-	# Physical (Secondary) — steady block/damage; each play settles toward Hollow.
+	# Ebb — the Water control seed: chip + Weak. Weak softens the enemy's next hit, so it
+	# doubles as Water's early defense (its answer to having no block) and sets up the
+	# multi-hit lane.
+	var ebb := _card("Ebb", 1, CardData.CardType.ATTACK,
+		CardData.TargetType.SINGLE_ENEMY, [_dmg(5), _status(StatusEffects.WEAK, 1), _pas(3)])
+	ebb.personality = CardData.PersonalityType.PRIMARY
+	ebb.flavor_text = "The tide pulls back, and their strength goes with it."
+	deck.append(ebb)
+
+	# Physical (Secondary) — self-scales via STRENGTH stacking (the damage buff), and it
+	# OWNS the big single hits: Measured Blow is the strongest single-target attack in the
+	# starter, and the Vulnerable enabler below turns it into the pole's payoff swing.
 	var measured := _card("Measured Blow", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_dmg(8), _pas(-3)])
+		CardData.TargetType.SINGLE_ENEMY, [_dmg(10), _pas(-3)])
 	measured.personality = CardData.PersonalityType.SECONDARY
 	measured.flavor_text = "No flourish. He just makes it land."
 	deck.append(measured)
+
+	# Sunder — the Physical Vulnerable enabler (Vuln is Physical's setup now: a ×1.5
+	# multiplier that pays off a big single hit without needing huge Strength/base). Chip +
+	# Vulnerable so a same-turn Measured Blow lands at 15, or a Strength-stacked one lands
+	# even harder. This is what makes the Physical core cohere from turn 1.
+	var sunder := _card("Sunder", 1, CardData.CardType.ATTACK,
+		CardData.TargetType.SINGLE_ENEMY, [_dmg(5), _status(StatusEffects.VULNERABLE, 1), _pas(-3)])
+	sunder.personality = CardData.PersonalityType.SECONDARY
+	sunder.flavor_text = "Find the seam in the plate. Everything after is easier."
+	deck.append(sunder)
+
+	# Tempered Strike — the Physical ramp seed: a modest hit + permanent Strength, so every
+	# later attack (Strikes included) hits harder. It's why Physical starts under Water's
+	# flat numbers but out-scales them over a fight.
+	var tempered := _card("Tempered Strike", 1, CardData.CardType.ATTACK,
+		CardData.TargetType.SINGLE_ENEMY,
+		[_dmg(5), _status_self(StatusEffects.STRENGTH, 1), _pas(-3)])
+	tempered.personality = CardData.PersonalityType.SECONDARY
+	tempered.flavor_text = "Each blow teaches his arm the next."
+	deck.append(tempered)
 
 	var guard := _card("Guard", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, [_blk(8), _pas(-3)])
@@ -68,7 +118,7 @@ static func emo_starting_deck() -> Array[CardData]:
 ## The Water starter card names — used by tooling that needs to strip the Primary
 ## starters to model a committed Physical build, so it stays in sync with the deck.
 static func emo_water_starters() -> PackedStringArray:
-	return PackedStringArray(["Outpouring", "Riptide"])
+	return PackedStringArray(["Outpouring", "Riptide", "Ebb"])
 
 
 # -- factory helpers --
@@ -101,4 +151,19 @@ static func _blk(v: int) -> BlockEffect:
 static func _pas(v: int) -> PassionEffect:
 	var e := PassionEffect.new()
 	e.value = v
+	return e
+
+
+static func _status(effect: StatusEffectData, stacks: int) -> StatusApplyEffect:
+	var e := StatusApplyEffect.new()
+	e.status_effect = effect
+	e.value = stacks
+	return e
+
+
+static func _status_self(effect: StatusEffectData, stacks: int) -> StatusApplyEffect:
+	var e := StatusApplyEffect.new()
+	e.status_effect = effect
+	e.value = stacks
+	e.apply_to_source = true
 	return e

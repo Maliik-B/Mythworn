@@ -12,9 +12,17 @@ extends CardEffect
 ## fraction, not an amount.
 @export var strength: float = 0.3
 
+## Each stack of the SOURCE's Zealotry multiplies the pull by this much — the Prophet's
+## escalation. Capped below 1.0 so a single pull can never fully wipe your pole.
+const ZEAL_SCALE := 0.12
+const MAX_PULL := 0.85
 
-func apply(_source, _target, _battle_state) -> void:
-	RunManager.pull_passion_to_center(strength)
+
+func apply(source, _target, _battle_state) -> void:
+	var s := strength
+	if source and source.has_status(StatusEffects.ZEALOTRY):
+		s *= 1.0 + source.get_status_stacks(StatusEffects.ZEALOTRY) * ZEAL_SCALE
+	RunManager.pull_passion_to_center(minf(s, MAX_PULL))
 
 
 func get_description() -> String:

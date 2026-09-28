@@ -46,9 +46,10 @@ ZONE_LEAN_PENALTY = 0.88
 # Signed Passion axis (matches the game): -100..+100, start 0 (Steady, the centre).
 # Thresholds [blazing_min, inspired_min, steady_min, wavering_min]; below = hollow.
 PASSION_THRESHOLDS = [50, 18, -18, -50]
-PASSION_MIN, PASSION_MAX = -100, 100
+PASSION_MIN, PASSION_MAX = -60, 60   # capped at ±60 so "at your pole" is a tight band mechanics can bite
 PASSION_START = 0
 VOLATILITY = 1.0        # Emo Hybrid passion_volatility
+ZEAL_SCALE = 0.12       # each Prophet Zealotry stack multiplies its center-pull by this
 
 NEUTRAL, PRIMARY, SECONDARY = "neutral", "primary", "secondary"  # primary=Water, secondary=Physical
 
@@ -107,6 +108,7 @@ class Combatant:
         self.intangible = 0
         self.frozen = 0
         self.enraged = 0
+        self.zealotry = 0
 
     def alive(self):
         return self.hp > 0
@@ -202,9 +204,10 @@ ENEMIES = {
         M("Reckless Fury", 1.5, [("dmg", 8), ("str", 2)], hi=0.33),
     ]),
     "The False Prophet": dict(hp=110, moves=[
-        # The Passion crucible: multiplicative pull toward 0 on nearly every turn.
-        M("False Sermon", 2.6, [("passion_center", 0.22), ("weak", 1)], cd=2),
-        M("Doubt", 2.4, [("passion_center", 0.14)]),
+        # The Passion crucible: an ESCALATING multiplicative pull. Both preaching moves build
+        # Zealotry, which multiplies the pull (see apply_enemy_effects) — race to silence it.
+        M("False Sermon", 2.6, [("passion_center", 0.26), ("weak", 1), ("self_zealotry", 1)], cd=2),
+        M("Doubt", 2.4, [("passion_center", 0.18), ("self_zealotry", 1)]),
         M("Condemn", 1.1, [("dmg", 10), ("vuln", 1)]),
         M("Zealot's Ward", 1.1, [("block", 14)]),
     ]),
@@ -331,12 +334,17 @@ def C(name, cost, kind, effects, pers=NEUTRAL, exhaust=False, x_cost=False):
                 exhaust=exhaust, x_cost=x_cost)
 
 
-# Starter (CharacterPool.emo_starting_deck): neutral backbone + a couple down each pole.
-STRIKE   = C("Strike", 1, "atk", [("dmg", 6)])
-DEFEND   = C("Defend", 1, "blk", [("block", 5)])
-OUTPOUR  = C("Outpouring", 1, "atk", [("dmg", 9), ("self_passion", 3)], PRIMARY)
+# Starter (CharacterPool.emo_starting_deck) — 10 cards: leaned neutral backbone (Strike -1,
+# Defend +1) + 3 self-scaling cards per pole (Water: multi-hit x control; Physical: Strength
+# ramp via Tempered Strike). See GAME_DESIGN "Starting deck — iteration log".
+STRIKE   = C("Strike", 1, "atk", [("dmg", 6), ("self_passion", -1)])
+DEFEND   = C("Defend", 1, "blk", [("block", 5), ("self_passion", 1)])
+OUTPOUR  = C("Outpouring", 1, "atk", [("dmg", 7), ("self_passion", 3)], PRIMARY)
 RIPTIDE  = C("Riptide", 1, "atk", [("dmg_x", 4, 2), ("self_passion", 3)], PRIMARY)
-MEASURED = C("Measured Blow", 1, "atk", [("dmg", 8), ("self_passion", -3)], SECONDARY)
+EBB      = C("Ebb", 1, "atk", [("dmg", 5), ("weak", 1), ("self_passion", 3)], PRIMARY)
+MEASURED = C("Measured Blow", 1, "atk", [("dmg", 10), ("self_passion", -3)], SECONDARY)
+TEMPERED = C("Tempered Strike", 1, "atk", [("dmg", 5), ("self_str", 1), ("self_passion", -3)], SECONDARY)
+SUNDER   = C("Sunder", 1, "atk", [("dmg", 5), ("vuln", 1), ("self_passion", -3)], SECONDARY)
 GUARD    = C("Guard", 1, "blk", [("block", 8), ("self_passion", -3)], SECONDARY)
 
 # Water (Primary) pool — glass swing, NO block. Mirrors build_emo_primary_pool.
@@ -357,7 +365,7 @@ DEVASTATE = C("Devastating Blow", 3, "atk", [("dmg", 28), ("self_passion", -5)],
 EXCALIBUR = C("Excalibur", 2, "atk", [("dmg", 14)])   # Sword-mode injected card
 
 
-FRESH_DECK = [STRIKE] * 2 + [DEFEND] * 2 + [OUTPOUR, RIPTIDE, MEASURED, GUARD]
+FRESH_DECK = [STRIKE] * 2 + [DEFEND] * 2 + [OUTPOUR, RIPTIDE, EBB, MEASURED, TEMPERED, SUNDER, GUARD]
 
 
 def mid_deck():
@@ -569,6 +577,8 @@ class Player:
                 if t: t.c.frozen = max(t.c.frozen, e[1])
             elif k == "intangible_self":
                 self.c.intangible += e[1]
+            elif k == "self_str":
+                self.c.strength += e[1]
             elif k == "self_passion":
                 self.passion = change_passion(self.passion, e[1])
         return energy - spent
@@ -620,10 +630,13 @@ def apply_enemy_effects(enemy, player, enemies):
             player.c.vulnerable += e[1]
         elif k == "poison":
             player.c.poison += e[1]
+        elif k == "self_zealotry":
+            enemy.c.zealotry += e[1]
         elif k == "passion":
             player.passion = change_passion(player.passion, e[1])
         elif k == "passion_center":
-            player.passion = pull_to_center(player.passion, e[1])
+            s = min(0.85, e[1] * (1.0 + enemy.c.zealotry * ZEAL_SCALE))
+            player.passion = pull_to_center(player.passion, s)
 
 
 def simulate(deck, enemy_names, seed, start_passion=PASSION_START, max_turns=60,

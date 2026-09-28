@@ -16,6 +16,11 @@ enum PersonalityType { PRIMARY, SECONDARY, NEUTRAL, NEGATIVE }
 @export var rarity: CardRarity = CardRarity.COMMON
 @export var target_type: TargetType = TargetType.SINGLE_ENEMY
 @export var personality: PersonalityType = PersonalityType.NEUTRAL
+## The card's SCHOOL — which pole's SYMBOL it wears (≈ Water / ⚔ Physical), independent of
+## `personality` (which drives the zone). For a committed pole card this equals its
+## personality. For a NEUTRAL card that fits a pole's style but is passion-neutral for zone
+## purposes, set this to the fitting pole so it still wears a symbol. NEUTRAL here = no symbol.
+@export var school: PersonalityType = PersonalityType.NEUTRAL
 @export var effects: Array[CardEffect] = []
 @export var exhaust: bool = false
 ## X-cost card (StS "X"): on play it spends ALL remaining energy, and its x_scaled
@@ -48,6 +53,7 @@ func duplicate_card() -> CardData:
 	copy.rarity = rarity
 	copy.target_type = target_type
 	copy.personality = personality
+	copy.school = school
 	copy.exhaust = exhaust
 	copy.x_cost = x_cost
 	copy.unplayable = unplayable
@@ -62,6 +68,17 @@ func duplicate_card() -> CardData:
 		copy.upgrade_effects.append(effect.duplicate())
 
 	return copy
+
+
+## Which pole's SYMBOL this card wears: its explicit `school` if set, else its `personality`
+## if that's a pole, else NEUTRAL (no symbol). One place so the card face and any preview
+## agree on the glyph. `school` lets a passion-neutral card still wear a pole's symbol.
+func symbol_pole() -> PersonalityType:
+	if school == PersonalityType.PRIMARY or school == PersonalityType.SECONDARY:
+		return school
+	if personality == PersonalityType.PRIMARY or personality == PersonalityType.SECONDARY:
+		return personality
+	return PersonalityType.NEUTRAL
 
 
 ## Upgrades this card. Uses upgrade_effects if defined, otherwise boosts base effect values.

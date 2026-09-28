@@ -8,3 +8,6 @@
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# The card manifest tool (tools/card_manifest) writes this reference image on every run.
+screenshots/card_manifest.png

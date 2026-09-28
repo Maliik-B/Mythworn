@@ -41,6 +41,11 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 
 				col = next_col
 
+	# Phase 1b: straighten any X-crossings so no two edges cross when drawn — the
+	# independent path-walks routinely produce them, and crossed lines misread as
+	# "which node does this connect to?" Purely a connection rewrite; connectivity holds.
+	_remove_edge_crossings(connections)
+
 	# Phase 2: Merge all top-floor nodes into a single boss node
 	var boss_pos = Vector2i(FLOOR_COUNT - 1, MAP_WIDTH / 2)
 	var top_positions: Array = []
@@ -123,6 +128,39 @@ static func _apply_jitter(map: MapData, rng: RandomNumberGenerator) -> void:
 		# spacing in map_scene / map_preview_overlay).
 		node.x_jitter = rng.randf_range(-0.22, 0.22)
 		node.y_jitter = rng.randf_range(-0.12, 0.12)
+
+
+## Removes X-crossings from the grid connections so the drawn graph is planar (no two
+## edges cross). All edges span adjacent floors with |Δcol| ≤ 1, so the ONLY way two
+## edges cross is the "X": (f,c)→(f+1,c+1) together with (f,c+1)→(f+1,c). We straighten
+## both — swap their targets to go straight up — which deletes the crossing while keeping
+## every source's exit and every target's feeder (connectivity preserved). Straightening
+## can only remove crossings, never create them, so a few passes reach a crossing-free
+## fixpoint. The cosmetic jitter (±0.22 col) is far too small to reorder columns, so a
+## planar grid stays planar when rendered.
+static func _remove_edge_crossings(connections: Dictionary) -> void:
+	for _pass in FLOOR_COUNT:
+		var changed := false
+		for floor in FLOOR_COUNT - 1:
+			for c in MAP_WIDTH - 1:
+				var a := Vector2i(floor, c)
+				var b := Vector2i(floor, c + 1)
+				if not connections.has(a) or not connections.has(b):
+					continue
+				var a_right := Vector2i(floor + 1, c + 1)
+				var b_left := Vector2i(floor + 1, c)
+				if a_right in connections[a] and b_left in connections[b]:
+					connections[a].erase(a_right)
+					connections[b].erase(b_left)
+					var a_straight := Vector2i(floor + 1, c)
+					var b_straight := Vector2i(floor + 1, c + 1)
+					if a_straight not in connections[a]:
+						connections[a].append(a_straight)
+					if b_straight not in connections[b]:
+						connections[b].append(b_straight)
+					changed = true
+		if not changed:
+			return
 
 
 ## Realm-specific central quest nodes. Currently: Camelot Act 1 gets the Sword in
