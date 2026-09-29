@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_curse()
 	_test_water_rework()
 	_test_multihit_wave()
+	_test_control_heal()
 	_test_new_regulars()
 	_test_xcost_maelstrom()
 	_test_swing_relics()
@@ -366,6 +367,33 @@ func _test_multihit_wave() -> void:
 		eng.enemies[0].stats.current_hp == hp_before - 18)
 	eng.free()
 	RunManager.passion.current_value = 0
+
+
+## The Emo Hybrid's innate control-heal passive (the Water attrition answer): landing Weak
+## or Frozen on an ENEMY mends the player by CharacterData.control_heal; enemy-applied CC
+## and applications at full HP do not. Auto-gated to Water's control statuses so a Physical
+## build never triggers it.
+func _test_control_heal() -> void:
+	var ch := CharacterPool.build_emo_hybrid()
+	_check("Emo Hybrid has a control-heal passive", ch.control_heal > 0)
+	RunManager.current_character = ch
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 80, [_dummy_attacker()])  # wounded (50/80) so there's room to heal
+	var hp0 := eng.player_stats.current_hp
+	eng.apply_status_effect(eng.enemies[0].stats, StatusEffects.WEAK, 1)
+	_check("landing Weak on an enemy heals the player by control_heal",
+		eng.player_stats.current_hp == hp0 + ch.control_heal)
+	var hp1 := eng.player_stats.current_hp
+	eng.apply_status_effect(eng.enemies[0].stats, StatusEffects.STUN, 1)
+	_check("landing Frozen on an enemy also heals",
+		eng.player_stats.current_hp == hp1 + ch.control_heal)
+	# Enemy-applied Weak on the PLAYER must never heal (gated to enemy targets).
+	var hp2 := eng.player_stats.current_hp
+	eng.apply_status_effect(eng.player_stats, StatusEffects.WEAK, 1)
+	_check("enemy CC on the player does NOT heal", eng.player_stats.current_hp == hp2)
+	eng.free()
+	_setup_run_state()  # restore the baseline test character + passion for later tests
 
 
 ## The three new Sep-2026 regulars (#18 roster thickening): each exists with its

@@ -21,7 +21,8 @@ Resynced 2026-09-24 to the balance pass (docs/BALANCE_SNAPSHOTS.md):
 
 Updated 2026-09-28 for the pool multi-hit content pass (#2/#3): Water's Cascade (y>=3 multi,
 now in the mid-deck), Deep Freeze's Vulnerable->Weak swap, Physical's Twin Strike + Whetstone
-(defined; not in the mirrored decks), and Caedmon's Compelled Onslaught retune.
+(defined; not in the mirrored decks), and Caedmon's Compelled Onslaught retune. Also models the
+Emo Hybrid's control-heal passive (CONTROL_HEAL): +HP per Weak/Frozen he lands on an enemy.
 
 Run: python tools/combat_sim.py
 """
@@ -39,6 +40,7 @@ TRIALS = 4000
 CHIP_TOLERANCE = 5      # HP of incoming the player will "eat" before bothering to block
 SAFETY_FRAC = 0.35      # below this fraction of max HP, the player blocks hard
 SPIKE = 12              # a single telegraphed hit >= this is worth answering
+CONTROL_HEAL = 2        # Emo Hybrid's innate passive: HP mended per Weak/Frozen he lands on an enemy
 
 # Graduated Passion zone (mirrors CombatEngine.zone_multiplier): extremes +-25%,
 # mid-leans (Inspired / Wavering) +-12%, the dispassionate centre (Steady) flat.
@@ -578,7 +580,9 @@ class Player:
                 if t: t.c.vulnerable += e[1]
             elif k == "weak":
                 t = self._lowest(enemies)
-                if t: t.c.weak += e[1]
+                if t:
+                    t.c.weak += e[1]
+                    self._control_heal()
             elif k == "str_target":
                 t = self._lowest(enemies)
                 if t: t.c.strength += e[1]
@@ -587,7 +591,9 @@ class Player:
                 if t: t.c.poison += e[1]
             elif k == "stun":
                 t = self._lowest(enemies)
-                if t: t.c.frozen = max(t.c.frozen, e[1])
+                if t:
+                    t.c.frozen = max(t.c.frozen, e[1])
+                    self._control_heal()
             elif k == "intangible_self":
                 self.c.intangible += e[1]
             elif k == "self_str":
@@ -603,6 +609,13 @@ class Player:
         deal_damage(target.c, base, source=self.c, zone=mult)
         if target.c.hp <= 0 and target.has_next_phase():
             target.advance_phase(self)
+
+    def _control_heal(self):
+        # Emo Hybrid's innate control-heal (CharacterData.control_heal): landing Weak or
+        # Frozen on an enemy mends him. The glass-Water pole's non-block attrition answer,
+        # auto-gated to the control build (Physical applies Vulnerable/Strength, not these).
+        if CONTROL_HEAL > 0:
+            self.c.hp = min(self.c.max_hp, self.c.hp + CONTROL_HEAL)
 
     def _cheapest(self, cards):
         return min(cards, key=lambda c: c["cost"]) if cards else None

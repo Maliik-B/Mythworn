@@ -22,6 +22,9 @@ signal enemy_action_started(enemy, move)
 signal enemy_stunned(enemy)
 signal turn_ended()
 signal player_damaged(amount: int, new_hp: int)
+## Fired when the player recovers HP (heal effects, the control-heal passive). Lets the
+## combat UI log it and refresh the bar, mirroring player_damaged.
+signal player_healed(amount: int, new_hp: int)
 signal enemy_damaged(enemy, amount: int, new_hp: int)
 signal enemy_died(enemy)
 ## Fired when a multi-phase boss depletes a phase's HP and transitions to the next

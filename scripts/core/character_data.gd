@@ -19,6 +19,14 @@ extends Resource
 @export var primary_personality: String = "" # e.g. "Magic"
 @export var secondary_personality: String = "" # e.g. "Physical"
 
+# -- Innate passive --
+## HP restored whenever the player lands a crowd-control status (Weak or Frozen) on an
+## enemy. The glass-Water pole's non-block answer to attrition: playing your control cards
+## mends you, so you recover by STILLING the enemy rather than by armoring up. Auto-gates
+## by pole — a Physical build applies Vulnerable/Strength, not Weak/Frozen, so it never
+## triggers. 0 for characters without the trait.
+@export var control_heal: int = 0
+
 # Card pools
 @export var starting_deck: Array[CardData] = []
 @export var primary_cards: Array[CardData] = [] # Cards offered at high passion

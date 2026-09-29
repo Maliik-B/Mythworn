@@ -671,6 +671,7 @@ func _connect_events() -> void:
 	Events.enemy_action_started.connect(_on_enemy_action_started)
 	Events.enemy_stunned.connect(_on_enemy_stunned)
 	Events.player_damaged.connect(_on_player_damaged)
+	Events.player_healed.connect(_on_player_healed)
 	Events.enemy_damaged.connect(_on_enemy_damaged)
 	Events.enemy_died.connect(_on_enemy_died)
 	Events.enemy_phase_changed.connect(_on_enemy_phase_changed)
@@ -2189,6 +2190,15 @@ func _on_player_damaged(amount: int, new_hp: int) -> void:
 	var mag := clampf(float(amount) / 18.0, 0.4, 1.6)
 	_screen_shake(10.0 * mag, 0.25)
 	_flash_damage_overlay(mag)
+	_refresh_ui()
+
+
+## The control-heal passive (or any heal) fired. Green log + bar refresh so the player
+## sees they recovered by stilling the enemy. No screen shake — recovery, not a hit.
+func _on_player_healed(amount: int, new_hp: int) -> void:
+	if amount <= 0:
+		return
+	_log("[color=lightgreen]You recover %d HP. (HP: %d)[/color]" % [amount, new_hp])
 	_refresh_ui()
 
 

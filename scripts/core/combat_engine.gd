@@ -464,6 +464,30 @@ func apply_status_effect(target: CombatantStats, effect: StatusEffectData,
 		stacks: int) -> void:
 	target.apply_status(effect, stacks)
 	Events.status_applied.emit(target, effect, stacks)
+	_try_control_heal(target, effect)
+
+
+## The Emo Hybrid's innate attrition answer (CharacterData.control_heal): landing a
+## crowd-control status (Weak or Frozen) on an ENEMY mends the player. Gated to enemy
+## targets so an enemy Weakening the player never heals them, and to Water's control
+## statuses so a Physical build (Vulnerable/Strength) never triggers it — the sustain
+## auto-follows the glass build that needs it. Fires per application, so Deep Freeze
+## (Frozen + Weak) mends twice.
+func _try_control_heal(target: CombatantStats, effect: StatusEffectData) -> void:
+	if target == player_stats:
+		return
+	if effect != StatusEffects.WEAK and effect != StatusEffects.STUN:
+		return
+	var amount := 0
+	if RunManager.current_character:
+		amount = RunManager.current_character.control_heal
+	if amount <= 0 or player_stats.is_dead():
+		return
+	var healed := mini(amount, player_stats.max_hp - player_stats.current_hp)
+	if healed <= 0:
+		return
+	player_stats.current_hp += healed
+	Events.player_healed.emit(healed, player_stats.current_hp)
 
 
 # -- Status Effect Ticking --

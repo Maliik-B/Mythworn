@@ -14,6 +14,10 @@ static func build_emo_hybrid() -> CharacterData:
 	c.passion_thresholds.assign([50, 18, -18, -50])
 	c.primary_personality = "Water"
 	c.secondary_personality = "Physical"
+	# Innate Water attrition answer: mend when he stills an enemy (lands Weak/Frozen). The
+	# glass pole's non-block sustain, auto-gated to the control build. Magnitude is the
+	# harness's calibration baseline (see docs/BALANCE_SNAPSHOTS.md).
+	c.control_heal = 2
 	c.starting_deck.assign(emo_starting_deck())
 	c.primary_cards = CardPool.build_emo_primary_pool()
 	c.secondary_cards = CardPool.build_emo_secondary_pool()
