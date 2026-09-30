@@ -18,6 +18,15 @@ const MAP_MARGIN_Y := 60
 const MAP_MARGIN_TOP := 165
 const NODE_SIZE := 50
 
+# Map-reveal flourish (plays once when a realm/act map is first generated, i.e. right after
+# the "A Realm Divided" pledge shapes it): pan up from the start to the boss while the nodes
+# pop in bottom-to-top, hold, then snap back down to the start. Makes the pledge's reshaping
+# legible -- the player watches the map their choice built.
+const REVEAL_UP_DURATION := 1.3
+const REVEAL_HOLD := 0.25
+const REVEAL_BACK_DURATION := 0.45
+const REVEAL_POP_DURATION := 0.34
+
 # UI references
 var scroll_container: ScrollContainer
 var map_canvas: Control
@@ -40,13 +49,17 @@ var _timer_accum := 0.0
 var _pulse_time := 0.0
 var _available_nodes: Array = []
 var _map_x_offset := 0.0  # horizontal centering shift for the node graph
+var _reveal_active := false  # true while the post-pledge map-reveal animation plays
 
 func _ready() -> void:
 	if not RunManager.run_active:
 		var character = _create_test_character()
 		RunManager.start_run(character)
 
-	if not RunManager.current_map:
+	# A freshly-generated map (realm/act entry, just after the pledge) gets the reveal
+	# flourish; returning to an existing map just re-centers on the player.
+	var fresh_map := RunManager.current_map == null
+	if fresh_map:
 		RunManager.current_map = MapGenerator.generate(RngManager.map_rng,
 			RunManager.current_realm_id, RunManager.current_act,
 			RunManager.realm_config.elite_frequency_mult)
@@ -59,7 +72,10 @@ func _ready() -> void:
 	_create_map_display()
 	_update_node_states()
 	_update_bottom_bar()
-	_scroll_to_player.call_deferred()
+	if fresh_map:
+		_begin_map_reveal()
+	else:
+		_scroll_to_player.call_deferred()
 	AudioManager.play_music("map")
 
 	# Refresh the bottom bar's title counter when titles change while on the map.
@@ -599,13 +615,14 @@ func _process(delta: float) -> void:
 		_timer_accum -= 1.0
 		timer_label.text = RunManager.get_run_time_string()
 
-	# Pulse available nodes
+	# Pulse available nodes (paused during the reveal, which drives modulate itself).
 	_pulse_time += delta
-	for id in _available_nodes:
-		var btn: Button = node_buttons.get(id)
-		if btn:
-			var pulse = 0.85 + sin(_pulse_time * 3.0) * 0.15
-			btn.modulate = Color(pulse + 0.15, pulse + 0.15, pulse + 0.15)
+	if not _reveal_active:
+		for id in _available_nodes:
+			var btn: Button = node_buttons.get(id)
+			if btn:
+				var pulse = 0.85 + sin(_pulse_time * 3.0) * 0.15
+				btn.modulate = Color(pulse + 0.15, pulse + 0.15, pulse + 0.15)
 
 
 # ============================================================
@@ -1626,6 +1643,8 @@ func _update_node_states() -> void:
 
 
 func _on_node_clicked(node: MapNode) -> void:
+	if _reveal_active:
+		return
 	var available = RunManager.current_map.get_available_next_ids()
 	if node.id not in available:
 		return
@@ -1736,6 +1755,78 @@ func _scroll_to_player() -> void:
 	var target_y = MAP_MARGIN_Y + (map.floor_count - 1 - target_floor) * NODE_SPACING_Y
 	var scroll_target = target_y - scroll_container.size.y / 2.0 + NODE_SIZE / 2.0
 	scroll_container.scroll_vertical = int(maxf(0, scroll_target))
+
+
+# ============================================================
+# MAP REVEAL (post-pledge flourish)
+# ============================================================
+
+## Hide every node synchronously (so there's no first-frame flash of the full map), flag
+## the reveal active, then start the animation once the scroll area has laid out.
+func _begin_map_reveal() -> void:
+	_reveal_active = true
+	for id in node_buttons:
+		var btn: Button = node_buttons[id]
+		btn.pivot_offset = btn.size / 2.0
+		btn.scale = Vector2(0.2, 0.2)
+		btn.modulate.a = 0.0
+	_play_map_reveal.call_deferred()
+
+
+## Pan up from the start to the boss while nodes pop in bottom-to-top, hold at the top, then
+## snap back down to the start where the player begins.
+func _play_map_reveal() -> void:
+	var map = RunManager.current_map
+	if map == null or node_buttons.is_empty():
+		_finish_map_reveal()
+		return
+	var floor_span := maxi(1, map.floor_count - 1)
+	var start_scroll := _scroll_value_for_floor(0)
+
+	var tw := create_tween()
+	if start_scroll > 4.0:
+		scroll_container.scroll_vertical = int(start_scroll)
+		tw.tween_property(scroll_container, "scroll_vertical", 0, REVEAL_UP_DURATION) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	else:
+		tw.tween_interval(REVEAL_UP_DURATION)  # short map: nothing to pan, just time the pops
+	tw.tween_interval(REVEAL_HOLD)
+	tw.tween_property(scroll_container, "scroll_vertical", int(start_scroll), REVEAL_BACK_DURATION) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(_finish_map_reveal)
+
+	# Stagger each node's pop by floor so the map assembles start (bottom) -> boss (top),
+	# tracking the upward pan.
+	for id in node_buttons:
+		var node: MapNode = map.get_node(id)
+		var f: int = node.floor_num if node else 0
+		var delay := (float(f) / float(floor_span)) * (REVEAL_UP_DURATION * 0.8)
+		_pop_node(node_buttons[id], delay)
+
+
+func _pop_node(btn: Button, delay: float) -> void:
+	var tw := create_tween()
+	tw.tween_interval(delay)
+	tw.set_parallel(true)
+	tw.tween_property(btn, "scale", Vector2.ONE, REVEAL_POP_DURATION) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(btn, "modulate:a", 1.0, REVEAL_POP_DURATION * 0.7)
+
+
+func _finish_map_reveal() -> void:
+	for id in node_buttons:
+		node_buttons[id].scale = Vector2.ONE
+	_reveal_active = false
+	_update_node_states()  # restore proper availability highlight/dimming + modulate
+	_scroll_to_player()
+
+
+## Scroll offset that centers the given floor's row in the viewport (floor 0 = the start row
+## at the bottom, high floors near the top). Clamped to a non-negative scroll.
+func _scroll_value_for_floor(floor_num: int) -> float:
+	var map = RunManager.current_map
+	var node_y: float = MAP_MARGIN_TOP + (map.floor_count - 1 - floor_num) * NODE_SPACING_Y + NODE_SIZE / 2.0
+	return maxf(0.0, node_y - scroll_container.size.y / 2.0)
 
 
 # ============================================================
