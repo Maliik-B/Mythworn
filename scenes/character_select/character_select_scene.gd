@@ -376,7 +376,20 @@ func _on_select_character() -> void:
 	AudioManager.play_sfx("button_click")
 	var character = _create_emo_hybrid()
 	RunManager.start_run(character)
-	SceneTransition.change_scene("res://scenes/map/map_scene.tscn")
+	_begin_run_intro(character)
+
+
+## Run-start sequencer (A2): grant the liaison send-off gifts, then queue the two VN
+## segments -- Fable send-off, then Camelot realm-entry -- which hand off to the map when
+## finished. The demo intro shows both liaisons and grants both gifts (the introduction);
+## per-run single-liaison texture is 1.0+ content. See docs/REALM_CAMELOT.md § Run-start.
+func _begin_run_intro(character: CharacterData) -> void:
+	RunManager.apply_liaison_gift(&"bram")
+	RunManager.apply_liaison_gift(&"neve")
+	RunManager.pending_vn = VNPool.build_sendoff(character)
+	RunManager.pending_vn_queue.append(VNPool.build_camelot_entry())
+	RunManager.pending_vn_next = "res://scenes/map/map_scene.tscn"
+	SceneTransition.change_scene("res://scenes/vn/vn_scene.tscn")
 
 
 # ============================================================

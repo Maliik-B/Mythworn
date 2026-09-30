@@ -627,6 +627,80 @@ func _test_realm_config() -> void:
 	_check("map stays planar with a raised elite frequency",
 		not _map_has_crossing(MapGenerator.generate(rng2, &"camelot", 1, 4.0)))
 
+	# Reward-rarity knob: a > 1 mult biases card rarity rolls toward RARE.
+	RunManager.realm_config = RealmConfig.new()
+	var rr_rng := RandomNumberGenerator.new()
+	rr_rng.seed = 123
+	var rare_neutral := 0
+	for i in 3000:
+		if CardPool._roll_rarity(rr_rng) == CardData.CardRarity.RARE:
+			rare_neutral += 1
+	RunManager.realm_config.reward_rarity_mult = 1.8
+	rr_rng.seed = 123
+	var rare_rich := 0
+	for i in 3000:
+		if CardPool._roll_rarity(rr_rng) == CardData.CardRarity.RARE:
+			rare_rich += 1
+	_check("reward_rarity_mult biases card rolls toward RARE", rare_rich > rare_neutral)
+	RunManager.realm_config = RealmConfig.new()  # restore neutral
+
+	# The liaison + boon relics exist (quest pool) and never leak into reward rolls.
+	_check("liaison + boon relics exist in the quest pool",
+		RelicPool.get_relic_by_name("Bram's Briefing") != null
+		and RelicPool.get_relic_by_name("Neve's Kit") != null
+		and RelicPool.get_relic_by_name("Peasant Militia") != null)
+	var reward_names := PackedStringArray()
+	var boon_rng := RandomNumberGenerator.new()
+	boon_rng.seed = 5
+	for i in 30:
+		for r in RelicPool.get_reward_choices(boon_rng, 3):
+			reward_names.append(r.relic_name)
+	_check("boon relics stay out of reward rolls",
+		"Bram's Briefing" not in reward_names
+		and "Neve's Kit" not in reward_names
+		and "Peasant Militia" not in reward_names)
+
+	# Liaison gifts grant the two send-off relics.
+	RunManager.relics.clear()
+	RunManager.apply_liaison_gift(&"bram")
+	RunManager.apply_liaison_gift(&"neve")
+	_check("liaison gifts grant Bram's Briefing + Neve's Kit",
+		RunManager.has_relic("Bram's Briefing") and RunManager.has_relic("Neve's Kit"))
+	RunManager.relics.clear()
+
+	# apply_realm_config is the single install path: sets config, applies passion_shift
+	# once, queues the map_boon, and emits realm_configured.
+	RunManager.passion.current_value = 0
+	var pcfg := RealmConfig.new()
+	pcfg.passion_shift = 6
+	pcfg.map_boon = &"militia"
+	var emitted := [false]
+	var on_cfg := func(_r): emitted[0] = true
+	Events.realm_configured.connect(on_cfg)
+	RunManager.apply_realm_config(pcfg)
+	_check("apply_realm_config installs the config", RunManager.realm_config == pcfg)
+	_check("apply_realm_config applies passion_shift once", RunManager.passion.current_value == 6)
+	_check("apply_realm_config queues the map_boon", RunManager.pending_map_boon == &"militia")
+	_check("apply_realm_config emits realm_configured", emitted[0])
+	Events.realm_configured.disconnect(on_cfg)
+
+	# consume_map_boon grants the militia relic exactly once (map reloads re-run _ready).
+	RunManager.relics.clear()
+	RunManager.consume_map_boon()
+	_check("consume_map_boon grants the militia relic", RunManager.has_relic("Peasant Militia"))
+	RunManager.consume_map_boon()
+	var militia_count := 0
+	for r in RunManager.relics:
+		if r.relic_name == "Peasant Militia":
+			militia_count += 1
+	_check("consume_map_boon is one-shot", militia_count == 1)
+
+	# Restore neutral state for the tests that follow.
+	RunManager.relics.clear()
+	RunManager.realm_config = RealmConfig.new()
+	RunManager.pending_map_boon = &""
+	RunManager.passion.current_value = 0
+
 
 ## The VN plumbing (A2): VNData builds with chainable beats + choices, and a choice's
 ## RealmConfig is what vn_scene applies to the run — the realm-entry consequence.
@@ -644,6 +718,30 @@ func _test_vn_data() -> void:
 	_check("a VN choice's config becomes the run's realm_config",
 		RunManager.realm_config.enemy_difficulty_mult == 1.3)
 	RunManager.realm_config = RealmConfig.new()  # restore neutral for later tests
+
+	# Authored A2 content (VNPool): the send-off is dialogue-only; the Camelot entry
+	# offers the Court/Folk choice with asymmetric configs.
+	var sendoff := VNPool.build_sendoff(RunManager.current_character)
+	_check("send-off VN has beats and no terminal choice",
+		sendoff.beats.size() > 0 and sendoff.choices.is_empty())
+	var entry := VNPool.build_camelot_entry()
+	_check("Camelot entry offers Court + Folk choices with configs",
+		entry.choices.size() == 2
+		and entry.choices[0].config != null and entry.choices[1].config != null)
+	_check("Court is harder + richer; Folk is easier + carries the militia boon",
+		entry.choices[0].config.elite_frequency_mult > 1.0
+		and entry.choices[0].config.reward_rarity_mult > 1.0
+		and entry.choices[1].config.elite_frequency_mult < 1.0
+		and entry.choices[1].config.map_boon == &"militia")
+
+	# Run-start queue: send-off -> entry -> map (what vn_scene._finish walks).
+	RunManager.pending_vn = sendoff
+	RunManager.pending_vn_queue.clear()
+	RunManager.pending_vn_queue.append(entry)
+	_check("queue advances send-off -> realm-entry",
+		RunManager.pending_vn_queue.pop_front() == entry
+		and RunManager.pending_vn_queue.is_empty())
+	RunManager.pending_vn = null
 
 
 func _count_elites(map: MapData) -> int:
