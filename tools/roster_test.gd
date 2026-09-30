@@ -734,6 +734,13 @@ func _test_vn_data() -> void:
 		and entry.choices[0].config.reward_rarity_mult > 1.0
 		and entry.choices[1].config.elite_frequency_mult < 1.0
 		and entry.choices[1].config.map_boon == &"militia")
+	# The common-folk pledge shoves Passion to tier-1 Physical (Wavering) from the Steady
+	# start; Court leaves it alone.
+	var folk_cfg := entry.choices[1].config
+	_check("folk pledge shifts Passion toward Physical, landing tier-1 (Wavering)",
+		folk_cfg.passion_shift < 0
+		and RunManager.get_passion_tier_for_value(folk_cfg.passion_shift) == PassionState.Tier.WAVERING)
+	_check("court pledge leaves Passion unmoved", entry.choices[0].config.passion_shift == 0)
 
 	# Run-start queue: send-off -> entry -> map (what vn_scene._finish walks).
 	RunManager.pending_vn = sendoff

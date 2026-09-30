@@ -68,12 +68,15 @@ static func _add_neve_beats(vn: VNData) -> void:
 	vn.add_beat("Neve", "Go on. Come back in one piece. You're bad at that.", C_NEVE)
 
 
-## The Camelot realm-entry — arrival at a realm in crisis, then the court-vs-common-folk
-## allegiance choice that SHAPES the run (each choice carries a RealmConfig applied via
-## RunManager.apply_realm_config before the map generates). ~3 scroll panels + the choice.
+## The Camelot realm-entry — "A Realm Divided": arrival at a realm in crisis, then the
+## court-vs-common-folk allegiance choice that SHAPES the run (each choice carries a
+## RealmConfig applied via RunManager.apply_realm_config BEFORE the map generates, so it
+## reshapes the map's composition, not just retunes it). ~3 scroll panels + the choice.
+## This is the one big realm-shaping decision; the smaller within-act event layer (e.g. the
+## standalone Peasant's Plea lore event) is separate. See docs/REALM_CAMELOT.md.
 static func build_camelot_entry() -> VNData:
 	var vn := VNData.new()
-	vn.title = "Arrival at Camelot"
+	vn.title = "A Realm Divided"
 
 	vn.add_beat("", "Camelot rises ahead — banners at half-mast, the fields beyond the walls churned to mud and ash. Its champion, Sir Caedmon, rode out to meet the thing at the gates. What rode back was not him.", C_NARRATION)
 	vn.add_beat("", "They have been waiting for you. Word runs ahead of a dispatched keeper the way the old promise runs ahead of the sword: a hero will come, and draw Excalibur, and set it right. By the time you reach the gate, two delegations are already crossing the yard.", C_NARRATION)
@@ -101,7 +104,11 @@ static func _court_config() -> RealmConfig:
 
 ## Common folk: side with the people. An easier realm -- fewer, weaker elites plus a
 ## militia map_boon -- but the slighted court raises shop prices all act, and loot is a
-## touch plainer. Starting values per the REALM_CAMELOT table; tune vs the combat harness.
+## touch plainer. Also shoves Passion into tier-1 Physical (the grounded, people's-champion
+## stance pulls the keeper toward his physical self): from the Steady start (0) a -34 shift
+## lands mid-Wavering, the first Physical tier below center (Emo Hybrid thresholds
+## [50,18,-18,-50]; volatility 1.0). Starting values per the REALM_CAMELOT table; tune vs
+## the combat harness.
 static func _folk_config() -> RealmConfig:
 	var c := RealmConfig.new()
 	c.enemy_difficulty_mult = 0.95
@@ -109,4 +116,5 @@ static func _folk_config() -> RealmConfig:
 	c.shop_price_mult = 1.2
 	c.reward_rarity_mult = 0.9
 	c.map_boon = &"militia"
+	c.passion_shift = -34
 	return c
