@@ -28,7 +28,7 @@ static func build_sendoff(_character: CharacterData) -> VNData:
 
 	# Bram — Records.
 	vn.add_beat("", "Bram slides a folder across the Records desk without looking up.", C_NARRATION)
-	vn.add_beat("Bram", "Filled it with everything we still have on Camelot. There's a 'weapon of heroes' in there -- some reference out of Celtic lore. We think. Lore never sticks around more than a couple days.", C_BRAM)
+	vn.add_beat("Bram", "Filled it with everything we still have on Camelot. There's a 'weapon of heroes' in there — some reference out of Celtic lore. We think. Lore never sticks around more than a couple days.", C_BRAM)
 	vn.add_beat("You", "I know the feeling.", C_KEEPER)
 	vn.add_beat("", "Bram looks up then. Not unkindly.", C_NARRATION)
 	vn.add_beat("Bram", "Right. You would.", C_BRAM)
@@ -55,14 +55,14 @@ static func build_camelot_entry() -> VNData:
 	var vn := VNData.new()
 	vn.title = "Arrival at Camelot"
 
-	vn.add_beat("", "Camelot rises ahead -- banners at half-mast, the fields beyond the walls churned to mud and ash. Its champion, Sir Caedmon, rode out to meet the thing at the gates. What rode back was not him.", C_NARRATION)
+	vn.add_beat("", "Camelot rises ahead — banners at half-mast, the fields beyond the walls churned to mud and ash. Its champion, Sir Caedmon, rode out to meet the thing at the gates. What rode back was not him.", C_NARRATION)
 	vn.add_beat("", "They have been waiting for you. Word runs ahead of a dispatched keeper the way the old promise runs ahead of the sword: a hero will come, and draw Excalibur, and set it right. By the time you reach the gate, two delegations are already crossing the yard.", C_NARRATION)
-	vn.add_beat("", "From the keep, the court -- velvet and guarded smiles, an offer of everything the crown can spare. From the town, the common folk -- calloused hands, no smiles to spare, the same desperate plea. Both want the hero. Only one gets the first of you.", C_NARRATION)
+	vn.add_beat("", "From the keep, the court — velvet and guarded smiles, an offer of everything the crown can spare. From the town, the common folk — calloused hands, no smiles to spare, the same desperate plea. Both want the hero. Only one gets the first of you.", C_NARRATION)
 
 	vn.add_choice("Stand with the court.", _court_config(),
-		"The courtiers fold you into their warmth and their promises. The keep's doors open; the townsfolk's delegation melts back into the crowd. You will want for nothing here -- and nothing here is free.")
+		"The courtiers fold you into their warmth and their promises. The keep's doors open; the townsfolk's delegation melts back into the crowd. You will want for nothing here — and nothing here is free.")
 	vn.add_choice("Stand with the common folk.", _folk_config(),
-		"The townsfolk take you in among themselves, rough and grateful. Behind you, the court's smiles cool by a degree. The people will hold nothing back for you -- and the crown will remember the slight.")
+		"The townsfolk take you in among themselves, rough and grateful. Behind you, the court's smiles cool by a degree. The people will hold nothing back for you — and the crown will remember the slight.")
 	return vn
 
 
