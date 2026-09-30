@@ -36,6 +36,10 @@ var current_realm_id: StringName = &"camelot"
 # Tracks which realms have been visited this run (in entry order).
 # Used by the Realm Selection screen to exclude already-visited realms.
 var visited_realm_ids: Array[StringName] = []
+# The current realm's run-shape config (difficulty / economy / map knobs), set by the
+# realm-entry VN choice (Camelot: court vs common folk). Neutral by default; reset at run
+# start and re-set on entering each realm. See RealmConfig + docs/REALM_CAMELOT.md.
+var realm_config := RealmConfig.new()
 
 # --- Titles ---
 # All title ids the player has earned this run (whether equipped or not).
@@ -139,6 +143,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	perks.clear()
 	run_active = true
 	current_map = null
+	realm_config = RealmConfig.new()  # neutral until the realm-entry VN sets it
 	pending_enemies.clear()
 	pending_gold_reward = 0
 	pending_relic_reward = false

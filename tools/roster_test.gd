@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_prophet_escalation()
 	_test_starter_deck()
 	_test_map_planarity()
+	_test_realm_config()
 	_test_boss_reward()
 	await _test_frozen_skips()
 	_test_scene_scripts_compile()
@@ -589,6 +590,49 @@ func _map_has_crossing(map: MapData) -> bool:
 				if (edges[i][0] - edges[j][0]) * (edges[i][1] - edges[j][1]) < 0:
 					return true
 	return false
+
+
+## The A2 realm-config system: neutral by default, and the wired knobs flow through —
+## enemy difficulty scales encounter HP, and elite frequency biases the map's elite count
+## (without breaking planarity). reward_rarity / map_boon are fielded but not yet wired.
+func _test_realm_config() -> void:
+	var cfg := RealmConfig.new()
+	_check("RealmConfig defaults are neutral",
+		cfg.enemy_difficulty_mult == 1.0 and cfg.shop_price_mult == 1.0
+		and cfg.elite_frequency_mult == 1.0 and cfg.reward_rarity_mult == 1.0
+		and cfg.map_boon == &"")
+
+	# Difficulty knob: a 2x multiplier scales the opener enemy's HP.
+	var base_hp: int = EnemyPool.get_combat_encounter(0, 1.0)[0].max_health
+	var hard_hp: int = EnemyPool.get_combat_encounter(0, 2.0)[0].max_health
+	_check("difficulty knob scales encounter HP (2x > 1x)", hard_hp > base_hp)
+
+	# Elite-frequency knob: over many seeds, a high multiplier yields more elite nodes than
+	# the neutral map (the min-floor gate + no-two-in-a-row + elite cap still bound it).
+	var elites_neutral := 0
+	var elites_dense := 0
+	for s in range(40):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = s
+		elites_neutral += _count_elites(MapGenerator.generate(rng, &"camelot", 1, 1.0))
+		rng.seed = s
+		elites_dense += _count_elites(MapGenerator.generate(rng, &"camelot", 1, 4.0))
+	_check("elite-frequency knob raises the elite count (4x > 1x over 40 seeds)",
+		elites_dense > elites_neutral)
+
+	# A raised elite frequency must not break map planarity.
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 7
+	_check("map stays planar with a raised elite frequency",
+		not _map_has_crossing(MapGenerator.generate(rng2, &"camelot", 1, 4.0)))
+
+
+func _count_elites(map: MapData) -> int:
+	var n := 0
+	for id in map.nodes:
+		if map.nodes[id].node_type == MapNode.NodeType.ELITE:
+			n += 1
+	return n
 
 
 ## Boss card reward: must offer a full 3, include at least one RARE, and never a

@@ -63,6 +63,9 @@ func _ready() -> void:
 
 func _generate_shop() -> void:
 	var discount := _get_shop_discount_percent()
+	# Realm-config economy knob: a "greedy court" realm marks prices up, a "common folk"
+	# realm down. Applied to the base before the title discount so both compose.
+	var price_mult: float = RunManager.realm_config.shop_price_mult
 
 	shop_cards = CardPool.get_reward_choices(RngManager.loot_rng, CARD_COUNT)
 	for card in shop_cards:
@@ -74,7 +77,7 @@ func _generate_shop() -> void:
 				base = 60 + RngManager.loot_rng.randi_range(-5, 10)
 			CardData.CardRarity.RARE:
 				base = 90 + RngManager.loot_rng.randi_range(-5, 15)
-		card_prices[card] = _apply_discount(base, discount)
+		card_prices[card] = _apply_discount(int(round(base * price_mult)), discount)
 
 	var owned = RunManager.get_owned_relic_names()
 	shop_relics = RelicPool.get_reward_choices(RngManager.loot_rng, RELIC_COUNT, owned)
@@ -87,7 +90,7 @@ func _generate_shop() -> void:
 				base = 110 + RngManager.loot_rng.randi_range(-10, 15)
 			RelicData.RelicRarity.RARE:
 				base = 150 + RngManager.loot_rng.randi_range(-10, 20)
-		relic_prices[relic] = _apply_discount(base, discount)
+		relic_prices[relic] = _apply_discount(int(round(base * price_mult)), discount)
 
 
 ## Aggregates discount from all sources (titles, future relics) and applies the

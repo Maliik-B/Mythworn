@@ -11,7 +11,7 @@ const PATH_COUNT := 6
 ## post-processing places signature nodes (e.g. Camelot's Sword in the Stone at the
 ## center of Act 1). Default behavior preserves the original generic map.
 static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
-		act: int = 1) -> MapData:
+		act: int = 1, elite_frequency_mult: float = 1.0) -> MapData:
 	var map = MapData.new()
 	map.floor_count = FLOOR_COUNT
 
@@ -103,7 +103,7 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 			map.starting_node_ids.append(id)
 
 	# Phase 6: Assign node types
-	_assign_types(map, rng)
+	_assign_types(map, rng, elite_frequency_mult)
 
 	# Phase 7: Realm-specific signature nodes
 	_apply_realm_specifics(map, realm_id, act)
@@ -206,7 +206,8 @@ const MIN_SHOPS_TOTAL := 2      # at least this many shops exist somewhere on th
 ## (Elite/Rest/Shop) sit back-to-back on a path and min-floor rules hold. A pair of
 ## guarantee passes then cap elites-per-path and ensure a reachable shop (incl. a
 ## back-half gold sink) exists — without forcing one onto every route.
-static func _assign_types(map: MapData, rng: RandomNumberGenerator) -> void:
+static func _assign_types(map: MapData, rng: RandomNumberGenerator,
+		elite_frequency_mult: float = 1.0) -> void:
 	var last := map.floor_count - 1
 
 	# Fixed structural floors: the opening fight, a guaranteed pre-boss rest so
@@ -232,7 +233,7 @@ static func _assign_types(map: MapData, rng: RandomNumberGenerator) -> void:
 	# Fill the interior bottom-up so each node can see its parents' assigned types.
 	for floor in range(1, last - 1):
 		for node in map.get_nodes_on_floor(floor):
-			node.node_type = _pick_interior_type(node, floor, last, preds, map, rng)
+			node.node_type = _pick_interior_type(node, floor, last, preds, map, rng, elite_frequency_mult)
 
 	# Path-aware guarantees.
 	_enforce_elite_cap(map)
@@ -241,8 +242,9 @@ static func _assign_types(map: MapData, rng: RandomNumberGenerator) -> void:
 
 ## Weighted, constrained type roll for one interior node.
 static func _pick_interior_type(node: MapNode, floor: int, last: int,
-		preds: Dictionary, map: MapData, rng: RandomNumberGenerator) -> MapNode.NodeType:
-	var weights := _region_weights(floor, last)
+		preds: Dictionary, map: MapData, rng: RandomNumberGenerator,
+		elite_frequency_mult: float = 1.0) -> MapNode.NodeType:
+	var weights := _region_weights(floor, last, elite_frequency_mult)
 
 	# Min-floor gates.
 	if floor < MIN_ELITE_FLOOR:
@@ -270,16 +272,17 @@ static func _pick_interior_type(node: MapNode, floor: int, last: int,
 ## Region-weighted base distribution (before constraints). Early floors are mostly
 ## fights to build the deck; the mid/late board opens up to elites, services, and
 ## more events/mysteries.
-static func _region_weights(floor: int, last: int) -> Dictionary:
+static func _region_weights(floor: int, last: int, elite_frequency_mult: float = 1.0) -> Dictionary:
+	var w: Dictionary
 	if floor <= 4:
-		return {
+		w = {
 			MapNode.NodeType.COMBAT: 60.0,
 			MapNode.NodeType.EVENT: 24.0,
 			MapNode.NodeType.MYSTERY: 12.0,
 			MapNode.NodeType.ELITE: 6.0,
 		}
 	elif floor <= 8:
-		return {
+		w = {
 			MapNode.NodeType.COMBAT: 30.0,
 			MapNode.NodeType.ELITE: 17.0,
 			MapNode.NodeType.EVENT: 18.0,
@@ -288,7 +291,7 @@ static func _region_weights(floor: int, last: int) -> Dictionary:
 			MapNode.NodeType.SHOP: 12.0,
 		}
 	else:
-		return {
+		w = {
 			MapNode.NodeType.COMBAT: 26.0,
 			MapNode.NodeType.ELITE: 20.0,
 			MapNode.NodeType.EVENT: 16.0,
@@ -296,6 +299,12 @@ static func _region_weights(floor: int, last: int) -> Dictionary:
 			MapNode.NodeType.REST: 10.0,
 			MapNode.NodeType.SHOP: 14.0,
 		}
+	# Realm-config elite-frequency knob: scale the ELITE weight so a "dangerous" realm
+	# carries more elites (and a "safe" one fewer). The min-floor gate + no-two-in-a-row
+	# + elite cap constraints in _pick_interior_type / _enforce_elite_cap still apply.
+	if w.has(MapNode.NodeType.ELITE):
+		w[MapNode.NodeType.ELITE] *= elite_frequency_mult
+	return w
 
 
 static func _weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> MapNode.NodeType:

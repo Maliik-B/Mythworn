@@ -48,7 +48,8 @@ func _ready() -> void:
 
 	if not RunManager.current_map:
 		RunManager.current_map = MapGenerator.generate(RngManager.map_rng,
-			RunManager.current_realm_id, RunManager.current_act)
+			RunManager.current_realm_id, RunManager.current_act,
+			RunManager.realm_config.elite_frequency_mult)
 
 	_build_ui()
 	_create_map_display()
@@ -1738,21 +1739,21 @@ func _scroll_to_player() -> void:
 # ============================================================
 
 func _combat_encounter(floor_num: int) -> Array[EnemyData]:
-	# Camelot's regular roster + encounter pairings now live in EnemyPool. The
-	# difficulty_mult argument is where the A2 realm-config (court vs common folk)
-	# will hook in; until then it defaults to neutral.
-	return EnemyPool.get_combat_encounter(floor_num)
+	# Camelot's regular roster + encounter pairings live in EnemyPool; the realm-config
+	# difficulty knob (set by the realm-entry VN: court vs common folk) scales every
+	# encounter this run.
+	return EnemyPool.get_combat_encounter(floor_num, RunManager.realm_config.enemy_difficulty_mult)
 
 
 func _elite_encounter() -> Array[EnemyData]:
-	return EnemyPool.get_elite_encounter()
+	return EnemyPool.get_elite_encounter(RunManager.realm_config.enemy_difficulty_mult)
 
 
 func _boss_encounter() -> Array[EnemyData]:
 	# Act 1 is Sir Caedmon (EnemyPool). Acts 2-3 are out of demo scope and keep
 	# their legacy placeholder bosses until those acts get built.
 	if RunManager.current_act <= 1:
-		return EnemyPool.get_boss()
+		return EnemyPool.get_boss(RunManager.realm_config.enemy_difficulty_mult)
 	var result: Array[EnemyData] = []
 	result.append(_make_boss())
 	return result
