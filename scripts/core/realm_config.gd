@@ -16,9 +16,15 @@ var enemy_difficulty_mult: float = 1.0
 ## Multiplier on shop card + relic base prices (shop_scene).
 var shop_price_mult: float = 1.0
 
-## Multiplier on the map's ELITE node weight during generation
-## (MapGenerator.generate → _region_weights), so a "dangerous" realm carries more elites.
+## Drives the pledge's ELITE-node transform in MapGenerator: > 1 converts a few combat
+## nodes into NEW elites (Court = more risk + more reward), recorded so the map can show
+## exactly which nodes changed. 1.0 = no added elites.
 var elite_frequency_mult: float = 1.0
+
+## Folk pledge: weaken the realm's existing elites in place rather than removing them, so
+## the player keeps their rewards but the fights are easier (a Weak + power nerf, applied at
+## the encounter). MapGenerator flags the elite nodes; the node shows a "weakened" badge.
+var elite_weaken: bool = false
 
 ## Reward rarity bias: > 1 shifts card/relic reward rolls toward higher rarities.
 ## FIELDED — wired at the reward-draft consumption point in a later A2 increment.
@@ -36,6 +42,6 @@ var passion_shift: int = 0
 
 ## One-line summary for logs / a future config-readout UI.
 func describe() -> String:
-	return "RealmConfig(diff x%.2f, shop x%.2f, elites x%.2f, rarity x%.2f, boon '%s', passion %+d)" % [
+	return "RealmConfig(diff x%.2f, shop x%.2f, elites x%.2f%s, rarity x%.2f, boon '%s', passion %+d)" % [
 		enemy_difficulty_mult, shop_price_mult, elite_frequency_mult,
-		reward_rarity_mult, map_boon, passion_shift]
+		" weakened" if elite_weaken else "", reward_rarity_mult, map_boon, passion_shift]

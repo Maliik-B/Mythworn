@@ -18,19 +18,14 @@ const MAP_MARGIN_Y := 60
 const MAP_MARGIN_TOP := 165
 const NODE_SIZE := 50
 
-# Map-reveal flourish (plays once when a realm/act map is first generated, i.e. right after
-# the "A Realm Divided" pledge shapes it): pan up from the start to the boss while each node
-# enlarges -> swaps its glyph in -> de-enlarges (RevealAnim), bottom-to-top; hold, then snap
-# back down to the start. Makes the pledge's reshaping legible -- the player watches the map
-# their choice built. Durations are deliberately unhurried.
-const REVEAL_UP_DURATION := 2.6
-const REVEAL_HOLD := 0.5
-const REVEAL_BACK_DURATION := 0.9
-# Per-node enlarge -> swap -> de-enlarge timings (fed to RevealAnim).
+# Realm-entry flourish: on the first map open, ONLY the nodes the "A Realm Divided" pledge
+# changed animate (Court upgrades combats->elites, Folk weakens elites). Each enlarges ->
+# swaps to its new look -> de-enlarges (RevealAnim). Everything else loads as normal.
 const REVEAL_ENLARGE := 1.4
 const REVEAL_ENLARGE_T := 0.28
 const REVEAL_SWAP_T := 0.24
 const REVEAL_DEENLARGE_T := 0.20
+const PLEDGE_CHANGE_STAGGER := 0.18  # delay between successive changed-node animations
 
 # UI references
 var scroll_container: ScrollContainer
@@ -54,7 +49,6 @@ var _timer_accum := 0.0
 var _pulse_time := 0.0
 var _available_nodes: Array = []
 var _map_x_offset := 0.0  # horizontal centering shift for the node graph
-var _reveal_active := false  # true while the post-pledge map-reveal animation plays
 
 func _ready() -> void:
 	if not RunManager.run_active:
@@ -67,7 +61,8 @@ func _ready() -> void:
 	if fresh_map:
 		RunManager.current_map = MapGenerator.generate(RngManager.map_rng,
 			RunManager.current_realm_id, RunManager.current_act,
-			RunManager.realm_config.elite_frequency_mult)
+			RunManager.realm_config.elite_frequency_mult,
+			RunManager.realm_config.elite_weaken)
 
 	# Resolve a realm-entry map_boon (A2) the first time the map opens this realm.
 	# consume_map_boon clears the pending slot, so the later node-return reloads no-op.
@@ -77,10 +72,10 @@ func _ready() -> void:
 	_create_map_display()
 	_update_node_states()
 	_update_bottom_bar()
-	if fresh_map:
-		_begin_map_reveal()
-	else:
-		_scroll_to_player.call_deferred()
+	_scroll_to_player.call_deferred()
+	# First map open after a pledge: animate only the nodes the pledge changed.
+	if fresh_map and not RunManager.current_map.pledge_changes.is_empty():
+		_prime_pledge_changes()
 	AudioManager.play_music("map")
 
 	# Refresh the bottom bar's title counter when titles change while on the map.
@@ -620,14 +615,23 @@ func _process(delta: float) -> void:
 		_timer_accum -= 1.0
 		timer_label.text = RunManager.get_run_time_string()
 
-	# Pulse available nodes (paused during the reveal, which drives modulate itself).
+	# Pulse available nodes
 	_pulse_time += delta
-	if not _reveal_active:
-		for id in _available_nodes:
-			var btn: Button = node_buttons.get(id)
-			if btn:
-				var pulse = 0.85 + sin(_pulse_time * 3.0) * 0.15
-				btn.modulate = Color(pulse + 0.15, pulse + 0.15, pulse + 0.15)
+	for id in _available_nodes:
+		var btn: Button = node_buttons.get(id)
+		if btn:
+			var pulse = 0.85 + sin(_pulse_time * 3.0) * 0.15
+			btn.modulate = Color(pulse + 0.15, pulse + 0.15, pulse + 0.15)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Dev-only: press R to replay the pledge-change flourish on the current map (feel-tuning
+	# without relaunching). Debug builds only; never fires in a shipped build.
+	if not OS.is_debug_build():
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
+		if RunManager.current_map and not RunManager.current_map.pledge_changes.is_empty():
+			_prime_pledge_changes()
 
 
 # ============================================================
@@ -1545,54 +1549,7 @@ func _create_node_button(node: MapNode) -> Button:
 	var btn = Button.new()
 	btn.custom_minimum_size = Vector2(NODE_SIZE, NODE_SIZE)
 	btn.size = Vector2(NODE_SIZE, NODE_SIZE)
-	btn.text = MapNode.type_label(node.node_type)
-	btn.add_theme_font_size_override("font_size", 20)
-
-	var style = StyleBoxFlat.new()
-	style.set_corner_radius_all(NODE_SIZE / 2)
-	style.set_border_width_all(3)
-	style.bg_color = MapNode.type_color(node.node_type).darkened(0.5)
-	style.border_color = MapNode.type_color(node.node_type)
-
-	var hover_style = style.duplicate()
-	hover_style.bg_color = MapNode.type_color(node.node_type).darkened(0.3)
-
-	var pressed_style = style.duplicate()
-	pressed_style.bg_color = MapNode.type_color(node.node_type).darkened(0.6)
-
-	# The Sword in the Stone is the signature quest node — make it louder than a
-	# regular map dot: bigger glyph, thicker and brighter gold ring. (It also gets
-	# the availability pulse from _process, so no competing tween here.)
-	if node.node_type == MapNode.NodeType.SWORD_IN_STONE:
-		btn.add_theme_font_size_override("font_size", 30)
-		var gold := MapNode.type_color(node.node_type)
-		style.bg_color = gold.darkened(0.35)
-		style.set_border_width_all(5)
-		style.border_color = gold.lightened(0.25)
-		hover_style.bg_color = gold.darkened(0.15)
-		hover_style.set_border_width_all(5)
-		hover_style.border_color = gold.lightened(0.4)
-		pressed_style.set_border_width_all(5)
-
-	# The boss is the act's threat — bold, vivid, and resilient to the map's darkening
-	# effects (bright bg + thick bright border) so it always reads even in the dim
-	# upper map. Its locked-state dimming is also softened in _update_node_states.
-	if node.node_type == MapNode.NodeType.BOSS:
-		btn.add_theme_font_size_override("font_size", 32)
-		var bc := MapNode.type_color(node.node_type)
-		style.bg_color = bc.darkened(0.15)
-		style.set_border_width_all(5)
-		style.border_color = bc.lightened(0.35)
-		hover_style.bg_color = bc.darkened(0.0)
-		hover_style.set_border_width_all(5)
-		hover_style.border_color = bc.lightened(0.5)
-		pressed_style.set_border_width_all(5)
-
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", hover_style)
-	btn.add_theme_stylebox_override("pressed", pressed_style)
-	btn.add_theme_stylebox_override("disabled", style.duplicate())
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	_style_node_button(btn, node.node_type, node.weakened)
 
 	# Tooltip descriptions by node type
 	var tooltip_map = {
@@ -1606,12 +1563,68 @@ func _create_node_button(node: MapNode) -> Button:
 		MapNode.NodeType.SWORD_IN_STONE: "An ancient blade waits in stone…",
 	}
 	btn.tooltip_text = tooltip_map.get(node.node_type, "")
+	if node.node_type == MapNode.NodeType.ELITE and node.weakened:
+		btn.tooltip_text = "Weakened elite — the people sabotaged it. Easier fight, same rewards."
 
 	btn.pressed.connect(_on_node_clicked.bind(node))
 	btn.mouse_entered.connect(_on_node_hover.bind(node))
 	btn.mouse_exited.connect(_on_node_unhover)
 
 	return btn
+
+
+## Applies a node button's glyph + styleboxes for a given type (and, for elites, whether it's
+## weakened). Extracted so the pledge-change animation can set a node's pre-change look then
+## swap to its real one. A weakened elite reads as "drained" (cold, desaturated colour).
+func _style_node_button(btn: Button, node_type: int, weakened: bool = false) -> void:
+	btn.text = MapNode.type_label(node_type)
+	btn.add_theme_font_size_override("font_size", 20)
+
+	var base_col := MapNode.type_color(node_type)
+	if node_type == MapNode.NodeType.ELITE and weakened:
+		base_col = Color(0.5, 0.56, 0.62)  # drained
+
+	var style := StyleBoxFlat.new()
+	style.set_corner_radius_all(NODE_SIZE / 2)
+	style.set_border_width_all(3)
+	style.bg_color = base_col.darkened(0.5)
+	style.border_color = base_col
+
+	var hover_style := style.duplicate()
+	hover_style.bg_color = base_col.darkened(0.3)
+
+	var pressed_style := style.duplicate()
+	pressed_style.bg_color = base_col.darkened(0.6)
+
+	# The Sword in the Stone is the signature quest node — louder ring + bigger glyph.
+	if node_type == MapNode.NodeType.SWORD_IN_STONE:
+		btn.add_theme_font_size_override("font_size", 30)
+		var gold := MapNode.type_color(node_type)
+		style.bg_color = gold.darkened(0.35)
+		style.set_border_width_all(5)
+		style.border_color = gold.lightened(0.25)
+		hover_style.bg_color = gold.darkened(0.15)
+		hover_style.set_border_width_all(5)
+		hover_style.border_color = gold.lightened(0.4)
+		pressed_style.set_border_width_all(5)
+
+	# The boss is the act's threat — bold, vivid, resilient to the map's darkening.
+	if node_type == MapNode.NodeType.BOSS:
+		btn.add_theme_font_size_override("font_size", 32)
+		var bc := MapNode.type_color(node_type)
+		style.bg_color = bc.darkened(0.15)
+		style.set_border_width_all(5)
+		style.border_color = bc.lightened(0.35)
+		hover_style.bg_color = bc.darkened(0.0)
+		hover_style.set_border_width_all(5)
+		hover_style.border_color = bc.lightened(0.5)
+		pressed_style.set_border_width_all(5)
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", hover_style)
+	btn.add_theme_stylebox_override("pressed", pressed_style)
+	btn.add_theme_stylebox_override("disabled", style.duplicate())
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 
 # ============================================================
@@ -1648,8 +1661,6 @@ func _update_node_states() -> void:
 
 
 func _on_node_clicked(node: MapNode) -> void:
-	if _reveal_active:
-		return
 	var available = RunManager.current_map.get_available_next_ids()
 	if node.id not in available:
 		return
@@ -1693,7 +1704,7 @@ func _enter_node(node: MapNode) -> void:
 		MapNode.NodeType.COMBAT:
 			_start_combat(_combat_encounter(node.floor_num), 16 + node.floor_num * 2)
 		MapNode.NodeType.ELITE:
-			_start_combat(_elite_encounter(), 34 + node.floor_num * 2, true, false)
+			_start_combat(_elite_encounter(node.weakened), 34 + node.floor_num * 2, true, false)
 		MapNode.NodeType.BOSS:
 			RunManager.pending_act_complete = true
 			_start_combat(_boss_encounter(), 50 + node.floor_num * 2, true, true)
@@ -1763,82 +1774,56 @@ func _scroll_to_player() -> void:
 
 
 # ============================================================
-# MAP REVEAL (post-pledge flourish)
+# PLEDGE CHANGES (realm-entry flourish — only the nodes the pledge changed)
 # ============================================================
 
-## Hide every node synchronously (so there's no first-frame flash of the full map), flag
-## the reveal active, then start the animation once the scroll area has laid out.
-func _begin_map_reveal() -> void:
-	_reveal_active = true
-	for id in node_buttons:
-		var btn: Button = node_buttons[id]
-		# Stash the real glyph and blank it -- it swaps back in at each node's flip midpoint.
-		btn.set_meta("reveal_text", btn.text)
-		btn.text = ""
+## Set each changed node to its PRE-change look and hide it (scale/alpha) synchronously, so
+## there's no first-frame flash of the final state, then start the animation after layout.
+func _prime_pledge_changes() -> void:
+	var map = RunManager.current_map
+	for id in map.pledge_changes:
+		var btn: Button = node_buttons.get(id)
+		if btn == null:
+			continue
+		if map.pledge_changes[id] == &"elite_added":
+			_style_node_button(btn, MapNode.NodeType.COMBAT, false)  # was a combat node
+		else:  # &"weakened" — was a normal (un-weakened) elite
+			_style_node_button(btn, MapNode.NodeType.ELITE, false)
 		btn.pivot_offset = btn.size / 2.0
 		btn.scale = Vector2(0.5, 0.5)
 		btn.modulate.a = 0.0
-	_play_map_reveal.call_deferred()
+	_play_pledge_changes.call_deferred()
 
 
-## Pan up from the start to the boss while nodes pop in bottom-to-top, hold at the top, then
-## snap back down to the start where the player begins.
-func _play_map_reveal() -> void:
+## Animate each changed node (enlarge -> swap to its real look -> de-enlarge), staggered.
+func _play_pledge_changes() -> void:
 	var map = RunManager.current_map
-	if map == null or node_buttons.is_empty():
-		_finish_map_reveal()
+	if map == null or map.pledge_changes.is_empty():
 		return
-	var floor_span := maxi(1, map.floor_count - 1)
-	var start_scroll := _scroll_value_for_floor(0)
-
-	var tw := create_tween()
-	if start_scroll > 4.0:
-		scroll_container.scroll_vertical = int(start_scroll)
-		tw.tween_property(scroll_container, "scroll_vertical", 0, REVEAL_UP_DURATION) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	else:
-		tw.tween_interval(REVEAL_UP_DURATION)  # short map: nothing to pan, just time the pops
-	tw.tween_interval(REVEAL_HOLD)
-	tw.tween_property(scroll_container, "scroll_vertical", int(start_scroll), REVEAL_BACK_DURATION) \
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_callback(_finish_map_reveal)
-
-	# Stagger each node's reveal by floor so the map assembles start (bottom) -> boss (top),
-	# tracking the upward pan.
-	for id in node_buttons:
+	var ids: Array = map.pledge_changes.keys()
+	ids.sort()
+	var shown := 0
+	for id in ids:
+		var btn: Button = node_buttons.get(id)
 		var node: MapNode = map.get_node(id)
-		var f: int = node.floor_num if node else 0
-		var delay := (float(f) / float(floor_span)) * (REVEAL_UP_DURATION * 0.8)
-		_reveal_node(node_buttons[id], delay)
+		if btn == null or node == null:
+			continue
+		RevealAnim.play_node(self, btn, float(shown) * PLEDGE_CHANGE_STAGGER, {
+			"enlarge": REVEAL_ENLARGE,
+			"enlarge_t": REVEAL_ENLARGE_T,
+			"swap_t": REVEAL_SWAP_T,
+			"deenlarge_t": REVEAL_DEENLARGE_T,
+		}, _pledge_swap_cb(btn, node))
+		shown += 1
+	# Re-settle availability dimming once the last changed node lands.
+	var total := float(maxi(0, shown - 1)) * PLEDGE_CHANGE_STAGGER \
+		+ REVEAL_ENLARGE_T + REVEAL_SWAP_T + REVEAL_DEENLARGE_T + 0.05
+	get_tree().create_timer(total).timeout.connect(_update_node_states)
 
 
-func _reveal_node(btn: Button, delay: float) -> void:
-	var swap_cb := func() -> void: btn.text = btn.get_meta("reveal_text", "")
-	RevealAnim.play_node(self, btn, delay, {
-		"enlarge": REVEAL_ENLARGE,
-		"enlarge_t": REVEAL_ENLARGE_T,
-		"swap_t": REVEAL_SWAP_T,
-		"deenlarge_t": REVEAL_DEENLARGE_T,
-	}, swap_cb)
-
-
-func _finish_map_reveal() -> void:
-	for id in node_buttons:
-		var btn: Button = node_buttons[id]
-		btn.scale = Vector2.ONE
-		if btn.has_meta("reveal_text"):
-			btn.text = btn.get_meta("reveal_text")
-	_reveal_active = false
-	_update_node_states()  # restore proper availability highlight/dimming + modulate
-	_scroll_to_player()
-
-
-## Scroll offset that centers the given floor's row in the viewport (floor 0 = the start row
-## at the bottom, high floors near the top). Clamped to a non-negative scroll.
-func _scroll_value_for_floor(floor_num: int) -> float:
-	var map = RunManager.current_map
-	var node_y: float = MAP_MARGIN_TOP + (map.floor_count - 1 - floor_num) * NODE_SPACING_Y + NODE_SIZE / 2.0
-	return maxf(0.0, node_y - scroll_container.size.y / 2.0)
+## Flip-midpoint callback: swap the node into its real, post-change look.
+func _pledge_swap_cb(btn: Button, node: MapNode) -> Callable:
+	return func() -> void: _style_node_button(btn, node.node_type, node.weakened)
 
 
 # ============================================================
@@ -1852,8 +1837,20 @@ func _combat_encounter(floor_num: int) -> Array[EnemyData]:
 	return EnemyPool.get_combat_encounter(floor_num, RunManager.realm_config.enemy_difficulty_mult)
 
 
-func _elite_encounter() -> Array[EnemyData]:
-	return EnemyPool.get_elite_encounter(RunManager.realm_config.enemy_difficulty_mult)
+# Folk's weakened elites keep their rewards but fight at a power nerf (reduced stats via a
+# lower difficulty mult) and start Weak -- a real, felt debuff behind the "weakened" badge.
+const WEAKENED_ELITE_POWER := 0.7
+const WEAKENED_ELITE_WEAK := 2
+
+func _elite_encounter(weakened := false) -> Array[EnemyData]:
+	var mult := RunManager.realm_config.enemy_difficulty_mult
+	if weakened:
+		mult *= WEAKENED_ELITE_POWER
+	var enc := EnemyPool.get_elite_encounter(mult)
+	if weakened:
+		for e in enc:
+			e.starting_statuses.append([StatusEffects.WEAK, WEAKENED_ELITE_WEAK])
+	return enc
 
 
 func _boss_encounter() -> Array[EnemyData]:

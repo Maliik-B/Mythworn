@@ -89,30 +89,33 @@ static func build_camelot_entry() -> VNData:
 	return vn
 
 
-## Court: side with power. A harder, richer realm -- more elites, tougher enemies, better
-## loot; shops stay at their normal price. Starting values per the REALM_CAMELOT table;
+## Court: side with power. A harder, richer realm -- the pledge converts a couple of combat
+## nodes into NEW elites (more risk, more reward), enemies hit a touch harder, loot is
+## richer; shops stay at their normal price. Starting values per the REALM_CAMELOT table;
 ## tune vs the combat harness.
 static func _court_config() -> RealmConfig:
 	var c := RealmConfig.new()
 	c.enemy_difficulty_mult = 1.1
-	c.elite_frequency_mult = 1.4
+	c.elite_frequency_mult = 1.4  # > 1 -> the transform adds elites
 	c.shop_price_mult = 1.0
 	c.reward_rarity_mult = 1.3
 	c.map_boon = &""
 	return c
 
 
-## Common folk: side with the people. An easier realm -- fewer, weaker elites plus a
-## militia map_boon -- but the slighted court raises shop prices all act, and loot is a
-## touch plainer. Also shoves Passion into tier-1 Physical (the grounded, people's-champion
-## stance pulls the keeper toward his physical self): from the Steady start (0) a -34 shift
-## lands mid-Wavering, the first Physical tier below center (Emo Hybrid thresholds
+## Common folk: side with the people. An easier realm -- the people WEAKEN the realm's
+## elites in place (you keep their rewards, but those fights start the enemies Weak + power-
+## nerfed) plus a militia map_boon -- but the slighted court raises shop prices all act, and
+## loot is a touch plainer. Also shoves Passion into tier-1 Physical (the grounded, people's-
+## champion stance pulls the keeper toward his physical self): from the Steady start (0) a
+## -34 shift lands mid-Wavering, the first Physical tier below center (Emo Hybrid thresholds
 ## [50,18,-18,-50]; volatility 1.0). Starting values per the REALM_CAMELOT table; tune vs
 ## the combat harness.
 static func _folk_config() -> RealmConfig:
 	var c := RealmConfig.new()
 	c.enemy_difficulty_mult = 0.95
-	c.elite_frequency_mult = 0.7
+	c.elite_frequency_mult = 1.0  # elites stay (keep the rewards); they're weakened instead
+	c.elite_weaken = true
 	c.shop_price_mult = 1.2
 	c.reward_rarity_mult = 0.9
 	c.map_boon = &"militia"

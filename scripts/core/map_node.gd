@@ -10,6 +10,10 @@ var column: int = 0
 var node_type: NodeType = NodeType.COMBAT
 var next_nodes: Array[int] = [] # IDs of connected nodes on the next floor
 var visited: bool = false
+# ELITE-only: weakened by the Folk pledge (see RealmConfig.elite_weaken). The node stays an
+# elite (keeps its reward), but the encounter starts the enemies with Weak + a power nerf,
+# and the node shows a "weakened" badge. Set by MapGenerator's pledge transform.
+var weakened: bool = false
 # Purely-cosmetic sub-cell offsets (in fractions of a cell) so the rendered graph
 # looks organically placed instead of a rigid lattice. Set by MapGenerator; the
 # grid column/floor still drive connectivity, balance, and layout — jitter never

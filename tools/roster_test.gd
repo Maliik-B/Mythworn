@@ -628,6 +628,40 @@ func _test_realm_config() -> void:
 	_check("map stays planar with a raised elite frequency",
 		not _map_has_crossing(MapGenerator.generate(rng2, &"camelot", 1, 4.0)))
 
+	# Pledge transform: Court (elite_frequency > 1) upgrades combats to NEW elites + records
+	# them; Folk (weaken) flags the existing elites weakened. Both go on map.pledge_changes;
+	# a neutral map records nothing.
+	var ptrng := RandomNumberGenerator.new()
+	ptrng.seed = 11
+	var court_map := MapGenerator.generate(ptrng, &"camelot", 1, 1.4, false)
+	var added := 0
+	var added_are_elites := true
+	for cid in court_map.pledge_changes:
+		if court_map.pledge_changes[cid] == &"elite_added":
+			added += 1
+			if court_map.nodes[cid].node_type != MapNode.NodeType.ELITE:
+				added_are_elites = false
+	_check("Court pledge adds recorded new elites", added > 0 and added_are_elites)
+
+	ptrng.seed = 11
+	var folk_map := MapGenerator.generate(ptrng, &"camelot", 1, 1.0, true)
+	var elite_ct := 0
+	for fid in folk_map.nodes:
+		if folk_map.nodes[fid].node_type == MapNode.NodeType.ELITE:
+			elite_ct += 1
+	var weak_records := 0
+	var weak_flagged := true
+	for fid in folk_map.pledge_changes:
+		if folk_map.pledge_changes[fid] == &"weakened":
+			weak_records += 1
+			if not folk_map.nodes[fid].weakened:
+				weak_flagged = false
+	_check("Folk pledge weakens all existing elites (flagged + recorded)",
+		elite_ct > 0 and weak_records == elite_ct and weak_flagged)
+
+	_check("a neutral map records no pledge changes",
+		MapGenerator.generate(RandomNumberGenerator.new(), &"camelot", 1, 1.0, false).pledge_changes.is_empty())
+
 	# Reward-rarity knob: a > 1 mult biases card rarity rolls toward RARE.
 	RunManager.realm_config = RealmConfig.new()
 	var rr_rng := RandomNumberGenerator.new()
@@ -729,10 +763,10 @@ func _test_vn_data() -> void:
 	_check("Camelot entry offers Court + Folk choices with configs",
 		entry.choices.size() == 2
 		and entry.choices[0].config != null and entry.choices[1].config != null)
-	_check("Court is harder + richer; Folk is easier + carries the militia boon",
+	_check("Court adds elites + richer loot; Folk weakens elites + carries the militia boon",
 		entry.choices[0].config.elite_frequency_mult > 1.0
 		and entry.choices[0].config.reward_rarity_mult > 1.0
-		and entry.choices[1].config.elite_frequency_mult < 1.0
+		and entry.choices[1].config.elite_weaken
 		and entry.choices[1].config.map_boon == &"militia")
 	# The common-folk pledge shoves Passion to tier-1 Physical (Wavering) from the Steady
 	# start; Court leaves it alone.
@@ -869,7 +903,6 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/shop/shop_scene.gd",
 			"res://scenes/act/act_transition_scene.gd",
 			"res://scenes/settings/settings_scene.gd",
-			"res://scenes/dev/reveal_test_scene.gd",
 			"res://scenes/vn/vn_scene.gd"]:
 		var scr = load(path)
 		_check("compiles: %s" % path, scr != null and scr is GDScript)

@@ -6,6 +6,10 @@ var nodes: Dictionary = {} # int (id) -> MapNode
 var floor_count: int = 15
 var current_node_id: int = -1 # -1 = haven't entered the map yet
 var starting_node_ids: Array[int] = []
+# Nodes the realm-entry pledge changed, for the "watch your choice reshape these" animation:
+# node id -> change kind (&"elite_added" = a combat node the Court pledge upgraded to elite;
+# &"weakened" = an elite the Folk pledge weakened). Empty on a neutral / no-pledge map.
+var pledge_changes: Dictionary = {}
 
 
 func get_node(id: int) -> MapNode:

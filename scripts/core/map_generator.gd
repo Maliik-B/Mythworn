@@ -11,7 +11,8 @@ const PATH_COUNT := 6
 ## post-processing places signature nodes (e.g. Camelot's Sword in the Stone at the
 ## center of Act 1). Default behavior preserves the original generic map.
 static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
-		act: int = 1, elite_frequency_mult: float = 1.0) -> MapData:
+		act: int = 1, elite_frequency_mult: float = 1.0,
+		weaken_elites: bool = false) -> MapData:
 	var map = MapData.new()
 	map.floor_count = FLOOR_COUNT
 
@@ -102,16 +103,75 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 		if map.nodes[id].floor_num == 0:
 			map.starting_node_ids.append(id)
 
-	# Phase 6: Assign node types
-	_assign_types(map, rng, elite_frequency_mult)
+	# Phase 6: Assign node types — always NEUTRAL now. The realm-entry pledge shapes the
+	# map via a recorded transform (Phase 7b) instead of an invisible generation weight, so
+	# the map can show exactly which nodes the choice changed.
+	_assign_types(map, rng, 1.0)
 
 	# Phase 7: Realm-specific signature nodes
 	_apply_realm_specifics(map, realm_id, act)
+
+	# Phase 7b: apply the pledge's node changes (Court adds elites; Folk weakens them) and
+	# record them on map.pledge_changes for the "watch your choice reshape these" animation.
+	_apply_pledge_transform(map, rng, elite_frequency_mult, weaken_elites)
 
 	# Phase 8: cosmetic placement jitter — organic look, never touches connectivity
 	_apply_jitter(map, rng)
 
 	return map
+
+
+# Court elite_frequency 1.4 -> +2 elites; the multiplier drives the count so a stress value
+# (e.g. 4x in tests) still adds more than neutral.
+const ELITE_ADD_SCALE := 5.0
+const MAX_ELITES_ADDED := 4
+
+
+## The pledge's discrete, RECORDED effect on the map. Court (elite_frequency > 1) upgrades a
+## few interior combat nodes to NEW elites; Folk (weaken_elites) flags the existing elites
+## as weakened (they keep their rewards, the encounter starts them Weak + power-nerfed). Both
+## record their touched nodes on map.pledge_changes so map_scene animates only those.
+static func _apply_pledge_transform(map: MapData, rng: RandomNumberGenerator,
+		elite_frequency_mult: float, weaken_elites: bool) -> void:
+	map.pledge_changes = {}
+
+	var extra := roundi((elite_frequency_mult - 1.0) * ELITE_ADD_SCALE)
+	if extra > 0:
+		var candidates := _combat_nodes_for_upgrade(map)
+		_rng_shuffle(candidates, rng)
+		var n := mini(mini(extra, MAX_ELITES_ADDED), candidates.size())
+		for i in n:
+			var id: int = candidates[i]
+			map.nodes[id].node_type = MapNode.NodeType.ELITE
+			map.pledge_changes[id] = &"elite_added"
+
+	if weaken_elites:
+		for id in map.nodes:
+			var node: MapNode = map.nodes[id]
+			if node.node_type == MapNode.NodeType.ELITE and not map.pledge_changes.has(id):
+				node.weakened = true
+				map.pledge_changes[id] = &"weakened"
+
+
+## Interior combat nodes in the mid/late act -- keep the opening gentle and never touch the
+## boss / Sword / starting rows.
+static func _combat_nodes_for_upgrade(map: MapData) -> Array[int]:
+	var out: Array[int] = []
+	for id in map.nodes:
+		var node: MapNode = map.nodes[id]
+		if node.node_type == MapNode.NodeType.COMBAT \
+				and node.floor_num >= 2 and node.floor_num <= map.floor_count - 3:
+			out.append(id)
+	return out
+
+
+## Deterministic Fisher-Yates using the run's seeded rng (Array.shuffle uses the global one).
+static func _rng_shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
+	for i in range(arr.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
 
 
 ## Gives each node a small sub-cell offset so the rendered graph looks hand-placed
