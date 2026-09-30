@@ -25,7 +25,13 @@ const REVEAL_ENLARGE := 1.4
 const REVEAL_ENLARGE_T := 0.28
 const REVEAL_SWAP_T := 0.24
 const REVEAL_DEENLARGE_T := 0.20
-const PLEDGE_CHANGE_STAGGER := 0.18  # delay between successive changed-node animations
+# The flourish gently pans the camera up through the changed nodes (so the player's eye
+# follows each change as it animates), then glides back to the start.
+const PLEDGE_HOLD := 0.35
+const PLEDGE_BACK := 0.9
+const PLEDGE_PAN_PER_NODE := 0.4
+const PLEDGE_PAN_MIN := 1.4
+const PLEDGE_PAN_MAX := 2.8
 
 # UI references
 var scroll_container: ScrollContainer
@@ -49,6 +55,7 @@ var _timer_accum := 0.0
 var _pulse_time := 0.0
 var _available_nodes: Array = []
 var _map_x_offset := 0.0  # horizontal centering shift for the node graph
+var _pledge_anim_active := false  # true while the changed-node camera flourish plays
 
 func _ready() -> void:
 	if not RunManager.run_active:
@@ -615,13 +622,14 @@ func _process(delta: float) -> void:
 		_timer_accum -= 1.0
 		timer_label.text = RunManager.get_run_time_string()
 
-	# Pulse available nodes
+	# Pulse available nodes (paused during the changed-node flourish's camera pan).
 	_pulse_time += delta
-	for id in _available_nodes:
-		var btn: Button = node_buttons.get(id)
-		if btn:
-			var pulse = 0.85 + sin(_pulse_time * 3.0) * 0.15
-			btn.modulate = Color(pulse + 0.15, pulse + 0.15, pulse + 0.15)
+	if not _pledge_anim_active:
+		for id in _available_nodes:
+			var btn: Button = node_buttons.get(id)
+			if btn:
+				var pulse = 0.85 + sin(_pulse_time * 3.0) * 0.15
+				btn.modulate = Color(pulse + 0.15, pulse + 0.15, pulse + 0.15)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1661,6 +1669,8 @@ func _update_node_states() -> void:
 
 
 func _on_node_clicked(node: MapNode) -> void:
+	if _pledge_anim_active:
+		return
 	var available = RunManager.current_map.get_available_next_ids()
 	if node.id not in available:
 		return
@@ -1795,35 +1805,75 @@ func _prime_pledge_changes() -> void:
 	_play_pledge_changes.call_deferred()
 
 
-## Animate each changed node (enlarge -> swap to its real look -> de-enlarge), staggered.
+## Gently pan the camera up through the changed nodes (bottom -> top) so the player's eye
+## follows each change as it animates (enlarge -> swap -> de-enlarge), then glide back to the
+## start. Each node's anim fires as the camera reaches it.
 func _play_pledge_changes() -> void:
 	var map = RunManager.current_map
 	if map == null or map.pledge_changes.is_empty():
 		return
 	var ids: Array = map.pledge_changes.keys()
-	ids.sort()
-	var shown := 0
+	ids.sort_custom(func(a, b): return map.nodes[a].floor_num < map.nodes[b].floor_num)
+	_pledge_anim_active = true
+
+	var start_scroll := _scroll_value_for_floor(0)  # the player's rest position
+	var top_floor: int = map.nodes[ids[ids.size() - 1]].floor_num
+	var top_scroll := _scroll_value_for_floor(top_floor)
+	var span := start_scroll - top_scroll  # panning up = scroll decreases
+	var pan_up := clampf(PLEDGE_PAN_PER_NODE * float(ids.size()), PLEDGE_PAN_MIN, PLEDGE_PAN_MAX)
+
+	# Camera: start -> up to the top-most changed node -> hold -> back to the start. The pan-up
+	# is LINEAR so elapsed time maps directly to scroll position -- that's what lets each node's
+	# animation stay in sync with where the camera actually is (an eased pan would drift).
+	var tw := create_tween()
+	if span > 4.0:
+		tw.tween_property(scroll_container, "scroll_vertical", int(top_scroll), pan_up) \
+			.set_trans(Tween.TRANS_LINEAR)
+	else:
+		tw.tween_interval(pan_up)  # everything already on screen; just time the anims
+	tw.tween_interval(PLEDGE_HOLD)
+	tw.tween_property(scroll_container, "scroll_vertical", int(start_scroll), PLEDGE_BACK) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(_finish_pledge_changes)
+
+	# Start each node's anim so its SWAP (the actual change, at the flip midpoint) lands exactly
+	# as the camera centers the node. The swap fires enlarge_t + swap_t/2 into the anim.
+	var swap_lead := REVEAL_ENLARGE_T + REVEAL_SWAP_T * 0.5
 	for id in ids:
 		var btn: Button = node_buttons.get(id)
 		var node: MapNode = map.get_node(id)
 		if btn == null or node == null:
 			continue
-		RevealAnim.play_node(self, btn, float(shown) * PLEDGE_CHANGE_STAGGER, {
+		var frac := 0.0
+		if span > 4.0:
+			frac = clampf((start_scroll - _scroll_value_for_floor(node.floor_num)) / span, 0.0, 1.0)
+		var delay := maxf(0.0, frac * pan_up - swap_lead)
+		RevealAnim.play_node(self, btn, delay, {
 			"enlarge": REVEAL_ENLARGE,
 			"enlarge_t": REVEAL_ENLARGE_T,
 			"swap_t": REVEAL_SWAP_T,
 			"deenlarge_t": REVEAL_DEENLARGE_T,
 		}, _pledge_swap_cb(btn, node))
-		shown += 1
-	# Re-settle availability dimming once the last changed node lands.
-	var total := float(maxi(0, shown - 1)) * PLEDGE_CHANGE_STAGGER \
-		+ REVEAL_ENLARGE_T + REVEAL_SWAP_T + REVEAL_DEENLARGE_T + 0.05
-	get_tree().create_timer(total).timeout.connect(_update_node_states)
+
+
+func _finish_pledge_changes() -> void:
+	_pledge_anim_active = false
+	_update_node_states()  # restore availability dimming on the changed nodes
+	_scroll_to_player()    # settle exactly at the start
 
 
 ## Flip-midpoint callback: swap the node into its real, post-change look.
 func _pledge_swap_cb(btn: Button, node: MapNode) -> Callable:
 	return func() -> void: _style_node_button(btn, node.node_type, node.weakened)
+
+
+## Scroll offset that centers the given floor's row in the viewport (floor 0 = the start row
+## at the bottom). Matches _scroll_to_player's formula so the pan starts/ends at the rest
+## position without a jump. Clamped non-negative.
+func _scroll_value_for_floor(floor_num: int) -> float:
+	var map = RunManager.current_map
+	var target_y: float = MAP_MARGIN_Y + (map.floor_count - 1 - floor_num) * NODE_SPACING_Y
+	return maxf(0.0, target_y - scroll_container.size.y / 2.0 + NODE_SIZE / 2.0)
 
 
 # ============================================================
