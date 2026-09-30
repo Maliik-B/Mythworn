@@ -119,6 +119,7 @@ func _test_caedmon_phase_gate() -> void:
 	var phase2 := ["Compelled Onslaught", "Hollowing Gaze", "Puppet's Fervor"]
 	_check("Caedmon is multi-phase (2 bars)",
 		caedmon.is_multiphase() and caedmon.phase_hps.size() == 2)
+	_check("Caedmon has a death-beat line", caedmon.death_line != "")
 
 	# Phase 1: only disciplined moves (phases are separate bars now, not HP gates).
 	var st := EnemyCombatState.new(caedmon)

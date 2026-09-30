@@ -29,6 +29,11 @@ var phase_movesets: Array = []            # Array[Array[EnemyMove]], one per pha
 @export var phase_enter_self_strength: Array[int] = [] # Strength the enemy gains
 @export var phase_enter_enraged: Array[int] = []       # Enraged (retaliation) the enemy gains
 
+## A final line spoken as this enemy falls (empty = silent). Floated as a speech bubble
+## in combat_scene._on_enemy_died, before the death animation clears the model. Used for
+## boss death beats (e.g. Sir Caedmon, freed from the compulsion in death).
+@export var death_line: String = ""
+
 
 ## True if this enemy fights in multiple separate-HP-bar phases.
 func is_multiphase() -> bool:

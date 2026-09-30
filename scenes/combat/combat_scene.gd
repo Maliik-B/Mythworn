@@ -2214,6 +2214,15 @@ func _on_enemy_damaged(enemy, amount: int, new_hp: int) -> void:
 func _on_enemy_died(enemy) -> void:
 	_log("[color=green]%s defeated![/color]" % enemy.enemy_data.enemy_name)
 	RunManager.run_stats["enemies_killed"] = RunManager.run_stats.get("enemies_killed", 0) + 1
+	# Boss death beat: a final line as the enemy falls (e.g. Caedmon, freed from the
+	# compulsion — the Act-2 Puppeteer tease). Float it BEFORE _animate_enemy_death erases
+	# the panel from enemy_nodes; the combat log keeps a permanent copy either way.
+	var final_line: String = enemy.enemy_data.death_line
+	if final_line != "":
+		var panel: Control = enemy_nodes.get(enemy)
+		if panel:
+			_log("[color=violet]%s: \"%s\"[/color]" % [enemy.enemy_data.enemy_name, final_line])
+			_show_enemy_speech(panel, final_line)
 	_animate_enemy_death(enemy)
 	_refresh_ui()
 

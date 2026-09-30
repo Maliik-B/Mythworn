@@ -485,6 +485,11 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	e.phase_enter_damage.assign([0, _scale(18, mult)])
 	e.phase_enter_self_strength.assign([0, 2])
 	e.phase_enter_enraged.assign([0, 1])
+	# Death beat: in death the compulsion finally lets go, the "…free" moment that closes
+	# his arc (phase 2 begged "don't make me…"). A light tease of the Act-2 Puppeteer ("who
+	# held the strings", "it will reach for another").
+	# Ellipses, to match his prose voice (playtest #23).
+	e.death_line = "...oh. It's quiet. The hand on mine has let go... I'm free. Find who held the strings, keeper. It will reach for another. ...thank you."
 	return e
 
 

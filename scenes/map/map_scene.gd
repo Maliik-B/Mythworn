@@ -3,7 +3,12 @@ extends Control
 ## and transitions to combat/rest/etc based on node type.
 
 # Layout
-const NODE_SPACING_X := 130
+# 200 (was 130): the 7 grid columns now span ~1410px of the 1920 base width (~73%,
+# centred by _map_x_offset) instead of ~990px (~52%), so the graph fills the board
+# instead of clustering in a narrow centre band with the sides empty (backlog #2).
+# Purely a render-spacing change — grid columns/connections/planarity are untouched,
+# and it stays within the viewport so horizontal scroll (disabled) is never needed.
+const NODE_SPACING_X := 200
 const NODE_SPACING_Y := 90
 const MAP_MARGIN_X := 80
 const MAP_MARGIN_Y := 60
