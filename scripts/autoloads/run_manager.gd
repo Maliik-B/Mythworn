@@ -27,6 +27,11 @@ var pending_special_event: StringName = &""
 ## routes to the "beast unmade" follow-up beat (which grants Excalibur) rather than a
 ## normal reward. Cleared when consumed.
 var pending_guardian_fight: bool = false
+## A VN segment queued for vn_scene to play (realm-entry, the Fable send-off, story beats).
+## vn_scene reads + clears it, applies its chosen choice's consequences, then routes to
+## pending_vn_next. Cleared at run start.
+var pending_vn: VNData = null
+var pending_vn_next: String = "res://scenes/map/map_scene.tscn"
 var run_start_time: int = 0 # msec from Time.get_ticks_msec()
 var run_stats: Dictionary = {}
 
@@ -150,6 +155,8 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_relic_is_boss = false
 	pending_special_event = &""
 	pending_guardian_fight = false
+	pending_vn = null
+	pending_vn_next = "res://scenes/map/map_scene.tscn"
 	pending_act_complete = false
 	excalibur_mode = ExcaliburMode.SWORD
 	philosophy_id = &""

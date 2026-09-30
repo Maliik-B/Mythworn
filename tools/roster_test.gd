@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_starter_deck()
 	_test_map_planarity()
 	_test_realm_config()
+	_test_vn_data()
 	_test_boss_reward()
 	await _test_frozen_skips()
 	_test_scene_scripts_compile()
@@ -627,6 +628,24 @@ func _test_realm_config() -> void:
 		not _map_has_crossing(MapGenerator.generate(rng2, &"camelot", 1, 4.0)))
 
 
+## The VN plumbing (A2): VNData builds with chainable beats + choices, and a choice's
+## RealmConfig is what vn_scene applies to the run — the realm-entry consequence.
+func _test_vn_data() -> void:
+	var cfg := RealmConfig.new()
+	cfg.enemy_difficulty_mult = 1.3
+	var vn := VNData.new()
+	vn.add_beat("Bram", "test line").add_beat("Neve", "another").add_choice("Court", cfg, "outcome")
+	_check("VNData builds beats + choices (chainable)",
+		vn.beats.size() == 2 and vn.choices.size() == 1
+		and vn.beats[0].speaker == "Bram" and vn.choices[0].config == cfg
+		and vn.choices[0].result_text == "outcome")
+	# The realm-entry consequence vn_scene performs on choose: choice.config → realm_config.
+	RunManager.realm_config = vn.choices[0].config
+	_check("a VN choice's config becomes the run's realm_config",
+		RunManager.realm_config.enemy_difficulty_mult == 1.3)
+	RunManager.realm_config = RealmConfig.new()  # restore neutral for later tests
+
+
 func _count_elites(map: MapData) -> int:
 	var n := 0
 	for id in map.nodes:
@@ -714,7 +733,8 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/reward/card_reward_scene.gd", "res://scenes/event/event_scene.gd",
 			"res://scenes/character_select/character_select_scene.gd",
 			"res://scenes/shop/shop_scene.gd",
-			"res://scenes/act/act_transition_scene.gd"]:
+			"res://scenes/act/act_transition_scene.gd",
+			"res://scenes/vn/vn_scene.gd"]:
 		var scr = load(path)
 		_check("compiles: %s" % path, scr != null and scr is GDScript)
 
