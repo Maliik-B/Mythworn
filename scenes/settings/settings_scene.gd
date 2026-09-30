@@ -7,6 +7,7 @@ var _music_slider: HSlider
 var _sfx_slider: HSlider
 var _fullscreen_check: CheckButton
 var _shake_check: CheckButton
+var _intro_check: CheckButton
 
 
 func _ready() -> void:
@@ -76,6 +77,11 @@ func _build_ui() -> void:
 	# Screen Shake
 	_shake_check = _add_toggle_row(content, "Screen Shake", shake_enabled)
 	_shake_check.toggled.connect(_on_shake_toggled)
+
+	# Always Show Intro — the Fable send-off introduction plays once per save by
+	# default, then a single liaison per run. On keeps the full two-liaison intro every run.
+	_intro_check = _add_toggle_row(content, "Always Show Intro", ProfileManager.always_show_intro)
+	_intro_check.toggled.connect(_on_intro_toggled)
 
 	# Back button
 	var back_btn = Button.new()
@@ -228,6 +234,11 @@ func _on_shake_toggled(toggled_on: bool) -> void:
 	AudioManager.play_sfx("button_click")
 	shake_enabled = toggled_on
 	print("[Settings] Screen shake: ", "ON" if toggled_on else "OFF")
+
+
+func _on_intro_toggled(toggled_on: bool) -> void:
+	AudioManager.play_sfx("button_click")
+	ProfileManager.set_always_show_intro(toggled_on)
 
 
 func _on_back() -> void:

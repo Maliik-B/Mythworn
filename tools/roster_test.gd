@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_map_planarity()
 	_test_realm_config()
 	_test_vn_data()
+	_test_profile_intro()
 	_test_boss_reward()
 	await _test_frozen_skips()
 	_test_scene_scripts_compile()
@@ -744,6 +745,34 @@ func _test_vn_data() -> void:
 	RunManager.pending_vn = null
 
 
+## Intro gating (ProfileManager): the full two-liaison introduction shows the first time
+## on a save, then a single liaison per run, and the settings toggle forces it back on.
+## Leaves the profile at fresh defaults so a later real play still gets the intro.
+func _test_profile_intro() -> void:
+	ProfileManager.set_always_show_intro(false)
+	ProfileManager.reset_seen_cutscenes()
+	_check("fresh profile shows the full intro", ProfileManager.should_show_full_intro())
+	ProfileManager.mark_seen(ProfileManager.CUTSCENE_INTRO)
+	_check("intro id is recorded as seen", ProfileManager.has_seen(ProfileManager.CUTSCENE_INTRO))
+	_check("after seeing it, the full intro is suppressed",
+		not ProfileManager.should_show_full_intro())
+	ProfileManager.set_always_show_intro(true)
+	_check("always-show toggle forces the full intro back on",
+		ProfileManager.should_show_full_intro())
+	ProfileManager.set_always_show_intro(false)
+
+	# The single-liaison send-off builds for either liaison and is shorter than the full one.
+	var full := VNPool.build_sendoff(RunManager.current_character)
+	var bram := VNPool.build_sendoff_single(RunManager.current_character, &"bram")
+	var neve := VNPool.build_sendoff_single(RunManager.current_character, &"neve")
+	_check("single-liaison send-off builds for Bram + Neve, shorter than the full intro",
+		bram.beats.size() > 0 and neve.beats.size() > 0
+		and bram.beats.size() < full.beats.size() and neve.beats.size() < full.beats.size())
+
+	# Restore fresh defaults so running this suite doesn't consume the player's intro.
+	ProfileManager.reset_seen_cutscenes()
+
+
 func _count_elites(map: MapData) -> int:
 	var n := 0
 	for id in map.nodes:
@@ -832,6 +861,7 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/character_select/character_select_scene.gd",
 			"res://scenes/shop/shop_scene.gd",
 			"res://scenes/act/act_transition_scene.gd",
+			"res://scenes/settings/settings_scene.gd",
 			"res://scenes/vn/vn_scene.gd"]:
 		var scr = load(path)
 		_check("compiles: %s" % path, scr != null and scr is GDScript)

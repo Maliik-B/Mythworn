@@ -15,7 +15,6 @@ run/main_scene="res://scenes/splash/splash_scene.tscn"
 config/features=PackedStringArray("4.4")
 
 [autoload]
-
 Events="*res://scripts/autoloads/events.gd"
 RngManager="*res://scripts/autoloads/rng_manager.gd"
 RealmRegistry="*res://scripts/autoloads/realm_registry.gd"
@@ -24,6 +23,7 @@ AudioManager="*res://scripts/autoloads/audio_manager.gd"
 SceneTransition="*res://scripts/autoloads/scene_transition.gd"
 TitleEarnedPopup="*res://scripts/autoloads/title_earned_popup.gd"
 PauseMenu="*res://scripts/autoloads/pause_menu.gd"
+ProfileManager="*res://scripts/autoloads/profile_manager.gd"
 
 [display]
 

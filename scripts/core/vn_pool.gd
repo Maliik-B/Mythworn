@@ -16,17 +16,36 @@ const C_COURT := Color(0.86, 0.74, 0.40)       # gilt
 const C_FOLK := Color(0.72, 0.66, 0.52)        # homespun
 
 
-## The Fable send-off — the keeper's coworkers see them off before deployment. Dialogue
-## only (no choice); the liaison gifts are granted separately by apply_liaison_gift. The
-## demo ships the Emo-Hybrid-reactive intro (both liaisons); per-liaison random/authored
-## beats and Hotheaded-Mage reactivity are 1.0+ content.
+## The full Fable send-off — the FIRST-run introduction, both liaisons in one scene.
+## Dialogue only (no choice); the liaison gifts are granted separately by
+## apply_liaison_gift. Shown only the first time on a save (or when the player toggles
+## "always show intro" back on); returning runs use build_sendoff_single. The demo ships
+## the Emo-Hybrid-reactive banter; Hotheaded-Mage reactivity is 1.0+ content.
 static func build_sendoff(_character: CharacterData) -> VNData:
 	var vn := VNData.new()
 	vn.title = "Before Deployment"
-
 	vn.add_beat("", "The Fable office, before deployment. Two desks, two coworkers, the same tired morning.", C_NARRATION)
+	_add_bram_beats(vn)
+	_add_neve_beats(vn)
+	return vn
 
-	# Bram — Records.
+
+## A returning-run send-off: one liaison only, since the two-liaison version is the
+## first-run introduction. Each liaison's beats self-frame (Records / Dispatch), so there
+## is no shared opener. The caller picks the liaison (random per run) and grants that
+## liaison's gift.
+static func build_sendoff_single(_character: CharacterData, liaison: StringName) -> VNData:
+	var vn := VNData.new()
+	vn.title = "Before Deployment"
+	if liaison == &"neve":
+		_add_neve_beats(vn)
+	else:
+		_add_bram_beats(vn)
+	return vn
+
+
+## Bram — Records. Dry, tired; hands over the Camelot briefing.
+static func _add_bram_beats(vn: VNData) -> void:
 	vn.add_beat("", "Bram slides a folder across the Records desk without looking up.", C_NARRATION)
 	vn.add_beat("Bram", "Filled it with everything we still have on Camelot. There's a 'weapon of heroes' in there — some reference out of Celtic lore. We think. Lore never sticks around more than a couple days.", C_BRAM)
 	vn.add_beat("You", "I know the feeling.", C_KEEPER)
@@ -34,7 +53,9 @@ static func build_sendoff(_character: CharacterData) -> VNData:
 	vn.add_beat("Bram", "Right. You would.", C_BRAM)
 	vn.add_beat("Bram", "At least yours is only the once. Mine does it on a schedule.", C_BRAM)
 
-	# Neve — Dispatch.
+
+## Neve — Dispatch. Warm veteran; hands over the kit.
+static func _add_neve_beats(vn: VNData) -> void:
 	vn.add_beat("", "Dispatch. Neve holds the kit a second longer than she needs to.", C_NARRATION)
 	vn.add_beat("Neve", "Camelot. Political realm. Everyone smiles while they take something off you.", C_NEVE)
 	vn.add_beat("You", "You say that about every realm.", C_KEEPER)
@@ -45,7 +66,6 @@ static func build_sendoff(_character: CharacterData) -> VNData:
 	vn.add_beat("Neve", "Those are the worst kind.", C_NEVE)
 	vn.add_beat("", "She writes something small in the back of a battered notebook, the way other people check a watch, and hands you the rest of your supplies.", C_NARRATION)
 	vn.add_beat("Neve", "Go on. Come back in one piece. You're bad at that.", C_NEVE)
-	return vn
 
 
 ## The Camelot realm-entry — arrival at a realm in crisis, then the court-vs-common-folk

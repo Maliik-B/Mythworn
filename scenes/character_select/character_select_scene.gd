@@ -379,14 +379,24 @@ func _on_select_character() -> void:
 	_begin_run_intro(character)
 
 
-## Run-start sequencer (A2): grant the liaison send-off gifts, then queue the two VN
-## segments -- Fable send-off, then Camelot realm-entry -- which hand off to the map when
-## finished. The demo intro shows both liaisons and grants both gifts (the introduction);
-## per-run single-liaison texture is 1.0+ content. See docs/REALM_CAMELOT.md § Run-start.
+## Run-start sequencer (A2): pick the send-off, grant its gift(s), then queue the two VN
+## segments -- send-off, then Camelot realm-entry -- which hand off to the map when done.
+## The full two-liaison introduction plays only the first time on a save (or when the
+## player has toggled "always show intro" back on, via ProfileManager); returning runs
+## show one liaison at random, with just that liaison's gift. See docs/REALM_CAMELOT.md
+## § Run-start.
 func _begin_run_intro(character: CharacterData) -> void:
-	RunManager.apply_liaison_gift(&"bram")
-	RunManager.apply_liaison_gift(&"neve")
-	RunManager.pending_vn = VNPool.build_sendoff(character)
+	if ProfileManager.should_show_full_intro():
+		# First play (or toggled on): the full introduction + both send-off gifts.
+		RunManager.apply_liaison_gift(&"bram")
+		RunManager.apply_liaison_gift(&"neve")
+		RunManager.pending_vn = VNPool.build_sendoff(character)
+		ProfileManager.mark_seen(ProfileManager.CUTSCENE_INTRO)
+	else:
+		# Returning run: one liaison at random (seeded), with that liaison's gift.
+		var liaison: StringName = &"neve" if RngManager.event_rng.randi() % 2 == 0 else &"bram"
+		RunManager.apply_liaison_gift(liaison)
+		RunManager.pending_vn = VNPool.build_sendoff_single(character, liaison)
 	RunManager.pending_vn_queue.append(VNPool.build_camelot_entry())
 	RunManager.pending_vn_next = "res://scenes/map/map_scene.tscn"
 	SceneTransition.change_scene("res://scenes/vn/vn_scene.tscn")
