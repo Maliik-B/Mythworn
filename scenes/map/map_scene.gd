@@ -51,6 +51,10 @@ func _ready() -> void:
 			RunManager.current_realm_id, RunManager.current_act,
 			RunManager.realm_config.elite_frequency_mult)
 
+	# Resolve a realm-entry map_boon (A2) the first time the map opens this realm.
+	# consume_map_boon clears the pending slot, so the later node-return reloads no-op.
+	RunManager.consume_map_boon()
+
 	_build_ui()
 	_create_map_display()
 	_update_node_states()

@@ -28,10 +28,17 @@ var pending_special_event: StringName = &""
 ## normal reward. Cleared when consumed.
 var pending_guardian_fight: bool = false
 ## A VN segment queued for vn_scene to play (realm-entry, the Fable send-off, story beats).
-## vn_scene reads + clears it, applies its chosen choice's consequences, then routes to
-## pending_vn_next. Cleared at run start.
+## vn_scene reads + clears it, applies its chosen choice's consequences, then pulls the
+## next segment from pending_vn_queue (below), and only routes to pending_vn_next when the
+## queue is empty. Cleared at run start.
 var pending_vn: VNData = null
+## Follow-on VN segments played after pending_vn, in order. The run-start sequencer loads
+## this with [Camelot realm-entry] so the flow is: send-off -> realm-entry -> map.
+var pending_vn_queue: Array[VNData] = []
 var pending_vn_next: String = "res://scenes/map/map_scene.tscn"
+## A realm map_boon queued by apply_realm_config, resolved once when the map next opens
+## (map_scene._ready -> consume_map_boon). StringName id; &"" = nothing pending.
+var pending_map_boon: StringName = &""
 var run_start_time: int = 0 # msec from Time.get_ticks_msec()
 var run_stats: Dictionary = {}
 
@@ -156,7 +163,9 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_special_event = &""
 	pending_guardian_fight = false
 	pending_vn = null
+	pending_vn_queue.clear()
 	pending_vn_next = "res://scenes/map/map_scene.tscn"
+	pending_map_boon = &""
 	pending_act_complete = false
 	excalibur_mode = ExcaliburMode.SWORD
 	philosophy_id = &""
@@ -401,6 +410,59 @@ func set_current_realm(realm_id: StringName) -> void:
 ## True if the player has visited this realm in the current run.
 func has_visited_realm(realm_id: StringName) -> bool:
 	return visited_realm_ids.has(realm_id)
+
+
+# --- Realm configuration (A2) ---
+
+## Install a realm-shape config (from the realm-entry VN choice: Camelot court vs common
+## folk). Sets the run's realm_config, queues its map_boon for the next map open, applies
+## its one-shot passion_shift, and emits realm_configured so UI/codex can react. This is
+## the single apply path — vn_scene calls it when a choice carries a config, and the
+## mid-run Court Intrigue / Peasant's Plea events retune through it too.
+func apply_realm_config(config: RealmConfig) -> void:
+	if config == null:
+		return
+	realm_config = config
+	pending_map_boon = config.map_boon
+	if config.passion_shift != 0:
+		change_passion(config.passion_shift)
+	Events.realm_configured.emit(get_current_realm())
+
+
+## Resolve the queued realm map_boon exactly once (called from map_scene._ready). Boons
+## are keyed by id; the catalogue is small for the demo. Clears the pending slot first so
+## a map reload (every node return re-runs _ready) never re-grants it.
+func consume_map_boon() -> void:
+	var boon := pending_map_boon
+	pending_map_boon = &""
+	match boon:
+		&"":
+			return
+		&"militia":
+			# Common folk: the town musters a shield-wall militia at your side.
+			var r := RelicPool.get_relic_by_name("Peasant Militia")
+			if r:
+				add_relic(r)
+		_:
+			push_warning("consume_map_boon: unknown boon id '%s'" % boon)
+
+
+## Grant a Fable liaison's run-start gift (the send-off boon — separate from realm_config).
+## Bram (Records) leans info, Neve (Dispatch) leans supplies; each is a bespoke quest-pool
+## relic so it never appears in shops or reward rolls. See docs/REALM_CAMELOT.md § Run-start.
+func apply_liaison_gift(liaison: StringName) -> void:
+	var relic_name := ""
+	match liaison:
+		&"bram":
+			relic_name = "Bram's Briefing"
+		&"neve":
+			relic_name = "Neve's Kit"
+		_:
+			push_warning("apply_liaison_gift: unknown liaison '%s'" % liaison)
+			return
+	var r := RelicPool.get_relic_by_name(relic_name)
+	if r:
+		add_relic(r)
 
 
 # --- Titles ---

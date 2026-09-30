@@ -191,10 +191,19 @@ static func _pick_from_pool(pool: Array[CardData], rng: RandomNumberGenerator,
 
 
 static func _roll_rarity(rng: RandomNumberGenerator) -> CardData.CardRarity:
-	var roll = rng.randf()
-	if roll < 0.6:
+	# Base weights: common 0.6, uncommon 0.3, rare 0.1. The realm's reward_rarity_mult
+	# (A2: Court biases loot up, folk down) scales the two non-common weights; common
+	# soaks the remainder. Neutral (1.0) reproduces the original 0.6 / 0.9 thresholds.
+	var mult := 1.0
+	if RunManager and RunManager.realm_config:
+		mult = RunManager.realm_config.reward_rarity_mult
+	var rare_w := 0.1 * mult
+	var unc_w := 0.3 * mult
+	var common_w := maxf(0.0, 1.0 - rare_w - unc_w)
+	var roll := rng.randf() * (common_w + unc_w + rare_w)
+	if roll < common_w:
 		return CardData.CardRarity.COMMON
-	if roll < 0.9:
+	if roll < common_w + unc_w:
 		return CardData.CardRarity.UNCOMMON
 	return CardData.CardRarity.RARE
 

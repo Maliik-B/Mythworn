@@ -129,9 +129,10 @@ func _show_choices() -> void:
 
 func _on_choice(choice: VNData.VNChoice) -> void:
 	# Apply the realm-shape consequence (if any) — this is how the realm-entry VN sets the
-	# run's realm state before the map opens.
+	# run's realm state before the map opens. apply_realm_config also queues the map_boon,
+	# applies any passion_shift, and emits realm_configured.
 	if choice.config != null:
-		RunManager.realm_config = choice.config
+		RunManager.apply_realm_config(choice.config)
 	_choices_box.visible = false
 	for ch in _choices_box.get_children():
 		ch.queue_free()
@@ -150,7 +151,13 @@ func _finish() -> void:
 	if _finishing:
 		return
 	_finishing = true
-	SceneTransition.change_scene(_next_scene)
+	# Chain to the next queued VN segment (send-off -> realm-entry), if any; otherwise
+	# hand off to the final destination captured at _ready (the map by default).
+	if not RunManager.pending_vn_queue.is_empty():
+		RunManager.pending_vn = RunManager.pending_vn_queue.pop_front()
+		SceneTransition.change_scene("res://scenes/vn/vn_scene.tscn")
+	else:
+		SceneTransition.change_scene(_next_scene)
 
 
 func _fallback_vn() -> VNData:

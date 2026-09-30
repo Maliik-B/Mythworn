@@ -25,12 +25,17 @@ var elite_frequency_mult: float = 1.0
 var reward_rarity_mult: float = 1.0
 
 ## A one-time run-start realm boon keyed by id (empty = none), resolved when the realm
-## map first opens. FIELDED — the boon catalogue + application land in a later increment.
+## map first opens. Applied via RunManager.consume_map_boon (queued from apply_realm_config).
 var map_boon: StringName = &""
+
+## A one-shot Passion delta applied the moment this config is installed
+## (RunManager.apply_realm_config). Zero for the neutral + Court/Folk entry configs;
+## the mid-run Peasant's Plea event uses it to move Passion when it retunes the realm.
+var passion_shift: int = 0
 
 
 ## One-line summary for logs / a future config-readout UI.
 func describe() -> String:
-	return "RealmConfig(diff x%.2f, shop x%.2f, elites x%.2f, rarity x%.2f, boon '%s')" % [
+	return "RealmConfig(diff x%.2f, shop x%.2f, elites x%.2f, rarity x%.2f, boon '%s', passion %+d)" % [
 		enemy_difficulty_mult, shop_price_mult, elite_frequency_mult,
-		reward_rarity_mult, map_boon]
+		reward_rarity_mult, map_boon, passion_shift]
