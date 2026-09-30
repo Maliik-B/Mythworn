@@ -869,6 +869,7 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/shop/shop_scene.gd",
 			"res://scenes/act/act_transition_scene.gd",
 			"res://scenes/settings/settings_scene.gd",
+			"res://scenes/dev/reveal_test_scene.gd",
 			"res://scenes/vn/vn_scene.gd"]:
 		var scr = load(path)
 		_check("compiles: %s" % path, scr != null and scr is GDScript)

@@ -19,13 +19,18 @@ const MAP_MARGIN_TOP := 165
 const NODE_SIZE := 50
 
 # Map-reveal flourish (plays once when a realm/act map is first generated, i.e. right after
-# the "A Realm Divided" pledge shapes it): pan up from the start to the boss while the nodes
-# pop in bottom-to-top, hold, then snap back down to the start. Makes the pledge's reshaping
-# legible -- the player watches the map their choice built.
-const REVEAL_UP_DURATION := 1.3
-const REVEAL_HOLD := 0.25
-const REVEAL_BACK_DURATION := 0.45
-const REVEAL_POP_DURATION := 0.34
+# the "A Realm Divided" pledge shapes it): pan up from the start to the boss while each node
+# enlarges -> swaps its glyph in -> de-enlarges (RevealAnim), bottom-to-top; hold, then snap
+# back down to the start. Makes the pledge's reshaping legible -- the player watches the map
+# their choice built. Durations are deliberately unhurried.
+const REVEAL_UP_DURATION := 2.6
+const REVEAL_HOLD := 0.5
+const REVEAL_BACK_DURATION := 0.9
+# Per-node enlarge -> swap -> de-enlarge timings (fed to RevealAnim).
+const REVEAL_ENLARGE := 1.4
+const REVEAL_ENLARGE_T := 0.28
+const REVEAL_SWAP_T := 0.24
+const REVEAL_DEENLARGE_T := 0.20
 
 # UI references
 var scroll_container: ScrollContainer
@@ -1767,8 +1772,11 @@ func _begin_map_reveal() -> void:
 	_reveal_active = true
 	for id in node_buttons:
 		var btn: Button = node_buttons[id]
+		# Stash the real glyph and blank it -- it swaps back in at each node's flip midpoint.
+		btn.set_meta("reveal_text", btn.text)
+		btn.text = ""
 		btn.pivot_offset = btn.size / 2.0
-		btn.scale = Vector2(0.2, 0.2)
+		btn.scale = Vector2(0.5, 0.5)
 		btn.modulate.a = 0.0
 	_play_map_reveal.call_deferred()
 
@@ -1795,27 +1803,31 @@ func _play_map_reveal() -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(_finish_map_reveal)
 
-	# Stagger each node's pop by floor so the map assembles start (bottom) -> boss (top),
+	# Stagger each node's reveal by floor so the map assembles start (bottom) -> boss (top),
 	# tracking the upward pan.
 	for id in node_buttons:
 		var node: MapNode = map.get_node(id)
 		var f: int = node.floor_num if node else 0
 		var delay := (float(f) / float(floor_span)) * (REVEAL_UP_DURATION * 0.8)
-		_pop_node(node_buttons[id], delay)
+		_reveal_node(node_buttons[id], delay)
 
 
-func _pop_node(btn: Button, delay: float) -> void:
-	var tw := create_tween()
-	tw.tween_interval(delay)
-	tw.set_parallel(true)
-	tw.tween_property(btn, "scale", Vector2.ONE, REVEAL_POP_DURATION) \
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(btn, "modulate:a", 1.0, REVEAL_POP_DURATION * 0.7)
+func _reveal_node(btn: Button, delay: float) -> void:
+	var swap_cb := func() -> void: btn.text = btn.get_meta("reveal_text", "")
+	RevealAnim.play_node(self, btn, delay, {
+		"enlarge": REVEAL_ENLARGE,
+		"enlarge_t": REVEAL_ENLARGE_T,
+		"swap_t": REVEAL_SWAP_T,
+		"deenlarge_t": REVEAL_DEENLARGE_T,
+	}, swap_cb)
 
 
 func _finish_map_reveal() -> void:
 	for id in node_buttons:
-		node_buttons[id].scale = Vector2.ONE
+		var btn: Button = node_buttons[id]
+		btn.scale = Vector2.ONE
+		if btn.has_meta("reveal_text"):
+			btn.text = btn.get_meta("reveal_text")
 	_reveal_active = false
 	_update_node_states()  # restore proper availability highlight/dimming + modulate
 	_scroll_to_player()
