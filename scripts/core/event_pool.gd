@@ -18,6 +18,7 @@ static func _build_pool() -> Array[EventData]:
 	pool.append(_training_grounds())
 	pool.append(_suspicious_chest())
 	pool.append(_campfire_remnants())
+	pool.append(_peasants_plea())
 
 	return pool
 
@@ -221,6 +222,61 @@ static func _suspicious_chest() -> EventData:
 	c3.result_text = "Wisdom is knowing when not to act. You walk on, unscathed."
 	c3.passion_change = 2
 	c3.awarded_title_id = &"the_calculating"
+
+	e.choices.append(c1)
+	e.choices.append(c2)
+	e.choices.append(c3)
+	return e
+
+
+## Camelot within-realm lore event (the "good-feeling pass" step 2). A village bled
+## dry by the crown's tithe begs relief — leaning into the court-vs-folk axis the "A
+## Realm Divided" pledge sets up. Helping is the keeper letting his guard down, so it
+## moves Passion toward Water (+); the cold, crown-serving choice hardens him (-).
+## Arthurian flavor. (Flavor is medieval/Camelot; the demo
+## only ever runs this pool in Camelot. Multi-realm pools will need realm-filtering.)
+static func _peasants_plea() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Peasant's Plea"
+	e.description = ("The village sits where the king's road bends, and it is too quiet for the hour. "
+		+ "No smoke off the bake-ovens. A cart stands half-loaded in the square with nobody minding "
+		+ "it. The people who come out to meet you come slow, the way you'd approach a strange "
+		+ "dog.\n\nAn old woman speaks for them. \"You came down the king's road with a sword on "
+		+ "you, so you're his or you're not. Either way, you'll want to hear it.\" She nods at the "
+		+ "cart. Grain sacks, a crate of thin hens, a strongbox. \"The collector rides in at dawn "
+		+ "for the crown's share. He took the seed-corn last winter. He'll take it again, and we'll "
+		+ "be chewing the thatch by spring.\"\n\nA child watches from a doorway. Nobody tells it to "
+		+ "go inside.")
+
+	var c1 = EventData.EventChoice.new()
+	c1.text = "Pay the crown's share yourself. (Lose 35 Gold)"
+	c1.result_text = ("You count the coin into the old woman's hands. It is more than the collector "
+		+ "will expect, and he will not think to ask where it came from. That night the village "
+		+ "feeds you at its own thin table. An old campaigner who soldiered for the last king sits "
+		+ "with you late, showing you a trick of his he says the young ones never have the patience "
+		+ "to learn.")
+	c1.gold_change = -35
+	c1.passion_change = 5
+	c1.card_reward = true
+	c1.awarded_title_id = &"the_merciful"
+
+	var c2 = EventData.EventChoice.new()
+	c2.text = "Take the crown's share yourself, and your own cut with it."
+	c2.result_text = ("You tell them you will see the king's due collected. They are almost grateful, "
+		+ "until they understand you mean to carry it off tonight, ahead of the collector. You take "
+		+ "the strongbox and a measure of the grain. Nobody tries to stop a sword. By the time you "
+		+ "reach the trees, the quiet behind you has a different weight to it.")
+	c2.gold_change = 30
+	c2.passion_change = -6
+	c2.awarded_title_id = &"the_calculating"
+
+	var c3 = EventData.EventChoice.new()
+	c3.text = "This is not your realm to set right. Walk on."
+	c3.result_text = ("You tell her it isn't yours to mend, which is true, and you take the road out "
+		+ "before the sun is up. It is an easy enough thing to say. A mile on you find it has not "
+		+ "made you feel any lighter. Whatever the collector does at dawn, you will be a long way "
+		+ "from the sound of it.")
+	c3.passion_change = -3
 
 	e.choices.append(c1)
 	e.choices.append(c2)
