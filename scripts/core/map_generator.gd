@@ -109,7 +109,7 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 	_assign_types(map, rng, 1.0)
 
 	# Phase 7: Realm-specific signature nodes
-	_apply_realm_specifics(map, realm_id, act)
+	_apply_realm_specifics(map, realm_id, act, rng)
 
 	# Phase 7b: apply the pledge's node changes (Court adds elites; Folk weakens them) and
 	# record them on map.pledge_changes for the "watch your choice reshape these" animation.
@@ -159,6 +159,10 @@ static func _combat_nodes_for_upgrade(map: MapData) -> Array[int]:
 	var out: Array[int] = []
 	for id in map.nodes:
 		var node: MapNode = map.nodes[id]
+		# Skip the questline's payoff node: it must keep its original look until the player
+		# arms it, and its own reveal flourish shouldn't fight the pledge flourish.
+		if node.quest_payoff_id != &"" or node.quest_giver_id != &"":
+			continue
 		if node.node_type == MapNode.NodeType.COMBAT \
 				and node.floor_num >= 2 and node.floor_num <= map.floor_count - 3:
 			out.append(id)
@@ -228,9 +232,11 @@ static func _remove_edge_crossings(connections: Dictionary) -> void:
 ## node — paths that happen to go through the center hit it, others bypass it.
 ## This matches the design intent that pathing to the central quest is itself the
 ## decision, not a forced detour.
-static func _apply_realm_specifics(map: MapData, realm_id: StringName, act: int) -> void:
+static func _apply_realm_specifics(map: MapData, realm_id: StringName, act: int,
+		rng: RandomNumberGenerator) -> void:
 	if realm_id == &"camelot" and act == 1:
 		_place_sword_in_stone(map)
+		_place_raider_questline(map, rng)
 
 
 static func _place_sword_in_stone(map: MapData) -> void:
@@ -248,6 +254,92 @@ static func _place_sword_in_stone(map: MapData) -> void:
 			best_id = id
 	if best_id != -1:
 		map.nodes[best_id].node_type = MapNode.NodeType.SWORD_IN_STONE
+
+
+# The beast/bandit cross-map questline. A giver and a payoff are placed with a known
+# relationship: the giver is a plain-looking event node in the early act, and the payoff is
+# an ordinary node DOWNSTREAM of and FORWARD-REACHABLE FROM the giver, so an accepted quest
+# can never be stranded. The payoff keeps its original look (indistinguishable) until the
+# player accepts the plea, which arms it. See MapNode quest fields + map_scene.
+const QUEST_ID := &"raiders"
+const QUEST_GIVER_MIN_FLOOR := 2
+const QUEST_GIVER_MAX_FLOOR := 5
+const QUEST_PAYOFF_MIN_GAP := 2  # payoff sits at least this many floors ahead of the giver
+
+
+static func _place_raider_questline(map: MapData, rng: RandomNumberGenerator) -> void:
+	# Candidate givers: interior nodes in the early act that aren't a landmark, the start,
+	# or the pre-boss rest. Shuffle so the pick is seeded but varied per run.
+	var givers: Array[int] = []
+	for id in map.nodes:
+		var n: MapNode = map.nodes[id]
+		if n.floor_num < QUEST_GIVER_MIN_FLOOR or n.floor_num > QUEST_GIVER_MAX_FLOOR:
+			continue
+		if _is_reserved_node(map, n):
+			continue
+		# Only overwrite a combat or event node -- never clobber a scarce, path-planned
+		# service (shop/rest) or an elite to seat the plea.
+		if n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT:
+			continue
+		givers.append(id)
+	_rng_shuffle(givers, rng)
+
+	# For the first giver that has a valid downstream payoff, place both and stop.
+	for giver_id in givers:
+		var giver: MapNode = map.nodes[giver_id]
+		var payoff_id := _pick_quest_payoff(map, giver, rng)
+		if payoff_id == -1:
+			continue
+		giver.node_type = MapNode.NodeType.EVENT  # looks like any event node
+		giver.quest_giver_id = QUEST_ID
+		map.nodes[payoff_id].quest_payoff_id = QUEST_ID
+		return
+
+
+## A COMBAT node forward-reachable from `giver`, far enough ahead to read as "elsewhere on
+## the map," and not a reserved node. -1 if none fits.
+static func _pick_quest_payoff(map: MapData, giver: MapNode, rng: RandomNumberGenerator) -> int:
+	var reachable := _reachable_from(map, giver.id)
+	var cands: Array[int] = []
+	for id in reachable:
+		var n: MapNode = map.nodes[id]
+		if n.node_type != MapNode.NodeType.COMBAT:
+			continue
+		if n.floor_num < giver.floor_num + QUEST_PAYOFF_MIN_GAP:
+			continue
+		if _is_reserved_node(map, n):
+			continue
+		cands.append(id)
+	if cands.is_empty():
+		return -1
+	_rng_shuffle(cands, rng)
+	return cands[0]
+
+
+## Nodes that signature placement must never overwrite: the boss, the Sword, the opening
+## row, the guaranteed pre-boss rest, and anything already tagged for the questline.
+static func _is_reserved_node(map: MapData, n: MapNode) -> bool:
+	if n.node_type == MapNode.NodeType.BOSS or n.node_type == MapNode.NodeType.SWORD_IN_STONE:
+		return true
+	if n.floor_num == 0 or n.floor_num >= map.floor_count - 2:
+		return true
+	if n.quest_giver_id != &"" or n.quest_payoff_id != &"":
+		return true
+	return false
+
+
+## Set of node ids reachable by walking FORWARD (next_nodes) from `start_id`, excluding the
+## start itself. Used to guarantee the payoff is reachable once the player stands on the giver.
+static func _reachable_from(map: MapData, start_id: int) -> Dictionary:
+	var seen: Dictionary = {}
+	var stack: Array[int] = [start_id]
+	while not stack.is_empty():
+		var id: int = stack.pop_back()
+		for nxt in map.nodes[id].next_nodes:
+			if not seen.has(nxt):
+				seen[nxt] = true
+				stack.append(nxt)
+	return seen
 
 
 # Path-aware type-assignment rules. The point is that which BRANCH you take is a

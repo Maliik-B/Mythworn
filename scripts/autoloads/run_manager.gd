@@ -23,10 +23,11 @@ var pending_act_complete: bool = false
 ## instead of pulling from EventPool. Used for realm signature nodes like
 ## Camelot's Sword in the Stone. Cleared on consumption.
 var pending_special_event: StringName = &""
-## True while the Sword-in-the-Stone guardian fight is in progress, so combat victory
-## routes to the "beast unmade" follow-up beat (which grants Excalibur) rather than a
-## normal reward. Cleared when consumed.
-var pending_guardian_fight: bool = false
+## True while a fight that was LAUNCHED FROM AN EVENT is in progress, so combat victory
+## routes back to event_scene (which reads pending_special_event for the follow-up beat)
+## rather than the normal reward flow. Used by the Sword-in-the-Stone guardian and the
+## raider questline payoff. Cleared when consumed.
+var pending_event_combat: bool = false
 ## A VN segment queued for vn_scene to play (realm-entry, the Fable send-off, story beats).
 ## vn_scene reads + clears it, applies its chosen choice's consequences, then pulls the
 ## next segment from pending_vn_queue (below), and only routes to pending_vn_next when the
@@ -110,6 +111,17 @@ var has_abdicated: bool = false
 # commitments). Gates content via get_realm_hostility_level().
 var realm_standing: Dictionary[StringName, int] = {}
 
+# --- Cross-map questline (the beast/bandit raiders) ---
+# The accepted quest id (&"" = nothing accepted). Set when the player accepts the plea at
+# the quest-giver node; that arms the payoff node elsewhere on the map. Keyed by id so the
+# system generalizes to future questlines. See MapNode.quest_giver_id / quest_payoff_id.
+var active_quest_id: StringName = &""
+# The payoff has been claimed (heal + Blooded Edge granted). Stops any re-trigger.
+var quest_completed: bool = false
+# map_scene has played the one-shot "the payoff node is armed" reveal flourish. Keeps the
+# reveal from replaying on every later return to the map.
+var quest_payoff_revealed: bool = false
+
 const MAX_ACTS := 3
 const DEFAULT_STARTING_REALM: StringName = &"camelot"
 const TITLE_SLOT_COUNT := 2
@@ -161,7 +173,10 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_relic_reward = false
 	pending_relic_is_boss = false
 	pending_special_event = &""
-	pending_guardian_fight = false
+	pending_event_combat = false
+	active_quest_id = &""
+	quest_completed = false
+	quest_payoff_revealed = false
 	pending_vn = null
 	pending_vn_queue.clear()
 	pending_vn_next = "res://scenes/map/map_scene.tscn"
@@ -254,6 +269,15 @@ func has_relic(relic_name: String) -> bool:
 		if r.relic_name == relic_name:
 			return true
 	return false
+
+
+## Returns the owned relic instance with this name, or null. Lets combat read a relic's
+## tunable `value` (e.g. Blooded Edge's first-attack bonus) without rescanning the pool.
+func get_relic(relic_name: String) -> RelicData:
+	for r in relics:
+		if r.relic_name == relic_name:
+			return r
+	return null
 
 
 func get_owned_relic_names() -> PackedStringArray:

@@ -2507,10 +2507,11 @@ func _show_continue_button(text: String, callback: Callable) -> void:
 
 
 func _on_continue_pressed() -> void:
-	# The Sword-in-the-Stone guardian fight skips the normal reward — victory routes
-	# to the "beast unmade" beat, which grants Excalibur itself.
-	if RunManager.pending_guardian_fight:
-		RunManager.pending_guardian_fight = false
+	# A fight launched from an event (the Sword guardian, the raider ambush) skips the
+	# normal reward — victory routes back to event_scene, which reads pending_special_event
+	# for the follow-up beat that grants the quest reward.
+	if RunManager.pending_event_combat:
+		RunManager.pending_event_combat = false
 		SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		return
 	if RunManager.pending_relic_reward:

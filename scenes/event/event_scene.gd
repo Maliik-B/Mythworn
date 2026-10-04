@@ -33,6 +33,12 @@ func _build_special_event(id: StringName) -> EventData:
 			return _build_sword_in_stone_event()
 		&"sword_guardian_won":
 			return _build_sword_guardian_won_event()
+		&"raider_plea":
+			return _build_raider_plea_event()
+		&"raider_ambush":
+			return _build_raider_ambush_event()
+		&"raider_victory":
+			return _build_raider_victory_event()
 		_:
 			push_warning("Unknown special event id: %s" % id)
 			return EventPool.get_random_event(RngManager.event_rng)
@@ -96,6 +102,99 @@ func _build_sword_guardian_won_event() -> EventData:
 	take.granted_relic_id = &"Excalibur"
 	take.awarded_title_id = &"swords_bearer"
 	take.passion_change = 3
+	e.choices.append(take)
+
+	return e
+
+
+# ============================================================
+# RAIDER QUESTLINE (cross-map: plea arms a payoff node elsewhere)
+# ============================================================
+
+## The quest-giver plea. Looks like any event node on the map; accepting ARMS the payoff
+## node (see EventChoice.arms_quest). Beast-and-bandit coded: a reiver the countryside calls
+## the Boar. Helping is the keeper's guard dropping, so it nudges Passion toward Water (+),
+## matching the tithe plea and the 8 base events' mercy convention. Medieval flavor.
+func _build_raider_plea_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Road Past the Ford"
+	e.description = ("The village backs onto the treeline, and it has the look of a place that "
+		+ "keeps its doors barred by daylight. A barn has burned down to its blackened frame. The "
+		+ "well is boarded over. The few people about move with the stiffness of the newly "
+		+ "hurt.\n\nA man with his arm in a sling does the talking. \"You'll have heard of the Boar, "
+		+ "if you came through the weald.\" He says the name like it tastes bad. \"Was a reiver once, "
+		+ "with a reiver's sense. Now he just takes, and burns what he can't carry, and laughs doing "
+		+ "it. They started calling him the Boar for how he fights. It stuck.\"\n\nHe nods at the "
+		+ "trees. \"They lair up the old drovers' road, past the ford. We can't move him. You've got a "
+		+ "sword, and you're going that way regardless.\"")
+
+	var accept = EventData.EventChoice.new()
+	accept.text = "Follow the drovers' road. Put an end to the Boar."
+	accept.result_text = ("You tell him you'll take the road past the ford. He doesn't thank you. "
+		+ "He's past thanking people for things that haven't happened yet. But he draws you a map in "
+		+ "the dirt with the point of a stick, and marks where the trees close in. \"They'll hear you "
+		+ "before you see them,\" he says. \"They always do.\"")
+	accept.arms_quest = &"raiders"
+	accept.passion_change = 3
+	e.choices.append(accept)
+
+	var decline = EventData.EventChoice.new()
+	decline.text = "The Boar is not your fight. Take another road."
+	decline.result_text = ("You tell him it isn't yours to settle, and his face doesn't change, "
+		+ "because he expected nothing else. You take a road that bends away from the ford. For a "
+		+ "while you can still smell the wet char of the barn on the wind. Then you can't.")
+	decline.passion_change = -2
+	e.choices.append(decline)
+
+	return e
+
+
+## The payoff node, armed. The keeper has tracked the band to its lair; the fight is the
+## scripted raider band (The Boar + two Weald Raiders). Victory routes to the reward beat.
+func _build_raider_ambush_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Lair Past the Ford"
+	e.description = ("The drovers' road narrows until the trees meet overhead and the daylight goes "
+		+ "green and thin. The man was right: you hear them first. A whistle, passed from one side of "
+		+ "the track to the other, then the brush moving the way brush doesn't.\n\nThey come out onto "
+		+ "the road ahead of you, unhurried, a handful of them with the wood at their backs. The big "
+		+ "one in the middle doesn't carry himself like a man expecting trouble. He carries himself "
+		+ "like he is the trouble. When he sees the sword, he grins, and it is not a nice thing to "
+		+ "watch.")
+
+	var fight = EventData.EventChoice.new()
+	fight.text = "Draw, and make an end of it."
+	fight.starts_combat = &"raider_band"
+	e.choices.append(fight)
+
+	return e
+
+
+## The reward beat after the band falls. Pledge-agnostic: an immediate heal (the village binds
+## your wounds) plus Blooded Edge (the one good thing they had left to give). Marking the quest
+## complete here stops any re-trigger; the grant itself happens on the choice.
+func _build_raider_victory_event() -> EventData:
+	RunManager.quest_completed = true
+
+	var e = EventData.new()
+	e.event_name = "What the Village Had Left"
+	e.description = ("It ends the way these things end: all at once, and then quiet. The Boar is the "
+		+ "last down, and he goes hard, swearing at you through the blood as though the insult is that "
+		+ "it was you and not someone grander.\n\nBy the time you walk back, the smell of the burned "
+		+ "barn has people out of their doors to meet you. The man with the sling comes out last, and "
+		+ "slowest, and looks a long while at the road behind you before he looks at you. Whatever he "
+		+ "sees there is enough. They feed you, and bind what needs binding, and press on you the one "
+		+ "good thing they had left to give.")
+
+	var take = EventData.EventChoice.new()
+	take.text = "Take what the village offers."
+	take.result_text = ("It is an old campaigner's knife, kept oiled through everything. \"First "
+		+ "cut's the one that counts,\" the man says, closing your hand around it. \"He taught me "
+		+ "that. Before the Boar got him.\" The edge of it seems to find the gap in a guard on its "
+		+ "own.")
+	take.hp_change = maxi(1, int(round(RunManager.max_hp * 0.28)))
+	take.granted_relic_id = &"Blooded Edge"
+	take.passion_change = 2
 	e.choices.append(take)
 
 	return e
@@ -290,7 +389,7 @@ func _on_choice_selected(index: int) -> void:
 
 ## Launches a scripted event fight. The Sword-in-the-Stone guardian is the Champion
 ## of the Usurper (thematically a champion who went to fight Caedmon and was corrupted).
-## Combat victory routes back to the "beast unmade" beat via pending_guardian_fight +
+## Combat victory routes back to the "beast unmade" beat via pending_event_combat +
 ## pending_special_event; the player gets no normal reward — Excalibur IS the reward.
 func _start_event_combat(key: StringName) -> void:
 	match key:
@@ -300,8 +399,18 @@ func _start_event_combat(key: StringName) -> void:
 			RunManager.pending_gold_reward = 0
 			RunManager.pending_relic_reward = false
 			RunManager.pending_relic_is_boss = false
-			RunManager.pending_guardian_fight = true
+			RunManager.pending_event_combat = true
 			RunManager.pending_special_event = &"sword_guardian_won"
+			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
+		&"raider_band":
+			RunManager.pending_enemies.clear()
+			for enemy in EnemyPool.get_raider_band():
+				RunManager.pending_enemies.append(enemy)
+			RunManager.pending_gold_reward = 0
+			RunManager.pending_relic_reward = false
+			RunManager.pending_relic_is_boss = false
+			RunManager.pending_event_combat = true
+			RunManager.pending_special_event = &"raider_victory"
 			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
 		_:
 			push_warning("Unknown event combat key: %s" % key)
@@ -338,6 +447,11 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 		var relic = RelicPool.get_relic_by_name(String(choice.granted_relic_id))
 		if relic and not RunManager.has_relic(relic.relic_name):
 			RunManager.add_relic(relic)
+
+	# Accepting a plea arms the cross-map questline: the payoff node reveals on the next
+	# return to the map (map_scene plays the arm flourish + objective toast).
+	if choice.arms_quest != &"":
+		RunManager.active_quest_id = choice.arms_quest
 
 
 func _show_effect_summary(choice: EventData.EventChoice) -> void:

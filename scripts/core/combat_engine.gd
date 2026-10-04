@@ -26,6 +26,10 @@ var _current_card: CardData = null # Set during card resolution for zone penalty
 ## Energy spent by the X-cost card currently resolving (X). Read by x_scaled effects
 ## so a torrent repeats once per energy; 0 outside an X-cost resolution.
 var _current_x: int = 0
+## Blooded Edge (raider questline relic): bonus damage still owed to the player's FIRST
+## attack this combat. Primed at start_combat from the relic's value, spent on the first
+## card-dealt damage instance, then 0 for the rest of the fight. 0 when the relic isn't held.
+var _blooded_edge_pending: int = 0
 
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
 ## synchronously. The balance harness (tools/combat_harness) sets this so it can
@@ -68,6 +72,9 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 		enemies.append(enemy)
 
 	turn_number = 0
+	# Blooded Edge: prime the first-attack bonus from the relic's tunable value (0 if unheld).
+	var blooded := RunManager.get_relic("Blooded Edge")
+	_blooded_edge_pending = blooded.value if blooded else 0
 	_arm_be_the_king(player_hp)
 	# Whiplash power listens on tier crossings for the fight; no-op unless the player
 	# actually holds Whiplash (checked in the handler). Disconnected at combat end.
@@ -396,6 +403,13 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	# Applied before zone penalty so the penalty scales the boosted total uniformly.
 	if source == player_stats:
 		amount += RunManager.get_title_passive_total(TitleData.EffectType.DAMAGE_BONUS_FLAT)
+
+	# Blooded Edge: the first attack damage the player lands this combat hits harder. Gated
+	# on _current_card so only a played card's hit spends it (not a poison tick or lash), and
+	# applied alongside the title bonus so all flat player bonuses scale uniformly under zones.
+	if source == player_stats and _current_card != null and _blooded_edge_pending > 0:
+		amount += _blooded_edge_pending
+		_blooded_edge_pending = 0
 
 	# Zone modifier: at a committed extreme, the dominant personality's cards hit
 	# harder (+25%) and the off-type suffers (-25%). Only for player cards, never

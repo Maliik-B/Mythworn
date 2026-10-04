@@ -192,6 +192,19 @@ static func reset_encounter_state() -> void:
 	_last_key = ""
 
 
+## The raider questline payoff fight: The Boar (a bandit war-chief the countryside calls a
+## beast) and his Weald Raiders. Deliberately scaled by ACT ONLY -- no realm difficulty_mult
+## -- so the quest reward fight plays the same under either pledge (it is pledge-agnostic by
+## design; the pledge shapes the rest of the map, not this).
+static func get_raider_band() -> Array[EnemyData]:
+	var mult := _act_mult()
+	var result: Array[EnemyData] = []
+	result.append(the_boar(mult))
+	result.append(weald_raider(mult))
+	result.append(weald_raider(mult))
+	return result
+
+
 ## The Act-1 boss: Sir Caedmon. (Acts 2-3 are out of demo scope; map_scene still
 ## routes those to its legacy boss builders.)
 static func get_boss(difficulty_mult: float = 1.0) -> Array[EnemyData]:
@@ -421,6 +434,43 @@ static func iron_verdict(mult := 1.0) -> EnemyData:
 	# Armed from turn 1 so the retaliation puzzle is live before he can be rushed.
 	e.starting_statuses = [[StatusEffects.ENRAGED, 2]]
 	return e
+
+
+# ============================================================
+# CAMELOT QUESTLINE — THE RAIDERS (beast/bandit payoff fight)
+# ============================================================
+
+## The Boar (High HP, the anchor). A bandit war-chief the countryside nicknamed for the way
+## he fights: he gores, he charges, and he will not go down. Gore is the telegraphed beast-
+## charge to block around; Blood-Howl hands Strength to his whole pack, which makes HIM the
+## priority kill -- leave him up and the raiders' chip turns into real damage.
+static func the_boar(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Trample", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(9, mult))], 1.8),
+		# The beast-charge telegraph. Cooldown paces it as a rhythm to guard against.
+		_move("Gore", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(16, mult))], 1.4, 2),
+		# Rallies the pack (self included), so ignoring him snowballs the raiders.
+		_move("Blood-Howl", EnemyMove.IntentType.BUFF,
+			[_ally_status(StatusEffects.STRENGTH, 1)], 1.0, 2),
+	]
+	return _enemy("The Boar", _scale(60, mult), moves)
+
+
+## Weald Raider (Low HP, fast + fragile). A bandit out of the wild wood. Cutthroat chips;
+## Hamstring lays VULNERABLE on you so the Boar's Gore (and the other raider) spike. Glass:
+## a couple of hits end one, so the puzzle is whether you can spare them before the Vulnerable
+## stacks line up a charge.
+static func weald_raider(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Cutthroat", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(6, mult))], 1.6),
+		# Sets Vulnerable on YOU. Cooldown so two raiders can't chain you into a lock.
+		_move("Hamstring", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.VULNERABLE, 1)], 1.2, 2),
+	]
+	return _enemy("Weald Raider", _scale(22, mult), moves)
 
 
 # ============================================================

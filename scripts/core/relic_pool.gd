@@ -45,6 +45,16 @@ static func _build_quest_pool() -> Array[RelicData]:
 		"The common folk march at your side. Start each combat with 8 Block.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 8))
+
+	# -- Raider questline payoff relic. Granted by the "raider_victory" event beat after the
+	#    cross-map hunt. Effect is NONE here (no generic trigger fits "first attack of the
+	#    combat"); CombatEngine reads the relic directly and adds `value` to the first attack
+	#    damage you land each combat, like Excalibur's externally-driven behavior. The value
+	#    is the tunable first-hit bonus. Quest-only, so it never appears in shops or rewards.
+	pool.append(_relic("Blooded Edge",
+		"The first attack you land each combat deals 6 bonus damage.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.NONE, 6))
 	return pool
 
 

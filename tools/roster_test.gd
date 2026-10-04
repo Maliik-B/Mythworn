@@ -662,6 +662,45 @@ func _test_realm_config() -> void:
 	_check("a neutral map records no pledge changes",
 		MapGenerator.generate(RandomNumberGenerator.new(), &"camelot", 1, 1.0, false).pledge_changes.is_empty())
 
+	# Raider questline placement: a camelot act-1 map seats a giver (an event node) and a
+	# payoff that is DOWNSTREAM of and FORWARD-REACHABLE FROM it, so an accepted quest can
+	# never be stranded. Checked across seeds; placement should essentially always succeed.
+	var q_placed := 0
+	var q_payoff_ok := true
+	var q_giver_is_event := true
+	for s in range(40):
+		var qrng := RandomNumberGenerator.new()
+		qrng.seed = 200 + s
+		var qmap := MapGenerator.generate(qrng, &"camelot", 1, 1.0, false)
+		var giver_id := -1
+		var payoff_id := -1
+		for id in qmap.nodes:
+			if qmap.nodes[id].quest_giver_id == &"raiders":
+				giver_id = id
+			if qmap.nodes[id].quest_payoff_id == &"raiders":
+				payoff_id = id
+		if giver_id == -1 or payoff_id == -1:
+			continue
+		q_placed += 1
+		if qmap.nodes[giver_id].node_type != MapNode.NodeType.EVENT:
+			q_giver_is_event = false
+		var reach := _forward_reachable(qmap, giver_id)
+		if not reach.has(payoff_id) \
+				or qmap.nodes[payoff_id].floor_num <= qmap.nodes[giver_id].floor_num:
+			q_payoff_ok = false
+	_check("raider questline places a giver + payoff on most seeds", q_placed >= 36)
+	_check("quest giver is an event node", q_giver_is_event)
+	_check("quest payoff is downstream + forward-reachable from the giver", q_payoff_ok)
+
+	# The payoff fight composes The Boar + two Weald Raiders (pledge-agnostic by construction).
+	var band := EnemyPool.get_raider_band()
+	var band_names := PackedStringArray()
+	for e in band:
+		band_names.append(e.enemy_name)
+	_check("raider band is The Boar + two Weald Raiders",
+		band.size() == 3 and band_names.count("The Boar") == 1
+		and band_names.count("Weald Raider") == 2)
+
 	# Reward-rarity knob: a > 1 mult biases card rarity rolls toward RARE.
 	RunManager.realm_config = RealmConfig.new()
 	var rr_rng := RandomNumberGenerator.new()
@@ -679,21 +718,23 @@ func _test_realm_config() -> void:
 	_check("reward_rarity_mult biases card rolls toward RARE", rare_rich > rare_neutral)
 	RunManager.realm_config = RealmConfig.new()  # restore neutral
 
-	# The liaison + boon relics exist (quest pool) and never leak into reward rolls.
-	_check("liaison + boon relics exist in the quest pool",
+	# The liaison + boon + quest relics exist (quest pool) and never leak into reward rolls.
+	_check("liaison + boon + quest relics exist in the quest pool",
 		RelicPool.get_relic_by_name("Bram's Briefing") != null
 		and RelicPool.get_relic_by_name("Neve's Kit") != null
-		and RelicPool.get_relic_by_name("Peasant Militia") != null)
+		and RelicPool.get_relic_by_name("Peasant Militia") != null
+		and RelicPool.get_relic_by_name("Blooded Edge") != null)
 	var reward_names := PackedStringArray()
 	var boon_rng := RandomNumberGenerator.new()
 	boon_rng.seed = 5
 	for i in 30:
 		for r in RelicPool.get_reward_choices(boon_rng, 3):
 			reward_names.append(r.relic_name)
-	_check("boon relics stay out of reward rolls",
+	_check("boon + quest relics stay out of reward rolls",
 		"Bram's Briefing" not in reward_names
 		and "Neve's Kit" not in reward_names
-		and "Peasant Militia" not in reward_names)
+		and "Peasant Militia" not in reward_names
+		and "Blooded Edge" not in reward_names)
 
 	# Liaison gifts grant the two send-off relics.
 	RunManager.relics.clear()
@@ -820,6 +861,20 @@ func _count_elites(map: MapData) -> int:
 		if map.nodes[id].node_type == MapNode.NodeType.ELITE:
 			n += 1
 	return n
+
+
+## Node ids reachable by walking forward (next_nodes) from start_id, excluding start.
+## Mirrors MapGenerator._reachable_from so the questline reachability guarantee is tested.
+func _forward_reachable(map: MapData, start_id: int) -> Dictionary:
+	var seen := {}
+	var stack: Array[int] = [start_id]
+	while not stack.is_empty():
+		var id: int = stack.pop_back()
+		for nxt in map.nodes[id].next_nodes:
+			if not seen.has(nxt):
+				seen[nxt] = true
+				stack.append(nxt)
+	return seen
 
 
 ## Boss card reward: must offer a full 3, include at least one RARE, and never a

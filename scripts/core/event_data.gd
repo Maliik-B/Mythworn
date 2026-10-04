@@ -27,3 +27,7 @@ class EventChoice extends RefCounted:
 	## normally: event_scene sets up the encounter and routes to combat, and combat
 	## victory routes to the follow-up beat. Used by the Sword-in-the-Stone guardian.
 	var starts_combat: StringName = &""
+	## If non-empty, accepting this choice ARMS the cross-map questline with this id
+	## (RunManager.active_quest_id): the payoff node elsewhere on the map reveals and becomes
+	## the quest's payoff. Used by the raiders' plea. See MapNode quest fields + map_scene.
+	var arms_quest: StringName = &""

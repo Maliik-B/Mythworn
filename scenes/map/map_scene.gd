@@ -33,6 +33,11 @@ const PLEDGE_PAN_PER_NODE := 0.4
 const PLEDGE_PAN_MIN := 1.4
 const PLEDGE_PAN_MAX := 2.8
 
+# Armed questline-payoff marker. A hunt-gold objective glyph the payoff node takes on once
+# the plea reveals it (distinct from the Sword's ✦ and the boss ★).
+const QUEST_GLYPH := "◎"
+const QUEST_GLYPH_COLOR := Color(1.0, 0.8, 0.3)
+
 # UI references
 var scroll_container: ScrollContainer
 var map_canvas: Control
@@ -83,6 +88,10 @@ func _ready() -> void:
 	# First map open after a pledge: animate only the nodes the pledge changed.
 	if fresh_map and not RunManager.current_map.pledge_changes.is_empty():
 		_prime_pledge_changes()
+	# Returning to the map having just accepted the plea: reveal the now-armed payoff node
+	# once. (Mutually exclusive with the pledge flourish, which only plays on a fresh map.)
+	elif RunManager.active_quest_id != &"" and not RunManager.quest_payoff_revealed:
+		_prime_quest_reveal()
 	AudioManager.play_music("map")
 
 	# Refresh the bottom bar's title counter when titles change while on the map.
@@ -1557,7 +1566,9 @@ func _create_node_button(node: MapNode) -> Button:
 	var btn = Button.new()
 	btn.custom_minimum_size = Vector2(NODE_SIZE, NODE_SIZE)
 	btn.size = Vector2(NODE_SIZE, NODE_SIZE)
-	_style_node_button(btn, node.node_type, node.weakened)
+	# An armed payoff shows the quest glyph (the arm-reveal flourish briefly resets it to its
+	# pre-arm look, then swaps the glyph back in). Before the plea is accepted it's ordinary.
+	_style_node_button(btn, node.node_type, node.weakened, _is_quest_payoff_armed(node))
 
 	# Tooltip descriptions by node type
 	var tooltip_map = {
@@ -1573,6 +1584,8 @@ func _create_node_button(node: MapNode) -> Button:
 	btn.tooltip_text = tooltip_map.get(node.node_type, "")
 	if node.node_type == MapNode.NodeType.ELITE and node.weakened:
 		btn.tooltip_text = "Weakened elite — the people sabotaged it. Easier fight, same rewards."
+	if _is_quest_payoff_armed(node):
+		btn.tooltip_text = "The hunt leads here. The Boar's band waits on the road past the ford."
 
 	btn.pressed.connect(_on_node_clicked.bind(node))
 	btn.mouse_entered.connect(_on_node_hover.bind(node))
@@ -1584,7 +1597,8 @@ func _create_node_button(node: MapNode) -> Button:
 ## Applies a node button's glyph + styleboxes for a given type (and, for elites, whether it's
 ## weakened). Extracted so the pledge-change animation can set a node's pre-change look then
 ## swap to its real one. A weakened elite reads as "drained" (cold, desaturated colour).
-func _style_node_button(btn: Button, node_type: int, weakened: bool = false) -> void:
+func _style_node_button(btn: Button, node_type: int, weakened: bool = false,
+		quest_armed: bool = false) -> void:
 	btn.text = MapNode.type_label(node_type)
 	btn.add_theme_font_size_override("font_size", 20)
 
@@ -1628,6 +1642,20 @@ func _style_node_button(btn: Button, node_type: int, weakened: bool = false) -> 
 		hover_style.border_color = bc.lightened(0.5)
 		pressed_style.set_border_width_all(5)
 
+	# Armed questline payoff — a louder marker (a hunt-gold ring + objective glyph) that
+	# overrides the node's ordinary look once the plea reveals it.
+	if quest_armed:
+		btn.text = QUEST_GLYPH
+		btn.add_theme_font_size_override("font_size", 28)
+		var qg := QUEST_GLYPH_COLOR
+		style.bg_color = qg.darkened(0.4)
+		style.set_border_width_all(5)
+		style.border_color = qg.lightened(0.2)
+		hover_style.bg_color = qg.darkened(0.2)
+		hover_style.set_border_width_all(5)
+		hover_style.border_color = qg.lightened(0.4)
+		pressed_style.set_border_width_all(5)
+
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", hover_style)
 	btn.add_theme_stylebox_override("pressed", pressed_style)
@@ -1657,11 +1685,12 @@ func _update_node_states() -> void:
 			btn.modulate = Color(0.55, 0.55, 0.55, 0.92)
 			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		else:
-			# Landmark nodes (boss, the Sword) stay bright even when locked so they
-			# survive the map's darkening effects and always read; ordinary future
-			# nodes dim to show they're out of reach.
+			# Landmark nodes (boss, the Sword, an armed quest payoff) stay bright even when
+			# locked so they survive the map's darkening effects and always read; ordinary
+			# future nodes dim to show they're out of reach.
 			if node.node_type == MapNode.NodeType.BOSS \
-					or node.node_type == MapNode.NodeType.SWORD_IN_STONE:
+					or node.node_type == MapNode.NodeType.SWORD_IN_STONE \
+					or _is_quest_payoff_armed(node):
 				btn.modulate = Color(0.9, 0.9, 0.9, 1.0)
 			else:
 				btn.modulate = Color(0.42, 0.42, 0.42, 0.85)
@@ -1710,6 +1739,13 @@ func _enter_node(node: MapNode) -> void:
 	RunManager.run_stats["floors_cleared"] = RunManager.run_stats.get("floors_cleared", 0) + 1
 	_update_node_states()
 
+	# Armed questline payoff: route to the quest's ambush instead of this node's normal type.
+	# (The node looked ordinary until the plea armed it; now it pays off the hunt.)
+	if _is_quest_payoff_armed(node) and not RunManager.quest_completed:
+		RunManager.pending_special_event = &"raider_ambush"
+		SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
+		return
+
 	match node.node_type:
 		MapNode.NodeType.COMBAT:
 			_start_combat(_combat_encounter(node.floor_num), 16 + node.floor_num * 2)
@@ -1725,6 +1761,10 @@ func _enter_node(node: MapNode) -> void:
 		MapNode.NodeType.SHOP:
 			SceneTransition.change_scene("res://scenes/shop/shop_scene.tscn")
 		MapNode.NodeType.EVENT:
+			# A quest-giver event node routes to its plea; ordinary event nodes pull from
+			# the random pool.
+			if node.quest_giver_id != &"":
+				RunManager.pending_special_event = &"raider_plea"
 			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		MapNode.NodeType.SWORD_IN_STONE:
 			# Reuse the event scene with a flag — Excalibur is a one-shot event
@@ -1874,6 +1914,117 @@ func _scroll_value_for_floor(floor_num: int) -> float:
 	var map = RunManager.current_map
 	var target_y: float = MAP_MARGIN_Y + (map.floor_count - 1 - floor_num) * NODE_SPACING_Y
 	return maxf(0.0, target_y - scroll_container.size.y / 2.0 + NODE_SIZE / 2.0)
+
+
+# ============================================================
+# QUESTLINE PAYOFF REVEAL (arm flourish — one node, mid-run)
+# ============================================================
+
+## True if `node` is the payoff for the quest the player has accepted. Drives its glyph,
+## landmark brightness, and routing. Independent of completion (a done payoff keeps its mark).
+func _is_quest_payoff_armed(node: MapNode) -> bool:
+	return node.quest_payoff_id != &"" and node.quest_payoff_id == RunManager.active_quest_id
+
+
+## The armed payoff node on the current map, or null (none placed / no quest accepted).
+func _quest_payoff_node() -> MapNode:
+	var map = RunManager.current_map
+	if map == null or RunManager.active_quest_id == &"":
+		return null
+	for id in map.nodes:
+		if map.nodes[id].quest_payoff_id == RunManager.active_quest_id:
+			return map.nodes[id]
+	return null
+
+
+## The player's current floor (0 if they haven't entered the map yet). Used to anchor the
+## reveal pan's start/end at where the player is sitting.
+func _player_floor() -> int:
+	var map = RunManager.current_map
+	if map.current_node_id >= 0:
+		return map.get_node(map.current_node_id).floor_num
+	return 0
+
+
+## Set the payoff node to its PRE-arm look and hide it synchronously (no first-frame flash of
+## the glyph), latch the one-shot flag, then start the reveal after layout.
+func _prime_quest_reveal() -> void:
+	var node := _quest_payoff_node()
+	if node == null:
+		RunManager.quest_payoff_revealed = true  # nothing to reveal; don't retry
+		return
+	var btn: Button = node_buttons.get(node.id)
+	if btn == null:
+		return
+	RunManager.quest_payoff_revealed = true
+	_style_node_button(btn, node.node_type, node.weakened, false)  # its ordinary pre-arm look
+	btn.pivot_offset = btn.size / 2.0
+	btn.scale = Vector2(0.5, 0.5)
+	btn.modulate.a = 0.0
+	_play_quest_reveal.call_deferred(node)
+
+
+## Pan the camera to the payoff node, play the reveal (its swap lands as the camera centers
+## it, like the pledge flourish), raise a one-line objective toast, then glide back.
+func _play_quest_reveal(node: MapNode) -> void:
+	var btn: Button = node_buttons.get(node.id)
+	if btn == null:
+		return
+	_pledge_anim_active = true
+
+	var start_scroll := _scroll_value_for_floor(_player_floor())
+	var target_scroll := _scroll_value_for_floor(node.floor_num)
+	var span := absf(start_scroll - target_scroll)
+	var pan := PLEDGE_PAN_MIN
+
+	var tw := create_tween()
+	if span > 4.0:
+		tw.tween_property(scroll_container, "scroll_vertical", int(target_scroll), pan) \
+			.set_trans(Tween.TRANS_LINEAR)
+	else:
+		tw.tween_interval(pan)
+	tw.tween_interval(PLEDGE_HOLD)
+	tw.tween_property(scroll_container, "scroll_vertical", int(start_scroll), PLEDGE_BACK) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(_finish_pledge_changes)
+
+	# Time the swap (the actual glyph change) to land as the camera settles on the node.
+	var swap_lead := REVEAL_ENLARGE_T + REVEAL_SWAP_T * 0.5
+	var delay := maxf(0.0, pan - swap_lead)
+	RevealAnim.play_node(self, btn, delay, {
+		"enlarge": REVEAL_ENLARGE,
+		"enlarge_t": REVEAL_ENLARGE_T,
+		"swap_t": REVEAL_SWAP_T,
+		"deenlarge_t": REVEAL_DEENLARGE_T,
+	}, _quest_swap_cb(btn, node))
+
+	_show_objective_toast("The hunt is marked. The Boar waits on the road past the ford.")
+
+
+## Flip-midpoint callback: swap the payoff node into its armed quest-glyph look.
+func _quest_swap_cb(btn: Button, node: MapNode) -> Callable:
+	return func() -> void: _style_node_button(btn, node.node_type, node.weakened, true)
+
+
+## A brief centered objective line that fades in, holds, and fades out below the header.
+func _show_objective_toast(text: String) -> void:
+	var toast = Label.new()
+	toast.text = text
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast.add_theme_font_size_override("font_size", 20)
+	toast.add_theme_color_override("font_color", QUEST_GLYPH_COLOR)
+	toast.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	toast.add_theme_constant_override("outline_size", 5)
+	toast.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	toast.offset_top = 174  # clear of the floating header
+	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	toast.modulate.a = 0.0
+	add_child(toast)
+	var tw := create_tween()
+	tw.tween_property(toast, "modulate:a", 1.0, 0.45)
+	tw.tween_interval(2.4)
+	tw.tween_property(toast, "modulate:a", 0.0, 0.7)
+	tw.tween_callback(toast.queue_free)
 
 
 # ============================================================
