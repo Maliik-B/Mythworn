@@ -118,9 +118,11 @@ func _build_sword_guardian_won_event() -> EventData:
 func _build_raider_plea_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Road Past the Ford"
-	e.description = ("The village backs onto the treeline, and it has the look of a place that "
-		+ "keeps its doors barred by daylight. A barn has burned down to its blackened frame. The "
-		+ "well is boarded over. The few people about move with the stiffness of the newly "
+	e.description = ("You push through a last snarl of hedge and briar where the track gives "
+		+ "out, and the land opens onto a village in the hollow below. It backs against the "
+		+ "treeline. Even from the rise it has the look of a place that keeps its doors barred by "
+		+ "daylight. A barn has burned down to its blackened frame. The well is boarded over. The "
+		+ "few people who come out to meet you move with the stiffness of the newly "
 		+ "hurt.\n\nA man with his arm in a sling does the talking. \"You'll have heard of the Boar, "
 		+ "if you came through the weald.\" He says the name like it tastes bad. \"Was a reiver once, "
 		+ "with a reiver's sense. Now he just takes, and burns what he can't carry, and laughs doing "
