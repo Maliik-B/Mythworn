@@ -31,3 +31,11 @@ class EventChoice extends RefCounted:
 	## (RunManager.active_quest_id): the payoff node elsewhere on the map reveals and becomes
 	## the quest's payoff. Used by the raiders' plea. See MapNode quest fields + map_scene.
 	var arms_quest: StringName = &""
+	## Favor gate: if &"folk" / &"court", this choice is only selectable while the player
+	## holds that faction's favor (RunManager.has_folk_favor / has_court_favor). Otherwise it
+	## renders like any option but disabled, with "Need: Favor of the People/Court" appended --
+	## so the pledge visibly opens one door and locks the other. &"" = ungated.
+	var requires_favor: StringName = &""
+	## Signed nudge to the realm's court<->folk standing when taken: positive toward the
+	## people, negative toward the court (RunManager.change_realm_standing). 0 = no change.
+	var standing_change: int = 0

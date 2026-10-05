@@ -259,6 +259,7 @@ static func _peasants_plea() -> EventData:
 	c1.passion_change = 5
 	c1.card_reward = true
 	c1.awarded_title_id = &"the_merciful"
+	c1.standing_change = 8  # sparing the folk, the way anyone could
 
 	var c2 = EventData.EventChoice.new()
 	c2.text = "Take the crown's share yourself, and your own cut with it."
@@ -269,6 +270,7 @@ static func _peasants_plea() -> EventData:
 	c2.gold_change = 30
 	c2.passion_change = -6
 	c2.awarded_title_id = &"the_calculating"
+	c2.standing_change = -12  # robbing them like a collector turns the people against you
 
 	var c3 = EventData.EventChoice.new()
 	c3.text = "This is not your realm to set right. Walk on."
@@ -278,7 +280,40 @@ static func _peasants_plea() -> EventData:
 		+ "from the sound of it.")
 	c3.passion_change = -3
 
+	# Folk-gated: only a keeper the people already trust can ask them to conspire. Opens for
+	# a Folk-pledged hero (and anyone who has earned the people's favor); locked otherwise with
+	# "Need: Favor of the People". The aligned boon -- Pay's outcome without the gold cost.
+	var cf = EventData.EventChoice.new()
+	cf.text = "Have the village hide its stores before the collector rides in."
+	cf.result_text = ("They don't argue. People who trust you move fast. By the time the gray "
+		+ "light comes up the grain and the seed-corn are gone, into cellars and hollow logs and "
+		+ "the thatch itself. The village wears the face of a place with nothing left worth taking, "
+		+ "and the collector will believe it. He has seen enough real famine to know the look. The "
+		+ "old campaigner who stayed to help you work shows you a trick with a blade while you wait "
+		+ "out the dark.")
+	cf.requires_favor = &"folk"
+	cf.passion_change = 6
+	cf.card_reward = true
+	cf.awarded_title_id = &"the_merciful"
+	cf.standing_change = 12
+
+	# Court-gated: only a keeper the crown already backs can wave its own levy aside. Opens for
+	# a Court-pledged hero (and anyone who has earned the court's favor); locked otherwise with
+	# "Need: Favor of the Court". Effortless authority -- no gold, no risk, but no growth either.
+	var cc = EventData.EventChoice.new()
+	cc.text = "Ride ahead and tell the collector the crown forgives this village's share."
+	cc.result_text = ("You find the collector on the road at first light and tell him, in the "
+		+ "crown's name, that this village is forgiven its share this season. He doesn't like it. "
+		+ "But he knows whose voice you carry, and it is not one he can afford to argue with, so he "
+		+ "turns his cart around. The village will never learn how close it came. You will.")
+	cc.requires_favor = &"court"
+	cc.passion_change = 3
+	cc.awarded_title_id = &"the_merciful"
+	cc.standing_change = -4
+
 	e.choices.append(c1)
+	e.choices.append(cf)
+	e.choices.append(cc)
 	e.choices.append(c2)
 	e.choices.append(c3)
 	return e

@@ -100,6 +100,7 @@ static func _court_config() -> RealmConfig:
 	c.shop_price_mult = 1.0
 	c.reward_rarity_mult = 1.3
 	c.map_boon = &""
+	c.standing_init = -25  # plant you in the court's favor (clears FAVOR_THRESHOLD)
 	return c
 
 
@@ -120,4 +121,5 @@ static func _folk_config() -> RealmConfig:
 	c.reward_rarity_mult = 0.9
 	c.map_boon = &"militia"
 	c.passion_shift = -34
+	c.standing_init = 25  # plant you in the people's favor (clears FAVOR_THRESHOLD)
 	return c

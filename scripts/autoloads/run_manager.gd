@@ -106,10 +106,15 @@ var last_btk_score: float = 0.0
 # and narrative phrases consume it.
 var last_btk_tier: int = 0
 var has_abdicated: bool = false
-# Per-realm reputation that swings on commitments and betrayals. Default 0;
-# negative on betrayal (abdication after building trust, breaking event
-# commitments). Gates content via get_realm_hostility_level().
+# Per-realm court<->folk standing: positive = the people's favor, negative = the court's
+# favor, 0 = neutral. The "A Realm Divided" pledge plants you on one side (Folk +, Court -
+# via RealmConfig.standing_init), and faction-aligned event choices nudge it from there.
+# Read by favor-gated event options (has_folk_favor / has_court_favor) and the run's ending.
 var realm_standing: Dictionary[StringName, int] = {}
+# Standing magnitude that counts as a faction's favor. The pledge's +-25 clears it, so the
+# pledged side's favor-gated options unlock immediately; crossing to the other side's favor
+# takes committed play. Tunable with the pledge values in the balance pass.
+const FAVOR_THRESHOLD := 20
 
 # --- Cross-map questline (the beast/bandit raiders) ---
 # The accepted quest id (&"" = nothing accepted). Set when the player accepts the plea at
@@ -450,6 +455,10 @@ func apply_realm_config(config: RealmConfig) -> void:
 	pending_map_boon = config.map_boon
 	if config.passion_shift != 0:
 		change_passion(config.passion_shift)
+	# The pledge plants your court<->folk standing (Folk +, Court -). Non-zero only on the
+	# pledge configs, so neutral configs + mid-run retunes leave standing untouched.
+	if config.standing_init != 0:
+		set_realm_standing(current_realm_id, config.standing_init)
 	Events.realm_configured.emit(get_current_realm())
 
 
@@ -659,14 +668,24 @@ func update_kings_reputation(latest_score: float) -> void:
 	Events.kings_reputation_updated.emit(kings_reputation)
 
 
-## Returns the standing for a realm. Defaults to 0 (neutral) if never set.
+## Returns the court<->folk standing for a realm (+ = people, - = court). 0 if never set.
 func get_realm_standing(realm_id: StringName) -> int:
 	return realm_standing.get(realm_id, 0)
 
 
-## Mutate per-realm standing. Negative deltas represent betrayals; positive
-## deltas represent loyalty-earning acts. Emits realm_standing_changed with
-## the old/new values so UI and events can react.
+## Directly set a realm's standing (the pledge plants the initial value). Emits
+## realm_standing_changed with the old/new values so UI and events can react.
+func set_realm_standing(realm_id: StringName, value: int) -> void:
+	var old_value := get_realm_standing(realm_id)
+	if value == old_value:
+		return
+	realm_standing[realm_id] = value
+	Events.realm_standing_changed.emit(realm_id, old_value, value)
+
+
+## Nudge a realm's court<->folk standing by a signed delta: positive toward the people,
+## negative toward the court. Faction-aligned event choices call this. Emits
+## realm_standing_changed with the old/new values so UI and events can react.
 func change_realm_standing(realm_id: StringName, delta: int) -> void:
 	if delta == 0:
 		return
@@ -674,6 +693,20 @@ func change_realm_standing(realm_id: StringName, delta: int) -> void:
 	var new_value := old_value + delta
 	realm_standing[realm_id] = new_value
 	Events.realm_standing_changed.emit(realm_id, old_value, new_value)
+
+
+## True if the player holds the given realm's people's favor (standing at/above the
+## threshold). Defaults to the current realm. Drives folk-gated event options.
+func has_folk_favor(realm_id: StringName = &"") -> bool:
+	var rid: StringName = realm_id if realm_id != &"" else current_realm_id
+	return get_realm_standing(rid) >= FAVOR_THRESHOLD
+
+
+## True if the player holds the given realm's court favor (standing at/below the negative
+## threshold). Defaults to the current realm. Drives court-gated event options.
+func has_court_favor(realm_id: StringName = &"") -> bool:
+	var rid: StringName = realm_id if realm_id != &"" else current_realm_id
+	return get_realm_standing(rid) <= -FAVOR_THRESHOLD
 
 
 ## Coarse-grained hostility readout for content gating. Map / encounter

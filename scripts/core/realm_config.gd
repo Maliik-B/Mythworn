@@ -39,9 +39,16 @@ var map_boon: StringName = &""
 ## the mid-run Peasant's Plea event uses it to move Passion when it retunes the realm.
 var passion_shift: int = 0
 
+## The realm's court<->folk standing the pledge plants you at (RunManager.realm_standing):
+## positive = the people's favor, negative = the court's favor. The Court pledge sets this
+## negative and the Folk pledge positive, enough to clear RunManager.FAVOR_THRESHOLD so the
+## pledged side's favor-gated event options unlock from the start. Zero = no change (neutral
+## configs + mid-run retunes leave standing alone). Applied in RunManager.apply_realm_config.
+var standing_init: int = 0
+
 
 ## One-line summary for logs / a future config-readout UI.
 func describe() -> String:
-	return "RealmConfig(diff x%.2f, shop x%.2f, elites x%.2f%s, rarity x%.2f, boon '%s', passion %+d)" % [
+	return "RealmConfig(diff x%.2f, shop x%.2f, elites x%.2f%s, rarity x%.2f, boon '%s', passion %+d, standing %+d)" % [
 		enemy_difficulty_mult, shop_price_mult, elite_frequency_mult,
-		" weakened" if elite_weaken else "", reward_rarity_mult, map_boon, passion_shift]
+		" weakened" if elite_weaken else "", reward_rarity_mult, map_boon, passion_shift, standing_init]

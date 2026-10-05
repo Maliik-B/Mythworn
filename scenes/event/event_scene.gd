@@ -138,6 +138,7 @@ func _build_raider_plea_event() -> EventData:
 		+ "before you see them,\" he says. \"They always do.\"")
 	accept.arms_quest = &"raiders"
 	accept.passion_change = 3
+	accept.standing_change = 8  # taking up the people's fight earns their regard
 	e.choices.append(accept)
 
 	var decline = EventData.EventChoice.new()
@@ -316,6 +317,16 @@ func _show_choices() -> void:
 			btn.disabled = true
 			btn.text += " (Not enough gold)"
 			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
+		# Favor gate: a faction-aligned option the opposed/neutral player can see but not take.
+		# Same option styling as any other, just disabled with the requirement appended.
+		elif choice.requires_favor == &"folk" and not RunManager.has_folk_favor():
+			btn.disabled = true
+			btn.text += " (Need: Favor of the People)"
+			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
+		elif choice.requires_favor == &"court" and not RunManager.has_court_favor():
+			btn.disabled = true
+			btn.text += " (Need: Favor of the Court)"
+			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		choice_container.add_child(btn)
 
 
@@ -455,6 +466,10 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.arms_quest != &"":
 		RunManager.active_quest_id = choice.arms_quest
 
+	# Faction-aligned acts shift the realm's court<->folk standing.
+	if choice.standing_change != 0:
+		RunManager.change_realm_standing(RunManager.current_realm_id, choice.standing_change)
+
 
 func _show_effect_summary(choice: EventData.EventChoice) -> void:
 	var parts: PackedStringArray = []
@@ -474,6 +489,10 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 		parts.append("+%d Passion" % choice.passion_change)
 	elif choice.passion_change < 0:
 		parts.append("%d Passion" % choice.passion_change)
+	if choice.standing_change > 0:
+		parts.append("People's Favor +%d" % choice.standing_change)
+	elif choice.standing_change < 0:
+		parts.append("Court's Favor +%d" % -choice.standing_change)
 	if choice.awarded_title_id != &"":
 		var title_data := TitlePool.get_title(choice.awarded_title_id)
 		if title_data:

@@ -817,6 +817,44 @@ func _test_vn_data() -> void:
 		and RunManager.get_passion_tier_for_value(folk_cfg.passion_shift) == PassionState.Tier.WAVERING)
 	_check("court pledge leaves Passion unmoved", entry.choices[0].config.passion_shift == 0)
 
+	# Favor axis: the pledge plants court<->folk standing past the favor threshold so the
+	# aligned side's gated options unlock at once and the opposed side's do not.
+	_check("Court pledge plants court favor; Folk pledge plants the people's favor",
+		entry.choices[0].config.standing_init <= -RunManager.FAVOR_THRESHOLD
+		and entry.choices[1].config.standing_init >= RunManager.FAVOR_THRESHOLD)
+	RunManager.set_realm_standing(&"camelot", entry.choices[0].config.standing_init)
+	var court_ok := RunManager.has_court_favor(&"camelot") and not RunManager.has_folk_favor(&"camelot")
+	RunManager.set_realm_standing(&"camelot", entry.choices[1].config.standing_init)
+	var folk_ok := RunManager.has_folk_favor(&"camelot") and not RunManager.has_court_favor(&"camelot")
+	_check("standing resolves to the right faction's favor", court_ok and folk_ok)
+	# A swing out of the pledged band drops that favor before the other side's is earned.
+	RunManager.set_realm_standing(&"camelot", 25)
+	RunManager.change_realm_standing(&"camelot", -30)  # 25 -> -5
+	_check("a standing swing drops you out of the pledged favor",
+		not RunManager.has_folk_favor(&"camelot") and not RunManager.has_court_favor(&"camelot"))
+	RunManager.realm_standing.clear()
+
+	# The tithe exposes both a folk-gated and a court-gated option (the pledge opens one,
+	# locks the other) plus standing nudges on the plain choices.
+	var tithe: EventData = null
+	for ev in EventPool._build_pool():
+		if ev.event_name == "The Peasant's Plea":
+			tithe = ev
+			break
+	var has_folk_gate := false
+	var has_court_gate := false
+	var moves_standing := false
+	if tithe:
+		for ch in tithe.choices:
+			if ch.requires_favor == &"folk":
+				has_folk_gate = true
+			if ch.requires_favor == &"court":
+				has_court_gate = true
+			if ch.standing_change != 0:
+				moves_standing = true
+	_check("the tithe gates a folk and a court option and moves standing",
+		has_folk_gate and has_court_gate and moves_standing)
+
 	# Run-start queue: send-off -> entry -> map (what vn_scene._finish walks).
 	RunManager.pending_vn = sendoff
 	RunManager.pending_vn_queue.clear()
