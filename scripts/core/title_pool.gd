@@ -5,6 +5,7 @@ class_name TitlePool
 
 const HERALDIC_ACCENT: Color = Color(0.78, 0.18, 0.18)    # Camelot red
 const NEUTRAL_ACCENT: Color = Color(0.85, 0.78, 0.55)     # Parchment
+const PEOPLES_ACCENT: Color = Color(0.82, 0.68, 0.32)     # Harvest gold (the common folk)
 
 
 # --- Public API ---
@@ -18,6 +19,7 @@ static func get_all_titles() -> Array[TitleData]:
 	titles.append(_build_outlander_of_camelot())
 	titles.append(_build_the_merciful())
 	titles.append(_build_the_calculating())
+	titles.append(_build_peoples_champion())
 	return titles
 
 
@@ -173,5 +175,25 @@ static func _build_the_calculating() -> TitleData:
 	t.original_value = 2
 
 	t.passive_effect = TitleData.EffectType.BLOCK_ON_TURN_START
+	t.passive_scales_with_tier = false
+	return t
+
+
+## Earned at the run's end for holding the people's line (high folk standing) through the
+## realm. A personality trait, not a realm office -- it doesn't fade when you leave Camelot,
+## because it's who you are, not a post you held. The people tend their champion's hurts.
+static func _build_peoples_champion() -> TitleData:
+	var t := TitleData.new()
+	t.title_id = &"peoples_champion"
+	t.category = TitleData.Category.PERSONALITY
+	t.origin_realm_id = &""
+	t.visual_style = RealmData.VisualStyle.NEUTRAL
+	t.accent_color = PEOPLES_ACCENT
+
+	t.original_name = "The People's Champion"
+	t.original_description = "You stood with the common folk and would not be made their king. Heal 4 HP after each combat."
+	t.original_value = 4
+
+	t.passive_effect = TitleData.EffectType.HEAL_ON_COMBAT_END
 	t.passive_scales_with_tier = false
 	return t

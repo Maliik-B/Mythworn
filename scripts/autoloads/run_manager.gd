@@ -115,6 +115,10 @@ var realm_standing: Dictionary[StringName, int] = {}
 # pledged side's favor-gated options unlock immediately; crossing to the other side's favor
 # takes committed play. Tunable with the pledge values in the balance pass.
 const FAVOR_THRESHOLD := 20
+# Standing that marks a "people's champion" at run's end: deliberately above the Folk pledge
+# alone (+25), so you must reinforce the pledge with at least one pro-folk act (the tithe's
+# folk option +12, or taking the raider hunt +8) to clear it. Drives the ending variant.
+const PEOPLES_CHAMPION_THRESHOLD := 33
 
 # --- Cross-map questline (the beast/bandit raiders) ---
 # The accepted quest id (&"" = nothing accepted). Set when the player accepts the plea at
@@ -707,6 +711,14 @@ func has_folk_favor(realm_id: StringName = &"") -> bool:
 func has_court_favor(realm_id: StringName = &"") -> bool:
 	var rid: StringName = realm_id if realm_id != &"" else current_realm_id
 	return get_realm_standing(rid) <= -FAVOR_THRESHOLD
+
+
+## True if the player held the people's line deep enough to be their champion (standing
+## at/above PEOPLES_CHAMPION_THRESHOLD). Read at the run's crown/ending beats. Defaults to
+## the current realm.
+func is_peoples_champion(realm_id: StringName = &"") -> bool:
+	var rid: StringName = realm_id if realm_id != &"" else current_realm_id
+	return get_realm_standing(rid) >= PEOPLES_CHAMPION_THRESHOLD
 
 
 ## Coarse-grained hostility readout for content gating. Map / encounter

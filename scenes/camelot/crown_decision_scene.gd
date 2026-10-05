@@ -61,8 +61,16 @@ void fragment() {
 	vbox.add_child(title)
 
 	var desc = Label.new()
-	desc.text = ("The boss is fallen. Camelot kneels. The crown that has waited a generation "
-		+ "for a hand worthy of it now waits for yours.\n\nDo you take it?")
+	if RunManager.is_peoples_champion():
+		# The people got to you first; the crown is still offered, but not only by the court.
+		desc.text = ("The boss is fallen, and Camelot kneels. But the court is not first to "
+			+ "reach you. The common folk come up from the lower town in a slow tide, calling "
+			+ "your name with a word in front of it the courtiers would never have chosen. The "
+			+ "crown is still held out to you. It is only that now two different hands are holding "
+			+ "it, and they do not want the same thing from the one who takes it.\n\nDo you take it?")
+	else:
+		desc.text = ("The boss is fallen. Camelot kneels. The crown that has waited a generation "
+			+ "for a hand worthy of it now waits for yours.\n\nDo you take it?")
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc.add_theme_font_size_override("font_size", 20)
 	desc.add_theme_color_override("font_color", Color(0.85, 0.82, 0.72))
@@ -84,9 +92,12 @@ void fragment() {
 		Color(1.0, 0.85, 0.35),
 		_on_take_crown))
 
+	var refuse_sub := "The throne is not yours to claim. Walk your own path."
+	if RunManager.is_peoples_champion():
+		refuse_sub = "Stay what they made you. Their champion, not their king."
 	btn_row.add_child(_make_choice_button(
 		"Refuse the Crown",
-		"The throne is not yours to claim. Walk your own path.",
+		refuse_sub,
 		Color(0.65, 0.65, 0.7),
 		_on_refuse_crown))
 
@@ -147,9 +158,13 @@ func _on_take_crown() -> void:
 
 func _on_refuse_crown() -> void:
 	AudioManager.play_sfx("button_click")
-	# Camelot's Champion is the "advisor" path title from REALM_CAMELOT.md.
-	# In Phase 2 this becomes a sub-decision (Wander / Advise / Leave).
-	RunManager.award_title(&"camelots_champion")
+	# Refusing the crown having held the people's line makes you THEIR champion specifically;
+	# otherwise it's the generic advisor path (Camelot's Champion) from REALM_CAMELOT.md.
+	# In Phase 2 the generic path becomes a sub-decision (Wander / Advise / Leave).
+	if RunManager.is_peoples_champion():
+		RunManager.award_title(&"peoples_champion")
+	else:
+		RunManager.award_title(&"camelots_champion")
 	Events.crown_decided.emit(false)
 	_proceed()
 

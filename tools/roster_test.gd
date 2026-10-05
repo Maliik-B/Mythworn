@@ -855,6 +855,25 @@ func _test_vn_data() -> void:
 	_check("the tithe gates a folk and a court option and moves standing",
 		has_folk_gate and has_court_gate and moves_standing)
 
+	# People's champion: the bar sits above the Folk pledge alone, so it takes the pledge
+	# plus at least one pro-folk act (e.g. the tithe's folk option, +12) to clear it.
+	var folk_init: int = entry.choices[1].config.standing_init
+	_check("people's-champion bar sits above the folk pledge alone",
+		RunManager.PEOPLES_CHAMPION_THRESHOLD > folk_init)
+	RunManager.set_realm_standing(&"camelot", folk_init + 12)
+	var champ_reached := RunManager.is_peoples_champion(&"camelot")
+	RunManager.set_realm_standing(&"camelot", folk_init)
+	var champ_not_from_pledge := not RunManager.is_peoples_champion(&"camelot")
+	_check("pledge + one pro-folk act makes a people's champion; the pledge alone does not",
+		champ_reached and champ_not_from_pledge)
+	RunManager.realm_standing.clear()
+
+	# The People's Champion ending title exists as a (non-degrading) personality trait.
+	var pc := TitlePool.get_title(&"peoples_champion")
+	_check("The People's Champion title exists (personality)",
+		pc != null and pc.category == TitleData.Category.PERSONALITY
+		and pc.original_name == "The People's Champion")
+
 	# Run-start queue: send-off -> entry -> map (what vn_scene._finish walks).
 	RunManager.pending_vn = sendoff
 	RunManager.pending_vn_queue.clear()

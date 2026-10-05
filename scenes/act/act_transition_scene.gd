@@ -9,6 +9,13 @@ var _time := 0.0
 
 func _ready() -> void:
 	is_final_act = RunManager.current_act >= RunManager.MAX_ACTS
+	# A people's champion who never pulled Excalibur gets no crown decision to earn the title
+	# at, so recognize it here (the crown scene's refuse path covers Excalibur-holders). Taking
+	# the crown makes you king, not their champion, so Excalibur-holders are excluded.
+	if RunManager.current_act == 1 and RunManager.current_realm_id == &"camelot" \
+			and RunManager.is_peoples_champion() and not RunManager.has_excalibur() \
+			and not RunManager.has_abdicated:
+		RunManager.award_title(&"peoples_champion")
 	_build_ui()
 	if is_final_act:
 		AudioManager.play_music("victory")
@@ -84,16 +91,39 @@ func _waystation_text() -> String:
 
 	var vignette := ""
 	if RunManager.current_act == 1 and RunManager.current_realm_id == &"camelot":
+		var champ := RunManager.is_peoples_champion()
+		var had_crown_offer := RunManager.has_excalibur()  # gated the crown decision
 		if RunManager.has_abdicated:
 			vignette = ("You set the crown down where they could all watch you do it, and "
 				+ "walked. No double follows you out; there is no role left to keep warm, only a "
 				+ "throne you emptied on your way to the door. You feel the realm's regard cool "
 				+ "at your back.")
 		elif RunManager.earned_title_ids.has(&"king_of_camelot"):
-			vignette = ("You leave the coronation to carry itself. Out of the royal apartments, "
-				+ "out of the king's mantle, down a servants' stair, and behind you your double "
-				+ "is already easing into the chamber, into the crown, into the reign. It will "
-				+ "wear your face better than you did.")
+			if champ:
+				vignette = ("You take the crown, and it is the lower town that roars for it, not "
+					+ "the court. The courtiers clap a half-beat late, having wanted a different "
+					+ "king and been handed yours. Down in the market a child is lifted onto "
+					+ "someone's shoulders to see you. You find yourself wondering how long a crown "
+					+ "the people gave stays the people's.")
+			else:
+				vignette = ("You leave the coronation to carry itself. Out of the royal apartments, "
+					+ "out of the king's mantle, down a servants' stair, and behind you your double "
+					+ "is already easing into the chamber, into the crown, into the reign. It will "
+					+ "wear your face better than you did.")
+		elif champ and had_crown_offer:
+			# Refused the crown having held the people's line -- their champion, not their king.
+			vignette = ("You will not take it, and you say so where they can all hear. For a "
+				+ "moment the court doesn't understand, and the people do. You were never going to "
+				+ "be their king. You were only ever going to be theirs, and they line the road out "
+				+ "of the lower town to tell you so, quietly and all at once. Behind you the court "
+				+ "is already closing ranks over a crown that will have to find another head.")
+		elif champ:
+			# Held the people's line but never pulled Excalibur, so no crown was ever offered.
+			vignette = ("No one offers you a crown. You never went for the sword, and a kingdom "
+				+ "does not hand itself to a stranger who did not reach for it. But the lower town "
+				+ "knows what you did for it, and the lower town is not the court. They see you to "
+				+ "the edge of the fields the way you would see off one of your own. It is worth "
+				+ "more than a coronation, and you both know it.")
 		elif RunManager.earned_title_ids.has(&"camelots_champion"):
 			vignette = ("You are gone before the court can turn to name a king. Head down, "
 				+ "through the market crowd, into the cool shadow of a borough wall, and you wait "
