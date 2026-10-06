@@ -19,6 +19,9 @@ static func _build_pool() -> Array[EventData]:
 	pool.append(_suspicious_chest())
 	pool.append(_campfire_remnants())
 	pool.append(_peasants_plea())
+	pool.append(_scriptorium())
+	pool.append(_the_tourney())
+	pool.append(_last_cart_out())
 
 	return pool
 
@@ -104,6 +107,181 @@ static func _forgotten_library() -> EventData:
 	c3.text = "Search for valuables"
 	c3.result_text = "Between the pages you find pressed coins and a gemstone."
 	c3.gold_change = 25
+
+	e.choices.append(c1)
+	e.choices.append(c2)
+	e.choices.append(c3)
+	return e
+
+
+## Camelot liaison event: Bram (Records) turns up at an abbey scriptorium the crown has
+## ordered burned, after one specific charter before it's ash -- institutional interest, not
+## a personal file. FOLK-GATED option: a people-trusted keeper can have the town carry the
+## whole archive out. Bram names Records without explaining Fable. His dry,
+## tired voice per the liaison brief. (Camelot-flavored; the demo only runs this pool here.)
+static func _scriptorium() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Scriptorium"
+	e.description = ("The abbey's scriptorium has one lamp still burning. A copyist works under it "
+		+ "fast and without hope, because the word came down the king's road at noon: the archive is "
+		+ "to be ash by morning. Too many charters in these drawers say the wrong families held the "
+		+ "wrong lands, and a king rewriting his claim would rather no older version survived to "
+		+ "argue with him.\n\nA figure waits at the end of the long table who does not belong to the "
+		+ "abbey. No habit, no tonsure, only a satchel of loose paper and the patience of a man who "
+		+ "has watched a great many things get lost and stopped being surprised by it. \"Bram. "
+		+ "Records.\" He taps the satchel. \"I'll be straight with you, I'm not here for the abbey. "
+		+ "There's one charter in that stack I need copied before the torches come. A king who burns "
+		+ "the old deeds means to write new ones, and somebody ought to keep the version that was "
+		+ "true.\"")
+
+	var c1 = EventData.EventChoice.new()
+	c1.text = "Sit down and copy with him until dawn."
+	c1.result_text = ("You take up a second pen. Bram writes in a fast, ugly, legible hand, and "
+		+ "between the two of you the charter is copied twice before the gray light comes. He blots "
+		+ "the last line and tucks both copies into the satchel. \"Good. Two of them now. Harder to "
+		+ "lose two.\" He leaves a folded page on the table as he goes, a copyist's old marginal "
+		+ "notes on a technique you hadn't considered. \"For your trouble.\"")
+	c1.card_reward = true
+	c1.passion_change = 3
+
+	# Folk-gated: only a keeper the people already trust can raise the whole town in a night.
+	# The aligned big outcome -- the entire archive saved, not just Bram's one page.
+	var cf = EventData.EventChoice.new()
+	cf.text = "Wake the town and carry the whole archive out before the torches come."
+	cf.result_text = ("You go door to door, and the people who trust you come out into the cold "
+		+ "without asking much why. By the time the crown's men arrive the shelves stand bare, the "
+		+ "charters scattered into a dozen cellars down the valley. Bram looks at the empty room with "
+		+ "open astonishment. \"I came for one page,\" he says. \"You saved the lot of it.\" He digs "
+		+ "something out of a cellar box and presses it into your hands before he leaves.")
+	cf.requires_favor = &"folk"
+	cf.card_reward = true
+	cf.gold_change = 20
+	cf.passion_change = 4
+	cf.standing_change = 10
+
+	var c2 = EventData.EventChoice.new()
+	c2.text = "Strip the gilt and gemwork from the bindings. They burn either way."
+	c2.result_text = ("You pry the stones and gold leaf from the old covers while the copyist "
+		+ "pretends not to watch. The words are ash by morning and the gilt is in your purse. Bram "
+		+ "says nothing to you. He only writes something short to himself, and does not offer to show "
+		+ "you what.")
+	c2.gold_change = 40
+	c2.passion_change = -6
+
+	var c3 = EventData.EventChoice.new()
+	c3.text = "There is nothing here worth losing sleep over. Leave."
+	c3.result_text = ("You take the road before the smoke starts. Bram does not try to stop you. He "
+		+ "has watched people walk away from burning rooms before. \"Safe travels,\" he says, and "
+		+ "means about half of it.")
+	c3.passion_change = -2
+
+	e.choices.append(c1)
+	e.choices.append(cf)
+	e.choices.append(c2)
+	e.choices.append(c3)
+	return e
+
+
+## Camelot court event: a tourney still bright in a rotting realm. The open option (wager on
+## the commoner) is the populist reward; entering the lists for the real prize is COURT-GATED
+## (the marshal only lifts the rope for a keeper the crown backs). Mirror of the Scriptorium's
+## folk gate on the court side. Surface Arthurian spectacle with the rot showing underneath.
+static func _the_tourney() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Tourney"
+	e.description = ("The tourney field is loud and bright in a realm gone quiet and gray everywhere "
+		+ "else, and that is the first wrong thing about it. The grandstand is full. Pennants snap in "
+		+ "a stiff wind. Down the lists two knights couch their lances and ride, and the crowd makes "
+		+ "the noise crowds make.\n\nLook closer and you see how many of the cheering faces hold too "
+		+ "still, and how the black creeps up under one champion's gorget where his squire keeps "
+		+ "worrying the strap to hide it. A herald takes wagers at the rail. A marshal takes names for "
+		+ "the open challenge, and looks hard at who he lets past the rope.")
+
+	var c1 = EventData.EventChoice.new()
+	c1.text = "Lay a purse on the commoner in the plain harness."
+	c1.result_text = ("You back the man with no device on his shield, and the stands laugh at you "
+		+ "for it, until he puts the rotting noble in the dirt and stands over him breathing clean "
+		+ "and hard. The herald counts out your winnings with a sour face. Across the field the "
+		+ "commoner catches your eye and touches two fingers to his brow.")
+	c1.gold_change = 25
+	c1.passion_change = 2
+	c1.standing_change = 5
+
+	# Court-gated: the marshal only lifts the rope for a name the crown stands behind. The real
+	# reward (a technique from a master-at-arms) sits behind court favor; a folk-pledged keeper
+	# is turned away at the rope, the way the Scriptorium turns a court keeper away from the folk.
+	var cc = EventData.EventChoice.new()
+	cc.text = "Give the marshal your name and ride in the open challenge."
+	cc.result_text = ("The marshal weighs your name, or the weight behind it, and lifts the rope. "
+		+ "They find you a horse and a lance. The ride is short and it hurts, but you put your man in "
+		+ "the dirt and the stand roars for you. Afterward an old master-at-arms who liked your seat "
+		+ "shows you a way of closing the distance you will not forget.")
+	cc.requires_favor = &"court"
+	cc.card_reward = true
+	cc.passion_change = 4
+	cc.standing_change = -4
+
+	var c3 = EventData.EventChoice.new()
+	c3.text = "Watch a single pass, then find the way out."
+	c3.result_text = ("You stay for one ride and leave while the crowd is still on its feet. The "
+		+ "brightness of the place sits wrong on you, like laughter at a sickbed. The road out is "
+		+ "quiet and you are glad of it.")
+	c3.passion_change = 3
+
+	e.choices.append(c1)
+	e.choices.append(cc)
+	e.choices.append(c3)
+	return e
+
+
+## Camelot liaison event: Neve (Dispatch) on-site running a village evacuation ahead of the
+## corruption. Help wholeheartedly, help while covering your own escape, or walk on. Her warm,
+## worried-veteran voice (and a touch of old-coworker familiarity with the keeper) per the
+## brief. The notebook is flavor and is never explained. Folk-leaning standing.
+static func _last_cart_out() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Last Cart Out"
+	e.description = ("The village is emptying the way water leaves a cracked basin, quick at first "
+		+ "and then a slow hopeless trickle of the people who had least to pack. The corruption is "
+		+ "two valleys off and coming. You can see it as a grayness in the far tree line that does "
+		+ "not move the way weather moves. In the square too few carts are being loaded by too many "
+		+ "hands.\n\nNeve is in the thick of it with a battered notebook, sending each cart off in "
+		+ "its turn and marking something down as it rolls. She is not dressed for the field and does "
+		+ "not seem to care. When she sees you her face does something complicated. \"Of course it's "
+		+ "you. It's always you where it's worst.\" She jerks her chin at a stalled wagon. \"Don't "
+		+ "stand there looking noble. There's a wheel off the miller's cart, and he's got six "
+		+ "children and a grandmother.\"")
+
+	var c1 = EventData.EventChoice.new()
+	c1.text = "Get under the axle and lift."
+	c1.result_text = ("You set your shoulder under the axle while the miller seats the wheel, and "
+		+ "you leave some skin behind doing it, but the cart rolls and the children and the "
+		+ "grandmother roll with it. Neve works you like a draft animal after that, cart to cart, "
+		+ "until the square stands empty and the gray is close enough to smell. \"There,\" she says, "
+		+ "breathless. \"Now you look how you ought to.\" She marks one last line in the notebook and "
+		+ "does not let you see it.")
+	c1.hp_change = -4
+	c1.passion_change = 5
+	c1.standing_change = 7
+	c1.awarded_title_id = &"the_merciful"
+
+	var c2 = EventData.EventChoice.new()
+	c2.text = "Help, but keep yourself a place on the last cart out."
+	c2.result_text = ("You help, and you are good at it, but you keep one eye on the last wagon and a "
+		+ "hand near its rail the whole while. Nobody is left behind that you could have carried, and "
+		+ "you are not on foot when the gray comes over the ridge. Neve notices, because Neve notices "
+		+ "everything, and says nothing, which is worse. She presses coin into your hand for the road "
+		+ "regardless. \"Go on. Careful is a kindness too. Mostly to yourself.\"")
+	c2.gold_change = 18
+	c2.passion_change = 2
+	c2.standing_change = 3
+
+	var c3 = EventData.EventChoice.new()
+	c3.text = "They have their own people for this. Move on."
+	c3.result_text = ("You tell her it is not your evacuation to run. She looks at you a moment the "
+		+ "way she does when she is deciding not to argue. \"No,\" she agrees. \"It isn't.\" She turns "
+		+ "back to her carts. You feel her not-arguing for a mile down the road.")
+	c3.passion_change = -3
 
 	e.choices.append(c1)
 	e.choices.append(c2)

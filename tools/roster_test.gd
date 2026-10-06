@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_map_planarity()
 	_test_realm_config()
 	_test_event_scheduling()
+	_test_new_events()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -877,6 +878,38 @@ func _test_realm_config() -> void:
 	RunManager.realm_config = RealmConfig.new()
 	RunManager.pending_map_boon = &""
 	RunManager.passion.current_value = 0
+
+
+## The Oct-2026 faction/liaison events: Scriptorium (Bram, folk-gated), Tourney (court-
+## gated), Last Cart Out (Neve). Each must be in the random pool, with its gated option
+## wired to the right faction so the pledge opens one side and locks the other.
+func _test_new_events() -> void:
+	var by_name := {}
+	for ev in EventPool._build_pool():
+		by_name[ev.event_name] = ev
+	_check("The Scriptorium, The Tourney, and The Last Cart Out are in the pool",
+		by_name.has("The Scriptorium") and by_name.has("The Tourney")
+		and by_name.has("The Last Cart Out"))
+
+	var scriptorium: EventData = by_name.get("The Scriptorium")
+	var has_folk_gate := false
+	if scriptorium:
+		for ch in scriptorium.choices:
+			if ch.requires_favor == &"folk":
+				has_folk_gate = true
+	_check("The Scriptorium has a folk-gated option", has_folk_gate)
+
+	var tourney: EventData = by_name.get("The Tourney")
+	var has_court_gate := false
+	if tourney:
+		for ch in tourney.choices:
+			if ch.requires_favor == &"court":
+				has_court_gate = true
+	_check("The Tourney has a court-gated option", has_court_gate)
+
+	var cart: EventData = by_name.get("The Last Cart Out")
+	_check("The Last Cart Out offers a spread of choices",
+		cart != null and cart.choices.size() >= 3)
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth
