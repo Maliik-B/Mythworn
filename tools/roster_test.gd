@@ -29,6 +29,7 @@ func _ready() -> void:
 	_test_multihit_wave()
 	_test_control_heal()
 	_test_new_regulars()
+	_test_content_enemies()
 	_test_xcost_maelstrom()
 	_test_swing_relics()
 	_test_prophet_escalation()
@@ -77,7 +78,8 @@ func _test_opener() -> void:
 
 
 func _test_elite_and_boss_identity() -> void:
-	var elite_names := ["Champion of the Usurper", "The False Prophet", "The Iron Verdict"]
+	var elite_names := ["Champion of the Usurper", "The False Prophet", "The Iron Verdict",
+		"The Hollow Prelate"]
 	var elite := EnemyPool.get_elite_encounter()
 	_check("elite is one of the three Camelot elites",
 		elite.size() == 1 and elite[0].enemy_name in elite_names)
@@ -429,6 +431,104 @@ func _test_new_regulars() -> void:
 	_check("Acolyte's Sap Will puts Weak on the player",
 		eng.player_stats.get_status_stacks(StatusEffects.WEAK) == 2)
 	eng.free()
+
+
+## The Oct-2026 content-furnishing enemies: the ranged-pierce Crossbowman, the escalation
+## Hollow Herald, the Poison-stacking Rotting Knight, and the self-healing Hollow Prelate
+## elite. Each is checked for its signature mechanic end-to-end through the real engine.
+func _test_content_enemies() -> void:
+	# Crossbowman: the Heavy Bolt carries pierce, and a piercing hit bypasses part of block.
+	var cross := EnemyPool.corrupted_crossbowman()
+	var bolt := _move_by_name(cross, "Heavy Bolt")
+	var bolt_pierce := 0
+	if bolt:
+		for e in bolt.effects:
+			if e is DamageEffect:
+				bolt_pierce = e.pierce
+	_check("Crossbowman's Heavy Bolt pierces block", bolt != null and bolt_pierce > 0)
+
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [EnemyPool.corrupted_crossbowman()])
+	eng.player_stats.gain_block(10)
+	# 11 dmg, pierce 5: 5 bypasses block straight to HP, the other 6 soaks block (10 -> 4).
+	bolt.effects[0].apply(eng.enemies[0].stats, eng.player_stats, eng)
+	_check("a piercing bolt bypasses part of block (HP -5, block 10 -> 4)",
+		eng.player_stats.current_hp == 45 and eng.player_stats.block == 4)
+	# Pierce can't deal more than the hit: 4 dmg / pierce 10 into no block = 4 HP, not 10.
+	eng.player_stats.current_hp = 50
+	eng.player_stats.reset_block()
+	eng.deal_damage(eng.player_stats, 4, eng.enemies[0].stats, 10)
+	_check("pierce is capped at the hit (4 dmg / pierce 10 -> HP -4)",
+		eng.player_stats.current_hp == 46)
+	eng.free()
+
+	# Hollow Herald: the banner buffs ALL allies' Strength and compounds each turn it fires.
+	var herald := EnemyPool.hollow_herald()
+	var standard := _move_by_name(herald, "Corrupt Standard")
+	var is_banner := false
+	if standard:
+		for e in standard.effects:
+			if e is StatusApplyEffect and e.apply_to_allies \
+					and e.status_effect == StatusEffects.STRENGTH:
+				is_banner = true
+	_check("Herald's Corrupt Standard buffs all allies' Strength", standard != null and is_banner)
+
+	var heng := CombatEngine.new()
+	add_child(heng)
+	heng.start_combat([], 50, 50, [EnemyPool.hollow_herald(), _dummy_attacker()])
+	standard.effects[0].apply(heng.enemies[0].stats, heng.player_stats, heng)
+	standard.effects[0].apply(heng.enemies[0].stats, heng.player_stats, heng)
+	_check("the banner ramps the group's Strength each turn (+1 -> +2 on the ally)",
+		heng.enemies[1].stats.get_status_stacks(StatusEffects.STRENGTH) == 2
+		and heng.enemies[0].stats.get_status_stacks(StatusEffects.STRENGTH) == 2)
+	heng.free()
+
+	# Rotting Knight: Miasma stacks Poison on the player, which then bleeds through on tick.
+	var rot := EnemyPool.rotting_knight()
+	_check("Rotting Knight exists with Festering Cut + Miasma",
+		rot.enemy_name == "Rotting Knight"
+		and _has_move(rot, "Festering Cut") and _has_move(rot, "Miasma"))
+	var reng := CombatEngine.new()
+	add_child(reng)
+	reng.start_combat([], 50, 50, [EnemyPool.rotting_knight()])
+	_move_by_name(rot, "Miasma").effects[0].apply(
+		reng.enemies[0].stats, reng.player_stats, reng)
+	_check("Miasma puts 3 Poison on the player",
+		reng.player_stats.get_status_stacks(StatusEffects.POISON) == 3)
+	reng.tick_start_of_turn(reng.player_stats)
+	_check("Poison bleeds through on tick (HP -3, Poison 3 -> 2)",
+		reng.player_stats.current_hp == 47
+		and reng.player_stats.get_status_stacks(StatusEffects.POISON) == 2)
+	reng.free()
+
+	# Hollow Prelate: the self-heal mends it (clamped to max) and fires enemy_healed; a heal
+	# at full HP does nothing (so it only bites once you've chipped it).
+	var prelate := EnemyPool.the_hollow_prelate()
+	var font := _move_by_name(prelate, "Draw on the Font")
+	var self_heals := false
+	if font:
+		for e in font.effects:
+			if e is HealEffect and e.apply_to_source:
+				self_heals = true
+	_check("Prelate's Draw on the Font is a self-heal", font != null and self_heals)
+
+	var peng := CombatEngine.new()
+	add_child(peng)
+	peng.start_combat([], 50, 50, [EnemyPool.the_hollow_prelate()])
+	var healed_fired := [false]
+	var on_heal := func(_en, _amt, _hp): healed_fired[0] = true
+	Events.enemy_healed.connect(on_heal)
+	var pstats: CombatantStats = peng.enemies[0].stats
+	pstats.current_hp = pstats.max_hp - 15  # wounded, so a 14 heal has room
+	font.effects[0].apply(pstats, peng.player_stats, peng)
+	_check("the Prelate self-heal mends it and fires enemy_healed",
+		pstats.current_hp == pstats.max_hp - 1 and healed_fired[0])
+	pstats.current_hp = pstats.max_hp
+	font.effects[0].apply(pstats, peng.player_stats, peng)
+	_check("a self-heal at full HP does nothing", pstats.current_hp == pstats.max_hp)
+	Events.enemy_healed.disconnect(on_heal)
+	peng.free()
 
 
 ## Maelstrom is the X-cost torrent (#21): x_cost card carrying an x_scaled DamageEffect,

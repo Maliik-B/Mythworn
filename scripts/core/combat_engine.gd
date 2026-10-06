@@ -390,7 +390,7 @@ func current_x() -> int:
 
 
 func deal_damage(target: CombatantStats, base_amount: int,
-		source: CombatantStats = null) -> void:
+		source: CombatantStats = null, pierce: int = 0) -> void:
 	var amount = base_amount
 
 	# Source modifiers
@@ -428,7 +428,16 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	if amount > 0 and target.has_status(StatusEffects.INTANGIBLE):
 		amount = 1
 
-	var actual = target.take_damage(amount)
+	# Piercing: a portion of the hit bypasses block and lands straight on HP; the
+	# remainder soaks block as usual. Clamped to the (post-modifier) amount so a
+	# pierce larger than the hit never deals bonus damage. Intangible has already
+	# clamped `amount` to 1 above, so a pierced hit still honours Intangible.
+	var actual: int
+	if pierce > 0:
+		var direct := mini(pierce, amount)
+		actual = target.take_damage(amount - direct) + target.take_direct_damage(direct)
+	else:
+		actual = target.take_damage(amount)
 	_on_damage_dealt(target, actual)
 
 	# Enraged: a struck combatant strikes its attacker back for its Enraged stacks.
@@ -446,6 +455,23 @@ func apply_block(target: CombatantStats, amount: int) -> void:
 	var actual = amount + target.get_status_stacks(StatusEffects.DEXTERITY)
 	target.gain_block(actual)
 	Events.block_gained.emit(target, actual)
+
+
+## Mends a combatant up to its max HP (the Hollow Prelate's self-heal — the DPS-check
+## elite). Clamps to the missing HP and emits enemy_healed for the matching enemy so the
+## UI refreshes the bar. The player heals through RunManager, so a player_stats target
+## finds no match here and emits nothing — enemy self-heals only.
+func heal_combatant(target: CombatantStats, amount: int) -> void:
+	if amount <= 0 or target.is_dead():
+		return
+	var healed := mini(amount, target.max_hp - target.current_hp)
+	if healed <= 0:
+		return
+	target.current_hp += healed
+	for enemy in enemies:
+		if enemy.stats == target:
+			Events.enemy_healed.emit(enemy, healed, target.current_hp)
+			return
 
 
 func draw_cards(count: int) -> void:

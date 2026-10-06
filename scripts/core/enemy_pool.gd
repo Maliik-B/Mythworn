@@ -48,6 +48,13 @@ const _COMBAT_POOL := [
 	["acolyte_shade", 0.9],       # Weak + curse pollution (annoyance/attrition)
 	["manatarms_solo", 0.6],      # a lone clean bruiser
 	["two_squires", 0.7],         # double glass harasser — stacking Vulnerable, low HP
+	# New Oct-2026 compositions (content-furnishing pass): the three new regulars give the
+	# pool a ranged-pierce threat, an escalation engine, and the first Poison body.
+	["crossbowman_solo", 0.6],    # the pierce teacher, lone — block isn't the whole answer
+	["crossbowman_knight", 1.0],  # pierce + a bruiser body: split your defense
+	["herald_knight", 0.9],       # banner escalation + bruiser (gated out of the early act)
+	["rotting_solo", 0.7],        # the poison teacher, lone
+	["rotting_shade", 0.9],       # poison + curse pollution — layered attrition
 ]
 
 
@@ -88,6 +95,10 @@ static func _pick_encounter_key(floor_num: int) -> String:
 	var pool := []
 	for entry in _COMBAT_POOL:
 		if entry[0] == "golem_conspirator" and floor_num < 5:
+			continue
+		# The Herald's banner snowballs a paired bruiser fast; keep it out of the early act
+		# where a fresh deck can't race it down, same as the Golem+Conspirator attrition gate.
+		if entry[0] == "herald_knight" and floor_num < 3:
 			continue
 		pool.append(entry)
 	var total := 0.0
@@ -143,24 +154,38 @@ static func _compose(key: String, mult: float) -> Array[EnemyData]:
 		"two_squires":
 			result.append(corrupted_squire(mult))
 			result.append(corrupted_squire(mult))
+		"crossbowman_solo":
+			result.append(corrupted_crossbowman(mult))
+		"crossbowman_knight":
+			result.append(corrupted_crossbowman(mult))
+			result.append(corrupted_knight(mult))
+		"herald_knight":
+			result.append(hollow_herald(mult))
+			result.append(corrupted_knight(mult))
+		"rotting_solo":
+			result.append(rotting_knight(mult))
+		"rotting_shade":
+			result.append(rotting_knight(mult))
+			result.append(realm_shade(mult))
 		_:
 			result.append(corrupted_knight(mult))
 	return result
 
 
-## Shuffle-bag of the three elites, drawn without replacement so a run meets each once
-## before any repeat (a path can hold up to MAX_ELITES_PER_PATH=3 elite nodes, so a full
-## bag exactly covers the worst case). Reset per run by reset_encounter_state().
+## Shuffle-bag of the four elites, drawn without replacement so a run meets distinct elites
+## before any repeat. A path holds up to MAX_ELITES_PER_PATH=3 elite nodes, so a run samples
+## 3 of the 4 (which one sits out varies). Reset per run by reset_encounter_state().
 static var _elite_bag: Array[String] = []
 
 
-## One elite for an elite node. The three test different axes: Champion (adaptability /
+## One elite for an elite node. The four test different axes: Champion (adaptability /
 ## HP-band phases), False Prophet (the Passion crucible), Iron Verdict (retaliation —
-## punishes chip/multi-hit, rewards big single hits). difficulty_mult is the A2 hook.
+## punishes chip/multi-hit, rewards big single hits), Hollow Prelate (a throughput / DPS
+## check — out-damage its heal+shield). difficulty_mult is the A2 hook.
 static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData]:
 	var mult := _act_mult() * difficulty_mult
 	if _elite_bag.is_empty():
-		_elite_bag = ["champion", "prophet", "verdict"]
+		_elite_bag = ["champion", "prophet", "verdict", "prelate"]
 		_shuffle_bag(_elite_bag)
 	var pick: String = _elite_bag.pop_back()
 	var result: Array[EnemyData] = []
@@ -169,6 +194,8 @@ static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData
 			result.append(false_prophet(mult))
 		"verdict":
 			result.append(iron_verdict(mult))
+		"prelate":
+			result.append(the_hollow_prelate(mult))
 		_:
 			result.append(champion_of_the_usurper(mult))
 	return result
@@ -353,6 +380,64 @@ static func prophets_acolyte(mult := 1.0) -> EnemyData:
 	return _enemy("Prophet's Acolyte", _scale(34, mult), moves)
 
 
+## Corrupted Crossbowman (Low-Med HP). The ranged-pierce threat: a heavy Bolt that punches
+## through part of your block, so turtling behind a wall doesn't fully answer it. Its catch
+## is the recovery — the Bolt is on a cooldown, so the turn after it fires the crossbowman
+## can only Crank (a weak hunker) or chip. The punish window lands AFTER the shot: eat the
+## bolt, then burst it while it reloads. Fragile, so that window usually closes the fight.
+static func corrupted_crossbowman(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		# The signature: heavy + partially block-piercing. Cooldown 2 forces the reload
+		# rhythm, so it can't chain bolts and the post-shot punish window is reliable.
+		_move("Heavy Bolt", EnemyMove.IntentType.ATTACK,
+			[_dmg_pierce(_scale(11, mult), 5)], 2.2, 2),
+		# The reload / punish window — it hunkers to crank the windlass, barely a threat.
+		_move("Crank Reload", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(5, mult))], 1.4),
+		# A weak quick shot so a reload turn isn't completely free for you.
+		_move("Snap Shot", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(5, mult))], 0.8),
+	]
+	return _enemy("Corrupted Crossbowman", _scale(32, mult), moves)
+
+
+## Hollow Herald (Low HP). The escalation engine: it raises a corrupted standard that hands
+## Strength to the WHOLE group every turn it stands, so a paired bruiser's damage climbs the
+## longer the Herald lives. That makes it the priority kill — unlike the Court Conspirator's
+## occasional one-shot rally, the Herald's banner compounds each turn. Fragile on its own;
+## the threat is entirely what it does to its companions, so drop it first.
+static func hollow_herald(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		# The banner: +1 Strength to every living enemy (self included) each turn. High
+		# weight + no cooldown so it fires most turns and the group's damage snowballs.
+		_move("Corrupt Standard", EnemyMove.IntentType.BUFF,
+			[_ally_status(StatusEffects.STRENGTH, 1)], 2.2),
+		# A little chip so it isn't purely passive while it waves the banner.
+		_move("Hollow Toll", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(5, mult))], 1.0),
+	]
+	return _enemy("Hollow Herald", _scale(30, mult), moves)
+
+
+## Rotting Knight (Med HP). The plague bruiser and the roster's only Poison source: its
+## festering strikes and miasma stack Poison on you, so it threatens on a timer even through
+## block. A body you can't just out-turtle — the longer it lives, the more the poison bleeds
+## you, so it rewards closing the fight instead of grinding it. Sells the realm's rot.
+static func rotting_knight(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Rusted Strike", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(8, mult))], 1.8),
+		# Festering strike: damage that also leaves Poison. Cooldown paces the stacking so
+		# it climbs as a rhythm rather than spiking out of a fresh deck's reach.
+		_move("Festering Cut", EnemyMove.IntentType.ATTACK_DEBUFF,
+			[_dmg(_scale(6, mult)), _status(StatusEffects.POISON, 2)], 1.4, 2),
+		# Pure poison application — the pressure that bleeds through any amount of block.
+		_move("Miasma", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.POISON, 3)], 1.1, 2),
+	]
+	return _enemy("Rotting Knight", _scale(44, mult), moves)
+
+
 # ============================================================
 # CAMELOT ELITES
 # ============================================================
@@ -434,6 +519,33 @@ static func iron_verdict(mult := 1.0) -> EnemyData:
 	# Armed from turn 1 so the retaliation puzzle is live before he can be rushed.
 	e.starting_statuses = [[StatusEffects.ENRAGED, 2]]
 	return e
+
+
+## The Hollow Prelate (High HP). The throughput / DPS-check elite: a corrupted high cleric
+## who mends himself and turtles behind heavy shields, so chip and slow control bleed out
+## against his sustain. The counterplay is raw throughput — out-damage the heal+block or the
+## fight drags forever. A fresh axis vs the other three (Champion = adaptability, False
+## Prophet = Passion, Iron Verdict = retaliation); no new combat tech, just heal + block +
+## a Weak so stalling him isn't free. Ties the roster's rotting faith (Acolyte / False
+## Prophet) to its elite.
+static func the_hollow_prelate(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Chastening Blow", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(12, mult))], 1.8),
+		# The shield wall — hitting into this wastes throughput you need for the heal race.
+		_move("Sanctuary", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(16, mult))], 1.3),
+		# The sustain that makes it a DPS check. Cooldown paces it so the heal undoes a
+		# round of chip rather than every hit. Self-heal does nothing at full HP, so it
+		# only bites once you've wounded him — the race is whether your damage outpaces it.
+		_move("Draw on the Font", EnemyMove.IntentType.BUFF,
+			[_self_heal(_scale(14, mult))], 1.4, 2),
+		# Throttles your offense so stalling the heal race isn't free (echoes the Acolyte's
+		# Sap Will). Weak is flat identity pressure, unscaled by difficulty.
+		_move("Sap Faith", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.WEAK, 2)], 1.0, 2),
+	]
+	return _enemy("The Hollow Prelate", _scale(115, mult), moves)
 
 
 # ============================================================
@@ -586,6 +698,24 @@ static func _dmg_x(v: int, hits: int) -> DamageEffect:
 	var e := DamageEffect.new()
 	e.value = v
 	e.hits = hits
+	return e
+
+
+## Piercing attack: `pierce` of the hit bypasses the player's block (the Corrupted
+## Crossbowman's bolt). The rest soaks block normally.
+static func _dmg_pierce(v: int, pierce: int) -> DamageEffect:
+	var e := DamageEffect.new()
+	e.value = v
+	e.pierce = pierce
+	return e
+
+
+## Enemy self-heal (the Hollow Prelate's sustain). apply_to_source routes the heal to
+## the combatant performing the move instead of the player.
+static func _self_heal(v: int) -> HealEffect:
+	var e := HealEffect.new()
+	e.value = v
+	e.apply_to_source = true
 	return e
 
 

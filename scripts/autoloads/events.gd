@@ -26,6 +26,9 @@ signal player_damaged(amount: int, new_hp: int)
 ## combat UI log it and refresh the bar, mirroring player_damaged.
 signal player_healed(amount: int, new_hp: int)
 signal enemy_damaged(enemy, amount: int, new_hp: int)
+## Fired when an enemy recovers HP (e.g. the Hollow Prelate's self-heal). Lets the
+## combat UI log it and refresh the bar, mirroring enemy_damaged.
+signal enemy_healed(enemy, amount: int, new_hp: int)
 signal enemy_died(enemy)
 ## Fired when a multi-phase boss depletes a phase's HP and transitions to the next
 ## instead of dying. `line` is the dialogue spoken on entering the new phase (may be

@@ -7,6 +7,11 @@ extends CardEffect
 ## `hits`. The engine supplies X via current_x(); pairs with CardData.x_cost. A torrent
 ## that strikes once per energy — synergises with Overflow and Vulnerable.
 @export var x_scaled: bool = false
+## Piercing: this many points of the hit bypass the target's block and land straight
+## on HP; the rest soaks block normally. Per hit, so a multi-hit pierce is rare by
+## design. The Corrupted Crossbowman's bolt is the canonical user — a guard-breaking
+## shot whose punish window is the reload that follows.
+@export var pierce: int = 0
 
 
 func apply(source, target, battle_state) -> void:
@@ -20,15 +25,16 @@ func apply(source, target, battle_state) -> void:
 			and RunManager.get_passion_tier() == PassionState.Tier.BLAZING:
 		total_hits += source.get_power_stacks(Powers.OVERFLOW)
 	for i in total_hits:
-		battle_state.deal_damage(target, value, source)
+		battle_state.deal_damage(target, value, source, pierce)
 
 
 func get_description() -> String:
+	var pierce_note := " Ignores %d block." % pierce if pierce > 0 else ""
 	if x_scaled:
-		return "Deal %d damage X times (X = energy spent)." % value
+		return "Deal %d damage X times (X = energy spent).%s" % [value, pierce_note]
 	if hits > 1:
-		return "Deal %d damage %d times (%d total)." % [value, hits, value * hits]
-	return "Deal %d damage." % value
+		return "Deal %d damage %d times (%d total).%s" % [value, hits, value * hits, pierce_note]
+	return "Deal %d damage.%s" % [value, pierce_note]
 
 
 ## Returns description with combat modifiers shown as base [modified]. Includes the

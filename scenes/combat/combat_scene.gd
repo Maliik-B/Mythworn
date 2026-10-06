@@ -673,6 +673,7 @@ func _connect_events() -> void:
 	Events.player_damaged.connect(_on_player_damaged)
 	Events.player_healed.connect(_on_player_healed)
 	Events.enemy_damaged.connect(_on_enemy_damaged)
+	Events.enemy_healed.connect(_on_enemy_healed)
 	Events.enemy_died.connect(_on_enemy_died)
 	Events.enemy_phase_changed.connect(_on_enemy_phase_changed)
 	Events.block_gained.connect(_on_block_gained)
@@ -1750,7 +1751,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 		var intent_color := Color(0.95, 0.85, 0.5)
 		var value_str := ""
 		match enemy.current_intent.intent_type:
-			EnemyMove.IntentType.ATTACK:
+			EnemyMove.IntentType.ATTACK, EnemyMove.IntentType.ATTACK_DEBUFF:
 				icon = "⚔"
 				intent_color = Color(1.0, 0.4, 0.3)
 				for effect in enemy.current_intent.effects:
@@ -1798,6 +1799,26 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 					if effect is StatusApplyEffect:
 						value_str = " %s" % effect.status_effect.effect_name
 						break
+		# A block-bypassing bolt reads as unfair if it's silent, so the pierce is
+		# spelled out on the intent beside the damage number.
+		for pierce_eff in enemy.current_intent.effects:
+			if pierce_eff is DamageEffect and pierce_eff.pierce > 0:
+				value_str += " (pierce %d)" % pierce_eff.pierce
+				break
+		# A self-heal intent (the Hollow Prelate) carries no status, so the BUFF branch
+		# leaves the readout blank — fill in the heal here so it's telegraphed.
+		for heal_eff in enemy.current_intent.effects:
+			if heal_eff is HealEffect and heal_eff.apply_to_source:
+				value_str = " Heal %d" % heal_eff.value
+				break
+		# An attack that also debuffs (the Rotting Knight's festering strike) keeps the
+		# attack's damage readout but takes the crossed glyph and names the status.
+		if enemy.current_intent.intent_type == EnemyMove.IntentType.ATTACK_DEBUFF:
+			icon = "⚔☠"
+			for debuff_eff in enemy.current_intent.effects:
+				if debuff_eff is StatusApplyEffect and not debuff_eff.apply_to_source:
+					value_str += " %s" % debuff_eff.status_effect.effect_name
+					break
 		# Passion pressure is its own threat category — an attack on your identity, not
 		# your HP or your stats. Override the generic (usually DEBUFF) readout with a
 		# distinct spark glyph + violet color so it reads as a different kind of threat.
@@ -2208,6 +2229,18 @@ func _on_enemy_damaged(enemy, amount: int, new_hp: int) -> void:
 	RunManager.run_stats["damage_dealt"] = RunManager.run_stats.get("damage_dealt", 0) + amount
 	var panel = enemy_nodes.get(enemy)
 	_spawn_damage_number("-%d" % amount, Color(1.0, 0.3, 0.2), panel)
+	_refresh_ui()
+
+
+## An enemy mended itself (the Hollow Prelate's self-heal). Green log + float + bar
+## refresh so the player reads the DPS check: out-damage the heal or the fight drags.
+func _on_enemy_healed(enemy, amount: int, new_hp: int) -> void:
+	if amount <= 0:
+		return
+	_log("[color=lightgreen]%s recovers %d HP. (HP: %d)[/color]" % [
+		enemy.enemy_data.enemy_name, amount, new_hp])
+	var panel = enemy_nodes.get(enemy)
+	_spawn_damage_number("+%d" % amount, Color(0.4, 1.0, 0.4), panel)
 	_refresh_ui()
 
 
