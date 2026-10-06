@@ -23,6 +23,15 @@ var pending_act_complete: bool = false
 ## instead of pulling from EventPool. Used for realm signature nodes like
 ## Camelot's Sword in the Stone. Cleared on consumption.
 var pending_special_event: StringName = &""
+## Count of ORDINARY (random-pool) event nodes entered this run. Quest/signature events
+## route through pending_special_event before the scene change, so they never reach the
+## random branch and never advance this count — it tracks only the player's "Nth event".
+var ordinary_event_count: int = 0
+## Pins a scripted story beat to a given ordinary-event ordinal: {ordinal:int -> event id}.
+## Lets a beat play on, say, the player's 2nd event (Cass's intro) while the rest stay
+## random. Empty = fully random. Populated per run in start_run; the ids resolve through
+## event_scene._build_special_event, the same authoring path as the signature events.
+var scripted_event_schedule := {}
 ## True while a fight that was LAUNCHED FROM AN EVENT is in progress, so combat victory
 ## routes back to event_scene (which reads pending_special_event for the follow-up beat)
 ## rather than the normal reward flow. Used by the Sword-in-the-Stone guardian and the
@@ -183,6 +192,9 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_relic_is_boss = false
 	pending_special_event = &""
 	pending_event_combat = false
+	ordinary_event_count = 0
+	# Scheduled story beats pinned to an ordinary-event ordinal. Empty = fully random.
+	scripted_event_schedule = {}
 	active_quest_id = &""
 	quest_completed = false
 	quest_payoff_revealed = false
@@ -242,6 +254,15 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	EnemyPool.reset_encounter_state()
 
 	Events.run_started.emit(character)
+
+
+## Advances the ordinary-event ordinal and returns the scripted event id pinned to this
+## visit, or &"" to draw from the random pool. Called by event_scene when an ordinary (non-
+## signature) event node is entered, so a story beat can be guaranteed on the player's Nth
+## event while the rest stay random. General: any ordinal in scripted_event_schedule works.
+func next_ordinary_event_script() -> StringName:
+	ordinary_event_count += 1
+	return scripted_event_schedule.get(ordinary_event_count, &"")
 
 
 func advance_act() -> void:

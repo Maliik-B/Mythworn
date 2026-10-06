@@ -18,7 +18,13 @@ func _ready() -> void:
 		event = _build_special_event(RunManager.pending_special_event)
 		RunManager.pending_special_event = &""
 	else:
-		event = EventPool.get_random_event(RngManager.event_rng)
+		# Ordinary event node. A scripted beat may be pinned to this visit's ordinal (e.g.
+		# Cass's intro as the guaranteed 2nd event); otherwise draw from the random pool.
+		var scripted := RunManager.next_ordinary_event_script()
+		if scripted != &"":
+			event = _build_special_event(scripted)
+		else:
+			event = EventPool.get_random_event(RngManager.event_rng)
 	_build_ui()
 	_show_choices()
 	AudioManager.play_music("rest")

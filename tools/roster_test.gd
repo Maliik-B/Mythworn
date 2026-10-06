@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_starter_deck()
 	_test_map_planarity()
 	_test_realm_config()
+	_test_event_scheduling()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -876,6 +877,25 @@ func _test_realm_config() -> void:
 	RunManager.realm_config = RealmConfig.new()
 	RunManager.pending_map_boon = &""
 	RunManager.passion.current_value = 0
+
+
+## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth
+## ordinary event while the rest stay random. The ordinal advances once per ordinary event,
+## and only the scheduled ordinal returns an id (everything else draws from the pool).
+func _test_event_scheduling() -> void:
+	var saved_schedule = RunManager.scripted_event_schedule
+	var saved_count := RunManager.ordinary_event_count
+	RunManager.scripted_event_schedule = {2: &"test_beat"}
+	RunManager.ordinary_event_count = 0
+	var first := RunManager.next_ordinary_event_script()
+	var second := RunManager.next_ordinary_event_script()
+	var third := RunManager.next_ordinary_event_script()
+	_check("1st ordinary event draws random (no scripted id)", first == &"")
+	_check("2nd ordinary event serves the scheduled beat", second == &"test_beat")
+	_check("3rd ordinary event draws random again", third == &"")
+	_check("the ordinal advances once per ordinary event", RunManager.ordinary_event_count == 3)
+	RunManager.scripted_event_schedule = saved_schedule
+	RunManager.ordinary_event_count = saved_count
 
 
 ## The VN plumbing (A2): VNData builds with chainable beats + choices, and a choice's
