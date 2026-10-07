@@ -128,9 +128,10 @@ static func _scriptorium() -> EventData:
 		+ "to be ash by morning. Too many charters in these drawers say the wrong families held the "
 		+ "wrong lands, and a king rewriting his claim would rather no older version survived to "
 		+ "argue with him.\n\nA figure waits at the end of the long table who does not belong to the "
-		+ "abbey. No habit, no tonsure, only a satchel of loose paper and the patience of a man who "
-		+ "has watched a great many things get lost and stopped being surprised by it. \"Bram. "
-		+ "Records.\" He taps the satchel. \"I'll be straight with you, I'm not here for the abbey. "
+		+ "abbey. No habit, no tonsure. You know him — Bram, from Records, with his satchel of loose "
+		+ "paper and the patience of a man who has watched a great many things get lost and stopped "
+		+ "being surprised by it. \"There you are,\" he says, and taps the satchel. \"I'll be straight "
+		+ "with you, I'm not here for the abbey. "
 		+ "There's one charter in that stack I need copied before the torches come. A king who burns "
 		+ "the old deeds means to write new ones, and somebody ought to keep the version that was "
 		+ "true.\"")
@@ -424,7 +425,7 @@ static func _peasants_plea() -> EventData:
 		+ "you, so you're his or you're not. Either way, you'll want to hear it.\" She nods at the "
 		+ "cart. Grain sacks, a crate of thin hens, a strongbox. \"The collector rides in at dawn "
 		+ "for the crown's share. He took the seed-corn last winter. He'll take it again, and we'll "
-		+ "be chewing the thatch by spring.\"\n\nA child watches from a doorway. Nobody tells it to "
+		+ "be chewing the thatch by spring.\"\n\nA child watches from a doorway. Nobody tells them to "
 		+ "go inside.")
 
 	var c1 = EventData.EventChoice.new()
@@ -454,9 +455,8 @@ static func _peasants_plea() -> EventData:
 	var c3 = EventData.EventChoice.new()
 	c3.text = "This is not your realm to set right. Walk on."
 	c3.result_text = ("You tell her it isn't yours to mend, which is true, and you take the road out "
-		+ "before the sun is up. It is an easy enough thing to say. A mile on you find it has not "
-		+ "made you feel any lighter. Whatever the collector does at dawn, you will be a long way "
-		+ "from the sound of it.")
+		+ "before the sun is up. It is an easy enough thing to say, a mile of walking hasn't made "
+		+ "you feel much better though.")
 	c3.passion_change = -3
 
 	# Folk-gated: only a keeper the people already trust can ask them to conspire. Opens for

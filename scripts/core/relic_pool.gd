@@ -41,8 +41,8 @@ static func _build_quest_pool() -> Array[RelicData]:
 
 	# -- Realm map_boon relic (A2). Common folk's boon: the town musters a militia to
 	#    shield you. Granted by RunManager.consume_map_boon when map_boon == &"militia".
-	pool.append(_relic("Peasant Militia",
-		"The common folk march at your side. Start each combat with 8 Block.",
+	pool.append(_relic("The People's Line",
+		"The common folk hold the line at your side. Start each combat with 8 Block.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 8))
 

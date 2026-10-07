@@ -107,7 +107,7 @@ static func emo_starting_deck() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY,
 		[_dmg(5), _status_self(StatusEffects.STRENGTH, 1), _pas(-3)])
 	tempered.personality = CardData.PersonalityType.SECONDARY
-	tempered.flavor_text = "Each blow teaches his arm the next."
+	tempered.flavor_text = "Each blow instructs the next."
 	deck.append(tempered)
 
 	var guard := _card("Guard", 1, CardData.CardType.SKILL,

@@ -511,7 +511,7 @@ func consume_map_boon() -> void:
 			return
 		&"militia":
 			# Common folk: the town musters a shield-wall militia at your side.
-			var r := RelicPool.get_relic_by_name("Peasant Militia")
+			var r := RelicPool.get_relic_by_name("The People's Line")
 			if r:
 				add_relic(r)
 		_:

@@ -282,7 +282,7 @@ static func _build_generic_pool() -> Array[CardData]:
 		[_damage(15), _passion(-2)]))
 
 	# Poison Fang: a DoT → +2 (poison/damage-over-time is Water's lane).
-	pool.append(_card("Poison Fang", 1, CardData.CardType.ATTACK,
+	pool.append(_card("Poisoned Fang", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
 		[_damage(3), _status(StatusEffects.POISON, 4), _passion(2)]))
 
@@ -556,7 +556,7 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.SECONDARY,
 		[_damage(6, 2), _passion(-3)])
-	twin.flavor_text = "Once to open the guard, once to end it."
+	twin.flavor_text = "First opens the wound. The next deepens it."
 	pool.append(twin)
 
 	# Whetstone — the Physical pool's dedicated Strength engine (content pass #2). Before this

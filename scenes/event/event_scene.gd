@@ -78,7 +78,7 @@ func _build_sword_in_stone_event() -> EventData:
 	walk.text = "Leave it to its vigil. The blade is not worth dying for."
 	walk.result_text = ("You step back into the trees. Behind you the beast settles over its stone "
 		+ "again, guarding a thing that will never answer to it. The choice not to reach is also a "
-		+ "kind of weight — and you find you can carry it.")
+		+ "kind of weight, and you find you can carry it.")
 	walk.passion_change = 3
 	e.choices.append(walk)
 

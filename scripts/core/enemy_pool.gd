@@ -678,7 +678,7 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# his arc (phase 2 begged "don't make me…"). A light tease of the Act-2 Puppeteer ("who
 	# held the strings", "it will reach for another").
 	# Ellipses, to match his prose voice (playtest #23).
-	e.death_line = "...oh. It's quiet. The hand on mine has let go... I'm free. Find who held the strings, keeper. It will reach for another. ...thank you."
+	e.death_line = "...oh. It's quiet. Find who held the strings, keeper. It will reach for another. ...thank you."
 	return e
 
 

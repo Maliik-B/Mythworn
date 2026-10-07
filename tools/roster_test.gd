@@ -827,7 +827,7 @@ func _test_realm_config() -> void:
 	_check("liaison + boon + quest relics exist in the quest pool",
 		RelicPool.get_relic_by_name("Bram's Briefing") != null
 		and RelicPool.get_relic_by_name("Neve's Kit") != null
-		and RelicPool.get_relic_by_name("Peasant Militia") != null
+		and RelicPool.get_relic_by_name("The People's Line") != null
 		and RelicPool.get_relic_by_name("Blooded Edge") != null)
 	var reward_names := PackedStringArray()
 	var boon_rng := RandomNumberGenerator.new()
@@ -838,7 +838,7 @@ func _test_realm_config() -> void:
 	_check("boon + quest relics stay out of reward rolls",
 		"Bram's Briefing" not in reward_names
 		and "Neve's Kit" not in reward_names
-		and "Peasant Militia" not in reward_names
+		and "The People's Line" not in reward_names
 		and "Blooded Edge" not in reward_names)
 
 	# Liaison gifts grant the two send-off relics.
@@ -868,11 +868,11 @@ func _test_realm_config() -> void:
 	# consume_map_boon grants the militia relic exactly once (map reloads re-run _ready).
 	RunManager.relics.clear()
 	RunManager.consume_map_boon()
-	_check("consume_map_boon grants the militia relic", RunManager.has_relic("Peasant Militia"))
+	_check("consume_map_boon grants the militia relic", RunManager.has_relic("The People's Line"))
 	RunManager.consume_map_boon()
 	var militia_count := 0
 	for r in RunManager.relics:
-		if r.relic_name == "Peasant Militia":
+		if r.relic_name == "The People's Line":
 			militia_count += 1
 	_check("consume_map_boon is one-shot", militia_count == 1)
 
