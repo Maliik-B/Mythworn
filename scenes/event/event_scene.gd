@@ -45,6 +45,8 @@ func _build_special_event(id: StringName) -> EventData:
 			return _build_raider_ambush_event()
 		&"raider_victory":
 			return _build_raider_victory_event()
+		&"room_that_isnt":
+			return _build_room_that_isnt_event()
 		_:
 			push_warning("Unknown special event id: %s" % id)
 			return EventPool.get_random_event(RngManager.event_rng)
@@ -205,6 +207,65 @@ func _build_raider_victory_event() -> EventData:
 	take.granted_relic_id = &"Blooded Edge"
 	take.passion_change = 2
 	e.choices.append(take)
+
+	return e
+
+
+## The Room That Isn't -- introduces Cass (Anomalies). Scheduled as the player's 2nd event
+## (RunManager.scripted_event_schedule, set in start_run). A space that's wrong in a way that
+## ISN'T the usual rot: a corridor longer inside than out, a window on a sky that isn't
+## Camelot's. Stepping through is Proposal A -- a deterministic trade, seen going in: a glimpse
+## of a lost home (the memory card "The House That Was") for a cut of HP that the seeing takes.
+## Cass names Anomalies and Fable without explaining what an anomaly is, and the lost home is
+## only glimpsed. Her voice: flat, unimpressed, already tired of you being here.
+func _build_room_that_isnt_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Room That Isn't"
+	e.description = ("The corridor runs longer than the building it's in. You counted the windows "
+		+ "from the yard, and there were four. In here there are seven, and the light coming through "
+		+ "the last one is the wrong color for the hour, the wrong color for the season, maybe the "
+		+ "wrong color for anywhere you've stood under a sky.\n\nThis isn't the rot. You know the rot "
+		+ "by now, the black veins and the smell. This is clean, and quiet, and wrong the way a word "
+		+ "repeated too many times stops being a word.\n\nA woman is already there, leaning in a "
+		+ "doorway that opens onto a room you are fairly sure the corridor does not have space for. "
+		+ "She doesn't look up from her notes. \"Cass. Anomalies.\" She says it the way you'd say a "
+		+ "department, because it is one. \"You're the one they sent for the sword. This isn't your "
+		+ "file. It's mine.\" She finally looks at you, and something in your face makes her put the "
+		+ "notes down. \"...you feel it pulling, don't you. Of course you do. Don't.\"")
+
+	# Proposal A: the deterministic trade, cost shown up front. The glimpse of home grants the
+	# memory card; the seeing takes a cut of HP. Cass warns you off, and lets you choose anyway.
+	var step = EventData.EventChoice.new()
+	step.text = "Step through the door that shouldn't fit. (Lose 8 HP)"
+	step.result_text = ("Cass says your name -- the one you gave yourself -- once, flatly, and "
+		+ "doesn't try to stop you with her hands. You step through, and for a moment you are "
+		+ "somewhere with a low roof and a particular light and the sense of a room you knew the "
+		+ "shape of without looking. You can't keep it. It goes the way they all go. But your hands "
+		+ "remember the shape of a door, and you come back carrying that much. It costs you. The "
+		+ "seeing always costs something. Cass watches you sway and says, not unkindly, \"I told "
+		+ "you.\" She writes something down. \"They never listen. I don't know why I still say it.\"")
+	step.hp_change = -8
+	step.granted_card_id = &"house_that_was"
+	e.choices.append(step)
+
+	# Look, don't cross: a smaller taste -- the longing without the wound. A Passion nudge, no card.
+	var look = EventData.EventChoice.new()
+	look.text = "Stand at the threshold and only look."
+	look.result_text = ("You stop at the edge of it and let yourself look and no further. It's "
+		+ "enough to ache and not enough to keep. After a while the wrongness of the light stops "
+		+ "feeling like an invitation and starts feeling like weather, and you can turn away from "
+		+ "weather. Cass nods, once, like you passed something she doesn't bother grading out loud.")
+	look.passion_change = 5
+	e.choices.append(look)
+
+	# The safe read: let her walk you out. Nothing gained, nothing lost -- she's plainly relieved.
+	var leave = EventData.EventChoice.new()
+	leave.text = "Let Cass walk you back out."
+	leave.result_text = ("\"Smart,\" she says, and means it, and walks you back down a corridor "
+		+ "that takes fewer steps to leave than it did to enter. At the door she almost says "
+		+ "something else, decides against it, and goes back to her notes. Behind you the room does "
+		+ "whatever the room does when no one is looking at it.")
+	e.choices.append(leave)
 
 	return e
 
@@ -467,6 +528,13 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 		if relic and not RunManager.has_relic(relic.relic_name):
 			RunManager.add_relic(relic)
 
+	# A memory ("remembrance") card granted straight to the deck -- the one-off reward from
+	# a memory event. add_card_to_deck duplicates it, so the deck owns a fresh instance.
+	if choice.granted_card_id != &"":
+		var mem = CardPool.get_memory_card(choice.granted_card_id)
+		if mem:
+			RunManager.add_card_to_deck(mem)
+
 	# Accepting a plea arms the cross-map questline: the payoff node reveals on the next
 	# return to the map (map_scene plays the arm flourish + objective toast).
 	if choice.arms_quest != &"":
@@ -508,6 +576,11 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 		var rel = RelicPool.get_relic_by_name(String(choice.granted_relic_id))
 		if rel:
 			parts.append("Acquired: %s" % rel.relic_name)
+
+	if choice.granted_card_id != &"":
+		var mem = CardPool.get_memory_card(choice.granted_card_id)
+		if mem:
+			parts.append("Remembered: %s" % mem.card_name)
 
 	if parts.size() > 0:
 		var summary = Label.new()

@@ -193,8 +193,12 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_special_event = &""
 	pending_event_combat = false
 	ordinary_event_count = 0
-	# Scheduled story beats pinned to an ordinary-event ordinal. Empty = fully random.
+	# Scheduled story beats pinned to an ordinary-event ordinal (empty = fully random).
+	# Camelot's demo beat: Cass's "The Room That Isn't" is guaranteed as the 2nd event so
+	# her introduction always lands, with the rest of the run's events staying random.
 	scripted_event_schedule = {}
+	if starting_realm == &"camelot":
+		scripted_event_schedule[2] = &"room_that_isnt"
 	active_quest_id = &""
 	quest_completed = false
 	quest_payoff_revealed = false

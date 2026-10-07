@@ -23,6 +23,10 @@ class EventChoice extends RefCounted:
 	## If non-empty, grants this relic via RunManager.acquire_relic when chosen.
 	## Used for one-shot quest events (e.g. Camelot's Sword in the Stone grants Excalibur).
 	var granted_relic_id: StringName = &""
+	## If non-empty, grants this specific MEMORY card (CardPool.get_memory_card) to the deck
+	## when chosen -- the one-off "remembrance" from a memory event (e.g. The Room That Isn't).
+	## Distinct from card_reward, which offers a pick-1-of-3 from the normal pool.
+	var granted_card_id: StringName = &""
 	## If non-empty, this choice LAUNCHES A SCRIPTED FIGHT (by key) instead of resolving
 	## normally: event_scene sets up the encounter and routes to combat, and combat
 	## victory routes to the follow-up beat. Used by the Sword-in-the-Stone guardian.

@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_map_planarity()
 	_test_realm_config()
 	_test_event_scheduling()
+	_test_scheduled_room()
 	_test_memory_cards()
 	_test_new_events()
 	_test_vn_data()
@@ -911,6 +912,24 @@ func _test_new_events() -> void:
 	var cart: EventData = by_name.get("The Last Cart Out")
 	_check("The Last Cart Out offers a spread of choices",
 		cart != null and cart.choices.size() >= 3)
+
+
+## The Room That Isn't (Cass's intro) is scheduled as the guaranteed 2nd event of a Camelot
+## run, and its step-in grants the "house_that_was" memory card. Verifies the end-to-end
+## wiring: start_run registration -> the scheduling ordinal -> a resolvable grant id.
+func _test_scheduled_room() -> void:
+	RunManager.start_run(CharacterPool.build_emo_hybrid())  # defaults to camelot
+	_check("a Camelot run schedules The Room as the 2nd event",
+		RunManager.scripted_event_schedule.get(2, &"") == &"room_that_isnt")
+	RunManager.ordinary_event_count = 0
+	RunManager.next_ordinary_event_script()                 # 1st event: random
+	_check("the 2nd ordinary event resolves to The Room",
+		RunManager.next_ordinary_event_script() == &"room_that_isnt")
+	_check("The Room's granted memory card resolves",
+		CardPool.get_memory_card(&"house_that_was") != null)
+	# start_run reset the run; restore the suite's baseline character + passion + encounter bag.
+	_setup_run_state()
+	EnemyPool.reset_encounter_state()
 
 
 ## Memory ("Remembrance") cards (Oct 2026): the three Emo/Cairn memory cards and their
