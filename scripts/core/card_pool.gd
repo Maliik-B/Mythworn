@@ -700,6 +700,105 @@ static func _recall(amount: int) -> CardEffect:
 	return e
 
 
+## Self-heal effect (routes through the combat engine so the heal shows live and isn't
+## clobbered by the end-of-combat HP sync). apply_to_source = the card's player.
+static func _heal(amount: int) -> HealEffect:
+	var e = HealEffect.new()
+	e.value = amount
+	e.apply_to_source = true
+	return e
+
+
+## Passion-scaled attack with an optional on-kill energy refund (the memory burst).
+static func _mdamage(amount: int, passion_divisor: int, kill_energy: int = 0) -> DamageEffect:
+	var e = DamageEffect.new()
+	e.value = amount
+	e.passion_bonus_divisor = passion_divisor
+	e.energy_on_kill = kill_energy
+	return e
+
+
+## Draw that forgets itself: draws `amount`, dropping by `decay` each play across the run.
+static func _ddraw(amount: int, decay: int) -> DrawEffect:
+	var e = DrawEffect.new()
+	e.value = amount
+	e.decay_per_play = decay
+	return e
+
+
+# ============================================================
+# MEMORY ("REMEMBRANCE") CARDS — Emo Hybrid (Cairn)
+# A league of their own: character-specific, overloaded, and sourced ONLY from memory
+# events, boss fights, and a shop relic (never the normal reward pool). Each answers an
+# enemy's intent a different way -- survive it, strike through it, or out-resource it.
+# Flavor is first person (the character's own voice): a keeper who lost his home and gave
+# himself a name.
+# ============================================================
+
+## Returns a fresh instance of a memory card by id (events/bosses grant a specific one).
+## Unknown id returns null. New memory cards register here.
+static func get_memory_card(id: StringName) -> CardData:
+	match id:
+		&"house_that_was":
+			return _memory_house_that_was()
+		&"everything_i_carried_out":
+			return _memory_everything_carried_out()
+		&"name_i_gave_myself":
+			return _memory_name_i_gave_myself()
+	return null
+
+
+## All memory cards (for the future shop relic that surfaces them, and for tests). Not
+## wired into any reward roll -- the gating is by construction (nothing adds these to a pool).
+static func build_memory_cards() -> Array[CardData]:
+	return [
+		_memory_house_that_was(),
+		_memory_everything_carried_out(),
+		_memory_name_i_gave_myself(),
+	]
+
+
+## Bypass the hit: a near-untouchable turn (block + a heal + draw + one turn of Intangible),
+## then the memory is spent for the fight (Exhaust = forgetting). Always does SOMETHING, even
+## if the block is redundant -- a hearth that takes you in.
+static func _memory_house_that_was() -> CardData:
+	var c := _pcard("The House That Was", 1, CardData.CardType.SKILL,
+		CardData.TargetType.SELF, CardData.CardRarity.RARE,
+		CardData.PersonalityType.PRIMARY,
+		[_block(15), _heal(6), _draw(2), _status_self(StatusEffects.INTANGIBLE, 1), _passion(10)],
+		true)  # exhaust
+	c.is_memory = true
+	c.flavor_text = ("For a breath the walls are up again and the hearth is lit. I almost "
+		+ "remember the room whole. For as long as it holds, I am present.")
+	return c
+
+
+## Strike through the hit: the whole weight I carry, set down at once -- so it scales with how
+## far I've committed to either pole, hardens me (Strength), and gives tempo back on a kill.
+static func _memory_everything_carried_out() -> CardData:
+	var c := _pcard("Everything I Carried Out", 2, CardData.CardType.ATTACK,
+		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
+		CardData.PersonalityType.SECONDARY,
+		[_mdamage(8, 4, 2), _status_self(StatusEffects.STRENGTH, 3), _passion(-12)])
+	c.is_memory = true
+	c.flavor_text = ("Everything I carried out of home, I am still carrying. Once in a while I "
+		+ "set the whole of it down at once, on whoever is in front of me.")
+	return c
+
+
+## Out-resource the hit: free card advantage that forgets itself across the run -- it draws one
+## fewer each time I lean on it, but never becomes dead (it still frees energy and steadies me).
+static func _memory_name_i_gave_myself() -> CardData:
+	var c := _pcard("The Name I Gave Myself", 0, CardData.CardType.SKILL,
+		CardData.TargetType.SELF, CardData.CardRarity.RARE,
+		CardData.PersonalityType.PRIMARY,
+		[_ddraw(4, 1), _energy(1), _passion(8)])
+	c.is_memory = true
+	c.flavor_text = ("Choosing a name felt strange, especially after turning it over all through "
+		+ "initiation. Nowadays, the word grants me strength.")
+	return c
+
+
 ## The Excalibur signature card. Constructed fresh each combat by CombatEngine
 ## when the player holds Excalibur in Sword mode. Never enters the player's
 ## persistent deck and never appears in reward pools or shops — its existence

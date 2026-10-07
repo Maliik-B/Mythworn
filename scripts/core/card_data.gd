@@ -34,6 +34,11 @@ enum PersonalityType { PRIMARY, SECONDARY, NEUTRAL, NEGATIVE }
 ## Retained cards stay in hand at end of turn instead of being discarded (StS-style
 ## "Retain"). The end-turn discard + its fly-to-pile animation both skip these.
 @export var retain: bool = false
+## Memory ("Remembrance") cards: a league-of-their-own, character-specific card sourced
+## ONLY from memory events, bosses, and a shop relic -- never the normal reward pool. The
+## flag marks them for that gated sourcing (and future visual treatment); it carries no
+## combat effect of its own. See CardPool.get_memory_card.
+@export var is_memory: bool = false
 @export var card_art: Texture2D
 
 # Upgrade tracking
@@ -58,6 +63,7 @@ func duplicate_card() -> CardData:
 	copy.x_cost = x_cost
 	copy.unplayable = unplayable
 	copy.retain = retain
+	copy.is_memory = is_memory
 	copy.card_art = card_art
 	copy.upgraded = upgraded
 

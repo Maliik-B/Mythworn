@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_map_planarity()
 	_test_realm_config()
 	_test_event_scheduling()
+	_test_memory_cards()
 	_test_new_events()
 	_test_vn_data()
 	_test_profile_intro()
@@ -910,6 +911,107 @@ func _test_new_events() -> void:
 	var cart: EventData = by_name.get("The Last Cart Out")
 	_check("The Last Cart Out offers a spread of choices",
 		cart != null and cart.choices.size() >= 3)
+
+
+## Memory ("Remembrance") cards (Oct 2026): the three Emo/Cairn memory cards and their
+## new mechanics -- a player heal that shows in combat, Passion-distance-scaled damage with
+## an on-kill energy refund, and a run-persistent decaying draw. Each is flagged is_memory,
+## RARE, and kept out of the normal reward pools by construction.
+func _test_memory_cards() -> void:
+	var house := CardPool.get_memory_card(&"house_that_was")
+	var carried := CardPool.get_memory_card(&"everything_i_carried_out")
+	var name_card := CardPool.get_memory_card(&"name_i_gave_myself")
+	_check("all three memory cards build by id",
+		house != null and carried != null and name_card != null)
+	_check("memory cards are flagged is_memory + RARE",
+		house.is_memory and carried.is_memory and name_card.is_memory
+		and house.rarity == CardData.CardRarity.RARE)
+	_check("get_memory_card returns null for an unknown id",
+		CardPool.get_memory_card(&"nope") == null)
+	_check("build_memory_cards returns all three", CardPool.build_memory_cards().size() == 3)
+	_check("duplicate_card preserves is_memory", house.duplicate_card().is_memory)
+
+	# Memory cards never leak into the normal card pools (gated by construction).
+	var leaked := false
+	for c in CardPool.build_emo_primary_pool() + CardPool.build_emo_secondary_pool():
+		if c.is_memory:
+			leaked = true
+	_check("no memory card appears in the normal Emo pools", not leaked)
+
+	# Card 1 (The House That Was): its heal routes through the live player_stats so it
+	# actually shows in combat (not RunManager, which would be clobbered on win). Play it
+	# wounded and the combat HP goes up, block lands, and Intangible is applied.
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 80, [_dummy_attacker()])  # wounded 50/80
+	RunManager.passion.current_value = 0
+	var healed_fired := [false]
+	var on_heal := func(_amt, _hp): healed_fired[0] = true
+	Events.player_healed.connect(on_heal)
+	var h := house.duplicate_card()
+	eng.piles.hand.append(h)
+	eng.energy = 3
+	eng.play_card(h, eng.player_stats)
+	_check("House That Was heals the live combat HP (+6) and fires player_healed",
+		eng.player_stats.current_hp == 56 and healed_fired[0])
+	_check("House That Was lands block + Intangible",
+		eng.player_stats.block == 15 and eng.player_stats.has_status(StatusEffects.INTANGIBLE))
+	Events.player_healed.disconnect(on_heal)
+	eng.free()
+
+	# Card 2 (Everything I Carried Out): damage scales with Passion distance from center,
+	# and felling the target refunds energy. At Passion 12 (Steady, zone flat), distance 12
+	# / divisor 4 = +3, so 8 -> 11 before the self-Strength (which applies after the hit).
+	var eng2 := CombatEngine.new()
+	add_child(eng2)
+	eng2.start_combat([], 50, 50, [_dummy_attacker()])  # 100-HP dummy, 0 block
+	RunManager.passion.current_value = 12
+	var carried_hit := carried.duplicate_card()
+	eng2.piles.hand.append(carried_hit)
+	eng2.energy = 3
+	var hp_before := eng2.enemies[0].stats.current_hp
+	eng2.play_card(carried_hit, eng2.enemies[0].stats)
+	_check("Everything I Carried Out scales with Passion distance (8 +12/4 = 11 at dist 12)",
+		eng2.enemies[0].stats.current_hp == hp_before - 11)
+	_check("Everything I Carried Out grants self-Strength",
+		eng2.player_stats.get_status_stacks(StatusEffects.STRENGTH) == 3)
+	eng2.free()
+
+	# On-kill energy refund: a low-HP target felled by the burst gives 2 energy back.
+	var eng3 := CombatEngine.new()
+	add_child(eng3)
+	eng3.start_combat([], 50, 50, [_dummy_attacker()])
+	RunManager.passion.current_value = 0
+	eng3.enemies[0].stats.current_hp = 5  # the 8 base will fell it
+	var finisher := carried.duplicate_card()
+	eng3.piles.hand.append(finisher)
+	eng3.energy = 3  # pays 2 -> 1, then +2 on kill -> 3
+	eng3.play_card(finisher, eng3.enemies[0].stats)
+	_check("Everything I Carried Out refunds 2 energy on a kill",
+		eng3.enemies[0].stats.is_dead() and eng3.energy == 3)
+	eng3.free()
+	RunManager.passion.current_value = 0
+
+	# Card 3 (The Name I Gave Myself): the draw decays by 1 each play and persists on the
+	# instance (run-persistent). A fresh instance starts at 4.
+	var nc := name_card.duplicate_card()
+	var draw_eff: DrawEffect = null
+	for e in nc.effects:
+		if e is DrawEffect:
+			draw_eff = e
+	_check("Name I Gave Myself has a decaying draw starting at 4",
+		draw_eff != null and draw_eff.value == 4 and draw_eff.decay_per_play == 1)
+	var deng := CombatEngine.new()
+	add_child(deng)
+	deng.start_combat([], 50, 50, [_dummy_attacker()])
+	draw_eff.apply(null, null, deng)
+	var after1 := draw_eff.value
+	draw_eff.apply(null, null, deng)
+	var after2 := draw_eff.value
+	_check("the draw forgets itself across plays (4 -> 3 -> 2)", after1 == 3 and after2 == 2)
+	_check("duplicate_card preserves the decay state (a copy keeps the current count)",
+		nc.duplicate_card().effects.any(func(e): return e is DrawEffect and e.value == 2))
+	deng.free()
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth

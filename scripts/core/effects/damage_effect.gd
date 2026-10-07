@@ -12,6 +12,21 @@ extends CardEffect
 ## design. The Corrupted Crossbowman's bolt is the canonical user — a guard-breaking
 ## shot whose punish window is the reload that follows.
 @export var pierce: int = 0
+## Passion-scaled bonus: when > 0, every this-many points of Passion distance from center
+## adds +1 damage (per hit). The memory card "Everything I Carried Out" scales with how far
+## committed I am to either pole. 0 = no scaling.
+@export var passion_bonus_divisor: int = 0
+## On-kill energy refund (StS "Feed"-style): when > 0, felling the target with this attack
+## gives back this much energy. Used by the memory burst "Everything I Carried Out".
+@export var energy_on_kill: int = 0
+
+
+## The base hit before combat modifiers, folding in the Passion-distance bonus so both
+## apply() and the dragged-preview description read the same number.
+func _effective_value() -> int:
+	if passion_bonus_divisor > 0:
+		return value + RunManager.passion_distance_from_center() / passion_bonus_divisor
+	return value
 
 
 func apply(source, target, battle_state) -> void:
@@ -24,17 +39,34 @@ func apply(source, target, battle_state) -> void:
 	if total_hits > 1 and source and source.has_power(Powers.OVERFLOW) \
 			and RunManager.get_passion_tier() == PassionState.Tier.BLAZING:
 		total_hits += source.get_power_stacks(Powers.OVERFLOW)
+	var dmg := _effective_value()
 	for i in total_hits:
-		battle_state.deal_damage(target, value, source, pierce)
+		battle_state.deal_damage(target, dmg, source, pierce)
+	# On-kill energy refund — checked once after all hits so a multi-hit doesn't
+	# double-count. The heavy blow that fells a foe gives its tempo back.
+	if energy_on_kill > 0 and target and target.is_dead() \
+			and battle_state and battle_state.has_method("change_energy"):
+		battle_state.change_energy(energy_on_kill)
+
+
+func _riders() -> String:
+	var s := ""
+	if passion_bonus_divisor > 0:
+		s += " +1 damage per %d Passion from center." % passion_bonus_divisor
+	if pierce > 0:
+		s += " Ignores %d block." % pierce
+	if energy_on_kill > 0:
+		s += " On kill, gain %d energy." % energy_on_kill
+	return s
 
 
 func get_description() -> String:
-	var pierce_note := " Ignores %d block." % pierce if pierce > 0 else ""
+	var riders := _riders()
 	if x_scaled:
-		return "Deal %d damage X times (X = energy spent).%s" % [value, pierce_note]
+		return "Deal %d damage X times (X = energy spent).%s" % [value, riders]
 	if hits > 1:
-		return "Deal %d damage %d times (%d total).%s" % [value, hits, value * hits, pierce_note]
-	return "Deal %d damage.%s" % [value, pierce_note]
+		return "Deal %d damage %d times (%d total).%s" % [value, hits, value * hits, riders]
+	return "Deal %d damage.%s" % [value, riders]
 
 
 ## Returns description with combat modifiers shown as base [modified]. Includes the
@@ -42,7 +74,8 @@ func get_description() -> String:
 ## onto an enemy — so the bracket shows the real number, composing with Strength/Weak.
 func get_modified_description(source: CombatantStats, target: CombatantStats = null,
 		zone_mult: float = 1.0) -> String:
-	var modified = value
+	# Start from the effective base so the Passion-distance bonus is already in the bracket.
+	var modified = _effective_value()
 	if source:
 		modified += source.get_status_stacks(StatusEffects.STRENGTH)
 		if source.has_status(StatusEffects.WEAK):
@@ -57,9 +90,10 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 		modified = int(modified * 1.5)
 	modified = maxi(0, modified)
 	if modified != value:
+		var riders := _riders()
 		if x_scaled:
-			return "Deal %d [%d] damage X times (X = energy spent)." % [value, modified]
+			return "Deal %d [%d] damage X times (X = energy spent).%s" % [value, modified, riders]
 		if hits > 1:
-			return "Deal %d [%d] damage %d times (%d total)." % [value, modified, hits, modified * hits]
-		return "Deal %d [%d] damage." % [value, modified]
+			return "Deal %d [%d] damage %d times (%d total).%s" % [value, modified, hits, modified * hits, riders]
+		return "Deal %d [%d] damage.%s" % [value, modified, riders]
 	return get_description()

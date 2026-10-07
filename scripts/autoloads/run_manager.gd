@@ -388,6 +388,15 @@ func passion_center() -> int:
 	return 0
 
 
+## Absolute distance of current Passion from the dispassionate center — how far committed
+## to EITHER pole. The memory card "Everything I Carried Out" scales its damage with this:
+## the harder I feel, the heavier the blow lands.
+func passion_distance_from_center() -> int:
+	if not passion:
+		return 0
+	return absi(passion.current_value - passion_center())
+
+
 ## Pulls Passion toward `target` by up to `magnitude` (volatility-scaled), never
 ## crossing past the target. An additive utility (kept for directional effects).
 func pull_passion_toward(target: int, magnitude: int) -> void:

@@ -457,10 +457,12 @@ func apply_block(target: CombatantStats, amount: int) -> void:
 	Events.block_gained.emit(target, actual)
 
 
-## Mends a combatant up to its max HP (the Hollow Prelate's self-heal — the DPS-check
-## elite). Clamps to the missing HP and emits enemy_healed for the matching enemy so the
-## UI refreshes the bar. The player heals through RunManager, so a player_stats target
-## finds no match here and emits nothing — enemy self-heals only.
+## Mends a combatant up to its max HP, clamped to the missing HP, and emits the matching
+## heal signal so the UI refreshes the bar. Used by the Hollow Prelate's self-heal AND by
+## player heal cards (the memory card "The House That Was") -- routing a player heal through
+## the live player_stats here, rather than RunManager.heal, is what makes it show in combat
+## (RunManager.current_hp is only synced from player_stats on victory, so a RunManager heal
+## mid-fight would be invisible and then overwritten).
 func heal_combatant(target: CombatantStats, amount: int) -> void:
 	if amount <= 0 or target.is_dead():
 		return
@@ -468,6 +470,9 @@ func heal_combatant(target: CombatantStats, amount: int) -> void:
 	if healed <= 0:
 		return
 	target.current_hp += healed
+	if target == player_stats:
+		Events.player_healed.emit(healed, target.current_hp)
+		return
 	for enemy in enemies:
 		if enemy.stats == target:
 			Events.enemy_healed.emit(enemy, healed, target.current_hp)
