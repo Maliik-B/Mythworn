@@ -55,6 +55,14 @@ static func _build_quest_pool() -> Array[RelicData]:
 		"The first attack you land each combat deals 6 bonus damage.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.NONE, 6))
+
+	# -- Reliquary event payoff relic. Granted by the "reliquary_won" beat after the chapel
+	#    beast falls (you refused to let the memory fade). Quest-only, so it never appears in
+	#    shops or reward rolls. A kept light = foresight; draws an extra card to open a fight.
+	pool.append(_relic("Vigil Candle",
+		"A vigil candle kept for someone who isn't coming back. Draw 1 additional card at the start of each combat.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.DRAW_CARDS, 1))
 	return pool
 
 

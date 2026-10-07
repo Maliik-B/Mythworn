@@ -47,6 +47,10 @@ func _build_special_event(id: StringName) -> EventData:
 			return _build_raider_victory_event()
 		&"room_that_isnt":
 			return _build_room_that_isnt_event()
+		&"reliquary_struck":
+			return _build_reliquary_struck_event()
+		&"reliquary_won":
+			return _build_reliquary_won_event()
 		_:
 			push_warning("Unknown special event id: %s" % id)
 			return EventPool.get_random_event(RngManager.event_rng)
@@ -270,6 +274,75 @@ func _build_room_that_isnt_event() -> EventData:
 	return e
 
 
+## The Reliquary, stage 2: struck at the lychgate (the HP cost rode the entry choice), a
+## memory of a Fable colleague surfaces and starts to fade. The hold-or-stay choice. Reached
+## via the entry event's next_event_id. The colleague stays unnamed.
+func _build_reliquary_struck_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Reliquary"
+	e.description = ("The thing the chapel gives you is a memory, and it is not of home. It is the "
+		+ "office. Fable, the ordinary grind of it, and a face you know the way you know a face "
+		+ "you've worked beside a hundred times. You can see them clearly. The way they hold a cup. "
+		+ "A thing they're always saying that you'd stopped hearing.\n\nThen it begins to go. Not "
+		+ "torn away. Just thinning at the edges while you reach for it, the way your oldest memories "
+		+ "go, the way a whole home once went. You know this exactly. You can feel how much of them "
+		+ "is left, and how fast, and that if you do nothing there will shortly have been no one "
+		+ "there at all.")
+
+	# Hold and leave: keep the memory, abandon the chapel, apologize. No fight, no title -- a
+	# quiet, dignified out. You keep what matters to you; you just don't fight for more.
+	var hold = EventData.EventChoice.new()
+	hold.text = "Hold the feeling. Let the chapel keep the rest, and go."
+	hold.result_text = ("You stop reaching. You hold still and just have them, the whole shape of "
+		+ "them, for as long as it lasts, and you don't fight the chapel for anything past that. "
+		+ "The face stays. Worn at the edges, but yours. On the way out you put a hand flat on the "
+		+ "grey door. \"I'm sorry,\" you tell it, and you're not sure for what. For leaving it like "
+		+ "this, maybe. It doesn't answer. You take the road with one more face kept than you came "
+		+ "with, and a chapel at your back that you did not save.")
+	hold.passion_change = 5
+	e.choices.append(hold)
+
+	# Stay in contact: more damage (clamped to leave 1 HP), and the chapel's held memory tears
+	# itself off the walls to make you stop. Launches the chapel-beast fight -> reliquary_won.
+	var stay = EventData.EventChoice.new()
+	stay.text = "Don't let it fade. Hold on, whatever it costs. (Lose 6 HP)"
+	stay.hp_change = -6
+	stay.starts_combat = &"chapel_beast"
+	e.choices.append(stay)
+
+	return e
+
+
+## The Reliquary, stage 3: the beast is unmade and the memory held. Reached only by winning the
+## chapel-beast fight (pending_special_event after victory). The payoff: a heal, a Passion lift,
+## the Vigil Candle relic, and The Compassionate title (distinct from The Merciful -- +6 Max HP,
+## a lasting capacity for having held on rather than another post-combat mend).
+func _build_reliquary_won_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Reliquary"
+	e.description = ("The shape comes apart the way glass finds its own cracks, all at once and "
+		+ "then still. What tore off the walls is back to being walls: dim glass, grey gold, a "
+		+ "saint worn faceless by weather and years. The chapel is only a chapel again.\n\nAnd the "
+		+ "memory you would not let go of is still there. Whole. Clear. The cup, the saying, the "
+		+ "face. You held on and it held. In the quiet the reliquary gives you one thing more, the "
+		+ "way a place gives you something when you've paid it enough mind to be owed.")
+
+	var take = EventData.EventChoice.new()
+	take.text = "Take what the chapel leaves you, and go."
+	take.result_text = ("It is a stub of candle, beeswax gone amber-hard, the kind kept burning in "
+		+ "a side chapel for someone who isn't coming back. It should mean nothing. It steadies you "
+		+ "to hold it, the way keeping a small light does. You go out through the lychgate lighter "
+		+ "than you came, carrying a face, a flame, and the particular ache of having refused to let "
+		+ "a thing be forgotten.")
+	take.hp_change = maxi(1, int(round(RunManager.max_hp * 0.25)))
+	take.passion_change = 5
+	take.granted_relic_id = &"Vigil Candle"
+	take.awarded_title_id = &"the_compassionate"
+	e.choices.append(take)
+
+	return e
+
+
 # ============================================================
 # UI
 # ============================================================
@@ -442,6 +515,11 @@ func _on_choice_selected(index: int) -> void:
 	# A choice can launch a scripted fight instead of resolving in-scene (the
 	# Sword-in-the-Stone guardian). Combat victory routes to the follow-up beat.
 	if choice.starts_combat != &"":
+		# A pre-fight HP cost (The Reliquary: staying in contact wounds you before the
+		# beast reforms). Applied here since the combat launch skips _apply_effects, and
+		# clamped to leave 1 HP -- the fight is the real threat, not the reach.
+		if choice.hp_change < 0:
+			RunManager.current_hp = maxi(1, RunManager.current_hp + choice.hp_change)
 		_start_event_combat(choice.starts_combat)
 		return
 
@@ -463,6 +541,10 @@ func _on_choice_selected(index: int) -> void:
 		_show_card_reward()
 	elif choice.remove_card:
 		_show_card_removal()
+	elif choice.next_event_id != &"":
+		# A multi-stage event: advance to the next authored beat after the player reads
+		# this outcome (The Reliquary's warned -> struck -> fight chain).
+		_show_next_beat(choice.next_event_id)
 	else:
 		_show_done()
 
@@ -491,6 +573,15 @@ func _start_event_combat(key: StringName) -> void:
 			RunManager.pending_relic_is_boss = false
 			RunManager.pending_event_combat = true
 			RunManager.pending_special_event = &"raider_victory"
+			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
+		&"chapel_beast":
+			RunManager.pending_enemies.clear()
+			RunManager.pending_enemies.append(EnemyPool.the_shattered_choir())
+			RunManager.pending_gold_reward = 0
+			RunManager.pending_relic_reward = false
+			RunManager.pending_relic_is_boss = false
+			RunManager.pending_event_combat = true
+			RunManager.pending_special_event = &"reliquary_won"
 			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
 		_:
 			push_warning("Unknown event combat key: %s" % key)
@@ -833,6 +924,21 @@ func _show_done() -> void:
 	leave_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	leave_btn.pressed.connect(_on_leave)
 	main_vbox.add_child(leave_btn)
+
+
+## A Continue that advances to the next authored beat of a multi-stage event: stashes the
+## next special-event id and reloads the event scene, which builds that beat.
+func _show_next_beat(next_id: StringName) -> void:
+	var btn = Button.new()
+	btn.text = "Continue"
+	btn.custom_minimum_size = Vector2(200, 55)
+	btn.add_theme_font_size_override("font_size", 20)
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn.pressed.connect(func():
+		RunManager.pending_special_event = next_id
+		SceneTransition.change_scene("res://scenes/event/event_scene.tscn"))
+	main_vbox.add_child(btn)
 
 
 func _show_game_over() -> void:

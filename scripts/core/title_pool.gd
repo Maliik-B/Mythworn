@@ -19,6 +19,7 @@ static func get_all_titles() -> Array[TitleData]:
 	titles.append(_build_outlander_of_camelot())
 	titles.append(_build_the_merciful())
 	titles.append(_build_the_calculating())
+	titles.append(_build_the_compassionate())
 	titles.append(_build_peoples_champion())
 	return titles
 
@@ -175,6 +176,26 @@ static func _build_the_calculating() -> TitleData:
 	t.original_value = 2
 
 	t.passive_effect = TitleData.EffectType.BLOCK_ON_TURN_START
+	t.passive_scales_with_tier = false
+	return t
+
+
+## Earned by refusing to let a memory fade -- winning the chapel-beast fight at The Reliquary.
+## Deliberately distinct from The Merciful (a post-combat heal): compassion here is a LASTING
+## capacity, so it grants bonus Max HP rather than a mend. A personality trait; never degrades.
+static func _build_the_compassionate() -> TitleData:
+	var t := TitleData.new()
+	t.title_id = &"the_compassionate"
+	t.category = TitleData.Category.PERSONALITY
+	t.origin_realm_id = &""
+	t.visual_style = RealmData.VisualStyle.NEUTRAL
+	t.accent_color = NEUTRAL_ACCENT
+
+	t.original_name = "The Compassionate"
+	t.original_description = "You would not let it be forgotten. +6 Max HP."
+	t.original_value = 6
+
+	t.passive_effect = TitleData.EffectType.MAX_HP_BONUS
 	t.passive_scales_with_tier = false
 	return t
 

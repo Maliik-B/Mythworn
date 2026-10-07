@@ -586,6 +586,33 @@ static func weald_raider(mult := 1.0) -> EnemyData:
 
 
 # ============================================================
+# CAMELOT EVENT FIGHT — The Reliquary's chapel beast
+# ============================================================
+
+## The Shattered Choir (mini-boss). What reforms off the reliquary's walls when you refuse to
+## let the memory fade: broken stained glass and relic-bone pulling together into a thing that
+## moves like a beast. A chosen, optional fight (The Reliquary event) with a strong reward, so
+## it's meatier than a regular. No new combat tech -- it layers a block-punishing shard torrent
+## (Raining Glass), a memory-eating drain (The Fade = Passion + Weak), and a reform that mends +
+## shields it (so you must out-throughput the sustain, echoing the Hollow Prelate on a smaller
+## scale). The reform does nothing at full HP, so it only bites once you've chipped it.
+static func the_shattered_choir(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		# The signature: a torrent of glass shards (multi-hit, so block is a partial answer).
+		_move("Raining Glass", EnemyMove.IntentType.ATTACK,
+			[_dmg_x(_scale(4, mult), 3)], 1.8),
+		# The memory-eater: drains Passion and lays Weak. Flat identity pressure, unscaled.
+		_move("The Fade", EnemyMove.IntentType.DEBUFF,
+			[_passion(-5), _status(StatusEffects.WEAK, 1)], 1.3, 2),
+		# Pulls itself back off the walls: mends + shields. Cooldown paces the sustain so you
+		# can out-race it with throughput rather than it healing every turn.
+		_move("Reform", EnemyMove.IntentType.BUFF,
+			[_self_heal(_scale(8, mult)), _block(_scale(6, mult))], 1.0, 2),
+	]
+	return _enemy("The Shattered Choir", _scale(70, mult), moves)
+
+
+# ============================================================
 # CAMELOT ACT-1 BOSS — Sir Caedmon, the Hollow Champion
 # ============================================================
 

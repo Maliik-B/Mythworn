@@ -22,6 +22,7 @@ static func _build_pool() -> Array[EventData]:
 	pool.append(_scriptorium())
 	pool.append(_the_tourney())
 	pool.append(_last_cart_out())
+	pool.append(_reliquary())
 
 	return pool
 
@@ -494,6 +495,45 @@ static func _peasants_plea() -> EventData:
 	e.choices.append(cc)
 	e.choices.append(c2)
 	e.choices.append(c3)
+	return e
+
+
+## The Reliquary (entry beat) -- the multi-stage memory event. Appears in the random rotation
+## like any event, but it unfolds: approaching is struck (the HP cost) and chains to the
+## fading-memory choice (reliquary_struck), which can launch the chapel-beast fight and pay off
+## in reliquary_won. Here the player is only warned: the chapel "takes a memory for every one
+## it gives". Camelot-flavored.
+static func _reliquary() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Reliquary"
+	e.description = ("A wayside chapel, small and old, the kind that holds one saint's relic and the "
+		+ "worn-smooth prayers of everyone who ever passed. The gold leaf on its door has gone the "
+		+ "grey of everything the chaos has touched. Someone has driven a stake into the ground at "
+		+ "the edge of the yard and tied a rag to it. You have learned what that means on a road "
+		+ "like this. No closer.\n\nAn old man working the hedge watches you weigh the door. \"They "
+		+ "go in to remember someone,\" he says, not stopping his shears. \"Comes of the chapel "
+		+ "being what it was. And they come out having lost something else for it, the ones that "
+		+ "come out. Takes a memory for every one it gives. Never did learn to trade fair.\"")
+
+	var approach = EventData.EventChoice.new()
+	approach.text = "Cross the yard to the door anyway. (Lose 6 HP)"
+	approach.result_text = ("You step past the stake and its rag, and the air at the lychgate goes "
+		+ "thick and close, like the pause before a church bell. Something strikes through you "
+		+ "before you reach the step. Not a blow you could have blocked. More like a hand closing "
+		+ "somewhere behind your ribs. You get a palm flat against the cold grey door and hold "
+		+ "there, and the chapel opens its one memory to you.")
+	approach.hp_change = -6
+	approach.next_event_id = &"reliquary_struck"
+	e.choices.append(approach)
+
+	var heed = EventData.EventChoice.new()
+	heed.text = "Heed the warning. Keep to the road."
+	heed.result_text = ("You leave the stake and its rag where they stand and walk on. The old man "
+		+ "nods to himself and goes back to his hedge, having said his piece to one more traveler "
+		+ "who had the sense to hear it. Whatever the chapel keeps, it keeps without you.")
+	heed.passion_change = 2
+	e.choices.append(heed)
+
 	return e
 
 

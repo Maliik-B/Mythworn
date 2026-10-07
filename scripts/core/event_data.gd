@@ -31,6 +31,11 @@ class EventChoice extends RefCounted:
 	## normally: event_scene sets up the encounter and routes to combat, and combat
 	## victory routes to the follow-up beat. Used by the Sword-in-the-Stone guardian.
 	var starts_combat: StringName = &""
+	## If non-empty, taking this choice CHAINS to another authored beat (a special event id)
+	## after its result text: the player reads the outcome, then a Continue advances to that
+	## next beat in the same scene flow. Lets one event unfold in stages (The Reliquary:
+	## warned -> struck -> the chapel beast). The choice's own effects still apply first.
+	var next_event_id: StringName = &""
 	## If non-empty, accepting this choice ARMS the cross-map questline with this id
 	## (RunManager.active_quest_id): the payoff node elsewhere on the map reveals and becomes
 	## the quest's payoff. Used by the raiders' plea. See MapNode quest fields + map_scene.

@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_scheduled_room()
 	_test_memory_cards()
 	_test_new_events()
+	_test_reliquary()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1031,6 +1032,64 @@ func _test_memory_cards() -> void:
 	_check("duplicate_card preserves the decay state (a copy keeps the current count)",
 		nc.duplicate_card().effects.any(func(e): return e is DrawEffect and e.value == 2))
 	deng.free()
+
+
+## The Reliquary (multi-stage memory event): the entry is in the random pool and chains into
+## the struck beat with an HP cost; the chapel-beast mini-boss builds; the Vigil Candle payoff
+## relic exists and stays out of reward rolls; and The Compassionate title is distinct from
+## The Merciful. The struck/won prose beats live in event_scene (verified by compile + live).
+func _test_reliquary() -> void:
+	var reliq: EventData = null
+	for ev in EventPool._build_pool():
+		if ev.event_name == "The Reliquary":
+			reliq = ev
+	var chains := false
+	var costs_hp := false
+	if reliq:
+		for ch in reliq.choices:
+			if ch.next_event_id == &"reliquary_struck":
+				chains = true
+				if ch.hp_change < 0:
+					costs_hp = true
+	_check("The Reliquary entry is in the pool and chains to the struck beat with an HP cost",
+		reliq != null and chains and costs_hp)
+
+	# The chapel beast mini-boss: a multi-hit torrent + a self-heal reform (the "off the walls").
+	var choir := EnemyPool.the_shattered_choir()
+	var has_glass := false
+	var has_reform_heal := false
+	for m in choir.moves:
+		if m.move_name == "Raining Glass":
+			for e in m.effects:
+				if e is DamageEffect and e.hits >= 3:
+					has_glass = true
+		if m.move_name == "Reform":
+			for e in m.effects:
+				if e is HealEffect and e.apply_to_source:
+					has_reform_heal = true
+	_check("The Shattered Choir has a multi-hit torrent + a self-heal reform",
+		choir.enemy_name == "The Shattered Choir" and has_glass and has_reform_heal)
+
+	# The Vigil Candle payoff relic (quest pool), and it never leaks into reward rolls.
+	var candle := RelicPool.get_relic_by_name("Vigil Candle")
+	_check("Vigil Candle draws an extra card at combat start",
+		candle != null and candle.trigger == RelicData.RelicTrigger.ON_COMBAT_START
+		and candle.effect == RelicData.RelicEffect.DRAW_CARDS)
+	var names := PackedStringArray()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	for i in 30:
+		for r in RelicPool.get_reward_choices(rng, 3):
+			names.append(r.relic_name)
+	_check("Vigil Candle stays out of reward rolls", "Vigil Candle" not in names)
+
+	# The Compassionate: a +6 Max HP personality title, mechanically distinct from The Merciful.
+	var comp := TitlePool.get_title(&"the_compassionate")
+	var merc := TitlePool.get_title(&"the_merciful")
+	_check("The Compassionate is a +6 Max HP personality title, distinct from The Merciful",
+		comp != null and comp.category == TitleData.Category.PERSONALITY
+		and comp.passive_effect == TitleData.EffectType.MAX_HP_BONUS and comp.original_value == 6
+		and merc != null and merc.passive_effect != comp.passive_effect)
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth
