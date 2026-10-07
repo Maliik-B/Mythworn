@@ -149,14 +149,12 @@ func get_generated_description() -> String:
 ## Vulnerable are folded into the damage brackets too.
 func get_modified_description(source: CombatantStats, target: CombatantStats = null) -> String:
 	var parts: PackedStringArray = []
-	# The zone multiplier is folded into damage brackets AND shown as a tag — but both only
-	# apply to attack damage, so compute it once and gate the tag on whether the card has a
-	# damage effect (a block/Strength/control skill is unaffected by the zone).
+	# The zone multiplier is folded into the damage brackets (the real post-zone number the
+	# hit will land for). No "[Zone Penalty/Bonus]" text tag: the zone is read VISUALLY from
+	# the card's school symbol + coin halo + the pole empower/grey treatment, which is the
+	# whole point of that icon work -- a text tag would just restate it and clutter the face.
 	var zm := CombatEngine.zone_multiplier(personality)
-	var has_damage := false
 	for effect in get_active_effects():
-		if effect is DamageEffect:
-			has_damage = true
 		var desc = effect.get_modified_description(source, target, zm)
 		if desc != "":
 			parts.append(desc)
@@ -167,9 +165,4 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 		text = description
 	if target_type == TargetType.ALL_ENEMIES:
 		text += " Hits all enemies."
-	if has_damage:
-		if zm < 1.0:
-			text += " [Zone Penalty: -%d%% dmg]" % roundi((1.0 - zm) * 100.0)
-		elif zm > 1.0:
-			text += " [Zone Bonus: +%d%% dmg]" % roundi((zm - 1.0) * 100.0)
 	return text
