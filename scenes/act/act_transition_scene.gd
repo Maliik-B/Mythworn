@@ -8,14 +8,18 @@ var _time := 0.0
 
 
 func _ready() -> void:
+	# Demo boundary: Camelot Act 1 is the whole demo. Beating Caedmon routes here instead of
+	# into the stubbed Act 2 (the enemy pool has no Act-2 content). Reaching act_transition
+	# already means a boss was beaten (pending_act_complete) and the crown decision is
+	# resolved, so the outcome is final. The demo-end scene owns the Act-1 Camelot wrap-up
+	# (including the people's-champion award below). Acts 2-3 + the final-victory path are
+	# untouched -- they need current_act >= 2 / >= MAX_ACTS, which never matches this guard.
+	if RunManager.current_act == 1 and RunManager.current_realm_id == &"camelot":
+		SceneTransition.change_scene("res://scenes/demo/demo_end_scene.tscn")
+		return
 	is_final_act = RunManager.current_act >= RunManager.MAX_ACTS
-	# A people's champion who never pulled Excalibur gets no crown decision to earn the title
-	# at, so recognize it here (the crown scene's refuse path covers Excalibur-holders). Taking
-	# the crown makes you king, not their champion, so Excalibur-holders are excluded.
-	if RunManager.current_act == 1 and RunManager.current_realm_id == &"camelot" \
-			and RunManager.is_peoples_champion() and not RunManager.has_excalibur() \
-			and not RunManager.has_abdicated:
-		RunManager.award_title(&"peoples_champion")
+	# (The Act-1 Camelot people's-champion award moved to demo_end_scene, which now owns that
+	# wrap-up; the demo gate above returns before this point for Act-1 Camelot.)
 	_build_ui()
 	if is_final_act:
 		AudioManager.play_music("victory")
