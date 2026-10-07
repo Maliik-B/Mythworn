@@ -27,9 +27,19 @@ var _seen_cutscenes: Dictionary = {}
 ## (the settings "toggle it back on" option). Persisted.
 var always_show_intro: bool = false
 
+## Persisted player settings. Music/SFX are linear 0-100 (applied to the audio buses);
+## fullscreen + screen_shake are the display/gameplay toggles. Loaded + applied at launch so
+## the player's choices survive a restart (previously they reset every session).
+var music_volume: float = 100.0
+var sfx_volume: float = 100.0
+var fullscreen: bool = false
+var screen_shake: bool = true
+
 
 func _ready() -> void:
 	load_profile()
+	apply_audio_settings()
+	apply_display_settings()
 
 
 func load_profile() -> void:
@@ -40,6 +50,10 @@ func load_profile() -> void:
 	for id in cfg.get_value(SECTION_CUTSCENES, "seen", PackedStringArray()):
 		_seen_cutscenes[StringName(id)] = true
 	always_show_intro = bool(cfg.get_value(SECTION_SETTINGS, "always_show_intro", false))
+	music_volume = float(cfg.get_value(SECTION_SETTINGS, "music_volume", 100.0))
+	sfx_volume = float(cfg.get_value(SECTION_SETTINGS, "sfx_volume", 100.0))
+	fullscreen = bool(cfg.get_value(SECTION_SETTINGS, "fullscreen", false))
+	screen_shake = bool(cfg.get_value(SECTION_SETTINGS, "screen_shake", true))
 
 
 func save_profile() -> void:
@@ -49,7 +63,67 @@ func save_profile() -> void:
 		seen.append(String(id))
 	cfg.set_value(SECTION_CUTSCENES, "seen", seen)
 	cfg.set_value(SECTION_SETTINGS, "always_show_intro", always_show_intro)
+	cfg.set_value(SECTION_SETTINGS, "music_volume", music_volume)
+	cfg.set_value(SECTION_SETTINGS, "sfx_volume", sfx_volume)
+	cfg.set_value(SECTION_SETTINGS, "fullscreen", fullscreen)
+	cfg.set_value(SECTION_SETTINGS, "screen_shake", screen_shake)
 	cfg.save(SAVE_PATH)
+
+
+# ============================================================
+# Settings application + setters (apply live AND persist)
+# ============================================================
+
+## Applies the stored music/SFX volumes to the audio buses. Called at launch and whenever
+## a volume changes, so the buses always match the persisted prefs.
+func apply_audio_settings() -> void:
+	_apply_bus_volume("Music", music_volume)
+	_apply_bus_volume("SFX", sfx_volume)
+
+
+## Applies the stored fullscreen choice to the window. Called at launch + on toggle.
+func apply_display_settings() -> void:
+	DisplayServer.window_set_mode(
+		DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+
+
+func _apply_bus_volume(bus_name: String, linear_value: float) -> void:
+	var idx := AudioServer.get_bus_index(bus_name)
+	if idx < 0:
+		return
+	if linear_value <= 0.0:
+		AudioServer.set_bus_mute(idx, true)
+	else:
+		AudioServer.set_bus_mute(idx, false)
+		AudioServer.set_bus_volume_db(idx, linear_to_db(linear_value / 100.0))
+
+
+func set_music_volume(v: float) -> void:
+	music_volume = clampf(v, 0.0, 100.0)
+	_apply_bus_volume("Music", music_volume)
+	save_profile()
+
+
+func set_sfx_volume(v: float) -> void:
+	sfx_volume = clampf(v, 0.0, 100.0)
+	_apply_bus_volume("SFX", sfx_volume)
+	save_profile()
+
+
+func set_fullscreen(enabled: bool) -> void:
+	if fullscreen == enabled:
+		return
+	fullscreen = enabled
+	apply_display_settings()
+	save_profile()
+
+
+## Gameplay toggle read by combat before it shakes the screen. Persisted so "off" sticks.
+func set_screen_shake(enabled: bool) -> void:
+	if screen_shake == enabled:
+		return
+	screen_shake = enabled
+	save_profile()
 
 
 ## True if the player has already seen the given one-time cutscene.

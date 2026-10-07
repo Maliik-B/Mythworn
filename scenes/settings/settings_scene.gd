@@ -1,7 +1,7 @@
 extends Control
-## Settings screen — adjust audio, display, and gameplay options.
-
-var shake_enabled: bool = true
+## Settings screen — adjust audio, display, and gameplay options. All four options
+## read from and write through ProfileManager, so they persist across launches and the
+## screen-shake toggle actually gates combat's shake (previously it only print()'d).
 
 var _music_slider: HSlider
 var _sfx_slider: HSlider
@@ -62,20 +62,19 @@ func _build_ui() -> void:
 	panel.add_child(content)
 
 	# Music Volume
-	_music_slider = _add_slider_row(content, "Music Volume", _get_bus_volume_linear("Music"))
+	_music_slider = _add_slider_row(content, "Music Volume", ProfileManager.music_volume)
 	_music_slider.value_changed.connect(_on_music_volume_changed)
 
 	# SFX Volume
-	_sfx_slider = _add_slider_row(content, "SFX Volume", _get_bus_volume_linear("SFX"))
+	_sfx_slider = _add_slider_row(content, "SFX Volume", ProfileManager.sfx_volume)
 	_sfx_slider.value_changed.connect(_on_sfx_volume_changed)
 
 	# Fullscreen
-	_fullscreen_check = _add_toggle_row(content, "Fullscreen",
-		DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN)
+	_fullscreen_check = _add_toggle_row(content, "Fullscreen", ProfileManager.fullscreen)
 	_fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 
 	# Screen Shake
-	_shake_check = _add_toggle_row(content, "Screen Shake", shake_enabled)
+	_shake_check = _add_toggle_row(content, "Screen Shake", ProfileManager.screen_shake)
 	_shake_check.toggled.connect(_on_shake_toggled)
 
 	# Always Show Intro — the Fable send-off introduction plays once per save by
@@ -185,55 +184,25 @@ func _add_toggle_row(parent: VBoxContainer, label_text: String, initial_value: b
 
 
 # ============================================================
-# Bus volume helpers
-# ============================================================
-
-func _get_bus_volume_linear(bus_name: String) -> float:
-	var bus_idx: int = AudioServer.get_bus_index(bus_name)
-	if bus_idx < 0:
-		return 100.0
-	if AudioServer.is_bus_mute(bus_idx):
-		return 0.0
-	var db_val: float = AudioServer.get_bus_volume_db(bus_idx)
-	# Convert dB back to linear 0-100
-	return clampf(db_to_linear(db_val) * 100.0, 0.0, 100.0)
-
-
-func _set_bus_volume(bus_name: String, linear_value: float) -> void:
-	var bus_idx: int = AudioServer.get_bus_index(bus_name)
-	if bus_idx < 0:
-		return
-	if linear_value <= 0.0:
-		AudioServer.set_bus_mute(bus_idx, true)
-	else:
-		AudioServer.set_bus_mute(bus_idx, false)
-		AudioServer.set_bus_volume_db(bus_idx, linear_to_db(linear_value / 100.0))
-
-
-# ============================================================
-# Signal callbacks
+# Signal callbacks — all route through ProfileManager (apply live + persist)
 # ============================================================
 
 func _on_music_volume_changed(value: float) -> void:
-	_set_bus_volume("Music", value)
+	ProfileManager.set_music_volume(value)
 
 
 func _on_sfx_volume_changed(value: float) -> void:
-	_set_bus_volume("SFX", value)
+	ProfileManager.set_sfx_volume(value)
 
 
 func _on_fullscreen_toggled(toggled_on: bool) -> void:
 	AudioManager.play_sfx("button_click")
-	if toggled_on:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	ProfileManager.set_fullscreen(toggled_on)
 
 
 func _on_shake_toggled(toggled_on: bool) -> void:
 	AudioManager.play_sfx("button_click")
-	shake_enabled = toggled_on
-	print("[Settings] Screen shake: ", "ON" if toggled_on else "OFF")
+	ProfileManager.set_screen_shake(toggled_on)
 
 
 func _on_intro_toggled(toggled_on: bool) -> void:

@@ -2449,6 +2449,10 @@ func _show_turn_banner(text: String, color: Color) -> void:
 func _screen_shake(intensity: float = 8.0, duration: float = 0.2) -> void:
 	if not _main_container:
 		return
+	# The settings "Screen Shake" toggle gates all shake (a real accessibility/comfort
+	# option now, not a dead print). Persisted via ProfileManager.
+	if not ProfileManager.screen_shake:
+		return
 	var base_pos = _main_container.position
 	var tween = create_tween()
 	var steps := 6
