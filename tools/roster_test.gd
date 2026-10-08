@@ -1095,8 +1095,9 @@ func _test_reliquary() -> void:
 
 
 ## The Oct-2026 title/relic reworks, end-to-end through the real engine:
-##  - The Compassionate (CLUTCH_HEAL): the first hit that leaves the player below half HP
-##    mends them once; a second drop that combat does not re-trigger it.
+##  - The Compassionate (CLUTCH_HEAL): the first hit that drops the player below half HP mends
+##    them once; it resolves before the lethal check, so a killing blow leaves them standing at
+##    8 HP (death-save), and a second drop that combat does not re-trigger it.
 ##  - Momentum (relic): each player hit on an enemy raises attack damage by 1 for the rest of
 ##    the turn (first hit +0, second +1), and the ramp resets at the start of the next turn.
 func _test_title_relic_reworks() -> void:
@@ -1115,6 +1116,16 @@ func _test_title_relic_reworks() -> void:
 	_check("the clutch heal fires only once per combat (28 -> 23, no re-heal)",
 		ceng.player_stats.current_hp == 23)
 	ceng.free()
+
+	# Death-save: resolved before the lethal check, an otherwise-killing first blow (HP floors
+	# at 0) leaves the player alive at the heal value (8) rather than dead.
+	var deng := CombatEngine.new()
+	add_child(deng)
+	deng.start_combat([], 50, 50, [_dummy_attacker()])
+	deng.deal_damage(deng.player_stats, 80, deng.enemies[0].stats)  # lethal: 50 -> 0 -> mend to 8
+	_check("The Compassionate catches a killing blow (survives at 8, not dead)",
+		deng.player_stats.current_hp == 8 and deng.phase != CombatEngine.Phase.BATTLE_LOST)
+	deng.free()
 	RunManager.equip_title(0, &"")
 	RunManager.earned_title_ids.erase(&"the_compassionate")
 

@@ -33,7 +33,8 @@ var _blooded_edge_pending: int = 0
 
 ## The Compassionate title: a one-per-combat clutch mend. _clutch_heal holds the HP to restore
 ## (0 unless the title is equipped), _clutch_used flags that this combat's save has fired. The
-## first player damage that drops them below half HP triggers it; it's a cushion, not a death-save.
+## first player damage that drops them below half HP triggers it, resolved BEFORE the lethal
+## check — and since HP floors at 0, it also pulls the player back from an otherwise-killing blow.
 var _clutch_heal: int = 0
 var _clutch_used: bool = false
 
@@ -598,16 +599,19 @@ func _reduce_status(stats: CombatantStats, effect: StatusEffectData) -> void:
 func _on_damage_dealt(target: CombatantStats, amount: int) -> void:
 	if target == player_stats:
 		Events.player_damaged.emit(amount, target.current_hp)
+		# The Compassionate (title): the first blow each combat that drops the player below half
+		# HP triggers a clutch mend. Resolved BEFORE the lethal check, and HP floors at 0, so it
+		# also catches an otherwise-killing blow — the player is left standing at _clutch_heal HP.
+		# Healed inline (not via heal_combatant, whose dead-guard would refuse a 0-HP revive).
+		if _clutch_heal > 0 and not _clutch_used and target.current_hp < target.max_hp / 2:
+			_clutch_used = true
+			var mended := mini(_clutch_heal, player_stats.max_hp - player_stats.current_hp)
+			if mended > 0:
+				player_stats.current_hp += mended
+				Events.player_healed.emit(mended, player_stats.current_hp)
 		if target.is_dead():
 			phase = Phase.BATTLE_LOST
 			Events.combat_lost.emit()
-		# The Compassionate (title): the first hit this combat that leaves the player standing
-		# but below half HP mends them once. A cushion, not a death-save — the lethal branch
-		# above already resolved, so a killing blow never triggers it.
-		elif _clutch_heal > 0 and not _clutch_used \
-				and target.current_hp > 0 and target.current_hp < target.max_hp / 2:
-			_clutch_used = true
-			heal_combatant(player_stats, _clutch_heal)
 	else:
 		for enemy in enemies:
 			if enemy.stats == target:
