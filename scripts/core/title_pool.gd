@@ -181,8 +181,9 @@ static func _build_the_calculating() -> TitleData:
 
 
 ## Earned by refusing to let a memory fade -- winning the chapel-beast fight at The Reliquary.
-## Deliberately distinct from The Merciful (a post-combat heal): compassion here is a LASTING
-## capacity, so it grants bonus Max HP rather than a mend. A personality trait; never degrades.
+## Deliberately distinct from The Merciful (a post-combat heal): compassion here is a CLUTCH
+## mend -- the first time a fight drives you below half HP, it catches you. A personality trait;
+## never degrades.
 static func _build_the_compassionate() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"the_compassionate"
@@ -192,10 +193,10 @@ static func _build_the_compassionate() -> TitleData:
 	t.accent_color = NEUTRAL_ACCENT
 
 	t.original_name = "The Compassionate"
-	t.original_description = "You would not let it be forgotten. +6 Max HP."
-	t.original_value = 6
+	t.original_description = "The first time you would drop below half HP each combat, heal 8."
+	t.original_value = 8
 
-	t.passive_effect = TitleData.EffectType.MAX_HP_BONUS
+	t.passive_effect = TitleData.EffectType.CLUTCH_HEAL
 	t.passive_scales_with_tier = false
 	return t
 

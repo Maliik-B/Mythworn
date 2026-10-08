@@ -31,6 +31,18 @@ var _current_x: int = 0
 ## card-dealt damage instance, then 0 for the rest of the fight. 0 when the relic isn't held.
 var _blooded_edge_pending: int = 0
 
+## The Compassionate title: a one-per-combat clutch mend. _clutch_heal holds the HP to restore
+## (0 unless the title is equipped), _clutch_used flags that this combat's save has fired. The
+## first player damage that drops them below half HP triggers it; it's a cushion, not a death-save.
+var _clutch_heal: int = 0
+var _clutch_used: bool = false
+
+## Momentum relic: a within-turn damage ramp. _momentum_per_hit is the per-hit bonus from the
+## relic's value (0 unless held); _momentum is the bonus accrued so far THIS turn, added to each
+## player attack and reset at the start of every player turn. Read directly, like Blooded Edge.
+var _momentum: int = 0
+var _momentum_per_hit: int = 0
+
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
 ## synchronously. The balance harness (tools/combat_harness) sets this so it can
 ## run thousands of trials against the REAL engine without waiting real seconds.
@@ -75,6 +87,13 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	# Blooded Edge: prime the first-attack bonus from the relic's tunable value (0 if unheld).
 	var blooded := RunManager.get_relic("Blooded Edge")
 	_blooded_edge_pending = blooded.value if blooded else 0
+	# The Compassionate: arm the once-per-combat clutch heal from the equipped title (0 if unworn).
+	_clutch_heal = RunManager.get_title_passive_total(TitleData.EffectType.CLUTCH_HEAL)
+	_clutch_used = false
+	# Momentum: prime the per-hit ramp from the relic (0 if unheld); the accrued bonus starts empty.
+	var mom := RunManager.get_relic("Momentum")
+	_momentum_per_hit = mom.value if mom else 0
+	_momentum = 0
 	_arm_be_the_king(player_hp)
 	# Whiplash power listens on tier crossings for the fight; no-op unless the player
 	# actually holds Whiplash (checked in the handler). Disconnected at combat end.
@@ -167,6 +186,7 @@ func start_player_turn() -> void:
 	phase = Phase.PLAYER_TURN_START
 
 	energy = MAX_ENERGY
+	_momentum = 0  # Momentum relic: the within-turn damage ramp resets each player turn.
 	player_stats.reset_block()
 	tick_start_of_turn(player_stats)
 
@@ -401,8 +421,11 @@ func deal_damage(target: CombatantStats, base_amount: int,
 
 	# Title damage bonus: flat damage added to all player attacks (not enemies).
 	# Applied before zone penalty so the penalty scales the boosted total uniformly.
+	# Momentum (relic) rides the same block: the bonus accrued earlier this turn is added here,
+	# so it scales under zones like the title bonus. _momentum is 0 on the turn's first hit.
 	if source == player_stats:
 		amount += RunManager.get_title_passive_total(TitleData.EffectType.DAMAGE_BONUS_FLAT)
+		amount += _momentum
 
 	# Blooded Edge: the first attack damage the player lands this combat hits harder. Gated
 	# on _current_card so only a played card's hit spends it (not a poison tick or lash), and
@@ -439,6 +462,12 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	else:
 		actual = target.take_damage(amount)
 	_on_damage_dealt(target, actual)
+
+	# Momentum: each hit the player lands on an enemy builds the ramp for the REST of this turn.
+	# Added after the hit resolves, so the first hit is +0 and each subsequent hit climbs — a
+	# multi-hit card ramps mid-combo. Gated to the player striking an enemy; reset each turn.
+	if _momentum_per_hit > 0 and source == player_stats and target != player_stats:
+		_momentum += _momentum_per_hit
 
 	# Enraged: a struck combatant strikes its attacker back for its Enraged stacks.
 	# Ignores block (a raw lash) and fires per hit, so multi-hit bursts cost more — the
@@ -572,6 +601,13 @@ func _on_damage_dealt(target: CombatantStats, amount: int) -> void:
 		if target.is_dead():
 			phase = Phase.BATTLE_LOST
 			Events.combat_lost.emit()
+		# The Compassionate (title): the first hit this combat that leaves the player standing
+		# but below half HP mends them once. A cushion, not a death-save — the lethal branch
+		# above already resolved, so a killing blow never triggers it.
+		elif _clutch_heal > 0 and not _clutch_used \
+				and target.current_hp > 0 and target.current_hp < target.max_hp / 2:
+			_clutch_used = true
+			heal_combatant(player_stats, _clutch_heal)
 	else:
 		for enemy in enemies:
 			if enemy.stats == target:

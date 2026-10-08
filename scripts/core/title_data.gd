@@ -28,6 +28,7 @@ enum EffectType {
 	MAX_HP_BONUS,           # value = bonus max HP while equipped
 	GOLD_ON_COMBAT_END,     # value = bonus gold awarded after each combat
 	HEAL_ON_COMBAT_END,     # value = HP healed after each combat
+	CLUTCH_HEAL,            # value = HP healed the first time you drop below half HP in a combat
 }
 
 @export var title_id: StringName = &""

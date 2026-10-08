@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_memory_cards()
 	_test_new_events()
 	_test_reliquary()
+	_test_title_relic_reworks()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1083,13 +1084,65 @@ func _test_reliquary() -> void:
 			names.append(r.relic_name)
 	_check("Vigil Candle stays out of reward rolls", "Vigil Candle" not in names)
 
-	# The Compassionate: a +6 Max HP personality title, mechanically distinct from The Merciful.
+	# The Compassionate: a clutch-heal personality title (value 8), mechanically distinct from
+	# The Merciful's post-combat heal.
 	var comp := TitlePool.get_title(&"the_compassionate")
 	var merc := TitlePool.get_title(&"the_merciful")
-	_check("The Compassionate is a +6 Max HP personality title, distinct from The Merciful",
+	_check("The Compassionate is a CLUTCH_HEAL personality title (8), distinct from The Merciful",
 		comp != null and comp.category == TitleData.Category.PERSONALITY
-		and comp.passive_effect == TitleData.EffectType.MAX_HP_BONUS and comp.original_value == 6
+		and comp.passive_effect == TitleData.EffectType.CLUTCH_HEAL and comp.original_value == 8
 		and merc != null and merc.passive_effect != comp.passive_effect)
+
+
+## The Oct-2026 title/relic reworks, end-to-end through the real engine:
+##  - The Compassionate (CLUTCH_HEAL): the first hit that leaves the player below half HP
+##    mends them once; a second drop that combat does not re-trigger it.
+##  - Momentum (relic): each player hit on an enemy raises attack damage by 1 for the rest of
+##    the turn (first hit +0, second +1), and the ramp resets at the start of the next turn.
+func _test_title_relic_reworks() -> void:
+	# --- The Compassionate clutch heal ---
+	RunManager.award_title(&"the_compassionate")
+	RunManager.equip_title(0, &"the_compassionate")
+	var ceng := CombatEngine.new()
+	add_child(ceng)
+	ceng.start_combat([], 50, 50, [_dummy_attacker()])  # full 50/50, half = 25
+	# Drop below half: 50 -> 20, which is under 25, so the clutch mend fires once (+8 -> 28).
+	ceng.deal_damage(ceng.player_stats, 30, ceng.enemies[0].stats)
+	_check("The Compassionate mends once on the first drop below half HP (20 -> 28)",
+		ceng.player_stats.current_hp == 28)
+	# A second drop below half the same combat does NOT re-trigger (28 -> 23, no heal).
+	ceng.deal_damage(ceng.player_stats, 5, ceng.enemies[0].stats)
+	_check("the clutch heal fires only once per combat (28 -> 23, no re-heal)",
+		ceng.player_stats.current_hp == 23)
+	ceng.free()
+	RunManager.equip_title(0, &"")
+	RunManager.earned_title_ids.erase(&"the_compassionate")
+
+	# --- Momentum relic ramp ---
+	var mom := RelicPool.get_relic_by_name("Momentum")
+	_check("Momentum is a RARE relic (value 1)",
+		mom != null and mom.rarity == RelicData.RelicRarity.RARE and mom.value == 1)
+	RunManager.relics.clear()
+	RunManager.add_relic(mom)
+	var meng := CombatEngine.new()
+	add_child(meng)
+	meng.start_combat([], 50, 50, [_dummy_attacker()])  # 100-HP dummy, 0 block
+	var dummy := meng.enemies[0].stats
+	var hp_before := dummy.current_hp
+	meng.deal_damage(dummy, 5, meng.player_stats)  # 1st hit: +0 momentum -> 5
+	var after_first := dummy.current_hp
+	meng.deal_damage(dummy, 5, meng.player_stats)  # 2nd hit: +1 momentum -> 6
+	var after_second := dummy.current_hp
+	_check("Momentum's 2nd hit deals 1 more than the 1st (5 then 6)",
+		hp_before - after_first == 5 and after_first - after_second == 6)
+	# The ramp resets at the start of the next player turn (back to a 5-damage first hit).
+	meng.start_player_turn()
+	var hp_turn2 := dummy.current_hp
+	meng.deal_damage(dummy, 5, meng.player_stats)
+	_check("Momentum resets each turn (first hit of the new turn deals 5 again)",
+		hp_turn2 - dummy.current_hp == 5)
+	meng.free()
+	RunManager.relics.clear()
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth

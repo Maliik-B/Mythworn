@@ -214,6 +214,14 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_STRENGTH, 1))
 
+	# Momentum: a within-turn ramp. CombatEngine reads this relic directly (NONE effect, like
+	# Blooded Edge) -- each hit you land on an enemy raises your attack damage by `value` for
+	# the rest of the turn, reset at the start of your next turn. Rewards multi-hit chains.
+	pool.append(_relic("Momentum",
+		"During your turn, each hit you land on an enemy gives your attacks +1 damage until your turn ends.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.NONE, 1))
+
 	# -- BOSS --
 	pool.append(_relic("Sanguine Tome", "Heal 12 HP after each combat.",
 		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_COMBAT_END,
