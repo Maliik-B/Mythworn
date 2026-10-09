@@ -54,6 +54,8 @@ func _report_regulars() -> void:
 		["Siege Golem (solo)", ["golem"]],
 		["Golem + Conspirator", ["golem", "conspirator"]],
 		["Knight + Shade", ["knight", "shade"]],
+		["Rotting Knight (solo)", ["rotting"]],
+		["Rotting Knight + Shade", ["rotting", "shade"]],
 	]:
 		_bar(row[0], _run(deck, row[1], 0, false))
 
@@ -248,6 +250,7 @@ func _build_enemies(keys: Array) -> Array[EnemyData]:
 			"conspirator": out.append(EnemyPool.court_conspirator())
 			"golem": out.append(EnemyPool.siege_golem())
 			"shade": out.append(EnemyPool.realm_shade())
+			"rotting": out.append(EnemyPool.rotting_knight())
 			"champion": out.append(EnemyPool.champion_of_the_usurper())
 			"prophet": out.append(EnemyPool.false_prophet())
 			"caedmon": out.append(EnemyPool.sir_caedmon())

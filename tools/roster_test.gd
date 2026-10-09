@@ -501,12 +501,12 @@ func _test_content_enemies() -> void:
 	reng.start_combat([], 50, 50, [EnemyPool.rotting_knight()])
 	_move_by_name(rot, "Miasma").effects[0].apply(
 		reng.enemies[0].stats, reng.player_stats, reng)
-	_check("Miasma puts 3 Poison on the player",
-		reng.player_stats.get_status_stacks(StatusEffects.POISON) == 3)
+	_check("Miasma puts 5 Poison on the player (front-loaded rework)",
+		reng.player_stats.get_status_stacks(StatusEffects.POISON) == 5)
 	reng.tick_start_of_turn(reng.player_stats)
-	_check("Poison bleeds through on tick (HP -3, Poison 3 -> 2)",
-		reng.player_stats.current_hp == 47
-		and reng.player_stats.get_status_stacks(StatusEffects.POISON) == 2)
+	_check("Poison bleeds through on tick (HP -5, Poison 5 -> 4)",
+		reng.player_stats.current_hp == 45
+		and reng.player_stats.get_status_stacks(StatusEffects.POISON) == 4)
 	reng.free()
 
 	# Hollow Prelate: the self-heal mends it (clamped to max) and fires enemy_healed; a heal

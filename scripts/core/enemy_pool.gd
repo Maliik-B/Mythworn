@@ -430,10 +430,11 @@ static func rotting_knight(mult := 1.0) -> EnemyData:
 		# Festering strike: damage that also leaves Poison. Cooldown paces the stacking so
 		# it climbs as a rhythm rather than spiking out of a fresh deck's reach.
 		_move("Festering Cut", EnemyMove.IntentType.ATTACK_DEBUFF,
-			[_dmg(_scale(6, mult)), _status(StatusEffects.POISON, 2)], 1.4, 2),
-		# Pure poison application — the pressure that bleeds through any amount of block.
+			[_dmg(_scale(6, mult)), _status(StatusEffects.POISON, 3)], 1.4, 2),
+		# Pure poison application — a front-loaded miasma that bleeds hardest the turn it lands
+		# (dmg = stacks, −1/turn) and bypasses block entirely. The timer you have to race.
 		_move("Miasma", EnemyMove.IntentType.DEBUFF,
-			[_status(StatusEffects.POISON, 3)], 1.1, 2),
+			[_status(StatusEffects.POISON, 5)], 1.1, 2),
 	]
 	return _enemy("Rotting Knight", _scale(44, mult), moves)
 
