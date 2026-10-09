@@ -283,11 +283,12 @@ static func _build_generic_pool() -> Array[CardData]:
 
 	# Poisoned Fang: the generic damage-DoT. Poison is now Chilled's clear opposite — raw
 	# front-loaded bleed that fades (dmg = stacks, −1/turn), not Water's freeze gauge. A big
-	# 6-stack hit bites hardest the turn it lands and tapers, rewarding racing the fight. (The
-	# +2 Passion lean is unchanged for now; poison's pole identity is a separate open question.)
+	# 6-stack hit bites hardest the turn it lands and tapers, rewarding racing the fight. NEUTRAL
+	# Passion lean (no push): the old +2 came from the dead "poison = Water" rationale; poison no
+	# longer ties to a pole, so playing it doesn't move your Passion either way.
 	pool.append(_card("Poisoned Fang", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
-		[_damage(3), _status(StatusEffects.POISON, 6), _passion(2)]))
+		[_damage(3), _status(StatusEffects.POISON, 6)]))
 
 	# Armor Break: applies Vulnerable → −2 (Vuln is Physical's big-hit enabler now).
 	pool.append(_card("Armor Break", 1, CardData.CardType.ATTACK,
