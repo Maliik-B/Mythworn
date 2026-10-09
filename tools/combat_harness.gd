@@ -285,7 +285,10 @@ func _mid_deck() -> Array[CardData]:
 	# borrows Physical's turf). Undertow exercises the debuff/soak lane; Maelstrom is now
 	# the X-cost torrent so it also exercises the new X path; Cascade (content pass #2) is
 	# the y≥3 multi a committed Water player would draft, so the boss is tuned against it.
-	for name in ["Tidal Strike", "Chillbrand", "Maelstrom", "Undertow", "Deep Freeze", "Cascade"]:
+	# Creeping Tide is the common Chilled SEED — included so the harness exercises the full
+	# freeze line (Creeping Tide + the Cascade/Deep Freeze riders stacking toward a freeze).
+	for name in ["Tidal Strike", "Chillbrand", "Maelstrom", "Undertow", "Deep Freeze", "Cascade",
+			"Creeping Tide"]:
 		var c := _find(prim, name)
 		if c != null:
 			d.append(c)

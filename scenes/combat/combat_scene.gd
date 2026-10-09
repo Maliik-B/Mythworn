@@ -1955,6 +1955,7 @@ func _refresh_ui() -> void:
 const STATUS_ICONS := {
 	"Poison": "☠",
 	"Frozen": "❄",
+	"Chilled": "❅",
 }
 
 

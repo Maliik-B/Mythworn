@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_profile_intro()
 	_test_boss_reward()
 	await _test_frozen_skips()
+	await _test_chilled_freeze()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -1366,6 +1367,80 @@ func _test_frozen_skips() -> void:
 		eng.player_stats.current_hp == hp_before
 		and not enemy_state.stats.has_status(StatusEffects.STUN))
 	eng.free()
+
+
+## Chilled (Cairn's signature Water DoT): a freeze-gauge DoT that resolves at the afflicted's
+## turn-END — flat chip + either a melt (below threshold) or a convert-to-Frozen (at threshold,
+## spending all the chill). Enemy turns run with instant=true so the pacing timers are skipped.
+func _test_chilled_freeze() -> void:
+	_check("Chilled status is registered", StatusEffects.CHILLED != null)
+	_check("Chilled and Poison are distinct effects (the two DoTs stay orthogonal)",
+		StatusEffects.CHILLED != StatusEffects.POISON)
+
+	# Creeping Tide is now the Chilled SEED (was Poison); Poisoned Fang stays the generic
+	# Poison card so the two DoTs live on different cards.
+	var prim := CardPool.build_emo_primary_pool()
+	var creeping := _card_by_name(prim, "Creeping Tide")
+	var creeping_chills := false
+	if creeping:
+		for e in creeping.effects:
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.CHILLED:
+				creeping_chills = true
+	_check("Creeping Tide seeds Chilled (no longer Poison)", creeping != null and creeping_chills)
+	var gen := CardPool._build_generic_pool()
+	var fang := _card_by_name(gen, "Poisoned Fang")
+	var fang_poisons := false
+	if fang:
+		for e in fang.effects:
+			if e is StatusApplyEffect and e.status_effect == StatusEffects.POISON:
+				fang_poisons = true
+	_check("Poisoned Fang still applies Poison (Chilled didn't swallow Poison)",
+		fang != null and fang_poisons)
+
+	# Below threshold: the chip lands flat and the gauge melts by 1.
+	var meng := CombatEngine.new()
+	add_child(meng)
+	meng.instant = true
+	meng.start_combat([], 50, 50, [_dummy_attacker()])
+	var men := meng.enemies[0]
+	meng.apply_status_effect(men.stats, StatusEffects.CHILLED, 5)
+	var ehp := men.stats.current_hp
+	await meng.start_enemy_turn()
+	_check("below threshold: Chilled chips a flat %d and melts 1 (5 -> 4)" % CombatEngine.CHILL_CHIP,
+		men.stats.current_hp == ehp - CombatEngine.CHILL_CHIP
+		and men.stats.get_status_stacks(StatusEffects.CHILLED) == 4)
+	meng.free()
+
+	# At threshold: the chill converts to Frozen, clears to 0, and the enemy skips its NEXT turn.
+	var feng := CombatEngine.new()
+	add_child(feng)
+	feng.instant = true
+	feng.start_combat([], 50, 50, [_dummy_attacker()])
+	var fen := feng.enemies[0]
+	feng.apply_status_effect(fen.stats, StatusEffects.CHILLED, CombatEngine.CHILL_FREEZE_THRESHOLD)
+	await feng.start_enemy_turn()  # enemy acts, then the chill converts at its turn-end
+	_check("at threshold: Chilled converts to Frozen and clears the chill",
+		fen.stats.has_status(StatusEffects.STUN)
+		and not fen.stats.has_status(StatusEffects.CHILLED))
+	var php := feng.player_stats.current_hp
+	await feng.start_enemy_turn()  # now Frozen -> the enemy forfeits its action
+	_check("the frozen-by-chill enemy skips its next turn (no player damage) then thaws",
+		feng.player_stats.current_hp == php
+		and not fen.stats.has_status(StatusEffects.STUN))
+	feng.free()
+
+	# Poison still ticks in its own lane (start-of-turn), independent of Chilled — a combatant
+	# can carry both at once. (The HP-per-tick bleed itself is covered in _test_content_enemies.)
+	var peng := CombatEngine.new()
+	add_child(peng)
+	peng.start_combat([], 50, 50, [_dummy_attacker()])
+	peng.player_stats.apply_status(StatusEffects.POISON, 3)
+	peng.player_stats.apply_status(StatusEffects.CHILLED, 2)
+	peng.tick_start_of_turn(peng.player_stats)
+	_check("Poison ticks at start-of-turn while Chilled (Poison 3 -> 2, Chilled untouched)",
+		peng.player_stats.get_status_stacks(StatusEffects.POISON) == 2
+		and peng.player_stats.get_status_stacks(StatusEffects.CHILLED) == 2)
+	peng.free()
 
 
 ## A minimal enemy whose only move is a guaranteed 20-damage attack — so a skipped

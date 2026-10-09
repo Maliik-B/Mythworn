@@ -416,13 +416,15 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	ripple.flavor_text = "One motion outward, and the whole room feels it."
 	pool.append(ripple)
 
-	# Creeping Tide replaces the old Mistveil (a plain 9-Block card that lived on
-	# Physical's turf). Water's answer to a skill slot is a damage-over-time seed, not a
-	# wall: it rewards racing / stalling with control rather than turtling.
+	# Creeping Tide is the Chilled SEED — the common that opens Cairn's signature freeze line.
+	# Water's skill slot isn't a wall; it lays Chilled, the freeze-gauge DoT that chips a little
+	# each turn and locks the enemy out once it builds. Distinct from Poison (raw ramp damage):
+	# this is the control lane. Reaching the freeze wants more than one application a turn, so it
+	# stacks across Creeping Tide + the Cascade/Deep Freeze riders rather than solo.
 	var creeping := _pcard("Creeping Tide", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		CardData.PersonalityType.PRIMARY,
-		[_status(StatusEffects.POISON, 4), _passion(3)])
+		[_status(StatusEffects.CHILLED, 5), _passion(3)])
 	creeping.flavor_text = "It gets into everything. You only notice once it's everywhere."
 	pool.append(creeping)
 
@@ -456,22 +458,26 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	# it's the natural home for the Overflow power (Blazing → an extra strike per stack) and
 	# scales with per-hit reach rather than one big number. Distinct from Physical's 2-hit:
 	# Water's multi is higher-count and rides Overflow, never Strength (Water has no Strength).
+	# Also lays a small chunk of Chilled, so a damage turn still feeds the freeze gauge.
 	var cascade := _pcard("Cascade", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.PRIMARY,
-		[_damage(4, 3), _passion(4)])
+		[_damage(4, 3), _status(StatusEffects.CHILLED, 3), _passion(4)])
 	cascade.flavor_text = "It falls in stages — each wave a little heavier than the last."
 	pool.append(cascade)
 
 	# -- RARE --
-	# Deep Freeze is Water's control climax: skip their turn (Frozen) + soften the turn
-	# after (Weak). Its old Vulnerable rider was the ONE Vulnerable leak on the Water pole —
-	# swapped to Weak (content pass #2) so Vulnerable is now exclusively Physical's enabler
-	# and the two poles' debuff kits stay orthogonal (Water controls, Physical exposes).
+	# Deep Freeze is Water's control climax: skip their turn (Frozen) now + soften the turn
+	# after (Weak), and lay a chunk of Chilled so the freeze-gauge is already well along when
+	# the instant Frozen thaws — the chill can re-lock them. Its old Vulnerable rider was the
+	# ONE Vulnerable leak on the Water pole — swapped to Weak (content pass #2) so Vulnerable is
+	# exclusively Physical's enabler and the poles' debuff kits stay orthogonal (Water controls,
+	# Physical exposes).
 	var deep_freeze := _pcard("Deep Freeze", 2, CardData.CardType.SKILL,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
 		CardData.PersonalityType.PRIMARY,
-		[_status(StatusEffects.STUN, 1), _status(StatusEffects.WEAK, 2), _passion(6)])
+		[_status(StatusEffects.STUN, 1), _status(StatusEffects.WEAK, 2),
+			_status(StatusEffects.CHILLED, 4), _passion(6)])
 	deep_freeze.flavor_text = "For one long breath, the world stops moving. So does the enemy."
 	pool.append(deep_freeze)
 

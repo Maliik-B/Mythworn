@@ -16,6 +16,13 @@ enum Phase {
 const HAND_SIZE := 5
 const MAX_ENERGY := 3
 
+## Chilled (Cairn's signature Water DoT) tuning. CHILL_CHIP is the FLAT end-of-turn damage
+## (not per-stack — the stacks are a freeze gauge, not a damage scale). Once stacks reach
+## CHILL_FREEZE_THRESHOLD the chill converts to Frozen and is spent. Starting values; tune
+## against tools/combat_harness alongside the per-card Chilled numbers in card_pool.
+const CHILL_CHIP := 2
+const CHILL_FREEZE_THRESHOLD := 10
+
 var phase: Phase = Phase.PLAYER_TURN_START
 var energy: int = MAX_ENERGY
 var turn_number: int = 0
@@ -287,11 +294,13 @@ func start_enemy_turn() -> void:
 			_reduce_status(enemy.stats, StatusEffects.STUN)
 			Events.enemy_stunned.emit(enemy)
 			await _pace(0.5)
+			resolve_chilled(enemy.stats)              # the chill still bites through a skipped turn
 			tick_end_of_turn(enemy.stats)
 			continue
 		Events.enemy_action_started.emit(enemy, enemy.current_intent)
 		await _pace(0.35)                             # anticipation / wind-up
 		execute_enemy_turn(enemy)                     # effect lands (damage flash/shake here)
+		resolve_chilled(enemy.stats)                  # Chilled ticks/freezes at the enemy's turn-end
 		tick_end_of_turn(enemy.stats)
 		await _pace(0.45)                             # let the hit read before the next enemy
 		if player_stats.is_dead():
@@ -585,6 +594,32 @@ func tick_end_of_turn(stats: CombatantStats) -> void:
 	_reduce_status(stats, StatusEffects.WEAK)
 	_reduce_status(stats, StatusEffects.INTANGIBLE)
 	_reduce_status(stats, StatusEffects.DEXTERITY)  # Poise: a temporary composure that fades
+
+
+## Chilled (Cairn's signature Water DoT) resolves at the END of the afflicted's turn:
+## a small FLAT chip, then EITHER a freeze (when the chill has built to the threshold —
+## spending all of it, so it reads as a freeze gauge rather than a damage scale) OR a
+## one-stack melt. Call this just before tick_end_of_turn for whoever's turn is ending so
+## the chip honours Intangible (still present pre-decay), matching the Poison tick. Applying
+## Frozen at turn-end lets the start-of-turn STUN check skip the afflicted's NEXT turn. The
+## freeze routes through apply_status_effect so Water's control-heal fires, like Deep Freeze.
+func resolve_chilled(stats: CombatantStats) -> void:
+	if not stats.has_status(StatusEffects.CHILLED):
+		return
+	var dmg := CHILL_CHIP
+	# Intangible reduces the chip to 1, matching the Poison tick's STS semantics.
+	if stats.has_status(StatusEffects.INTANGIBLE) and dmg > 0:
+		dmg = 1
+	stats.take_direct_damage(dmg)
+	_on_damage_dealt(stats, dmg)
+	if stats.is_dead():
+		return
+	if stats.get_status_stacks(StatusEffects.CHILLED) >= CHILL_FREEZE_THRESHOLD:
+		apply_status_effect(stats, StatusEffects.STUN, 1)
+		stats.remove_status(StatusEffects.CHILLED)
+		Events.status_removed.emit(stats, StatusEffects.CHILLED)
+	else:
+		_reduce_status(stats, StatusEffects.CHILLED)
 
 
 func _reduce_status(stats: CombatantStats, effect: StatusEffectData) -> void:

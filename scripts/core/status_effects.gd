@@ -9,6 +9,7 @@ static var POISON: StatusEffectData
 static var DEXTERITY: StatusEffectData
 static var INTANGIBLE: StatusEffectData
 static var STUN: StatusEffectData
+static var CHILLED: StatusEffectData
 static var ENRAGED: StatusEffectData
 static var ZEALOTRY: StatusEffectData
 
@@ -33,6 +34,12 @@ static func _static_init() -> void:
 	# same turn refreshes rather than stacking into a multi-turn lock.
 	STUN = _make("Frozen", "Skips their next turn.", false,
 		StatusEffectData.StackType.DURATION, StatusEffectData.Decay.TEMPORARY)
+	# Chilled: Cairn's signature Water DoT. The stack count is a FREEZE GAUGE, not a damage
+	# scale — at the end of its turn it takes a small FLAT chip and either freezes (at the
+	# threshold, spending all the chill) or melts by 1. PERSISTS so the generic end-of-turn
+	# decay never touches it; resolve_chilled() is the one place it ticks (avoids double-decay).
+	CHILLED = _make("Chilled", "At the end of its turn: takes 2 damage and loses 1 Chilled. At 10, it freezes (skips a turn) and the chill is spent.", false,
+		StatusEffectData.StackType.INTENSITY, StatusEffectData.Decay.PERSISTS)
 	# Enraged: a retaliation buff. When the owner takes attack damage, it strikes the
 	# attacker back for `stacks`. Pace-independent, so it makes even a burst-kill cost HP.
 	ENRAGED = _make("Enraged", "Strikes back at attackers for damage equal to stacks.", true,
