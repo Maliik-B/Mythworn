@@ -86,6 +86,11 @@ signal title_tier_changed(title_id: StringName, new_tier: int)
 ## new_mode is one of RunManager.ExcaliburMode.SWORD / SIGHT.
 signal excalibur_mode_changed(new_mode: int)
 
+## Emitted when the player toggles The Thurible (the Reliquary censer relic) between
+## swinging Passion toward Blazing and toward Hollow. new_mode is one of
+## RunManager.ThuribleMode.BLAZING / HOLLOW. The map UI re-renders the toggle on this.
+signal thurible_mode_changed(new_mode: int)
+
 ## Emitted when the player makes the Crown decision after defeating an act boss
 ## while holding Excalibur. took_crown=true → King of Camelot path;
 ## took_crown=false → refused, alternative paths (advisor, leave, wander).

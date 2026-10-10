@@ -49,6 +49,7 @@ var relic_btn: Button
 var deck_btn: Button
 var titles_btn: Button
 var excalibur_btn: Button  # Only visible when player holds Excalibur (Camelot quest reward)
+var thurible_btn: Button  # Only visible when player holds The Thurible (Reliquary censer relic)
 var timer_label: Label
 var seed_label: Label
 var info_label: Label
@@ -869,6 +870,19 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	excalibur_btn.visible = false
 	bar.add_child(excalibur_btn)
 
+	# The Thurible mode toggle — only shown when the player holds The Thurible (the Reliquary
+	# censer). Smoky-violet styling (incense, not Excalibur's quest-gold) so the two per-fight
+	# toggles read as distinct things to manage between fights.
+	thurible_btn = Button.new()
+	thurible_btn.flat = true
+	thurible_btn.add_theme_font_size_override("font_size", 20)
+	thurible_btn.add_theme_color_override("font_color", Color(0.74, 0.62, 0.92))
+	thurible_btn.add_theme_color_override("font_hover_color", Color(0.86, 0.78, 1.0))
+	thurible_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	thurible_btn.pressed.connect(_on_thurible_toggle_clicked)
+	thurible_btn.visible = false
+	bar.add_child(thurible_btn)
+
 	timer_label = Label.new()
 	timer_label.add_theme_font_size_override("font_size", 18)
 	timer_label.add_theme_color_override("font_color", Color(0.55, 0.55, 0.55))
@@ -904,6 +918,15 @@ func _update_bottom_bar() -> void:
 	else:
 		excalibur_btn.visible = false
 
+	if RunManager.has_thurible():
+		thurible_btn.visible = true
+		var pole := "▲ Blazing" if RunManager.thurible_mode == RunManager.ThuribleMode.BLAZING else "▼ Hollow"
+		thurible_btn.text = "Thurible: %s" % pole
+		thurible_btn.tooltip_text = ("Click to toggle. Each turn the censer swings your Passion"
+			+ " +3 toward Blazing or -3 toward Hollow. Switch sides between fights.")
+	else:
+		thurible_btn.visible = false
+
 	timer_label.text = RunManager.get_run_time_string()
 	seed_label.text = "Seed: %d" % RngManager.run_seed
 
@@ -911,6 +934,12 @@ func _update_bottom_bar() -> void:
 func _on_excalibur_toggle_clicked() -> void:
 	AudioManager.play_sfx("button_click")
 	RunManager.toggle_excalibur_mode()
+	_update_bottom_bar()
+
+
+func _on_thurible_toggle_clicked() -> void:
+	AudioManager.play_sfx("button_click")
+	RunManager.toggle_thurible_mode()
 	_update_bottom_bar()
 
 

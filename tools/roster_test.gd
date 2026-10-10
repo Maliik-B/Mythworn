@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_new_events()
 	_test_reliquary()
 	_test_title_relic_reworks()
+	_test_thurible()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1037,9 +1038,10 @@ func _test_memory_cards() -> void:
 
 
 ## The Reliquary (multi-stage memory event): the entry is in the random pool and chains into
-## the struck beat with an HP cost; the chapel-beast mini-boss builds; the Vigil Candle payoff
-## relic exists and stays out of reward rolls; and The Compassionate title is distinct from
-## The Merciful. The struck/won prose beats live in event_scene (verified by compile + live).
+## the struck beat with an HP cost; the chapel-beast mini-boss builds; and The Compassionate
+## title is distinct from The Merciful. The payoff relic (now The Thurible, which retired the
+## old Vigil Candle) is covered in _test_thurible. The struck/won prose beats live in
+## event_scene (verified by compile + live).
 func _test_reliquary() -> void:
 	var reliq: EventData = null
 	for ev in EventPool._build_pool():
@@ -1071,19 +1073,6 @@ func _test_reliquary() -> void:
 					has_reform_heal = true
 	_check("The Shattered Choir has a multi-hit torrent + a self-heal reform",
 		choir.enemy_name == "The Shattered Choir" and has_glass and has_reform_heal)
-
-	# The Vigil Candle payoff relic (quest pool), and it never leaks into reward rolls.
-	var candle := RelicPool.get_relic_by_name("Vigil Candle")
-	_check("Vigil Candle draws an extra card at combat start",
-		candle != null and candle.trigger == RelicData.RelicTrigger.ON_COMBAT_START
-		and candle.effect == RelicData.RelicEffect.DRAW_CARDS)
-	var names := PackedStringArray()
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 9
-	for i in 30:
-		for r in RelicPool.get_reward_choices(rng, 3):
-			names.append(r.relic_name)
-	_check("Vigil Candle stays out of reward rolls", "Vigil Candle" not in names)
 
 	# The Compassionate: a clutch-heal personality title (value 8), mechanically distinct from
 	# The Merciful's post-combat heal.
@@ -1155,6 +1144,65 @@ func _test_title_relic_reworks() -> void:
 		hp_turn2 - dummy.current_hp == 5)
 	meng.free()
 	RunManager.relics.clear()
+
+
+## The Thurible (the Reliquary censer toggle relic): it exists as a quest-only RARE read
+## directly by the engine (NONE effect, swing 3 at turn-start); never leaks into reward rolls;
+## the old Vigil Candle it replaced is retired; the mode toggles both ways and defaults Blazing;
+## and end-to-end the turn-start swing pushes Passion +3 in Blazing mode / -3 in Hollow mode.
+func _test_thurible() -> void:
+	var thur := RelicPool.get_relic_by_name("The Thurible")
+	_check("The Thurible exists (quest-only RARE, NONE effect read directly, swing 3 at turn start)",
+		thur != null and thur.rarity == RelicData.RelicRarity.RARE
+		and thur.effect == RelicData.RelicEffect.NONE and thur.value == 3
+		and thur.trigger == RelicData.RelicTrigger.ON_TURN_START)
+	# Quest-only: never leaks into post-combat reward rolls (like Excalibur / the other quest relics).
+	var names := PackedStringArray()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	for i in 30:
+		for r in RelicPool.get_reward_choices(rng, 3):
+			names.append(r.relic_name)
+	_check("The Thurible stays out of reward rolls", "The Thurible" not in names)
+	# The old Vigil Candle it replaced is fully retired from both relic pools.
+	_check("Vigil Candle is retired (superseded by The Thurible)",
+		RelicPool.get_relic_by_name("Vigil Candle") == null)
+
+	# The per-fight mode toggles both directions; a fresh run defaults it to Blazing.
+	RunManager.thurible_mode = RunManager.ThuribleMode.BLAZING
+	RunManager.toggle_thurible_mode()
+	_check("toggle_thurible_mode swings Blazing -> Hollow",
+		RunManager.thurible_mode == RunManager.ThuribleMode.HOLLOW)
+	RunManager.toggle_thurible_mode()
+	_check("toggle_thurible_mode swings back Hollow -> Blazing",
+		RunManager.thurible_mode == RunManager.ThuribleMode.BLAZING)
+
+	# End-to-end through the real engine: with The Thurible held, each player turn-start swings
+	# Passion by the mode's sign (test character volatility is 1.0, so +/-3 exactly).
+	RunManager.relics.clear()
+	RunManager.add_relic(thur)
+	RunManager.thurible_mode = RunManager.ThuribleMode.BLAZING
+	RunManager.passion.current_value = 0
+	var beng := CombatEngine.new()
+	add_child(beng)
+	beng.start_combat([], 50, 50, [_dummy_attacker()])  # turn 1 start swings +3
+	_check("The Thurible (Blazing) swings Passion +3 on turn 1",
+		RunManager.passion.current_value == 3)
+	beng.start_player_turn()  # next turn swings +3 again
+	_check("The Thurible (Blazing) swings +3 again next turn (3 -> 6)",
+		RunManager.passion.current_value == 6)
+	beng.free()
+	# Hollow mode pushes the other way.
+	RunManager.thurible_mode = RunManager.ThuribleMode.HOLLOW
+	RunManager.passion.current_value = 0
+	var heng := CombatEngine.new()
+	add_child(heng)
+	heng.start_combat([], 50, 50, [_dummy_attacker()])  # turn 1 start swings -3
+	_check("The Thurible (Hollow) swings Passion -3 on turn 1",
+		RunManager.passion.current_value == -3)
+	heng.free()
+	RunManager.relics.clear()
+	RunManager.thurible_mode = RunManager.ThuribleMode.BLAZING
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth

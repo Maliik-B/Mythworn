@@ -276,26 +276,28 @@ func _build_room_that_isnt_event() -> EventData:
 
 ## The Reliquary, stage 2: struck at the lychgate (the HP cost rode the entry choice), a
 ## memory of a Fable colleague surfaces and starts to fade. The hold-or-stay choice. Reached
-## via the entry event's next_event_id. The colleague stays unnamed.
+## via the entry event's next_event_id. The colleague is Neve (Dispatch, the run-start send-off
+## liaison), remembered plainly as a coworker.
 func _build_reliquary_struck_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Reliquary"
 	e.description = ("The thing the chapel gives you is a memory, and it is not of home. It is the "
-		+ "office. Fable, the ordinary grind of it, and a face you know the way you know a face "
-		+ "you've worked beside a hundred times. You can see them clearly. The way they hold a cup. "
-		+ "A thing they're always saying that you'd stopped hearing.\n\nThen it begins to go. Not "
-		+ "torn away. Just thinning at the edges while you reach for it, the way your oldest memories "
-		+ "go, the way a whole home once went. You know this exactly. You can feel how much of them "
-		+ "is left, and how fast, and that if you do nothing there will shortly have been no one "
-		+ "there at all.")
+		+ "office. Fable, the ordinary grind of it, and Neve. Dispatch. The kit she always packs "
+		+ "too carefully, the way she holds it a second longer than she needs to before she lets "
+		+ "you take it. You can see her clearly. The line she gets between her eyes. The thing she "
+		+ "is always saying that you'd stopped hearing. Come back in one piece. You're bad at that."
+		+ "\n\nThen she begins to go. Not torn away. Just thinning at the edges while you reach for "
+		+ "her, the way your oldest memories go, the way a whole home once went. You know this "
+		+ "exactly. You can feel how much of her is left, and how fast, and that if you do nothing "
+		+ "there will shortly have been no one there at all.")
 
 	# Hold and leave: keep the memory, abandon the chapel, apologize. No fight, no title -- a
 	# quiet, dignified out. You keep what matters to you; you just don't fight for more.
 	var hold = EventData.EventChoice.new()
 	hold.text = "Hold the feeling. Let the chapel keep the rest, and go."
-	hold.result_text = ("You stop reaching. You hold still and just have them, the whole shape of "
-		+ "them, for as long as it lasts, and you don't fight the chapel for anything past that. "
-		+ "The face stays. Worn at the edges, but yours. On the way out you put a hand flat on the "
+	hold.result_text = ("You stop reaching. You hold still and just have her, the whole shape of "
+		+ "her, for as long as it lasts, and you don't fight the chapel for anything past that. "
+		+ "Her face stays. Worn at the edges, but yours. On the way out you put a hand flat on the "
 		+ "grey door. \"I'm sorry,\" you tell it, and you're not sure for what. For leaving it like "
 		+ "this, maybe. It doesn't answer. You take the road with one more face kept than you came "
 		+ "with, and a chapel at your back that you did not save.")
@@ -305,7 +307,7 @@ func _build_reliquary_struck_event() -> EventData:
 	# Stay in contact: more damage (clamped to leave 1 HP), and the chapel's held memory tears
 	# itself off the walls to make you stop. Launches the chapel-beast fight -> reliquary_won.
 	var stay = EventData.EventChoice.new()
-	stay.text = "Don't let it fade. Hold on, whatever it costs. (Lose 6 HP)"
+	stay.text = "Don't let her fade. Hold on, whatever it costs. (Lose 6 HP)"
 	stay.hp_change = -6
 	stay.starts_combat = &"chapel_beast"
 	e.choices.append(stay)
@@ -315,28 +317,31 @@ func _build_reliquary_struck_event() -> EventData:
 
 ## The Reliquary, stage 3: the beast is unmade and the memory held. Reached only by winning the
 ## chapel-beast fight (pending_special_event after victory). The payoff: a heal, a Passion lift,
-## the Vigil Candle relic, and The Compassionate title (distinct from The Merciful -- +6 Max HP,
-## a lasting capacity for having held on rather than another post-combat mend).
+## The Thurible relic (the censer toggle, replacing the old Vigil Candle), and The Compassionate
+## title (distinct from The Merciful -- a lasting capacity for having held on rather than another
+## post-combat mend).
 func _build_reliquary_won_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Reliquary"
 	e.description = ("The shape comes apart the way glass finds its own cracks, all at once and "
 		+ "then still. What tore off the walls is back to being walls: dim glass, grey gold, a "
 		+ "saint worn faceless by weather and years. The chapel is only a chapel again.\n\nAnd the "
-		+ "memory you would not let go of is still there. Whole. Clear. The cup, the saying, the "
+		+ "memory you would not let go of is still there. Whole. Clear. The kit, the saying, her "
 		+ "face. You held on and it held. In the quiet the reliquary gives you one thing more, the "
 		+ "way a place gives you something when you've paid it enough mind to be owed.")
 
 	var take = EventData.EventChoice.new()
 	take.text = "Take what the chapel leaves you, and go."
-	take.result_text = ("It is a stub of candle, beeswax gone amber-hard, the kind kept burning in "
-		+ "a side chapel for someone who isn't coming back. It should mean nothing. It steadies you "
-		+ "to hold it, the way keeping a small light does. You go out through the lychgate lighter "
-		+ "than you came, carrying a face, a flame, and the particular ache of having refused to let "
-		+ "a thing be forgotten.")
+	take.result_text = ("It is a censer, a small chapel thurible of brass gone dark, its chain "
+		+ "kinked from a lifetime of being swung, a coal still sleeping in its throat. When you "
+		+ "lift it the thing swings on its own, and a thread of old incense lets go, and something "
+		+ "in you tips with it -- toward heat or toward quiet, depending on how you hold your hand. "
+		+ "It steadies you to carry it, the way a kept rhythm steadies you. You go out through the "
+		+ "lychgate lighter than you came, carrying a face, a slow-swinging weight, and the "
+		+ "particular ache of having refused to let a thing be forgotten.")
 	take.hp_change = maxi(1, int(round(RunManager.max_hp * 0.25)))
 	take.passion_change = 5
-	take.granted_relic_id = &"Vigil Candle"
+	take.granted_relic_id = &"The Thurible"
 	take.awarded_title_id = &"the_compassionate"
 	e.choices.append(take)
 

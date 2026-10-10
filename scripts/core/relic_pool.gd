@@ -58,11 +58,16 @@ static func _build_quest_pool() -> Array[RelicData]:
 
 	# -- Reliquary event payoff relic. Granted by the "reliquary_won" beat after the chapel
 	#    beast falls (you refused to let the memory fade). Quest-only, so it never appears in
-	#    shops or reward rolls. A kept light = foresight; draws an extra card to open a fight.
-	pool.append(_relic("Vigil Candle",
-		"A vigil candle kept for someone who isn't coming back. Draw 1 additional card at the start of each combat.",
-		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_START,
-		RelicData.RelicEffect.DRAW_CARDS, 1))
+	#    shops or reward rolls. A chapel censer that swings on its chain: before each of your
+	#    turns it drifts your Passion toward the pole you set on the map (Blazing +, Hollow -).
+	#    NONE effect read directly by CombatEngine (like Blooded Edge / Momentum) because a fixed
+	#    GAIN_PASSION relic can't flip sign per-fight. Coexists with Wellspring of Resolve /
+	#    Leaden Vow (the fixed one-directional +/-2 commons) as the premium, flexible version.
+	#    (Supersedes the old Vigil Candle, which this reward replaced and which is now retired.)
+	pool.append(_relic("The Thurible",
+		"A chapel censer on its chain. Before each of your turns it swings your Passion toward the pole you choose — +3 toward Blazing, or -3 toward Hollow. Switch sides between fights.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
+		RelicData.RelicEffect.NONE, 3))
 	return pool
 
 

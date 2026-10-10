@@ -51,6 +51,12 @@ var _clutch_used: bool = false
 var _momentum: int = 0
 var _momentum_per_hit: int = 0
 
+## The Thurible relic (Reliquary): the per-turn Passion swing magnitude, primed from the
+## relic's value (0 unless held). At the start of each player turn combat pushes Passion by
+## this amount, signed by the pole the player chose on the map (RunManager.thurible_mode).
+## Read directly, like Blooded Edge / Momentum, since a fixed GAIN_PASSION value can't flip sign.
+var _thurible_swing: int = 0
+
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
 ## synchronously. The balance harness (tools/combat_harness) sets this so it can
 ## run thousands of trials against the REAL engine without waiting real seconds.
@@ -102,6 +108,10 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	var mom := RunManager.get_relic("Momentum")
 	_momentum_per_hit = mom.value if mom else 0
 	_momentum = 0
+	# The Thurible: prime the per-turn swing magnitude (0 if unheld). Its sign is chosen
+	# per-fight via RunManager.thurible_mode and applied at each player turn-start.
+	var thur := RunManager.get_relic("The Thurible")
+	_thurible_swing = thur.value if thur else 0
 	_arm_be_the_king(player_hp)
 	# Whiplash power listens on tier crossings for the fight; no-op unless the player
 	# actually holds Whiplash (checked in the handler). Disconnected at combat end.
@@ -204,6 +214,7 @@ func start_player_turn() -> void:
 		return
 
 	_process_relics(RelicData.RelicTrigger.ON_TURN_START)
+	_apply_thurible_turn_start()
 	_apply_title_turn_start_effects()
 	_process_powers()
 
@@ -213,6 +224,17 @@ func start_player_turn() -> void:
 
 	phase = Phase.PLAYER_TURN
 	Events.player_turn_started.emit()
+
+
+## The Thurible relic: swings the player's Passion toward the pole chosen on the map screen
+## at the start of each player turn — +_thurible_swing toward Blazing, or -_thurible_swing
+## toward Hollow. Read directly (NONE effect) because a fixed GAIN_PASSION value can't flip
+## sign per-fight; the sign comes from RunManager.thurible_mode, toggled between combats.
+func _apply_thurible_turn_start() -> void:
+	if _thurible_swing <= 0:
+		return
+	var dir := 1 if RunManager.thurible_mode == RunManager.ThuribleMode.BLAZING else -1
+	RunManager.change_passion(dir * _thurible_swing)
 
 
 ## Applies equipped title effects that fire at the start of each player turn.

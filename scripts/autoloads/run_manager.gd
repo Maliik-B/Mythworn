@@ -89,6 +89,14 @@ var _title_applied_max_hp_bonus: int = 0
 enum ExcaliburMode { SWORD, SIGHT }
 var excalibur_mode: int = ExcaliburMode.SWORD
 
+# --- The Thurible (Reliquary censer relic) ---
+# A per-fight toggle: each fight the player picks which pole the censer swings their
+# Passion toward — Blazing (+) or Hollow (-). Combat reads the mode at the start of each
+# player turn and pushes Passion by the relic's value in that direction. Defaults to
+# Blazing. Only meaningful while the player holds The Thurible; otherwise ignored.
+enum ThuribleMode { BLAZING, HOLLOW }
+var thurible_mode: int = ThuribleMode.BLAZING
+
 # --- Crown & Reign (Phase 2) ---
 # Set once when the player takes the crown at the Act 1 Camelot boss.
 # philosophy_id values: &"iron_fist", &"leave_to_me", &"together", &""
@@ -162,6 +170,20 @@ func toggle_excalibur_mode() -> void:
 	Events.excalibur_mode_changed.emit(excalibur_mode)
 
 
+## True if the player currently holds The Thurible (granted by the Reliquary event).
+func has_thurible() -> bool:
+	return has_relic("The Thurible")
+
+
+## Toggles The Thurible between swinging Passion toward Blazing and toward Hollow. Only
+## meaningful between combats. Emits Events.thurible_mode_changed so the map UI re-renders.
+func toggle_thurible_mode() -> void:
+	thurible_mode = (ThuribleMode.HOLLOW
+		if thurible_mode == ThuribleMode.BLAZING
+		else ThuribleMode.BLAZING)
+	Events.thurible_mode_changed.emit(thurible_mode)
+
+
 func _ready() -> void:
 	# Listen for combat completion to apply title-based post-combat effects
 	# (gold and healing bonuses from equipped titles).
@@ -208,6 +230,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_map_boon = &""
 	pending_act_complete = false
 	excalibur_mode = ExcaliburMode.SWORD
+	thurible_mode = ThuribleMode.BLAZING
 	philosophy_id = &""
 	philosophy_strength_tier = 0
 	together_subchoice = &""
