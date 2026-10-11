@@ -119,6 +119,7 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 		Events.passion_tier_changed.connect(_on_passion_tier_changed_whiplash)
 	Events.combat_started.emit()
 	_process_relics(RelicData.RelicTrigger.ON_COMBAT_START)
+	_apply_pending_combat_boon()
 	start_player_turn()
 
 
@@ -235,6 +236,23 @@ func _apply_thurible_turn_start() -> void:
 		return
 	var dir := 1 if RunManager.thurible_mode == RunManager.ThuribleMode.BLAZING else -1
 	RunManager.change_passion(dir * _thurible_swing)
+
+
+## One-shot next-combat boons queued by an event (RunManager.pending_combat_boon). Applied once
+## at the start of the combat following the event, then cleared, so the boon lasts exactly one
+## fight. Small id->effect catalogue, like RunManager.consume_map_boon. Keep the ids in sync with
+## event_scene._combat_boon_label (the player-facing summary text).
+func _apply_pending_combat_boon() -> void:
+	var boon := RunManager.pending_combat_boon
+	if boon == &"":
+		return
+	RunManager.pending_combat_boon = &""
+	match boon:
+		&"wandering_vigor":
+			# The Wandering Spirit lends its strength for one fight: open with +2 Strength.
+			apply_status_effect(player_stats, StatusEffects.STRENGTH, 2)
+		_:
+			push_warning("Unknown pending_combat_boon: %s" % boon)
 
 
 ## Applies equipped title effects that fire at the start of each player turn.

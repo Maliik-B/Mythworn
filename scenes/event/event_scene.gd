@@ -528,6 +528,13 @@ func _on_choice_selected(index: int) -> void:
 		_start_event_combat(choice.starts_combat)
 		return
 
+	# A wager rolls once on selection: the win/loss overrides the gold and the result text
+	# before anything is applied or shown. Other effects on the choice still land either way.
+	if choice.gamble_win_gold != 0 or choice.gamble_lose_gold != 0:
+		var won: bool = RngManager.loot_rng.randf() < choice.gamble_chance
+		choice.gold_change = choice.gamble_win_gold if won else choice.gamble_lose_gold
+		choice.result_text = choice.gamble_win_text if won else choice.gamble_lose_text
+
 	_apply_effects(choice)
 	choice_container.visible = false
 
@@ -552,6 +559,16 @@ func _on_choice_selected(index: int) -> void:
 		_show_next_beat(choice.next_event_id)
 	else:
 		_show_done()
+
+
+## Player-facing label for a queued next-combat boon (RunManager.pending_combat_boon). Mirror
+## of the effect catalogue in CombatEngine._apply_pending_combat_boon -- keep the ids in sync.
+func _combat_boon_label(boon: StringName) -> String:
+	match boon:
+		&"wandering_vigor":
+			return "Next combat: +2 Strength"
+		_:
+			return "Next combat: a boon"
 
 
 ## Launches a scripted event fight. The Sword-in-the-Stone guardian is the Champion
@@ -640,6 +657,10 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.standing_change != 0:
 		RunManager.change_realm_standing(RunManager.current_realm_id, choice.standing_change)
 
+	# Queue a one-shot boon for the next combat (the Wandering Spirit's lent strength).
+	if choice.grants_combat_boon != &"":
+		RunManager.pending_combat_boon = choice.grants_combat_boon
+
 
 func _show_effect_summary(choice: EventData.EventChoice) -> void:
 	var parts: PackedStringArray = []
@@ -677,6 +698,9 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 		var mem = CardPool.get_memory_card(choice.granted_card_id)
 		if mem:
 			parts.append("Remembered: %s" % mem.card_name)
+
+	if choice.grants_combat_boon != &"":
+		parts.append(_combat_boon_label(choice.grants_combat_boon))
 
 	if parts.size() > 0:
 		var summary = Label.new()

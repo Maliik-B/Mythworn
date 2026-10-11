@@ -48,3 +48,19 @@ class EventChoice extends RefCounted:
 	## Signed nudge to the realm's court<->folk standing when taken: positive toward the
 	## people, negative toward the court (RunManager.change_realm_standing). 0 = no change.
 	var standing_change: int = 0
+	## Wager: if either gamble gold value is non-zero, selecting this choice ROLLS once
+	## (gamble_chance to win, default 0.5). A win applies gamble_win_gold and shows
+	## gamble_win_text; a loss applies gamble_lose_gold and shows gamble_lose_text --
+	## overriding gold_change and result_text. Every other effect (passion, standing, ...)
+	## still applies regardless of the roll. Used by the Tourney wager.
+	var gamble_win_gold: int = 0
+	var gamble_lose_gold: int = 0
+	var gamble_chance: float = 0.5
+	var gamble_win_text: String = ""
+	var gamble_lose_text: String = ""
+	## If non-empty, taking this choice queues a ONE-SHOT boon applied at the start of the
+	## player's NEXT combat, then cleared (RunManager.pending_combat_boon). The id's effect
+	## lives in CombatEngine._apply_pending_combat_boon; its player-facing label lives in
+	## event_scene._combat_boon_label (keep the two in sync). Used by the Wandering Spirit
+	## (wandering_vigor = start your next fight with +2 Strength).
+	var grants_combat_boon: StringName = &""

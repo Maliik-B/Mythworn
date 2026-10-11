@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_reliquary()
 	_test_title_relic_reworks()
 	_test_thurible()
+	_test_event_reworks()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1203,6 +1204,59 @@ func _test_thurible() -> void:
 	heng.free()
 	RunManager.relics.clear()
 	RunManager.thurible_mode = RunManager.ThuribleMode.BLAZING
+
+
+## Event restructures (Oct 2026): the Tourney wager is a real win/lose gamble; its court ride
+## costs HP; and the Wandering Spirit's power option is a one-shot next-combat boon that opens the
+## next fight with +2 Strength and then clears.
+func _test_event_reworks() -> void:
+	var tourney: EventData = null
+	var spirit: EventData = null
+	for ev in EventPool._build_pool():
+		if ev.event_name == "The Tourney":
+			tourney = ev
+		elif ev.event_name == "Wandering Spirit":
+			spirit = ev
+	# The wager is a bet now (win/lose gold, both outcomes written), not a flat payout.
+	var wager: EventData.EventChoice = tourney.choices[0] if tourney else null
+	_check("The Tourney wager is a gamble (win > 0, lose < 0, both outcomes written, no flat gold)",
+		wager != null and wager.gamble_win_gold > 0 and wager.gamble_lose_gold < 0
+		and wager.gamble_win_text != "" and wager.gamble_lose_text != "" and wager.gold_change == 0)
+	# The court ride now costs HP (jousting hurts) and stays court-gated with a card reward.
+	var ride: EventData.EventChoice = null
+	if tourney:
+		for ch in tourney.choices:
+			if ch.requires_favor == &"court":
+				ride = ch
+	_check("The Tourney court ride costs HP and is court-gated with a card reward",
+		ride != null and ride.hp_change < 0 and ride.card_reward)
+	# The Wandering Spirit's power option is now a one-shot next-combat boon.
+	var lend: EventData.EventChoice = null
+	if spirit:
+		for ch in spirit.choices:
+			if ch.grants_combat_boon != &"":
+				lend = ch
+	_check("The Wandering Spirit grants the wandering_vigor next-combat boon",
+		lend != null and lend.grants_combat_boon == &"wandering_vigor"
+		and lend.max_hp_change == 0)
+
+	# End-to-end: a queued boon opens the next fight with +2 Strength, then clears (one-shot).
+	RunManager.pending_combat_boon = &"wandering_vigor"
+	var beng := CombatEngine.new()
+	add_child(beng)
+	beng.start_combat([], 50, 50, [_dummy_attacker()])
+	_check("wandering_vigor opens the next combat with +2 Strength",
+		beng.player_stats.get_status_stacks(StatusEffects.STRENGTH) == 2)
+	_check("the next-combat boon is one-shot (cleared once it applies)",
+		RunManager.pending_combat_boon == &"")
+	beng.free()
+	# A second combat with nothing queued does not re-grant it.
+	var beng2 := CombatEngine.new()
+	add_child(beng2)
+	beng2.start_combat([], 50, 50, [_dummy_attacker()])
+	_check("no boon carries into a later fight (0 Strength when none queued)",
+		beng2.player_stats.get_status_stacks(StatusEffects.STRENGTH) == 0)
+	beng2.free()
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth

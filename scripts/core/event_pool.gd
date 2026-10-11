@@ -200,12 +200,22 @@ static func _the_tourney() -> EventData:
 		+ "the open challenge, and looks hard at who he lets past the rope.")
 
 	var c1 = EventData.EventChoice.new()
-	c1.text = "Lay a purse on the commoner in the plain harness."
-	c1.result_text = ("You back the man with no device on his shield, and the stands laugh at you "
+	c1.text = "Wager a purse on the commoner in the plain harness."
+	# An actual bet, not a payout: the underdog usually has it, but not always. Backing him
+	# openly is the pro-folk gesture win or lose, so passion and standing land either way --
+	# only the gold rolls (gamble_win_gold / gamble_lose_gold).
+	c1.gamble_chance = 0.55
+	c1.gamble_win_gold = 40
+	c1.gamble_lose_gold = -25
+	c1.gamble_win_text = ("You back the man with no device on his shield, and the stands laugh at you "
 		+ "for it, until he puts the rotting noble in the dirt and stands over him breathing clean "
 		+ "and hard. The herald counts out your winnings with a sour face. Across the field the "
 		+ "commoner catches your eye and touches two fingers to his brow.")
-	c1.gold_change = 25
+	c1.gamble_lose_text = ("You back the man with no device on his shield, and for three passes he "
+		+ "rides like he will shame the lot of them -- then the rotting noble's lance catches him "
+		+ "under the arm and he goes down and is slow to rise. The herald rakes in your stake without "
+		+ "meeting your eye. Across the field they get the commoner back to his knees; he finds you in "
+		+ "the crowd anyway, and touches two fingers to his brow.")
 	c1.passion_change = 2
 	c1.standing_change = 5
 
@@ -213,12 +223,14 @@ static func _the_tourney() -> EventData:
 	# reward (a technique from a master-at-arms) sits behind court favor; a folk-pledged keeper
 	# is turned away at the rope, the way the Scriptorium turns a court keeper away from the folk.
 	var cc = EventData.EventChoice.new()
-	cc.text = "Give the marshal your name and ride in the open challenge."
+	cc.text = "Give the marshal your name and ride in the open challenge. (Lose 8 HP)"
 	cc.result_text = ("The marshal weighs your name, or the weight behind it, and lifts the rope. "
-		+ "They find you a horse and a lance. The ride is short and it hurts, but you put your man in "
-		+ "the dirt and the stand roars for you. Afterward an old master-at-arms who liked your seat "
-		+ "shows you a way of closing the distance you will not forget.")
+		+ "They find you a horse and a lance. The ride is short and it hurts -- a lance on the shield "
+		+ "is a hammer-blow even when you keep your seat -- but you put your man in the dirt and the "
+		+ "stand roars for you. Afterward an old master-at-arms who liked your seat shows you a way of "
+		+ "closing the distance you will not forget.")
 	cc.requires_favor = &"court"
+	cc.hp_change = -8  # jousting hurts, even when you win the pass
 	cc.card_reward = true
 	cc.passion_change = 4
 	cc.standing_change = -4
@@ -335,10 +347,12 @@ static func _wandering_spirit() -> EventData:
 	c1.awarded_title_id = &"the_merciful"
 
 	var c2 = EventData.EventChoice.new()
-	c2.text = "Ask them to share their power"
-	c2.result_text = "The spirit hesitates, then reaches into your chest. Cold energy fills your veins."
-	c2.max_hp_change = 5
-	c2.hp_change = -5
+	c2.text = "Ask it to lend you its strength for the road ahead."
+	c2.result_text = ("The spirit hesitates, then lays a cold hand against your sword-arm. The chill "
+		+ "sinks in and settles there, patient, waiting for the next time you draw steel. It will "
+		+ "carry you through one hard fight, the spirit says, and then it will be spent, the way it is "
+		+ "spent itself.")
+	c2.grants_combat_boon = &"wandering_vigor"
 
 	var c3 = EventData.EventChoice.new()
 	c3.text = "Banish the spirit"

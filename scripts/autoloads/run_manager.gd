@@ -49,6 +49,10 @@ var pending_vn_next: String = "res://scenes/map/map_scene.tscn"
 ## A realm map_boon queued by apply_realm_config, resolved once when the map next opens
 ## (map_scene._ready -> consume_map_boon). StringName id; &"" = nothing pending.
 var pending_map_boon: StringName = &""
+## A one-shot boon queued by an event, applied at the START of the next combat and then
+## cleared (CombatEngine._apply_pending_combat_boon). StringName id; &"" = nothing pending.
+## The Wandering Spirit queues &"wandering_vigor" (+2 Strength for that one fight).
+var pending_combat_boon: StringName = &""
 var run_start_time: int = 0 # msec from Time.get_ticks_msec()
 var run_stats: Dictionary = {}
 
@@ -228,6 +232,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_vn_queue.clear()
 	pending_vn_next = "res://scenes/map/map_scene.tscn"
 	pending_map_boon = &""
+	pending_combat_boon = &""
 	pending_act_complete = false
 	excalibur_mode = ExcaliburMode.SWORD
 	thurible_mode = ThuribleMode.BLAZING
