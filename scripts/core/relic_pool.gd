@@ -189,9 +189,8 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.DRAW_CARDS, 2))
 
-	pool.append(_relic("Spring Charm", "Gain 3 Passion at the start of combat.",
-		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
-		RelicData.RelicEffect.GAIN_PASSION, 3))
+	# (Spring Charm retired Oct 2026 — its flat +3 Passion at combat start was superseded by the
+	# steerable per-turn pole relics. The Thurible is the flexible Passion-swing reward now.)
 
 	# -- Swing gear (design pass Sep 2026): dedicated relics that swing Passion HARDER,
 	# so a build-around player commits to a pole in ~1 fight instead of the base ~2,
