@@ -64,3 +64,15 @@ class EventChoice extends RefCounted:
 	## event_scene._combat_boon_label (keep the two in sync). Used by the Wandering Spirit
 	## (wandering_vigor = start your next fight with +2 Strength).
 	var grants_combat_boon: StringName = &""
+	## When card_reward is true, biases the pick-1-of-3 toward a school: &"primary" or
+	## &"secondary" draws only from that pool (the Forgotten Library's tomes); &"" = the
+	## normal mixed reward. Resolved via CardPool.get_school_reward_choices.
+	var card_reward_school: StringName = &""
+	## If true, selecting this choice rolls ONE random reward-pool relic the player doesn't
+	## own and grants it (resolved into granted_relic_id on selection, so the grant + summary
+	## reuse the normal relic path). The Forgotten Library's "search the shelves" find.
+	var grants_random_relic: bool = false
+	## If true, taking this choice lets the player skip the next map node: the next node they
+	## step onto is entered (position advances, it counts as visited) but its content is passed
+	## over (RunManager.pending_skip_node). The Tourney's "watch a pass and move on" shortcut.
+	var skips_next_node: bool = false

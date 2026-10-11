@@ -53,6 +53,10 @@ var pending_map_boon: StringName = &""
 ## cleared (CombatEngine._apply_pending_combat_boon). StringName id; &"" = nothing pending.
 ## The Wandering Spirit queues &"wandering_vigor" (+2 Strength for that one fight).
 var pending_combat_boon: StringName = &""
+## When true, the next map node the player enters is passed through: position advances and the
+## node is marked visited, but its content (combat/shop/event/...) is skipped. Set by the
+## Tourney's walk-on shortcut; consumed by map_scene on the next node entry. Never skips a boss.
+var pending_skip_node: bool = false
 var run_start_time: int = 0 # msec from Time.get_ticks_msec()
 var run_stats: Dictionary = {}
 
@@ -233,6 +237,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_vn_next = "res://scenes/map/map_scene.tscn"
 	pending_map_boon = &""
 	pending_combat_boon = &""
+	pending_skip_node = false
 	pending_act_complete = false
 	excalibur_mode = ExcaliburMode.SWORD
 	thurible_mode = ThuribleMode.BLAZING

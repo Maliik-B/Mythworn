@@ -89,29 +89,54 @@ static func _ancient_shrine() -> EventData:
 	return e
 
 
+## A library is a choice of WHICH knowledge, so it carries more options than a normal event
+## (five): two school-biased tomes, a strange untitled one, burning dead weight, and a search
+## that turns up a relic rather than coin -- a ruined library wouldn't hold a purse worth taking.
+## (Water/Physical label the Emo Hybrid's schools; the demo only runs the one character.)
 static func _forgotten_library() -> EventData:
 	var e = EventData.new()
 	e.event_name = "Forgotten Library"
-	e.description = "Shelves of rotting books line a hidden alcove. Most are ruined, but a few tomes remain intact. You could study one... or clear out the dead weight of what you already carry."
+	e.description = ("Shelves of rotting books line a hidden alcove. Most are ruined, but a few tomes "
+		+ "remain intact, and the spines you can still read fall into two hands -- the flowing script "
+		+ "of the water-scholars and the blunt manuals of fighting men. One book has no title at all.")
 
-	var c1 = EventData.EventChoice.new()
-	c1.text = "Study a tome (Add a card)"
-	c1.result_text = "You absorb the tome's teachings. New possibilities unfold."
-	c1.card_reward = true
+	var cw = EventData.EventChoice.new()
+	cw.text = "Study the water-scholar's tome. (Add a Water card)"
+	cw.result_text = "The flowing script pulls you under. A current of technique settles into your hands."
+	cw.card_reward = true
+	cw.card_reward_school = &"primary"
 
-	var c2 = EventData.EventChoice.new()
-	c2.text = "Burn a useless page (Remove a card)"
-	c2.result_text = "You focus on what matters, discarding what holds you back."
-	c2.remove_card = true
+	var cp = EventData.EventChoice.new()
+	cp.text = "Study the soldier's manual. (Add a Physical card)"
+	cp.result_text = ("Blunt diagrams and a dead man's notes down the margins. Your body remembers it "
+		+ "before your mind does.")
+	cp.card_reward = true
+	cp.card_reward_school = &"secondary"
 
-	var c3 = EventData.EventChoice.new()
-	c3.text = "Search for valuables"
-	c3.result_text = "Between the pages you find pressed coins and a gemstone."
-	c3.gold_change = 25
+	var cs = EventData.EventChoice.new()
+	cs.text = "Open the book with no title. (Add a card)"
+	cs.result_text = ("The pages are wrong somehow, and afterward you cannot say what you read. But "
+		+ "something in it took.")
+	cs.card_reward = true
 
-	e.choices.append(c1)
-	e.choices.append(c2)
-	e.choices.append(c3)
+	var cb = EventData.EventChoice.new()
+	cb.text = "Burn a useless page. (Remove a card)"
+	cb.result_text = "You focus on what matters, feeding what holds you back to the one honest flame here."
+	cb.remove_card = true
+
+	var cr = EventData.EventChoice.new()
+	cr.text = "Search the shelves for anything of worth. (Lose 4 HP)"
+	cr.result_text = ("A needle hidden in a cracked spine bites your thumb -- but behind the ruined "
+		+ "rank you turn up the one tome the rot never reached, and it is worth far more than the coin "
+		+ "you were hoping for.")
+	cr.hp_change = -4
+	cr.grants_random_relic = true
+
+	e.choices.append(cw)
+	e.choices.append(cp)
+	e.choices.append(cs)
+	e.choices.append(cb)
+	e.choices.append(cr)
 	return e
 
 
@@ -236,11 +261,13 @@ static func _the_tourney() -> EventData:
 	cc.standing_change = -4
 
 	var c3 = EventData.EventChoice.new()
-	c3.text = "Watch a single pass, then find the way out."
-	c3.result_text = ("You stay for one ride and leave while the crowd is still on its feet. The "
-		+ "brightness of the place sits wrong on you, like laughter at a sickbed. The road out is "
-		+ "quiet and you are glad of it.")
+	c3.text = "Watch a single pass, then slip out and take the drovers' road. (Skip the next node)"
+	c3.result_text = ("You stay for one ride and leave while the crowd is still on its feet. Behind the "
+		+ "grandstand a drovers' track cuts the long bend off the king's road, and you take it at a hard "
+		+ "walk. You have seen enough of this place -- the shortcut puts the next trouble on the road "
+		+ "well behind you.")
 	c3.passion_change = 3
+	c3.skips_next_node = true
 
 	e.choices.append(c1)
 	e.choices.append(cc)

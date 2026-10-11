@@ -1258,6 +1258,53 @@ func _test_event_reworks() -> void:
 		beng2.player_stats.get_status_stacks(StatusEffects.STRENGTH) == 0)
 	beng2.free()
 
+	# --- Forgotten Library: school-biased tomes + a relic find; Tourney walk-on skip ---
+	var lib: EventData = null
+	var tourney2: EventData = null
+	for ev in EventPool._build_pool():
+		if ev.event_name == "Forgotten Library":
+			lib = ev
+		elif ev.event_name == "The Tourney":
+			tourney2 = ev
+	var has_primary := false
+	var has_secondary := false
+	var has_relic_find := false
+	if lib:
+		for ch in lib.choices:
+			if ch.card_reward and ch.card_reward_school == &"primary":
+				has_primary = true
+			if ch.card_reward and ch.card_reward_school == &"secondary":
+				has_secondary = true
+			if ch.grants_random_relic and ch.hp_change < 0:
+				has_relic_find = true
+	_check("Forgotten Library offers 5 options incl. Water/Physical tomes + a costed relic find",
+		lib != null and lib.choices.size() == 5 and has_primary and has_secondary and has_relic_find)
+	var skip_found := false
+	if tourney2:
+		for ch in tourney2.choices:
+			if ch.skips_next_node:
+				skip_found = true
+	_check("The Tourney walk-on skips the next map node", skip_found)
+
+	# A tome's reward draws from the matching school pool (needs real character card pools).
+	var saved_char = RunManager.current_character
+	RunManager.current_character = CharacterPool.build_emo_hybrid()
+	var prim := CardPool.get_school_reward_choices(
+		RngManager.loot_rng, CardData.PersonalityType.PRIMARY, 3)
+	var sec := CardPool.get_school_reward_choices(
+		RngManager.loot_rng, CardData.PersonalityType.SECONDARY, 3)
+	var prim_ok := prim.size() == 3
+	for c in prim:
+		if c.personality != CardData.PersonalityType.PRIMARY:
+			prim_ok = false
+	var sec_ok := sec.size() == 3
+	for c in sec:
+		if c.personality != CardData.PersonalityType.SECONDARY:
+			sec_ok = false
+	_check("school-biased tome reward draws from the matching pool (Water=PRIMARY, Physical=SECONDARY)",
+		prim_ok and sec_ok)
+	RunManager.current_character = saved_char
+
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth
 ## ordinary event while the rest stay random. The ordinal advances once per ordinary event,

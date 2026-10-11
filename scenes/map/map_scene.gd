@@ -1768,6 +1768,14 @@ func _enter_node(node: MapNode) -> void:
 	RunManager.run_stats["floors_cleared"] = RunManager.run_stats.get("floors_cleared", 0) + 1
 	_update_node_states()
 
+	# A queued "skip the next node" (the Tourney's walk-on shortcut): step onto this node to
+	# advance position, but pass over its content and leave its children available. Consumed
+	# once, and never on the boss -- the act still has to be finished.
+	if RunManager.pending_skip_node and node.node_type != MapNode.NodeType.BOSS:
+		RunManager.pending_skip_node = false
+		info_label.text = "You took the shortcut, skipping ahead."
+		return
+
 	# Armed questline payoff: route to the quest's ambush instead of this node's normal type.
 	# (The node looked ordinary until the plea armed it; now it pays off the hunt.)
 	if _is_quest_payoff_armed(node) and not RunManager.quest_completed:

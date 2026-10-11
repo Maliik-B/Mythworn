@@ -38,6 +38,22 @@ static func get_reward_choices(rng: RandomNumberGenerator, count: int = 3) -> Ar
 	return _pick_from_pool(_build_generic_pool(), rng, count)
 
 
+## School-biased reward (the Forgotten Library's tomes): draws the offered cards straight from
+## the current character's PRIMARY or SECONDARY pool so a chosen tome themes the pick. Falls back
+## to the normal mixed reward if the requested pool is empty.
+static func get_school_reward_choices(rng: RandomNumberGenerator,
+		school: CardData.PersonalityType, count: int = 3) -> Array[CardData]:
+	var character = RunManager.current_character
+	var source: Array[CardData] = []
+	if character and school == CardData.PersonalityType.PRIMARY:
+		source = character.primary_cards
+	elif character and school == CardData.PersonalityType.SECONDARY:
+		source = character.secondary_cards
+	if source.is_empty():
+		return get_reward_choices(rng, count)
+	return _pick_from_pool(_build_character_pool(source), rng, count)
+
+
 ## Boss card reward: a real payoff for the act boss, not three commons. Guarantees at
 ## least one RARE and fills the rest with uncommon-or-better (a strong lean toward
 ## rare). Draws from the whole card space available to the current character (both

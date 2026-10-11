@@ -535,6 +535,14 @@ func _on_choice_selected(index: int) -> void:
 		choice.gold_change = choice.gamble_win_gold if won else choice.gamble_lose_gold
 		choice.result_text = choice.gamble_win_text if won else choice.gamble_lose_text
 
+	# A relic find rolls one random reward-pool relic the player doesn't own and routes it
+	# through granted_relic_id, so the grant and the summary reuse the normal relic path.
+	if choice.grants_random_relic and choice.granted_relic_id == &"":
+		var picks := RelicPool.get_reward_choices(
+			RngManager.loot_rng, 1, RunManager.get_owned_relic_names())
+		if picks.size() > 0:
+			choice.granted_relic_id = picks[0].relic_name
+
 	_apply_effects(choice)
 	choice_container.visible = false
 
@@ -550,7 +558,7 @@ func _on_choice_selected(index: int) -> void:
 
 	# Handle follow-ups
 	if choice.card_reward:
-		_show_card_reward()
+		_show_card_reward(choice.card_reward_school)
 	elif choice.remove_card:
 		_show_card_removal()
 	elif choice.next_event_id != &"":
@@ -661,6 +669,10 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.grants_combat_boon != &"":
 		RunManager.pending_combat_boon = choice.grants_combat_boon
 
+	# Queue a skip of the next map node (the Tourney's walk-on shortcut).
+	if choice.skips_next_node:
+		RunManager.pending_skip_node = true
+
 
 func _show_effect_summary(choice: EventData.EventChoice) -> void:
 	var parts: PackedStringArray = []
@@ -702,6 +714,9 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 	if choice.grants_combat_boon != &"":
 		parts.append(_combat_boon_label(choice.grants_combat_boon))
 
+	if choice.skips_next_node:
+		parts.append("Skip your next node")
+
 	if parts.size() > 0:
 		var summary = Label.new()
 		summary.text = ", ".join(parts)
@@ -716,7 +731,7 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 # CARD REWARD (pick 1 of 3)
 # ============================================================
 
-func _show_card_reward() -> void:
+func _show_card_reward(school: StringName = &"") -> void:
 	follow_up_container.visible = true
 	for child in follow_up_container.get_children():
 		child.queue_free()
@@ -728,7 +743,16 @@ func _show_card_reward() -> void:
 	header.add_theme_color_override("font_color", Color(0.9, 0.8, 0.4))
 	follow_up_container.add_child(header)
 
-	var cards = CardPool.get_reward_choices(RngManager.loot_rng, 3)
+	# A tome choice biases the three cards toward one school; otherwise a normal mixed reward.
+	var cards: Array[CardData]
+	if school == &"primary":
+		cards = CardPool.get_school_reward_choices(
+			RngManager.loot_rng, CardData.PersonalityType.PRIMARY, 3)
+	elif school == &"secondary":
+		cards = CardPool.get_school_reward_choices(
+			RngManager.loot_rng, CardData.PersonalityType.SECONDARY, 3)
+	else:
+		cards = CardPool.get_reward_choices(RngManager.loot_rng, 3)
 
 	# The 3 reward cards always fit, so center them across the full width. (A
 	# ScrollContainer here pinned the row to the left, since it sizes its child to
