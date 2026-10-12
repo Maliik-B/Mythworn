@@ -470,13 +470,13 @@ static func _peasants_plea() -> EventData:
 		+ "go inside.")
 
 	var c1 = EventData.EventChoice.new()
-	c1.text = "Pay the crown's share yourself. (Lose 35 Gold)"
+	c1.text = "Pay the crown's share yourself. (Lose 50 Gold)"
 	c1.result_text = ("You count the coin into the old woman's hands. It is more than the collector "
 		+ "will expect, and he will not think to ask where it came from. That night the village "
 		+ "feeds you at its own thin table. An old campaigner who soldiered for the last king sits "
 		+ "with you late, showing you a trick of his he says the young ones never have the patience "
 		+ "to learn.")
-	c1.gold_change = -35
+	c1.gold_change = -50
 	c1.passion_change = 5
 	c1.card_reward = true
 	c1.awarded_title_id = &"the_gracious"  # paying their debt from your own purse -- open-handed
@@ -488,7 +488,7 @@ static func _peasants_plea() -> EventData:
 		+ "until they understand you mean to carry it off tonight, ahead of the collector. You take "
 		+ "the strongbox and a measure of the grain. Nobody tries to stop a sword. By the time you "
 		+ "reach the trees, the quiet behind you has a different weight to it.")
-	c2.gold_change = 30
+	c2.gold_change = 45
 	c2.passion_change = -6
 	c2.awarded_title_id = &"the_calculating"
 	c2.standing_change = -12  # robbing them like a collector turns the people against you
