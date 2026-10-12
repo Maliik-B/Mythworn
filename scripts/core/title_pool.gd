@@ -18,6 +18,7 @@ static func get_all_titles() -> Array[TitleData]:
 	titles.append(_build_swords_bearer())
 	titles.append(_build_outlander_of_camelot())
 	titles.append(_build_the_merciful())
+	titles.append(_build_the_gracious())
 	titles.append(_build_the_calculating())
 	titles.append(_build_the_compassionate())
 	titles.append(_build_peoples_champion())
@@ -159,6 +160,27 @@ static func _build_the_merciful() -> TitleData:
 	t.original_value = 3
 
 	t.passive_effect = TitleData.EffectType.HEAL_ON_COMBAT_END
+	t.passive_scales_with_tier = false
+	return t
+
+
+## A second kindness title, split off from The Merciful so a run's repeat good-acts aren't wasted
+## on a title you already hold. Where mercy is sparing a life in peril, grace is generosity given
+## freely -- paying a stranger's debt, hearing out the lonely, pardoning a village. Distinct from
+## the mercy-heal lane: open hands leave you with a fuller measure. Personality trait; never degrades.
+static func _build_the_gracious() -> TitleData:
+	var t := TitleData.new()
+	t.title_id = &"the_gracious"
+	t.category = TitleData.Category.PERSONALITY
+	t.origin_realm_id = &""
+	t.visual_style = RealmData.VisualStyle.NEUTRAL
+	t.accent_color = NEUTRAL_ACCENT
+
+	t.original_name = "The Gracious"
+	t.original_description = "You met need with open hands when you didn't have to. +5 max HP."
+	t.original_value = 5
+
+	t.passive_effect = TitleData.EffectType.MAX_HP_BONUS
 	t.passive_scales_with_tier = false
 	return t
 

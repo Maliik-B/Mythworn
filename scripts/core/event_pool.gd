@@ -371,7 +371,7 @@ static func _wandering_spirit() -> EventData:
 	c1.result_text = "The spirit shares a tale of love and loss. As it fades, you feel your resolve harden."
 	c1.max_hp_change = 3
 	c1.passion_change = 4
-	c1.awarded_title_id = &"the_merciful"
+	c1.awarded_title_id = &"the_gracious"  # hearing out the lonely dead -- grace, not mercy
 
 	var c2 = EventData.EventChoice.new()
 	c2.text = "Ask it to lend you its strength for the road ahead."
@@ -479,7 +479,7 @@ static func _peasants_plea() -> EventData:
 	c1.gold_change = -35
 	c1.passion_change = 5
 	c1.card_reward = true
-	c1.awarded_title_id = &"the_merciful"
+	c1.awarded_title_id = &"the_gracious"  # paying their debt from your own purse -- open-handed
 	c1.standing_change = 8  # sparing the folk, the way anyone could
 
 	var c2 = EventData.EventChoice.new()
@@ -528,7 +528,7 @@ static func _peasants_plea() -> EventData:
 		+ "turns his cart around. The village will never learn how close it came. You will.")
 	cc.requires_favor = &"court"
 	cc.passion_change = 3
-	cc.awarded_title_id = &"the_merciful"
+	cc.awarded_title_id = &"the_gracious"  # a gracious pardon in the crown's name
 	cc.standing_change = -4
 
 	e.choices.append(c1)

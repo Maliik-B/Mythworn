@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_title_relic_reworks()
 	_test_thurible()
 	_test_event_reworks()
+	_test_title_split()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1304,6 +1305,28 @@ func _test_event_reworks() -> void:
 	_check("school-biased tome reward draws from the matching pool (Water=PRIMARY, Physical=SECONDARY)",
 		prim_ok and sec_ok)
 	RunManager.current_character = saved_char
+
+
+## The Merciful split (Oct 2026): a second kindness title, The Gracious, so a run's repeat
+## good-acts aren't wasted on a title already held. Distinct passive from the mercy-heal lane,
+## and the kindness grants are spread across both titles in the event pool.
+func _test_title_split() -> void:
+	var grace := TitlePool.get_title(&"the_gracious")
+	var merc := TitlePool.get_title(&"the_merciful")
+	_check("The Gracious is a MAX_HP_BONUS personality title (5), distinct from The Merciful's heal",
+		grace != null and grace.category == TitleData.Category.PERSONALITY
+		and grace.passive_effect == TitleData.EffectType.MAX_HP_BONUS and grace.original_value == 5
+		and merc != null and grace.passive_effect != merc.passive_effect)
+	var grants_gracious := 0
+	var grants_merciful := 0
+	for ev in EventPool._build_pool():
+		for ch in ev.choices:
+			if ch.awarded_title_id == &"the_gracious":
+				grants_gracious += 1
+			elif ch.awarded_title_id == &"the_merciful":
+				grants_merciful += 1
+	_check("kindness grants are spread across events (both The Gracious and The Merciful appear)",
+		grants_gracious >= 1 and grants_merciful >= 1)
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth
