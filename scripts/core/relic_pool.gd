@@ -12,6 +12,15 @@ static func get_relic_by_name(name: String) -> RelicData:
 	for relic in _build_quest_pool():
 		if relic.relic_name == name:
 			return relic
+	# The per-liaison pools are quest-only too, but live in their own builders so a
+	# grant resolved into granted_relic_id (Bram's Records / Neve's Dispatch relics)
+	# can still be looked up here by the apply + summary path.
+	for relic in _build_bram_pool():
+		if relic.relic_name == name:
+			return relic
+	for relic in _build_neve_pool():
+		if relic.relic_name == name:
+			return relic
 	return null
 
 
@@ -69,6 +78,97 @@ static func _build_quest_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.NONE, 3))
 	return pool
+
+
+# ============================================================
+# PER-LIAISON RELIC POOLS
+# ============================================================
+# Dedicated pools the Fable liaisons hand out at events. Folk events pay in relics (per the
+# faction-reward principle: a folk run skips no fights but faces steeper shops, so it earns
+# gear instead of cards). Each liaison gives from a themed set: Bram, from Records, deals in
+# knowledge and foresight (undercut the enemy, draw ahead, call in debts); Neve, from
+# Dispatch, deals in the well-packed kit (patch up, pack heavier, stand the blow). Like the
+# quest pool these live outside _build_pool, so they can never surface in shops or post-combat
+# reward rolls — only EventChoice.grants_liaison_relic draws from them, via
+# get_liaison_relic_choices. get_relic_by_name scans them so a granted id still resolves.
+
+## Bram's Records relics — scholarly foresight: you read up on the road and arrive knowing
+## where it's soft, a step ahead, with the accounts in hand.
+static func _build_bram_pool() -> Array[RelicData]:
+	var pool: Array[RelicData] = []
+	pool.append(_relic("Annotated Bestiary",
+		"Bram's notes on what walks this road. At the start of combat, apply 2 Vulnerable to ALL enemies.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.APPLY_VULNERABLE_ALL, 2))
+	pool.append(_relic("Writ of Precedence",
+		"The record shows they hold their ground on a lie, and some part of them knows it. At the start of combat, apply 1 Weak to ALL enemies.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.APPLY_WEAK_ALL, 1))
+	pool.append(_relic("Marginalia",
+		"A lifetime of notes crammed down the margins, and all of it comes back when you need it. Draw 1 additional card at the start of combat.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.DRAW_CARDS, 1))
+	pool.append(_relic("The Long Ledger",
+		"Records keeps every account, and sooner or later calls them in. Gain 20 bonus Gold after each combat.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicEffect.GAIN_GOLD, 20))
+	return pool
+
+
+## Neve's Dispatch relics — the kit she packs the way you never would: the bandages, the
+## rations, the thing stowed so it turns a blow instead of catching one.
+static func _build_neve_pool() -> Array[RelicData]:
+	var pool: Array[RelicData] = []
+	pool.append(_relic("Field Dressing",
+		"Neve packed the bandages you never remember to. Heal 8 HP after each combat.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicEffect.HEAL, 8))
+	pool.append(_relic("Iron Rations",
+		"She always overpacks the food, and swears it keeps forever. Upon pickup, gain 12 Max HP.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_PICKUP,
+		RelicData.RelicEffect.GAIN_MAX_HP, 12))
+	pool.append(_relic("Packed Tight",
+		"A kit stowed the way Neve stows it sits close and turns a blow. Start each combat with 10 Block.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_BLOCK, 10))
+	pool.append(_relic("Marching Tonic",
+		"A foul little flask she makes you drink before the hard roads. Start each combat with 1 Strength.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_STRENGTH, 1))
+	pool.append(_relic("Broken-In Boots",
+		"Dispatch issue, worn soft to your feet over too many miles. Start each combat with 1 Dexterity.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_DEXTERITY, 1))
+	return pool
+
+
+## Maps a liaison id to its pool. Unknown ids warn and return empty (a grant simply no-ops).
+static func _build_liaison_pool(liaison: StringName) -> Array[RelicData]:
+	match liaison:
+		&"bram":
+			return _build_bram_pool()
+		&"neve":
+			return _build_neve_pool()
+		_:
+			push_warning("Unknown liaison relic pool: %s" % liaison)
+			return []
+
+
+## Rolls up to `count` relics the player doesn't already own from a liaison's pool. Shuffled
+## with the passed rng (Fisher-Yates) so the roll is reproducible from the run seed. Events
+## resolve the first pick into granted_relic_id, so the grant reuses the normal relic path.
+static func get_liaison_relic_choices(liaison: StringName, rng: RandomNumberGenerator,
+		count: int = 1, exclude_names: PackedStringArray = []) -> Array[RelicData]:
+	var filtered: Array[RelicData] = []
+	for relic in _build_liaison_pool(liaison):
+		if relic.relic_name not in exclude_names:
+			filtered.append(relic)
+	for i in range(filtered.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp := filtered[i]
+		filtered[i] = filtered[j]
+		filtered[j] = tmp
+	return filtered.slice(0, mini(count, filtered.size()))
 
 
 static func get_reward_choices(rng: RandomNumberGenerator, count: int = 3,

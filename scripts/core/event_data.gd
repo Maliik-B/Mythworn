@@ -70,8 +70,17 @@ class EventChoice extends RefCounted:
 	var card_reward_school: StringName = &""
 	## If true, selecting this choice rolls ONE random reward-pool relic the player doesn't
 	## own and grants it (resolved into granted_relic_id on selection, so the grant + summary
-	## reuse the normal relic path). The Forgotten Library's "search the shelves" find.
+	## reuse the normal relic path). A generic find; grants_liaison_relic is the themed version.
 	var grants_random_relic: bool = false
+	## If non-empty (&"bram" / &"neve"), selecting this choice rolls ONE relic the player
+	## doesn't own from that liaison's DEDICATED pool and grants it (resolved into
+	## granted_relic_id on selection, so the grant + summary reuse the normal relic path).
+	## The per-liaison reward: Bram hands out Records relics, Neve hands out Dispatch kit --
+	## quest-only pools that never appear in shops or reward rolls. Mirrors grants_random_relic
+	## but draws from a themed pool (RelicPool.get_liaison_relic_choices). Used by the folk
+	## liaison events (Scriptorium = Bram, Last Cart Out = Neve) and the Records-flavored
+	## Forgotten Library find.
+	var grants_liaison_relic: StringName = &""
 	## If true, taking this choice lets the player skip the next map node: the next node they
 	## step onto is entered (position advances, it counts as visited) but its content is passed
 	## over (RunManager.pending_skip_node). The Tourney's "watch a pass and move on" shortcut.

@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_title_relic_reworks()
 	_test_thurible()
 	_test_event_reworks()
+	_test_liaison_relics()
 	_test_title_split()
 	_test_vn_data()
 	_test_profile_intro()
@@ -1276,9 +1277,11 @@ func _test_event_reworks() -> void:
 				has_primary = true
 			if ch.card_reward and ch.card_reward_school == &"secondary":
 				has_secondary = true
-			if ch.grants_random_relic and ch.hp_change < 0:
+			# The search now pulls from Bram's Records pool (retro-upgraded off the old generic
+			# grants_random_relic), so the ruined archive pays a scholarly relic, not a stat-stick.
+			if ch.grants_liaison_relic == &"bram" and ch.hp_change < 0:
 				has_relic_find = true
-	_check("Forgotten Library offers 5 options incl. Water/Physical tomes + a costed relic find",
+	_check("Forgotten Library offers 5 options incl. Water/Physical tomes + a costed Bram Records relic find",
 		lib != null and lib.choices.size() == 5 and has_primary and has_secondary and has_relic_find)
 	var skip_found := false
 	if tourney2:
@@ -1305,6 +1308,100 @@ func _test_event_reworks() -> void:
 	_check("school-biased tome reward draws from the matching pool (Water=PRIMARY, Physical=SECONDARY)",
 		prim_ok and sec_ok)
 	RunManager.current_character = saved_char
+
+
+## Per-liaison relic pools (Oct 2026): Bram's Records set + Neve's Dispatch set. Each is a
+## dedicated quest-only pool (never in shops/reward rolls), resolvable by name so a grant lands,
+## and the roller excludes owned relics. The folk liaison events + the Forgotten Library route
+## their rewards through these pools (folk events pay in relics, per the §D faction principle).
+func _test_liaison_relics() -> void:
+	var bram := RelicPool._build_bram_pool()
+	var neve := RelicPool._build_neve_pool()
+	_check("Bram (Records) + Neve (Dispatch) pools build with 4+ relics each",
+		bram.size() >= 4 and neve.size() >= 4)
+
+	# A granted liaison relic routes through granted_relic_id, so get_relic_by_name MUST resolve
+	# every relic in both pools (else the grant + summary would silently find nothing).
+	var all_resolve := true
+	for r in bram + neve:
+		if RelicPool.get_relic_by_name(r.relic_name) == null:
+			all_resolve = false
+	_check("every liaison relic resolves via get_relic_by_name", all_resolve)
+
+	# Quest-only: none of the liaison relics may leak into post-combat reward rolls.
+	var reward_names := PackedStringArray()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 17
+	for i in 40:
+		for r in RelicPool.get_reward_choices(rng, 3):
+			reward_names.append(r.relic_name)
+	var leaked := false
+	for r in bram + neve:
+		if r.relic_name in reward_names:
+			leaked = true
+	_check("liaison relics stay out of reward rolls", not leaked)
+
+	# The roller draws only from the named pool and honors the owned-exclusion list.
+	var lrng := RandomNumberGenerator.new()
+	lrng.seed = 3
+	var bram_names := PackedStringArray()
+	for r in bram:
+		bram_names.append(r.relic_name)
+	var picks := RelicPool.get_liaison_relic_choices(&"bram", lrng, 1)
+	_check("get_liaison_relic_choices(bram) returns a Bram-pool relic",
+		picks.size() == 1 and picks[0].relic_name in bram_names)
+	# Exclude all but one -- the roll must return exactly the remaining unowned relic.
+	var owned := PackedStringArray()
+	for i in range(bram.size() - 1):
+		owned.append(bram[i].relic_name)
+	var last := RelicPool.get_liaison_relic_choices(&"bram", lrng, 1, owned)
+	_check("the roller skips owned relics (returns only the unowned one)",
+		last.size() == 1 and last[0].relic_name == bram[bram.size() - 1].relic_name)
+	# Owning the whole pool yields nothing (the grant simply no-ops).
+	var all_owned := PackedStringArray()
+	for r in bram:
+		all_owned.append(r.relic_name)
+	_check("a fully-owned pool rolls nothing",
+		RelicPool.get_liaison_relic_choices(&"bram", lrng, 1, all_owned).is_empty())
+	# An unknown liaison id is empty, not a crash.
+	_check("unknown liaison id rolls nothing",
+		RelicPool.get_liaison_relic_choices(&"nobody", lrng, 1).is_empty())
+
+	# End-to-end grant: rolling a liaison relic and running it through the normal grant path
+	# (resolve by name -> add_relic) actually equips it, the way event_scene does on selection.
+	var saved_max := RunManager.max_hp
+	var saved_cur := RunManager.current_hp
+	RunManager.relics.clear()
+	var grant := RelicPool.get_liaison_relic_choices(
+		&"neve", lrng, 1, RunManager.get_owned_relic_names())
+	var granted_name := grant[0].relic_name if grant.size() > 0 else ""
+	var resolved := RelicPool.get_relic_by_name(granted_name)
+	if resolved:
+		RunManager.add_relic(resolved)
+	_check("a rolled Neve relic resolves by name and equips via the normal grant path",
+		granted_name != "" and RunManager.has_relic(granted_name))
+	RunManager.relics.clear()
+	RunManager.max_hp = saved_max  # a pickup relic (Iron Rations) bumps max HP; restore it
+	RunManager.current_hp = saved_cur
+
+	# Event wiring: the folk liaison rewards + the library find route to the right pools.
+	var by_name := {}
+	for ev in EventPool._build_pool():
+		by_name[ev.event_name] = ev
+	var lib_bram := false
+	for ch in by_name["Forgotten Library"].choices:
+		if ch.grants_liaison_relic == &"bram":
+			lib_bram = true
+	var scriptorium_bram := false
+	for ch in by_name["The Scriptorium"].choices:
+		if ch.requires_favor == &"folk" and ch.grants_liaison_relic == &"bram":
+			scriptorium_bram = true
+	var cart_neve := false
+	for ch in by_name["The Last Cart Out"].choices:
+		if ch.grants_liaison_relic == &"neve":
+			cart_neve = true
+	_check("Forgotten Library + Scriptorium folk option grant Bram relics; Last Cart Out grants a Neve relic",
+		lib_bram and scriptorium_bram and cart_neve)
 
 
 ## The Merciful split (Oct 2026): a second kindness title, The Gracious, so a run's repeat
@@ -1653,6 +1750,9 @@ func _test_scene_scripts_compile() -> void:
 	# Scene scripts only compile when their scene runs, so the project-load check
 	# never touches them. load() here (autoloads present) forces a full compile,
 	# catching errors in the resonance-sigil edits and the encounter wiring.
+	# load() alone is too lenient -- a cached GDScript resource still returns non-null even
+	# when it has a parse error (this missed an event_scene.gd error once), so reload() the
+	# script and require OK: that re-runs the compiler and reports parse failures as an Error.
 	for path in ["res://scenes/combat/combat_scene.gd", "res://scenes/map/map_scene.gd",
 			"res://scenes/reward/card_reward_scene.gd", "res://scenes/event/event_scene.gd",
 			"res://scenes/character_select/character_select_scene.gd",
@@ -1662,7 +1762,8 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/demo/demo_end_scene.gd",
 			"res://scenes/vn/vn_scene.gd"]:
 		var scr = load(path)
-		_check("compiles: %s" % path, scr != null and scr is GDScript)
+		var compiled: bool = scr != null and scr is GDScript and scr.reload() == OK
+		_check("compiles: %s" % path, compiled)
 
 
 func _test_cooldown() -> void:

@@ -91,7 +91,9 @@ static func _ancient_shrine() -> EventData:
 
 ## A library is a choice of WHICH knowledge, so it carries more options than a normal event
 ## (five): two school-biased tomes, a strange untitled one, burning dead weight, and a search
-## that turns up a relic rather than coin -- a ruined library wouldn't hold a purse worth taking.
+## that turns up a surviving document rather than coin -- a ruined library wouldn't hold a purse
+## worth taking, but it might hold a relic from Bram's Records pool (the archive is his kind of
+## place, even when he isn't standing in it).
 ## (Water/Physical label the Emo Hybrid's schools; the demo only runs the one character.)
 static func _forgotten_library() -> EventData:
 	var e = EventData.new()
@@ -127,10 +129,10 @@ static func _forgotten_library() -> EventData:
 	var cr = EventData.EventChoice.new()
 	cr.text = "Search the shelves for anything of worth. (Lose 4 HP)"
 	cr.result_text = ("A needle hidden in a cracked spine bites your thumb -- but behind the ruined "
-		+ "rank you turn up the one tome the rot never reached, and it is worth far more than the coin "
-		+ "you were hoping for.")
+		+ "rank you turn up the one tome the rot never reached, the kind of surviving record Bram "
+		+ "would have crossed a realm for, and it is worth far more than the coin you were hoping for.")
 	cr.hp_change = -4
-	cr.grants_random_relic = true
+	cr.grants_liaison_relic = &"bram"
 
 	e.choices.append(cw)
 	e.choices.append(cp)
@@ -172,7 +174,9 @@ static func _scriptorium() -> EventData:
 	c1.passion_change = 3
 
 	# Folk-gated: only a keeper the people already trust can raise the whole town in a night.
-	# The aligned big outcome -- the entire archive saved, not just Bram's one page.
+	# The aligned big outcome -- the entire archive saved, not just Bram's one page. Per the
+	# faction-reward principle (folk events pay in relics), Bram's thanks is a Records relic from
+	# his dedicated pool, not a card -- and the prose already reads like an object pressed on you.
 	var cf = EventData.EventChoice.new()
 	cf.text = "Wake the town and carry the whole archive out before the torches come."
 	cf.result_text = ("You go door to door, and the people who trust you come out into the cold "
@@ -181,7 +185,7 @@ static func _scriptorium() -> EventData:
 		+ "open astonishment. \"I came for one page,\" he says. \"You saved the lot of it.\" He digs "
 		+ "something out of a cellar box and presses it into your hands before he leaves.")
 	cf.requires_favor = &"folk"
-	cf.card_reward = true
+	cf.grants_liaison_relic = &"bram"
 	cf.gold_change = 20
 	cf.passion_change = 4
 	cf.standing_change = 10
@@ -278,7 +282,8 @@ static func _the_tourney() -> EventData:
 ## Camelot liaison event: Neve (Dispatch) on-site running a village evacuation ahead of the
 ## corruption. Help wholeheartedly, help while covering your own escape, or walk on. Her warm,
 ## worried-veteran voice (and a touch of old-coworker familiarity with the keeper) per the
-## brief. The notebook is flavor and is never explained. Folk-leaning standing.
+## brief. The notebook is flavor and is never explained. Folk-leaning standing, and the
+## wholehearted help earns a Dispatch relic from her pool (folk events pay in relics, per §D).
 static func _last_cart_out() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Last Cart Out"
@@ -299,12 +304,15 @@ static func _last_cart_out() -> EventData:
 		+ "you leave some skin behind doing it, but the cart rolls and the children and the "
 		+ "grandmother roll with it. Neve works you like a draft animal after that, cart to cart, "
 		+ "until the square stands empty and the gray is close enough to smell. \"There,\" she says, "
-		+ "breathless. \"Now you look how you ought to.\" She marks one last line in the notebook and "
-		+ "does not let you see it.")
+		+ "breathless. \"Now you look how you ought to.\" She digs in her own pack and presses a piece "
+		+ "of her kit into your hands before you can wave it off -- \"You'll want this worse than I "
+		+ "will, where you're going.\" Then she marks one last line in the notebook and does not let "
+		+ "you see it.")
 	c1.hp_change = -4
 	c1.passion_change = 5
 	c1.standing_change = 7
 	c1.awarded_title_id = &"the_merciful"
+	c1.grants_liaison_relic = &"neve"
 
 	var c2 = EventData.EventChoice.new()
 	c2.text = "Help, but keep yourself a place on the last cart out."

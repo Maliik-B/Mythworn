@@ -543,6 +543,16 @@ func _on_choice_selected(index: int) -> void:
 		if picks.size() > 0:
 			choice.granted_relic_id = picks[0].relic_name
 
+	# A liaison relic grant rolls one unowned relic from the named liaison's dedicated pool
+	# (Bram = Records, Neve = Dispatch) and routes it through granted_relic_id, the same way
+	# the generic find does -- so the grant and the summary reuse the normal relic path.
+	if choice.grants_liaison_relic != &"" and choice.granted_relic_id == &"":
+		var liaison_picks := RelicPool.get_liaison_relic_choices(
+			choice.grants_liaison_relic, RngManager.loot_rng, 1,
+			RunManager.get_owned_relic_names())
+		if liaison_picks.size() > 0:
+			choice.granted_relic_id = liaison_picks[0].relic_name
+
 	_apply_effects(choice)
 	choice_container.visible = false
 
