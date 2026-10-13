@@ -774,6 +774,33 @@ static func get_memory_card(id: StringName) -> CardData:
 	return null
 
 
+## Curse cards -- permanent, unplayable dead cards a run can pick up as a consequence (the
+## higher tier of "refusals with teeth": a spurned party's parting gift). Built by id so events
+## grant a specific, flavored curse. Distinct from the Realm Shade's per-combat Corruption
+## (EnemyPool._corruption_curse), which never persists; these ride in the run deck for good.
+static func get_curse_card(id: StringName) -> CardData:
+	match id:
+		&"clinging_grief":
+			return _curse_clinging_grief()
+	return null
+
+
+## The Wandering Spirit's parting curse: you sent it off with its grief unspoken, and some of
+## it stayed. An unplayable card that just crowds your hand -- the price of the cold dismissal.
+static func _curse_clinging_grief() -> CardData:
+	var c := CardData.new()
+	c.card_name = "Clinging Grief"
+	c.card_type = CardData.CardType.SKILL
+	c.rarity = CardData.CardRarity.COMMON
+	c.energy_cost = 0
+	c.unplayable = true
+	c.personality = CardData.PersonalityType.NEGATIVE
+	c.target_type = CardData.TargetType.NONE
+	c.description = "Unplayable. A grief that was not yours, clinging where you cannot set it down."
+	c.flavor_text = "You sent it away with everything still unsaid. Some of it came with you."
+	return c
+
+
 ## All memory cards (for the future shop relic that surfaces them, and for tests). Not
 ## wired into any reward roll -- the gating is by construction (nothing adds these to a pool).
 static func build_memory_cards() -> Array[CardData]:

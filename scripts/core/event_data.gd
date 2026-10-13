@@ -85,3 +85,9 @@ class EventChoice extends RefCounted:
 	## step onto is entered (position advances, it counts as visited) but its content is passed
 	## over (RunManager.pending_skip_node). The Tourney's "watch a pass and move on" shortcut.
 	var skips_next_node: bool = false
+	## If non-empty, taking this choice wedges a permanent unplayable CURSE card
+	## (CardPool.get_curse_card) into the run deck -- a refusal's "teeth" at the higher tier
+	## (the spurned/dismissed party's parting gift). Distinct from granted_card_id (a boon):
+	## this is a dead card that clogs the deck for the rest of the run. Used by the Wandering
+	## Spirit's banish option.
+	var grants_curse: StringName = &""

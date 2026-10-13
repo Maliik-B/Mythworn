@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_thurible()
 	_test_event_reworks()
 	_test_liaison_relics()
+	_test_refusals()
 	_test_title_split()
 	_test_vn_data()
 	_test_profile_intro()
@@ -1420,6 +1421,50 @@ func _test_liaison_relics() -> void:
 		lib_bram and scriptorium_bram and cart_neve)
 
 
+## Refusals with teeth (Oct 2026): walking away / refusing now carries a cost. Tier 1 -- the
+## folk/liaison walk-aways lose standing (or Passion for the factionless Wounded Traveler); Tier 2
+## -- the Wandering Spirit's banish wedges a permanent unplayable curse into the run deck.
+func _test_refusals() -> void:
+	var by_name := {}
+	for ev in EventPool._build_pool():
+		by_name[ev.event_name] = ev
+
+	# Tier 1: the pure walk-aways that used to cost nothing now bite.
+	var wounded_walk := _choice_by_text(by_name["Wounded Traveler"], "Walk away")
+	_check("Wounded Traveler's walk-away costs Passion",
+		wounded_walk != null and wounded_walk.passion_change < 0)
+	var plea_walk := _choice_by_text(by_name["The Peasant's Plea"], "Walk on")
+	_check("Peasant's Plea walk-on costs the people's favor",
+		plea_walk != null and plea_walk.standing_change < 0)
+	var cart_walk := _choice_by_text(by_name["The Last Cart Out"], "Move on")
+	_check("Last Cart Out's move-on costs the people's favor",
+		cart_walk != null and cart_walk.standing_change < 0)
+	var scrip_leave := _choice_by_text(by_name["The Scriptorium"], "Leave")
+	_check("Scriptorium's leave costs the people's favor",
+		scrip_leave != null and scrip_leave.standing_change < 0)
+
+	# Tier 2: the banish is a lingering curse now.
+	var banish := _choice_by_text(by_name["Wandering Spirit"], "Banish")
+	_check("Wandering Spirit's banish wedges a curse into the deck",
+		banish != null and banish.grants_curse == &"clinging_grief")
+
+	# The curse card builds unplayable + NEGATIVE; an unknown id is null.
+	var curse := CardPool.get_curse_card(&"clinging_grief")
+	_check("Clinging Grief is an unplayable NEGATIVE curse card",
+		curse != null and curse.unplayable
+		and curse.personality == CardData.PersonalityType.NEGATIVE)
+	_check("get_curse_card returns null for an unknown id",
+		CardPool.get_curse_card(&"nope") == null)
+
+	# End-to-end: granting the curse adds a permanent unplayable card to the run deck.
+	var saved_deck := RunManager.current_deck.duplicate()
+	RunManager.current_deck.clear()
+	RunManager.add_card_to_deck(curse)
+	_check("granting the curse adds an unplayable card to the run deck",
+		RunManager.current_deck.size() == 1 and RunManager.current_deck[0].unplayable)
+	RunManager.current_deck = saved_deck
+
+
 ## The Merciful split (Oct 2026): a second kindness title, The Gracious, so a run's repeat
 ## good-acts aren't wasted on a title already held. Distinct passive from the mercy-heal lane,
 ## and the kindness grants are spread across both titles in the event pool.
@@ -1748,6 +1793,17 @@ func _card_by_name(pool: Array[CardData], card_name: String) -> CardData:
 	for c in pool:
 		if c.card_name == card_name:
 			return c
+	return null
+
+
+## First choice in an event whose text contains `needle` (a substring, so a full option
+## sentence can be matched by its distinctive verb). Null if none / the event is missing.
+func _choice_by_text(ev: EventData, needle: String) -> EventData.EventChoice:
+	if ev == null:
+		return null
+	for ch in ev.choices:
+		if ch.text.find(needle) != -1:
+			return ch
 	return null
 
 

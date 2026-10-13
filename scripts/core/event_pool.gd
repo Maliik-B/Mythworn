@@ -52,7 +52,9 @@ static func _wounded_traveler() -> EventData:
 
 	var c3 = EventData.EventChoice.new()
 	c3.text = "Walk away"
-	c3.result_text = "You continue on your path. Some problems aren't yours to solve."
+	c3.result_text = ("You continue on your path. Some problems aren't yours to solve, you tell "
+		+ "yourself, and the telling costs you a little something to keep believing.")
+	c3.passion_change = -3  # leaving someone you could have helped hardens you
 
 	e.choices.append(c1)
 	e.choices.append(c2)
@@ -205,6 +207,7 @@ static func _scriptorium() -> EventData:
 		+ "has watched people walk away from burning rooms before. \"Safe travels,\" he says, and "
 		+ "means about half of it.")
 	c3.passion_change = -2
+	c3.standing_change = -4  # leaving the archive to burn is a small mark against you with the folk
 
 	e.choices.append(c1)
 	e.choices.append(cf)
@@ -331,6 +334,7 @@ static func _last_cart_out() -> EventData:
 		+ "way she does when she is deciding not to argue. \"No,\" she agrees. \"It isn't.\" She turns "
 		+ "back to her carts. You feel her not-arguing for a mile down the road.")
 	c3.passion_change = -3
+	c3.standing_change = -6  # walking out on the evacuation costs you with the people
 
 	e.choices.append(c1)
 	e.choices.append(c2)
@@ -389,11 +393,16 @@ static func _wandering_spirit() -> EventData:
 		+ "spent itself.")
 	c2.grants_combat_boon = &"wandering_vigor"
 
+	# Refusal with teeth (higher tier): dismissing the grieving spirit for loot leaves a
+	# lingering curse -- a permanent unplayable card. The gold is real, but so is the price.
 	var c3 = EventData.EventChoice.new()
 	c3.text = "Banish the spirit"
-	c3.result_text = "You dispel the spirit with a wave. Its essence scatters into glittering motes you collect."
+	c3.result_text = ("You dispel the spirit with a wave, and its essence scatters into glittering "
+		+ "motes you gather up off the ground. But not all of it scatters. Something of what it "
+		+ "carried catches in you like a burr, cold and unspent, and settles in to stay.")
 	c3.gold_change = 25
 	c3.passion_change = -4
+	c3.grants_curse = &"clinging_grief"
 
 	e.choices.append(c1)
 	e.choices.append(c2)
@@ -507,6 +516,7 @@ static func _peasants_plea() -> EventData:
 		+ "before the sun is up. It is an easy enough thing to say, a mile of walking hasn't made "
 		+ "you feel much better though.")
 	c3.passion_change = -3
+	c3.standing_change = -6  # turning your back on the folk costs you their regard
 
 	# Folk-gated: only a keeper the people already trust can ask them to conspire. Opens for
 	# a Folk-pledged hero (and anyone who has earned the people's favor); locked otherwise with

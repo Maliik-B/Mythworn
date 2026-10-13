@@ -159,6 +159,7 @@ func _build_raider_plea_event() -> EventData:
 		+ "because he expected nothing else. You take a road that bends away from the ford. For a "
 		+ "while you can still smell the wet char of the barn on the wind. Then you can't.")
 	decline.passion_change = -2
+	decline.standing_change = -5  # refusing the raided village's plea costs you with the people
 	e.choices.append(decline)
 
 	return e
@@ -683,6 +684,13 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.skips_next_node:
 		RunManager.pending_skip_node = true
 
+	# A refusal's curse (the higher tier of consequence): a permanent unplayable card wedged
+	# into the run deck -- the spurned party's parting gift, dead weight for the rest of the run.
+	if choice.grants_curse != &"":
+		var curse = CardPool.get_curse_card(choice.grants_curse)
+		if curse:
+			RunManager.add_card_to_deck(curse)
+
 
 func _show_effect_summary(choice: EventData.EventChoice) -> void:
 	var parts: PackedStringArray = []
@@ -726,6 +734,11 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 
 	if choice.skips_next_node:
 		parts.append("Skip your next node")
+
+	if choice.grants_curse != &"":
+		var curse = CardPool.get_curse_card(choice.grants_curse)
+		if curse:
+			parts.append("Cursed: %s" % curse.card_name)
 
 	if parts.size() > 0:
 		var summary = Label.new()
