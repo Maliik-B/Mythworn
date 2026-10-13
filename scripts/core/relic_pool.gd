@@ -115,30 +115,35 @@ static func _build_bram_pool() -> Array[RelicData]:
 	return pool
 
 
-## Neve's Dispatch relics — the kit she packs the way you never would: the bandages, the
-## rations, the thing stowed so it turns a blow instead of catching one.
+## Neve's Dispatch relics — a pure survival kit: nothing to swing, everything to keep you
+## standing (patch up between fights, bleed health back during them, stand the first blow,
+## steady the hands). Keeping people alive in a trade that chews them up is the whole of her
+## work, and it shows in what she packs.
 static func _build_neve_pool() -> Array[RelicData]:
 	var pool: Array[RelicData] = []
 	pool.append(_relic("Field Dressing",
 		"Neve packed the bandages you never remember to. Heal 8 HP after each combat.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.HEAL, 8))
+	# Was a flat +12 Max HP (a bland bigger-sponge); reworked to in-fight regen so it uses HP as
+	# a flowing resource, distinct from Field Dressing's between-fight top-up. HEAL on
+	# ON_TURN_START is already handled by _apply_relic_effect, so this needs no engine work.
 	pool.append(_relic("Iron Rations",
-		"She always overpacks the food, and swears it keeps forever. Upon pickup, gain 12 Max HP.",
-		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_PICKUP,
-		RelicData.RelicEffect.GAIN_MAX_HP, 12))
+		"She overpacks the food and makes you eat on the march, whatever you say about it. Heal 2 HP at the start of each turn.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
+		RelicData.RelicEffect.HEAL, 2))
 	pool.append(_relic("Packed Tight",
 		"A kit stowed the way Neve stows it sits close and turns a blow. Start each combat with 10 Block.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 10))
+	# A flask whose kick fades: Poise (this game's Dexterity) grants bonus block and sheds 1 each
+	# turn, so the steadiness is real early and gone by the long grind -- a defensive burst, not a
+	# flat stat. (Replaced the old +1 Strength, a plain Iron Quill clone; and this absorbed the
+	# cut Broken-In Boots, so one Poise relic owns the lane instead of two.)
 	pool.append(_relic("Marching Tonic",
-		"A foul little flask she makes you drink before the hard roads. Start each combat with 1 Strength.",
+		"A foul little flask she makes you drink before the hard roads; it squares the shoulders and steadies the hands, and the kick wears off as the fight wears on. Start each combat with 2 Poise.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
-		RelicData.RelicEffect.GAIN_STRENGTH, 1))
-	pool.append(_relic("Broken-In Boots",
-		"Dispatch issue, worn soft to your feet over too many miles. Start each combat with 1 Dexterity.",
-		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
-		RelicData.RelicEffect.GAIN_DEXTERITY, 1))
+		RelicData.RelicEffect.GAIN_DEXTERITY, 2))
 	return pool
 
 

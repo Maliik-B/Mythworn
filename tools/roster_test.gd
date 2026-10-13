@@ -1320,6 +1320,22 @@ func _test_liaison_relics() -> void:
 	_check("Bram (Records) + Neve (Dispatch) pools build with 4+ relics each",
 		bram.size() >= 4 and neve.size() >= 4)
 
+	# Neve's pool is the reworked survival kit: Iron Rations is now per-turn regen (not a flat
+	# Max-HP sponge), Marching Tonic is a Poise burst (not a Strength clone), and the duplicate
+	# Broken-In Boots is cut so one Poise relic owns the lane.
+	var neve_by := {}
+	for r in neve:
+		neve_by[r.relic_name] = r
+	var rations: RelicData = neve_by.get("Iron Rations")
+	var tonic: RelicData = neve_by.get("Marching Tonic")
+	_check("Iron Rations is per-turn regen (HEAL 2 at turn start, not Max HP)",
+		rations != null and rations.effect == RelicData.RelicEffect.HEAL
+		and rations.trigger == RelicData.RelicTrigger.ON_TURN_START and rations.value == 2)
+	_check("Marching Tonic is a Poise burst (+2 Dexterity/Poise at combat start, not Strength)",
+		tonic != null and tonic.effect == RelicData.RelicEffect.GAIN_DEXTERITY and tonic.value == 2)
+	_check("Broken-In Boots is cut (one Poise relic owns the lane)",
+		not neve_by.has("Broken-In Boots"))
+
 	# A granted liaison relic routes through granted_relic_id, so get_relic_by_name MUST resolve
 	# every relic in both pools (else the grant + summary would silently find nothing).
 	var all_resolve := true
@@ -1381,7 +1397,7 @@ func _test_liaison_relics() -> void:
 	_check("a rolled Neve relic resolves by name and equips via the normal grant path",
 		granted_name != "" and RunManager.has_relic(granted_name))
 	RunManager.relics.clear()
-	RunManager.max_hp = saved_max  # a pickup relic (Iron Rations) bumps max HP; restore it
+	RunManager.max_hp = saved_max  # restore HP in case a pickup-effect relic bumped it
 	RunManager.current_hp = saved_cur
 
 	# Event wiring: the folk liaison rewards + the library find route to the right pools.

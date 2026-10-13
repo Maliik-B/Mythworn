@@ -35,6 +35,7 @@ func _ready() -> void:
 	_report_prophet()
 	_report_boss()
 	_report_physical()
+	_report_regen_check()
 
 	print("\n== harness done ==\n")
 	get_tree().quit()
@@ -135,12 +136,41 @@ func _report_physical() -> void:
 			r["passion_mean"], _tier_name(int(round(r["passion_mean"])))])
 
 
+## Iron Rations balance probe: the relic reworked to +2 HP at the start of each turn. Run on a
+## Water build (so the innate control-heal is firing too) with and without the relic, on both a
+## boss attrition fight and a long regular timer, so we can see whether regen + control-heal
+## blunts attrition too hard. "Too high" would look like HP-lost collapsing toward zero or the
+## win-rate jumping from a real risk to a near-certainty; a healthy sustain relic just shaves a
+## chunk off the damage taken.
+func _report_regen_check() -> void:
+	print("\n=== IRON RATIONS REGEN CHECK — does +2 HP/turn stack too high with the control-heal? ===")
+	print("  Water build (control-heal active). Identical fights, with vs without Iron Rations held.")
+	# Boss, realistic loadout (already has Excalibur + 2 relics); Iron Rations is the 3rd.
+	var boss_base := _run(_boss_deck(), ["caedmon"], 50, true, COMMIT_TARGET, true)
+	var boss_reg := _run(_boss_deck(), ["caedmon"], 50, true, COMMIT_TARGET, true, "Iron Rations")
+	# A long regular attrition timer (no Excalibur), so the regen is read in isolation.
+	var reg_base := _run(_mid_deck(), ["rotting", "shade"], 0, false)
+	var reg_reg := _run(_mid_deck(), ["rotting", "shade"], 0, false, COMMIT_TARGET, false, "Iron Rations")
+	_regen_bar("Caedmon, realistic   (no Rations)", boss_base)
+	_regen_bar("Caedmon, realistic   (+Iron Rations)", boss_reg)
+	_regen_bar("Rotting+Shade        (no Rations)", reg_base)
+	_regen_bar("Rotting+Shade        (+Iron Rations)", reg_reg)
+	print("  read: healthy if +Rations shaves HP-lost modestly and nudges win%% -- not if HP-lost")
+	print("        collapses toward 0 or win%% jumps from a real risk to a near-certainty.")
+
+
+func _regen_bar(label: String, r: Dictionary) -> void:
+	print("  %-34s win %5.1f%%  turns %4.1f  HP-lost avg %4.1f p90 %3.0f" % [
+		label, r["winrate"], r["turns_mean"], r["hp_lost_mean"], r["hp_lost_p90"]])
+
+
 # ============================================================
 # TRIAL RUNNER + AGGREGATION
 # ============================================================
 
 func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
-		commit: bool, commit_target: int = COMMIT_TARGET, grant_excalibur := false) -> Dictionary:
+		commit: bool, commit_target: int = COMMIT_TARGET, grant_excalibur := false,
+		extra_relic: String = "") -> Dictionary:
 	var wins := 0
 	var hp_lost: Array[int] = []
 	var turns_sum := 0
@@ -148,7 +178,8 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 	var ttb_sum := 0
 	var ttb_count := 0
 	for s in TRIALS:
-		var r := _simulate(deck, enemy_keys, s, start_passion, commit, commit_target, grant_excalibur)
+		var r := _simulate(deck, enemy_keys, s, start_passion, commit, commit_target,
+			grant_excalibur, extra_relic)
 		turns_sum += r["turns"]
 		passion_sum += r["passion"]
 		if r["ttb"] >= 0:
@@ -182,7 +213,7 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 ## reach the COMMITTED extreme tier (Blazing for a +target, Hollow for a -target).
 func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		start_passion: int, commit: bool, commit_target: int = COMMIT_TARGET,
-		grant_excalibur := false) -> Dictionary:
+		grant_excalibur := false, extra_relic: String = "") -> Dictionary:
 	# Minimal run-state reset (mirrors roster_test; avoids start_run's realm/title
 	# machinery which is irrelevant to a single combat).
 	RunManager.current_character = _character
@@ -200,6 +231,12 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		RunManager.add_relic(RelicPool.get_relic_by_name("Excalibur"))
 		RunManager.add_relic(RelicPool.get_relic_by_name("Iron Quill"))       # +1 Strength/combat
 		RunManager.add_relic(RelicPool.get_relic_by_name("Guardian's Sigil"))  # +5 Block/turn
+	# An optional extra relic by name (e.g. a liaison relic under test). Resolved via
+	# get_relic_by_name so quest/liaison pools work too.
+	if extra_relic != "":
+		var er := RelicPool.get_relic_by_name(extra_relic)
+		if er:
+			RunManager.add_relic(er)
 
 	var eng := CombatEngine.new()
 	eng.instant = true
