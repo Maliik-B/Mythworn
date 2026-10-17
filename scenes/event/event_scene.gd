@@ -319,7 +319,7 @@ func _build_room_that_isnt_event() -> EventData:
 	# memory card; the seeing takes a cut of HP. Cass warns you off, and lets you choose anyway.
 	var step = EventData.EventChoice.new()
 	step.text = "Step through the door that shouldn't fit. (Lose 8 HP)"
-	step.result_text = ("Cass says your name -- the one you gave yourself -- once, flatly, and "
+	step.result_text = ("Cass says your name once, flatly. The one you gave yourself. She "
 		+ "doesn't try to stop you with her hands. You step through, and for a moment you are "
 		+ "somewhere with a low roof and a particular light and the sense of a room you knew the "
 		+ "shape of without looking. You can't keep it. It goes the way they all go. But your hands "
@@ -413,7 +413,7 @@ func _build_reliquary_won_event() -> EventData:
 	take.result_text = ("It is a censer, a small chapel thurible of brass gone dark, its chain "
 		+ "kinked from a lifetime of being swung, a coal still sleeping in its throat. When you "
 		+ "lift it the thing swings on its own, and a thread of old incense lets go, and something "
-		+ "in you tips with it -- toward heat or toward quiet, depending on how you hold your hand. "
+		+ "in you tips with it, toward heat or toward quiet, depending on how you hold your hand. "
 		+ "It steadies you to carry it, the way a kept rhythm steadies you. You go out through the "
 		+ "lychgate lighter than you came, carrying a face, a slow-swinging weight, and the "
 		+ "particular ache of having refused to let a thing be forgotten.")

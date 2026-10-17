@@ -110,17 +110,20 @@ static func _ancient_shrine() -> EventData:
 
 
 ## A library is a choice of WHICH knowledge, so it carries more options than a normal event
-## (five): two school-biased tomes, a strange untitled one, burning dead weight, and a search
-## that turns up a surviving document rather than coin -- a ruined library wouldn't hold a purse
-## worth taking, but it might hold a relic from Bram's Records pool (the archive is his kind of
-## place, even when he isn't standing in it).
+## (four): two school-biased tomes, burning dead weight, and a search that turns up a surviving
+## document rather than coin. A ruined library wouldn't hold a purse worth taking, but it might
+## hold a relic from Bram's Records pool (the archive is his kind of place, even when he isn't
+## standing in it). Four distinct acts: specialise toward your pole, specialise away from it,
+## prune the deck, gamble HP for a find.
 ## (Water/Physical label the Emo Hybrid's schools; the demo only runs the one character.)
 static func _forgotten_library() -> EventData:
 	var e = EventData.new()
 	e.event_name = "Forgotten Library"
-	e.description = ("Shelves of rotting books line a hidden alcove. Most are ruined, but a few tomes "
-		+ "remain intact, and the spines you can still read fall into two hands -- the flowing script "
-		+ "of the water-scholars and the blunt manuals of fighting men. One book has no title at all.")
+	e.description = ("It was a manor's library once, before the crown's men or the rot or plain "
+		+ "neglect took the roof off half of it. Rain has had years with most of the shelves. The "
+		+ "deep rank under the surviving span is dry, though, and the spines you can still read fall "
+		+ "into two hands: the flowing script of the water-scholars, and the blunt manuals of "
+		+ "fighting men.")
 
 	var cw = EventData.EventChoice.new()
 	cw.text = "Study the water-scholar's tome. (Add a Water card)"
@@ -135,12 +138,6 @@ static func _forgotten_library() -> EventData:
 	cp.card_reward = true
 	cp.card_reward_school = &"secondary"
 
-	var cs = EventData.EventChoice.new()
-	cs.text = "Open the book with no title. (Add a card)"
-	cs.result_text = ("The pages are wrong somehow, and afterward you cannot say what you read. But "
-		+ "something in it took.")
-	cs.card_reward = true
-
 	var cb = EventData.EventChoice.new()
 	cb.text = "Burn a useless page. (Remove a card)"
 	cb.result_text = "You focus on what matters, feeding what holds you back to the one honest flame here."
@@ -148,15 +145,14 @@ static func _forgotten_library() -> EventData:
 
 	var cr = EventData.EventChoice.new()
 	cr.text = "Search the shelves for anything of worth. (Lose 4 HP)"
-	cr.result_text = ("A needle hidden in a cracked spine bites your thumb -- but behind the ruined "
-		+ "rank you turn up the one tome the rot never reached, the kind of surviving record Bram "
+	cr.result_text = ("A needle hidden in a cracked spine bites your thumb. Then, behind the ruined "
+		+ "rank, you turn up the one tome the rot never reached, the kind of surviving record Bram "
 		+ "would have crossed a realm for, and it is worth far more than the coin you were hoping for.")
 	cr.hp_change = -4
 	cr.grants_liaison_relic = &"bram"
 
 	e.choices.append(cw)
 	e.choices.append(cp)
-	e.choices.append(cs)
 	e.choices.append(cb)
 	e.choices.append(cr)
 	return e
@@ -175,7 +171,7 @@ static func _scriptorium() -> EventData:
 		+ "to be ash by morning. Too many charters in these drawers say the wrong families held the "
 		+ "wrong lands, and a king rewriting his claim would rather no older version survived to "
 		+ "argue with him.\n\nA figure waits at the end of the long table who does not belong to the "
-		+ "abbey. No habit, no tonsure. You know him — Bram, from Records, with his satchel of loose "
+		+ "abbey. No habit, no tonsure. You know him. Bram, from Records, with his satchel of loose "
 		+ "paper and the patience of a man who has watched a great many things get lost and stopped "
 		+ "being surprised by it. \"There you are,\" he says, and taps the satchel. \"I'll be straight "
 		+ "with you, I'm not here for the abbey. "
@@ -262,7 +258,7 @@ static func _the_tourney() -> EventData:
 		+ "and hard. The herald counts out your winnings with a sour face. Across the field the "
 		+ "commoner catches your eye and touches two fingers to his brow.")
 	c1.gamble_lose_text = ("You back the man with no device on his shield, and for three passes he "
-		+ "rides like he will shame the lot of them -- then the rotting noble's lance catches him "
+		+ "rides like he will shame the lot of them. Then the rotting noble's lance catches him "
 		+ "under the arm and he goes down and is slow to rise. The herald rakes in your stake without "
 		+ "meeting your eye. Across the field they get the commoner back to his knees; he finds you in "
 		+ "the crowd anyway, and touches two fingers to his brow.")
@@ -275,10 +271,10 @@ static func _the_tourney() -> EventData:
 	var cc = EventData.EventChoice.new()
 	cc.text = "Give the marshal your name and ride in the open challenge. (Lose 8 HP)"
 	cc.result_text = ("The marshal weighs your name, or the weight behind it, and lifts the rope. "
-		+ "They find you a horse and a lance. The ride is short and it hurts -- a lance on the shield "
-		+ "is a hammer-blow even when you keep your seat -- but you put your man in the dirt and the "
-		+ "stand roars for you. Afterward an old master-at-arms who liked your seat shows you a way of "
-		+ "closing the distance you will not forget.")
+		+ "They find you a horse and a lance. The ride is short and it hurts, because a lance on the "
+		+ "shield is a hammer-blow even when you keep your seat. You put your man in the dirt anyway, "
+		+ "and the stand roars for you. Afterward an old master-at-arms who liked your seat shows you "
+		+ "a way of closing the distance you will not forget.")
 	cc.requires_favor = &"court"
 	cc.hp_change = -8  # jousting hurts, even when you win the pass
 	cc.card_reward = true
@@ -289,7 +285,7 @@ static func _the_tourney() -> EventData:
 	c3.text = "Watch a single pass, then slip out and take the drovers' road. (Skip the next node)"
 	c3.result_text = ("You stay for one ride and leave while the crowd is still on its feet. Behind the "
 		+ "grandstand a drovers' track cuts the long bend off the king's road, and you take it at a hard "
-		+ "walk. You have seen enough of this place -- the shortcut puts the next trouble on the road "
+		+ "walk. You have seen enough of this place. The shortcut puts the next trouble on the road "
 		+ "well behind you.")
 	c3.passion_change = 3
 	c3.skips_next_node = true
@@ -326,7 +322,7 @@ static func _last_cart_out() -> EventData:
 		+ "grandmother roll with it. Neve works you like a draft animal after that, cart to cart, "
 		+ "until the square stands empty and the gray is close enough to smell. \"There,\" she says, "
 		+ "breathless. \"Now you look how you ought to.\" She digs in her own pack and presses a piece "
-		+ "of her kit into your hands before you can wave it off -- \"You'll want this worse than I "
+		+ "of her kit into your hands before you can wave it off. \"You'll want this worse than I "
 		+ "will, where you're going.\" Then she marks one last line in the notebook and does not let "
 		+ "you see it.")
 	c1.hp_change = -4
@@ -531,8 +527,8 @@ static func _peasants_plea() -> EventData:
 	var c3 = EventData.EventChoice.new()
 	c3.text = "This is not your realm to set right. Walk on."
 	c3.result_text = ("You tell her it isn't yours to mend, which is true, and you take the road out "
-		+ "before the sun is up. It is an easy enough thing to say, a mile of walking hasn't made "
-		+ "you feel much better though.")
+		+ "before the sun is up. It is an easy enough thing to say. A mile of walking hasn't made "
+		+ "it sit any easier.")
 	c3.passion_change = -3
 	c3.standing_change = -6  # turning your back on the folk costs you their regard
 
@@ -643,10 +639,17 @@ static func _campfire_remnants() -> EventData:
 	e.choices.append(investigate)
 
 	var rest = EventData.EventChoice.new()
-	rest.text = "Build the embers back up and rest."
-	rest.result_text = ("You coax the fire back out of its ashes and sit a while in someone else's "
-		+ "leavings. The warmth loosens what the road has knotted, and for a little while nothing is "
-		+ "asked of you.")
+	rest.text = "Use their wood, and sleep in their camp."
+	rest.result_text = ("Their firewood is still dry under a scrap of canvas, which is the only "
+		+ "reason you get a fire at all, and it occurs to you while you are laying it that "
+		+ "somebody's small foresight is keeping you warm a week after it stopped doing him the "
+		+ "least bit of good. You right the cook-pot, scrape out what has dried hard in the bottom "
+		+ "of it, and boil your own supper in a dead man's pot.
+
+You sleep in the bedroll "
+		+ "furthest from the barrow. Not for any reason you would say out loud. In the morning you "
+		+ "are warm and whole and slower to get up than you ought to be, and you fold the bedroll "
+		+ "back the way you found it before you go, which helps nobody at all.")
 	rest.hp_change = 12
 	e.choices.append(rest)
 

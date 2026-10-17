@@ -1375,8 +1375,16 @@ func _test_event_reworks() -> void:
 			# grants_random_relic), so the ruined archive pays a scholarly relic, not a stat-stick.
 			if ch.grants_liaison_relic == &"bram" and ch.hp_change < 0:
 				has_relic_find = true
-	_check("Forgotten Library offers 5 options incl. Water/Physical tomes + a costed Bram Records relic find",
-		lib != null and lib.choices.size() == 5 and has_primary and has_secondary and has_relic_find)
+	# Down to four after the untitled book was cut: it offered an unschooled card beside two
+	# schooled ones, so it was strictly less informative than either neighbour.
+	_check("Forgotten Library offers 4 options incl. Water/Physical tomes + a costed Bram Records relic find",
+		lib != null and lib.choices.size() == 4 and has_primary and has_secondary and has_relic_find)
+	var lib_unschooled := false
+	if lib:
+		for ch in lib.choices:
+			if ch.card_reward and ch.card_reward_school == &"":
+				lib_unschooled = true
+	_check("Forgotten Library no longer offers an unschooled card", not lib_unschooled)
 	var skip_found := false
 	if tourney2:
 		for ch in tourney2.choices:
