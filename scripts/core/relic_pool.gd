@@ -77,6 +77,15 @@ static func _build_quest_pool() -> Array[RelicData]:
 		"A chapel censer on its chain. Before each of your turns it swings your Passion toward the pole you choose — +3 toward Blazing, or -3 toward Hollow. Switch sides between fights.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.NONE, 3))
+
+	# -- Campfire treasure payoff relic. Granted by the "campfire_victory" beat after the
+	#    barrow-warden falls (you followed the dead campers' map to the cache). Quest-only, so
+	#    it never appears in shops or reward rolls. The warden's own grave-mail, lifted off the
+	#    hoard: a straight defensive opener, strong enough to justify the optional detour.
+	pool.append(_relic("Barrow-Warden's Mail",
+		"The grave-mail off the hoard's dead keeper. Start each combat with 15 Block.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_BLOCK, 15))
 	return pool
 
 

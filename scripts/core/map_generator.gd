@@ -316,6 +316,52 @@ static func _pick_quest_payoff(map: MapData, giver: MapNode, rng: RandomNumberGe
 	return cands[0]
 
 
+# A treasure cache a random Campfire exposes mid-run. Unlike the raider payoff (seated at
+# gen with a known giver), the Campfire can fire anywhere, so its payoff is chosen at the
+# moment of investigation from the nodes still AHEAD of where the player is standing. This
+# only re-targets an existing COMBAT node's routing -- it never adds a node or edge -- so the
+# map's planarity and reachability guarantees are untouched. _is_reserved_node already skips
+# nodes tagged for another questline, so a Campfire cache never lands on the raider payoff.
+
+
+## COMBAT nodes forward-reachable from `from_id`, far enough ahead to read as "elsewhere on
+## the road," unvisited, not reserved, and not already a quest node. The candidate set behind
+## both the reachability gate and the pick.
+static func _treasure_candidates(map: MapData, from_id: int) -> Array[int]:
+	var cands: Array[int] = []
+	var from_node: MapNode = map.get_node(from_id)
+	if from_node == null:
+		return cands
+	var reachable := _reachable_from(map, from_id)
+	for id in reachable:
+		var n: MapNode = map.nodes[id]
+		if n.node_type != MapNode.NodeType.COMBAT:
+			continue
+		if n.floor_num < from_node.floor_num + QUEST_PAYOFF_MIN_GAP:
+			continue
+		if n.visited or _is_reserved_node(map, n):
+			continue
+		cands.append(id)
+	return cands
+
+
+## True if a Campfire standing on `from_id` has somewhere downstream to seat a treasure. rng-
+## free so the event-selection gate can consult it without perturbing the run seed (a Campfire
+## with no valid payoff is swapped for a different event rather than offering a dead choice).
+static func has_treasure_payoff(map: MapData, from_id: int) -> bool:
+	return not _treasure_candidates(map, from_id).is_empty()
+
+
+## Picks one treasure-payoff node (seeded), or -1 if none fits (the fire fired too late in the
+## act). The caller tags the node with quest_payoff_id and arms the quest.
+static func pick_treasure_payoff(map: MapData, from_id: int, rng: RandomNumberGenerator) -> int:
+	var cands := _treasure_candidates(map, from_id)
+	if cands.is_empty():
+		return -1
+	_rng_shuffle(cands, rng)
+	return cands[0]
+
+
 ## Nodes that signature placement must never overwrite: the boss, the Sword, the opening
 ## row, the guaranteed pre-boss rest, and anything already tagged for the questline.
 static func _is_reserved_node(map: MapData, n: MapNode) -> bool:

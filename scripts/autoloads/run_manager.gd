@@ -145,16 +145,13 @@ const FAVOR_THRESHOLD := 20
 # folk option +12, or taking the raider hunt +8) to clear it. Drives the ending variant.
 const PEOPLES_CHAMPION_THRESHOLD := 33
 
-# --- Cross-map questline (the beast/bandit raiders) ---
-# The accepted quest id (&"" = nothing accepted). Set when the player accepts the plea at
-# the quest-giver node; that arms the payoff node elsewhere on the map. Keyed by id so the
-# system generalizes to future questlines. See MapNode.quest_giver_id / quest_payoff_id.
-var active_quest_id: StringName = &""
-# The payoff has been claimed (heal + Blooded Edge granted). Stops any re-trigger.
-var quest_completed: bool = false
-# map_scene has played the one-shot "the payoff node is armed" reveal flourish. Keeps the
-# reveal from replaying on every later return to the map.
-var quest_payoff_revealed: bool = false
+# --- Cross-map questlines (the raider hunt, a Campfire-revealed treasure cache) ---
+# Active questlines keyed by id. Each value tracks whether the payoff node's one-shot arm-
+# reveal flourish has played and whether the payoff has been claimed. A dict, not a single id,
+# so independent questlines can be live at once: the placed raider hunt you accepted at a plea
+# AND a treasure cache a random Campfire exposed, both armed in the same act. The id keys the
+# reveal text + payoff routing in map_scene. See MapNode.quest_giver_id / quest_payoff_id.
+var active_quests: Dictionary = {}  # StringName -> {"revealed": bool, "completed": bool}
 
 const MAX_ACTS := 3
 const DEFAULT_STARTING_REALM: StringName = &"camelot"
@@ -229,9 +226,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	scripted_event_schedule = {}
 	if starting_realm == &"camelot":
 		scripted_event_schedule[2] = &"room_that_isnt"
-	active_quest_id = &""
-	quest_completed = false
-	quest_payoff_revealed = false
+	active_quests = {}
 	pending_vn = null
 	pending_vn_queue.clear()
 	pending_vn_next = "res://scenes/map/map_scene.tscn"
@@ -786,6 +781,48 @@ func has_court_favor(realm_id: StringName = &"") -> bool:
 func is_peoples_champion(realm_id: StringName = &"") -> bool:
 	var rid: StringName = realm_id if realm_id != &"" else current_realm_id
 	return get_realm_standing(rid) >= PEOPLES_CHAMPION_THRESHOLD
+
+
+# --- Cross-map questline state ---
+
+## Arms a questline (idempotent). The payoff node reveals on the next return to the map.
+## Keyed by id so more than one hunt can be live; re-arming an active id is a no-op.
+func arm_quest(quest_id: StringName) -> void:
+	if quest_id == &"" or active_quests.has(quest_id):
+		return
+	active_quests[quest_id] = {"revealed": false, "completed": false}
+
+
+## True if the questline is armed (regardless of whether its payoff is claimed yet).
+func is_quest_active(quest_id: StringName) -> bool:
+	return quest_id != &"" and active_quests.has(quest_id)
+
+
+## True once the questline's payoff has been claimed. Stops the payoff node re-triggering.
+func is_quest_completed(quest_id: StringName) -> bool:
+	return active_quests.has(quest_id) and active_quests[quest_id].completed
+
+
+## Marks the payoff claimed (called from the victory beat).
+func complete_quest(quest_id: StringName) -> void:
+	if active_quests.has(quest_id):
+		active_quests[quest_id].completed = true
+
+
+## Marks the one-shot arm-reveal flourish as played so it never replays.
+func mark_quest_revealed(quest_id: StringName) -> void:
+	if active_quests.has(quest_id):
+		active_quests[quest_id].revealed = true
+
+
+## The first armed questline whose reveal hasn't played yet (&"" = none pending). At most one
+## is pending per map return: arming only happens inside an event, and the player always passes
+## back through the map between events, so each armed quest reveals on its own return.
+func first_unrevealed_quest() -> StringName:
+	for quest_id in active_quests:
+		if not active_quests[quest_id].revealed:
+			return quest_id
+	return &""
 
 
 ## Coarse-grained hostility readout for content gating. Map / encounter

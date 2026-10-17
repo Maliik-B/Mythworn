@@ -7,6 +7,24 @@ static func get_random_event(rng: RandomNumberGenerator) -> EventData:
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
+## Like get_random_event, but drops events whose selection gate the caller can't satisfy.
+## Currently that's only the treasure-reveal gate: the Campfire's cache needs a node downstream
+## of the player to seat its fight, so when none exists the Campfire is excluded and a different
+## event is drawn (rather than offering a "follow the map" choice that goes nowhere). Draws once
+## from the filtered pool, so the rng advances exactly as the unfiltered draw would.
+static func get_random_event_filtered(rng: RandomNumberGenerator, allow_treasure_reveal: bool) -> EventData:
+	var pool := _build_pool()
+	if allow_treasure_reveal:
+		return pool[rng.randi_range(0, pool.size() - 1)]
+	var filtered: Array[EventData] = []
+	for e in pool:
+		if not e.requires_treasure_payoff:
+			filtered.append(e)
+	if filtered.is_empty():
+		filtered = pool
+	return filtered[rng.randi_range(0, filtered.size() - 1)]
+
+
 static func _build_pool() -> Array[EventData]:
 	var pool: Array[EventData] = []
 
@@ -596,29 +614,49 @@ static func _reliquary() -> EventData:
 	return e
 
 
+## The fire is days cold, but the camp tells a story: these were diggers who broke open an old
+## barrow, got the grave-goods out, and fled whatever was laid in with them -- leaving a journal
+## whose last page maps where they cached the haul. Reading it ARMS a treasure node down the
+## road (arms_quest = &"campfire"), which reveals on the next map return and pays off a strong
+## fight (the barrow-warden) for extra gold + a relic. requires_treasure_payoff gates the whole
+## event out when the fire would fire too late to seat that node, so the map-choice is never dead.
 static func _campfire_remnants() -> EventData:
 	var e = EventData.new()
 	e.event_name = "Campfire Remnants"
-	e.description = "Embers still glow in a recently abandoned campsite. Bedrolls, supplies, and a journal lie scattered. Whoever was here left in a hurry."
+	e.requires_treasure_payoff = true
+	e.description = ("The fire is days cold, but the camp is barely a week abandoned: bedrolls "
+		+ "still laid out, a cook-pot tipped where someone kicked it rising. These were diggers, "
+		+ "not travellers: mattocks, a coil of rope, and in the rise behind the camp an old barrow "
+		+ "stands open, its capstone levered aside. Whatever they pulled out of it, they left in "
+		+ "too much of a hurry to take their own gear. A journal lies open in the ashes, a map "
+		+ "sketched across its last page.")
 
-	var c1 = EventData.EventChoice.new()
-	c1.text = "Rest by the fire"
-	c1.result_text = "The warmth soothes your aches. You drift off briefly and wake feeling restored."
-	c1.hp_change = 12
+	var investigate = EventData.EventChoice.new()
+	investigate.text = "Read the journal, and follow its map."
+	investigate.result_text = ("The last pages are one man's hand going ragged. They broke the "
+		+ "barrow for a lord's grave-goods and got them clear, and then the thing laid in with the "
+		+ "gold stood up. They cached the haul further down the road, somewhere they prayed it "
+		+ "couldn't follow, and ran, and the writing stops mid-word. The map is clear enough. The "
+		+ "mark sits further along your way.")
+	investigate.arms_quest = &"campfire"
+	investigate.passion_change = 2  # the pull of the hunt
+	e.choices.append(investigate)
 
-	var c2 = EventData.EventChoice.new()
-	c2.text = "Read the journal"
-	c2.result_text = "The journal details combat techniques you haven't considered. You feel sharper."
-	c2.remove_card = true
-	c2.passion_change = 2
+	var rest = EventData.EventChoice.new()
+	rest.text = "Build the embers back up and rest."
+	rest.result_text = ("You coax the fire back out of its ashes and sit a while in someone else's "
+		+ "leavings. The warmth loosens what the road has knotted, and for a little while nothing is "
+		+ "asked of you.")
+	rest.hp_change = 12
+	e.choices.append(rest)
 
-	var c3 = EventData.EventChoice.new()
-	c3.text = "Loot the supplies"
-	c3.result_text = "You stuff your pockets with everything useful. Better you than the wilderness."
-	c3.gold_change = 18
-	c3.passion_change = -2
+	var loot = EventData.EventChoice.new()
+	loot.text = "Strip the camp and move on."
+	loot.result_text = ("You take what's worth carrying: the rope, a whetstone, a little coin sewn "
+		+ "into a bedroll against exactly this. Better your pack than the crows'. You leave the "
+		+ "journal where it lies.")
+	loot.gold_change = 18
+	loot.passion_change = -2
+	e.choices.append(loot)
 
-	e.choices.append(c1)
-	e.choices.append(c2)
-	e.choices.append(c3)
 	return e

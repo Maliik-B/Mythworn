@@ -24,7 +24,12 @@ func _ready() -> void:
 		if scripted != &"":
 			event = _build_special_event(scripted)
 		else:
-			event = EventPool.get_random_event(RngManager.event_rng)
+			# Gate out the Campfire's cache-reveal when there's nowhere downstream to seat it
+			# (see EventData.requires_treasure_payoff) so "follow the map" is never a dead choice.
+			var map = RunManager.current_map
+			var treasure_ok := map != null \
+				and MapGenerator.has_treasure_payoff(map, map.current_node_id)
+			event = EventPool.get_random_event_filtered(RngManager.event_rng, treasure_ok)
 	_build_ui()
 	_show_choices()
 	AudioManager.play_music("rest")
@@ -45,6 +50,10 @@ func _build_special_event(id: StringName) -> EventData:
 			return _build_raider_ambush_event()
 		&"raider_victory":
 			return _build_raider_victory_event()
+		&"campfire_ambush":
+			return _build_campfire_ambush_event()
+		&"campfire_victory":
+			return _build_campfire_victory_event()
 		&"room_that_isnt":
 			return _build_room_that_isnt_event()
 		&"reliquary_struck":
@@ -190,7 +199,7 @@ func _build_raider_ambush_event() -> EventData:
 ## your wounds) plus Blooded Edge (the one good thing they had left to give). Marking the quest
 ## complete here stops any re-trigger; the grant itself happens on the choice.
 func _build_raider_victory_event() -> EventData:
-	RunManager.quest_completed = true
+	RunManager.complete_quest(&"raiders")
 
 	var e = EventData.new()
 	e.event_name = "What the Village Had Left"
@@ -214,6 +223,74 @@ func _build_raider_victory_event() -> EventData:
 	e.choices.append(take)
 
 	return e
+
+
+# ============================================================
+# CAMPFIRE TREASURE (a random fire exposes a cache down the road)
+# ============================================================
+
+## The treasure payoff, armed. The dead campers' map led here: the barrow the warden came out
+## of, and the cache they hid before they ran. Reaching for the gold rouses him. Victory routes
+## to the reward beat. Fight-only, like the raider ambush -- the player armed this knowingly and
+## pathed to it, so there's no back-out at the cache.
+func _build_campfire_ambush_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Cache on the Road"
+	e.description = ("The map runs out at a fork where a cairn of grave-stones has been pulled "
+		+ "half apart. The cache is where the journal promised: oilcloth bundles wedged under the "
+		+ "stones, heavy with a lord's buried wealth. You have a hand on the first of them when the "
+		+ "cold comes up out of the ground.\n\nHe was a knight once, laid here with his hoard the "
+		+ "old way. The corruption has kept him past his rest, grey-gold and wrong, grave-mail grown "
+		+ "into him like bark on a fence-post. He does not speak. He simply stands between you and "
+		+ "the gold, the way he has stood since before the road had a name.")
+
+	var fight = EventData.EventChoice.new()
+	fight.text = "Take the hoard. Put him back in the ground."
+	fight.starts_combat = &"barrow_warden"
+	e.choices.append(fight)
+
+	return e
+
+
+## The reward beat after the warden falls. The cache is the payoff: a purse of the lord's buried
+## wealth (extra gold) and the warden's own grave-mail (Barrow-Warden's Mail). Marking the quest
+## complete here stops any re-trigger; the grants happen on the choice.
+func _build_campfire_victory_event() -> EventData:
+	RunManager.complete_quest(&"campfire")
+
+	var e = EventData.new()
+	e.event_name = "What the Barrow Kept"
+	e.description = ("He comes apart the way old things do, all at once, the cold going out of "
+		+ "him, the grave-mail folding empty to the road. For a breath the barrow is only a barrow "
+		+ "again, and the quiet is enormous.\n\nThe cache is where the dead men left it. The lord's "
+		+ "wealth is real, and heavier than it looks. And the mail the warden wore has come away "
+		+ "from him whole, the grave-cold still in it, fitted for a body about your size.")
+
+	var take = EventData.EventChoice.new()
+	take.text = "Take the hoard and the mail."
+	take.result_text = ("You load the coin into your pack until the seams complain, and work "
+		+ "yourself into the grave-mail. It settles cold against you and never warms, but little "
+		+ "gets through it, and it is yours now, not his.")
+	take.gold_change = 55
+	take.granted_relic_id = &"Barrow-Warden's Mail"
+	e.choices.append(take)
+
+	return e
+
+
+## Seats the Campfire treasure at a node downstream of the player, then arms the quest so the
+## payoff reveals on the next return to the map. The event-selection gate already confirmed a
+## candidate exists, so the pick normally succeeds; if it fails anyway the quest is left unarmed
+## rather than marking a node that can't be reached. event_rng keeps the pick run-seed-stable.
+func _arm_campfire_treasure() -> void:
+	var map = RunManager.current_map
+	if map == null:
+		return
+	var payoff_id := MapGenerator.pick_treasure_payoff(map, map.current_node_id, RngManager.event_rng)
+	if payoff_id == -1:
+		return
+	map.nodes[payoff_id].quest_payoff_id = &"campfire"
+	RunManager.arm_quest(&"campfire")
 
 
 ## The Room That Isn't -- introduces Cass (Anomalies). Scheduled as the player's 2nd event
@@ -624,6 +701,16 @@ func _start_event_combat(key: StringName) -> void:
 			RunManager.pending_event_combat = true
 			RunManager.pending_special_event = &"reliquary_won"
 			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
+		&"barrow_warden":
+			RunManager.pending_enemies.clear()
+			for enemy in EnemyPool.get_barrow_warden():
+				RunManager.pending_enemies.append(enemy)
+			RunManager.pending_gold_reward = 0
+			RunManager.pending_relic_reward = false
+			RunManager.pending_relic_is_boss = false
+			RunManager.pending_event_combat = true
+			RunManager.pending_special_event = &"campfire_victory"
+			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
 		_:
 			push_warning("Unknown event combat key: %s" % key)
 			_show_done()
@@ -667,10 +754,16 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 		if mem:
 			RunManager.add_card_to_deck(mem)
 
-	# Accepting a plea arms the cross-map questline: the payoff node reveals on the next
-	# return to the map (map_scene plays the arm flourish + objective toast).
+	# Accepting a plea arms a cross-map questline: the payoff node reveals on the next return
+	# to the map (map_scene plays the arm flourish + objective toast). The raider payoff is
+	# already seated at gen; the Campfire cache has no pre-placed node, so arming it first
+	# picks + tags a node downstream of where the player stands (the event-selection gate
+	# guaranteed one exists). A failed pick (shouldn't happen) just leaves the quest unarmed.
 	if choice.arms_quest != &"":
-		RunManager.active_quest_id = choice.arms_quest
+		if choice.arms_quest == &"campfire":
+			_arm_campfire_treasure()
+		else:
+			RunManager.arm_quest(choice.arms_quest)
 
 	# Faction-aligned acts shift the realm's court<->folk standing.
 	if choice.standing_change != 0:

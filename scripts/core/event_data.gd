@@ -5,6 +5,11 @@ extends RefCounted
 var event_name: String = ""
 var description: String = ""
 var choices: Array[EventChoice] = []
+## Selection gate: if true, this event may only be served when a treasure-payoff node exists
+## downstream of the player (MapGenerator.has_treasure_payoff). The Campfire's cache-reveal
+## needs somewhere ahead to seat the fight; if the fire would fire too late in the act,
+## event_scene swaps in a different event rather than offer a dead "follow the map" choice.
+var requires_treasure_payoff: bool = false
 
 
 class EventChoice extends RefCounted:
@@ -37,8 +42,10 @@ class EventChoice extends RefCounted:
 	## warned -> struck -> the chapel beast). The choice's own effects still apply first.
 	var next_event_id: StringName = &""
 	## If non-empty, accepting this choice ARMS the cross-map questline with this id
-	## (RunManager.active_quest_id): the payoff node elsewhere on the map reveals and becomes
-	## the quest's payoff. Used by the raiders' plea. See MapNode quest fields + map_scene.
+	## (RunManager.arm_quest): the payoff node elsewhere on the map reveals and becomes the
+	## quest's payoff on the next map return. Used by the raiders' plea (&"raiders") and the
+	## Campfire's cache-reveal (&"campfire", which also runtime-picks + tags its payoff node in
+	## event_scene._arm_campfire_treasure). See MapNode quest fields + map_scene.
 	var arms_quest: StringName = &""
 	## Favor gate: if &"folk" / &"court", this choice is only selectable while the player
 	## holds that faction's favor (RunManager.has_folk_favor / has_court_favor). Otherwise it

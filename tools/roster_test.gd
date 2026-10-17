@@ -813,6 +813,97 @@ func _test_realm_config() -> void:
 		band.size() == 3 and band_names.count("The Boar") == 1
 		and band_names.count("Weald Raider") == 2)
 
+	# Campfire treasure: a random fire exposes a cache node downstream of the player. Over
+	# seeds, standing at an early-interior node finds a valid payoff (so the selection gate
+	# rarely has to swap the Campfire out), and any picked payoff is a COMBAT node strictly
+	# downstream, forward-reachable, and not already reserved (never the raider payoff).
+	var t_available := 0
+	var t_pick_ok := true
+	for s in range(40):
+		var trng := RandomNumberGenerator.new()
+		trng.seed = 500 + s
+		var tmap := MapGenerator.generate(trng, &"camelot", 1, 1.0, false)
+		var from_id := -1
+		for id in tmap.nodes:
+			if tmap.nodes[id].floor_num == 3:
+				from_id = id
+				break
+		if from_id == -1:
+			continue
+		if not MapGenerator.has_treasure_payoff(tmap, from_id):
+			continue
+		t_available += 1
+		var pid := MapGenerator.pick_treasure_payoff(tmap, from_id, trng)
+		if pid == -1:
+			t_pick_ok = false
+			continue
+		var pn: MapNode = tmap.nodes[pid]
+		if pn.node_type != MapNode.NodeType.COMBAT \
+				or pn.floor_num <= tmap.nodes[from_id].floor_num \
+				or pn.quest_payoff_id != &"" \
+				or not _forward_reachable(tmap, from_id).has(pid):
+			t_pick_ok = false
+	_check("campfire treasure finds a downstream payoff from an early node on most seeds",
+		t_available >= 30)
+	_check("campfire treasure pick is a downstream, forward-reachable, unreserved combat node",
+		t_pick_ok)
+
+	# The barrow-warden treasure fight is a solo, elite-weight body; its relic is quest-only.
+	var warden := EnemyPool.get_barrow_warden()
+	_check("barrow-warden is a solo fight (The Barrow-Warden)",
+		warden.size() == 1 and warden[0].enemy_name == "The Barrow-Warden")
+	_check("Barrow-Warden's Mail exists in the quest pool",
+		RelicPool.get_relic_by_name("Barrow-Warden's Mail") != null)
+
+	# The selection gate: treasure-reveal events are dropped when no payoff is allowed, and
+	# reachable when it is. (The Campfire is the only such event.)
+	var gate_rng := RandomNumberGenerator.new()
+	gate_rng.seed = 77
+	var saw_campfire_when_blocked := false
+	for i in 200:
+		if EventPool.get_random_event_filtered(gate_rng, false).requires_treasure_payoff:
+			saw_campfire_when_blocked = true
+			break
+	_check("treasure-reveal events are excluded when no payoff is available",
+		not saw_campfire_when_blocked)
+	var saw_campfire_when_allowed := false
+	for i in 400:
+		if EventPool.get_random_event_filtered(gate_rng, true).requires_treasure_payoff:
+			saw_campfire_when_allowed = true
+			break
+	_check("treasure-reveal events can appear when a payoff is available",
+		saw_campfire_when_allowed)
+
+	# The Campfire event carries the cache-reveal option (arms_quest = campfire) + the gate flag.
+	var campfire_ev: EventData = null
+	for ev in EventPool._build_pool():
+		if ev.requires_treasure_payoff:
+			campfire_ev = ev
+			break
+	var campfire_has_arm := false
+	if campfire_ev:
+		for ch in campfire_ev.choices:
+			if ch.arms_quest == &"campfire":
+				campfire_has_arm = true
+	_check("the Campfire event gates on a payoff and offers the cache-reveal option",
+		campfire_ev != null and campfire_has_arm)
+
+	# Multi-quest state: two questlines can be armed + tracked independently.
+	RunManager.active_quests = {}
+	RunManager.arm_quest(&"raiders")
+	RunManager.arm_quest(&"campfire")
+	_check("two questlines can be armed at once",
+		RunManager.is_quest_active(&"raiders") and RunManager.is_quest_active(&"campfire"))
+	RunManager.complete_quest(&"raiders")
+	_check("completing one questline leaves the other active + incomplete",
+		RunManager.is_quest_completed(&"raiders")
+		and not RunManager.is_quest_completed(&"campfire")
+		and RunManager.is_quest_active(&"campfire"))
+	RunManager.mark_quest_revealed(&"raiders")
+	_check("first_unrevealed_quest returns the still-unrevealed questline",
+		RunManager.first_unrevealed_quest() == &"campfire")
+	RunManager.active_quests = {}  # restore
+
 	# Reward-rarity knob: a > 1 mult biases card rarity rolls toward RARE.
 	RunManager.realm_config = RealmConfig.new()
 	var rr_rng := RandomNumberGenerator.new()
@@ -835,7 +926,8 @@ func _test_realm_config() -> void:
 		RelicPool.get_relic_by_name("Bram's Briefing") != null
 		and RelicPool.get_relic_by_name("Neve's Kit") != null
 		and RelicPool.get_relic_by_name("The People's Line") != null
-		and RelicPool.get_relic_by_name("Blooded Edge") != null)
+		and RelicPool.get_relic_by_name("Blooded Edge") != null
+		and RelicPool.get_relic_by_name("Barrow-Warden's Mail") != null)
 	var reward_names := PackedStringArray()
 	var boon_rng := RandomNumberGenerator.new()
 	boon_rng.seed = 5
@@ -846,7 +938,8 @@ func _test_realm_config() -> void:
 		"Bram's Briefing" not in reward_names
 		and "Neve's Kit" not in reward_names
 		and "The People's Line" not in reward_names
-		and "Blooded Edge" not in reward_names)
+		and "Blooded Edge" not in reward_names
+		and "Barrow-Warden's Mail" not in reward_names)
 
 	# Liaison gifts grant the two send-off relics.
 	RunManager.relics.clear()

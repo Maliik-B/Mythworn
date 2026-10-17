@@ -232,6 +232,15 @@ static func get_raider_band() -> Array[EnemyData]:
 	return result
 
 
+## The Campfire treasure guardian: a solo, elite-weight fight (the barrow-warden denning on
+## the cache the campers dug up and fled). A chosen, optional detour with a strong reward, so
+## it's meatier than a regular but a notch under the Shattered Choir mini-boss.
+static func get_barrow_warden() -> Array[EnemyData]:
+	var result: Array[EnemyData] = []
+	result.append(the_barrow_warden(_act_mult()))
+	return result
+
+
 ## The Act-1 boss: Sir Caedmon. (Acts 2-3 are out of demo scope; map_scene still
 ## routes those to its legacy boss builders.)
 static func get_boss(difficulty_mult: float = 1.0) -> Array[EnemyData]:
@@ -611,6 +620,34 @@ static func the_shattered_choir(mult := 1.0) -> EnemyData:
 			[_self_heal(_scale(8, mult)), _block(_scale(6, mult))], 1.0, 2),
 	]
 	return _enemy("The Shattered Choir", _scale(70, mult), moves)
+
+
+# ============================================================
+# CAMELOT EVENT FIGHT — The Campfire cache's barrow-warden
+# ============================================================
+
+## The Barrow-Warden (solo, elite-weight). A knight laid in an old grave-mound with his hoard,
+## risen under the realm's corruption to keep it. The campers who dug for the cache woke him
+## and ran, leaving their gear by the dead fire. Optional (the Campfire's "follow the map"
+## reveal), with a strong reward, so he hits harder than a regular: a heavy telegraphed smash
+## he guards the gold with (Hoarder's Wrath), grave-cold that saps you (Barrow Chill = Weak +
+## Vulnerable, so the next smash spikes), and a steady maul between. No new combat tech.
+static func the_barrow_warden(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Grave Maul", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(11, mult))], 1.8),
+		# Grave-cold: Weak throttles your offense while Vulnerable sets up the heavy. Cooldown
+		# so it can't chain you into a lock.
+		_move("Barrow Chill", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.WEAK, 1), _status(StatusEffects.VULNERABLE, 1)], 1.1, 2),
+		# The telegraphed heavy he guards the hoard with. Cooldown paces it as a rhythm to block.
+		_move("Hoarder's Wrath", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(21, mult))], 1.3, 2),
+	]
+	# HP sits high enough (above a regular, under the Shattered Choir mini-boss) that the fight
+	# lasts long enough for Barrow Chill -> Hoarder's Wrath to actually cycle -- otherwise a
+	# burst deck ends it before the heavy lands and the "strong, earned treasure" read is lost.
+	return _enemy("The Barrow-Warden", _scale(82, mult), moves)
 
 
 # ============================================================

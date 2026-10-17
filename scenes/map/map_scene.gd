@@ -89,10 +89,11 @@ func _ready() -> void:
 	# First map open after a pledge: animate only the nodes the pledge changed.
 	if fresh_map and not RunManager.current_map.pledge_changes.is_empty():
 		_prime_pledge_changes()
-	# Returning to the map having just accepted the plea: reveal the now-armed payoff node
-	# once. (Mutually exclusive with the pledge flourish, which only plays on a fresh map.)
-	elif RunManager.active_quest_id != &"" and not RunManager.quest_payoff_revealed:
-		_prime_quest_reveal()
+	# Returning to the map having just armed a questline: reveal the now-armed payoff node
+	# once. (Mutually exclusive with the pledge flourish, which only plays on a fresh map.) At
+	# most one questline is pending a reveal per return -- arming always happens inside an event.
+	elif RunManager.first_unrevealed_quest() != &"":
+		_prime_quest_reveal(RunManager.first_unrevealed_quest())
 	AudioManager.play_music("map")
 
 	# Refresh the bottom bar's title counter when titles change while on the map.
@@ -1614,7 +1615,7 @@ func _create_node_button(node: MapNode) -> Button:
 	if node.node_type == MapNode.NodeType.ELITE and node.weakened:
 		btn.tooltip_text = "Weakened elite — the people sabotaged it. Easier fight, same rewards."
 	if _is_quest_payoff_armed(node):
-		btn.tooltip_text = "The hunt leads here. The Boar's band waits on the road past the ford."
+		btn.tooltip_text = _quest_payoff_tooltip(node.quest_payoff_id)
 
 	btn.pressed.connect(_on_node_clicked.bind(node))
 	btn.mouse_entered.connect(_on_node_hover.bind(node))
@@ -1777,9 +1778,9 @@ func _enter_node(node: MapNode) -> void:
 		return
 
 	# Armed questline payoff: route to the quest's ambush instead of this node's normal type.
-	# (The node looked ordinary until the plea armed it; now it pays off the hunt.)
-	if _is_quest_payoff_armed(node) and not RunManager.quest_completed:
-		RunManager.pending_special_event = &"raider_ambush"
+	# (The node looked ordinary until a plea/campfire armed it; now it pays off.)
+	if _is_quest_payoff_armed(node) and not RunManager.is_quest_completed(node.quest_payoff_id):
+		RunManager.pending_special_event = _quest_ambush_event(node.quest_payoff_id)
 		SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		return
 
@@ -1957,19 +1958,19 @@ func _scroll_value_for_floor(floor_num: int) -> float:
 # QUESTLINE PAYOFF REVEAL (arm flourish — one node, mid-run)
 # ============================================================
 
-## True if `node` is the payoff for the quest the player has accepted. Drives its glyph,
+## True if `node` is the payoff for a questline the player has armed. Drives its glyph,
 ## landmark brightness, and routing. Independent of completion (a done payoff keeps its mark).
 func _is_quest_payoff_armed(node: MapNode) -> bool:
-	return node.quest_payoff_id != &"" and node.quest_payoff_id == RunManager.active_quest_id
+	return node.quest_payoff_id != &"" and RunManager.is_quest_active(node.quest_payoff_id)
 
 
-## The armed payoff node on the current map, or null (none placed / no quest accepted).
-func _quest_payoff_node() -> MapNode:
+## The payoff node for the given questline on the current map, or null (none placed / unknown).
+func _quest_payoff_node(quest_id: StringName) -> MapNode:
 	var map = RunManager.current_map
-	if map == null or RunManager.active_quest_id == &"":
+	if map == null or quest_id == &"":
 		return null
 	for id in map.nodes:
-		if map.nodes[id].quest_payoff_id == RunManager.active_quest_id:
+		if map.nodes[id].quest_payoff_id == quest_id:
 			return map.nodes[id]
 	return null
 
@@ -1985,15 +1986,15 @@ func _player_floor() -> int:
 
 ## Set the payoff node to its PRE-arm look and hide it synchronously (no first-frame flash of
 ## the glyph), latch the one-shot flag, then start the reveal after layout.
-func _prime_quest_reveal() -> void:
-	var node := _quest_payoff_node()
+func _prime_quest_reveal(quest_id: StringName) -> void:
+	var node := _quest_payoff_node(quest_id)
 	if node == null:
-		RunManager.quest_payoff_revealed = true  # nothing to reveal; don't retry
+		RunManager.mark_quest_revealed(quest_id)  # nothing to reveal; don't retry
 		return
 	var btn: Button = node_buttons.get(node.id)
 	if btn == null:
 		return
-	RunManager.quest_payoff_revealed = true
+	RunManager.mark_quest_revealed(quest_id)
 	_style_node_button(btn, node.node_type, node.weakened, false)  # its ordinary pre-arm look
 	btn.pivot_offset = btn.size / 2.0
 	btn.scale = Vector2(0.5, 0.5)
@@ -2035,12 +2036,42 @@ func _play_quest_reveal(node: MapNode) -> void:
 		"deenlarge_t": REVEAL_DEENLARGE_T,
 	}, _quest_swap_cb(btn, node))
 
-	_show_objective_toast("The hunt is marked. The Boar waits on the road past the ford.")
+	_show_objective_toast(_quest_reveal_toast(node.quest_payoff_id))
 
 
 ## Flip-midpoint callback: swap the payoff node into its armed quest-glyph look.
 func _quest_swap_cb(btn: Button, node: MapNode) -> Callable:
 	return func() -> void: _style_node_button(btn, node.node_type, node.weakened, true)
+
+
+## The objective toast raised when a questline's payoff reveals, keyed by quest id.
+func _quest_reveal_toast(quest_id: StringName) -> String:
+	match quest_id:
+		&"raiders":
+			return "The hunt is marked. The Boar waits on the road past the ford."
+		&"campfire":
+			return "The dead men's map is marked. A barrow-cache waits down the road."
+	return "A mark is set on your road."
+
+
+## The hover tooltip an armed payoff node carries, keyed by quest id.
+func _quest_payoff_tooltip(quest_id: StringName) -> String:
+	match quest_id:
+		&"raiders":
+			return "The hunt leads here. The Boar's band waits on the road past the ford."
+		&"campfire":
+			return "The map leads here. A barrow-warden keeps the cache the campers left behind."
+	return "Something waits here."
+
+
+## The special-event id a questline's payoff node routes to when entered, keyed by quest id.
+func _quest_ambush_event(quest_id: StringName) -> StringName:
+	match quest_id:
+		&"raiders":
+			return &"raider_ambush"
+		&"campfire":
+			return &"campfire_ambush"
+	return &""
 
 
 ## A brief centered objective line that fades in, holds, and fades out below the header.
