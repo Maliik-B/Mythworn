@@ -56,13 +56,13 @@ const ENEMY_SPRITES = {
 	"Hollow Warden": ["res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/Idle.png", 12, 12, 62, 52],
 	"Fable's End": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
 	# New Sep/Oct-2026 roster (thickening + content furnishing). CC0 stand-ins chosen so no
-	# paired composition shows two identical sprites -- e.g. the Crossbowman is a Goblin so
-	# crossbowman_knight reads as a goblin + a skeleton, and the Herald is the robed Wizard so
+	# paired composition shows two identical sprites -- e.g. the Pikeman is a Goblin so
+	# pikeman_knight reads as a goblin + a skeleton, and the Herald is the robed Wizard so
 	# herald_knight doesn't double the skeleton. Distinct per-enemy art is the B5 track item.
 	"Man-at-Arms": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
 	"Corrupted Squire": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
 	"Prophet's Acolyte": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
-	"Corrupted Crossbowman": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
+	"Corrupted Pikeman": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
 	"Hollow Herald": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
 	"Rotting Knight": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
 	# New elites (both solo nodes, so no in-fight sprite clash).

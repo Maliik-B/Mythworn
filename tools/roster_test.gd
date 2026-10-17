@@ -445,27 +445,27 @@ func _test_new_regulars() -> void:
 	eng.free()
 
 
-## The Oct-2026 content-furnishing enemies: the ranged-pierce Crossbowman, the escalation
+## The Oct-2026 content-furnishing enemies: the reach-pierce Pikeman, the escalation
 ## Hollow Herald, the Poison-stacking Rotting Knight, and the self-healing Hollow Prelate
 ## elite. Each is checked for its signature mechanic end-to-end through the real engine.
 func _test_content_enemies() -> void:
-	# Crossbowman: the Heavy Bolt carries pierce, and a piercing hit bypasses part of block.
-	var cross := EnemyPool.corrupted_crossbowman()
-	var bolt := _move_by_name(cross, "Heavy Bolt")
+	# Pikeman: the Pike Thrust carries pierce, and a piercing hit bypasses part of block.
+	var cross := EnemyPool.corrupted_pikeman()
+	var bolt := _move_by_name(cross, "Pike Thrust")
 	var bolt_pierce := 0
 	if bolt:
 		for e in bolt.effects:
 			if e is DamageEffect:
 				bolt_pierce = e.pierce
-	_check("Crossbowman's Heavy Bolt pierces block", bolt != null and bolt_pierce > 0)
+	_check("Pikeman's Pike Thrust pierces block", bolt != null and bolt_pierce > 0)
 
 	var eng := CombatEngine.new()
 	add_child(eng)
-	eng.start_combat([], 50, 50, [EnemyPool.corrupted_crossbowman()])
+	eng.start_combat([], 50, 50, [EnemyPool.corrupted_pikeman()])
 	eng.player_stats.gain_block(10)
 	# 11 dmg, pierce 5: 5 bypasses block straight to HP, the other 6 soaks block (10 -> 4).
 	bolt.effects[0].apply(eng.enemies[0].stats, eng.player_stats, eng)
-	_check("a piercing bolt bypasses part of block (HP -5, block 10 -> 4)",
+	_check("a piercing thrust bypasses part of block (HP -5, block 10 -> 4)",
 		eng.player_stats.current_hp == 45 and eng.player_stats.block == 4)
 	# Pierce can't deal more than the hit: 4 dmg / pierce 10 into no block = 4 HP, not 10.
 	eng.player_stats.current_hp = 50

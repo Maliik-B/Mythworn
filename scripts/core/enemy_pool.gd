@@ -50,8 +50,8 @@ const _COMBAT_POOL := [
 	["two_squires", 0.7],         # double glass harasser — stacking Vulnerable, low HP
 	# New Oct-2026 compositions (content-furnishing pass): the three new regulars give the
 	# pool a ranged-pierce threat, an escalation engine, and the first Poison body.
-	["crossbowman_solo", 0.6],    # the pierce teacher, lone — block isn't the whole answer
-	["crossbowman_knight", 1.0],  # pierce + a bruiser body: split your defense
+	["pikeman_solo", 0.6],    # the pierce teacher, lone -- block isn't the whole answer
+	["pikeman_knight", 1.0],  # pierce + a bruiser body: split your defense
 	["herald_knight", 0.9],       # banner escalation + bruiser (gated out of the early act)
 	["rotting_solo", 0.7],        # the poison teacher, lone
 	["rotting_shade", 0.9],       # poison + curse pollution — layered attrition
@@ -154,10 +154,10 @@ static func _compose(key: String, mult: float) -> Array[EnemyData]:
 		"two_squires":
 			result.append(corrupted_squire(mult))
 			result.append(corrupted_squire(mult))
-		"crossbowman_solo":
-			result.append(corrupted_crossbowman(mult))
-		"crossbowman_knight":
-			result.append(corrupted_crossbowman(mult))
+		"pikeman_solo":
+			result.append(corrupted_pikeman(mult))
+		"pikeman_knight":
+			result.append(corrupted_pikeman(mult))
 			result.append(corrupted_knight(mult))
 		"herald_knight":
 			result.append(hollow_herald(mult))
@@ -389,25 +389,26 @@ static func prophets_acolyte(mult := 1.0) -> EnemyData:
 	return _enemy("Prophet's Acolyte", _scale(34, mult), moves)
 
 
-## Corrupted Crossbowman (Low-Med HP). The ranged-pierce threat: a heavy Bolt that punches
+## Corrupted Pikeman (Low-Med HP). The reach-pierce threat: a heavy Pike Thrust that punches
 ## through part of your block, so turtling behind a wall doesn't fully answer it. Its catch
-## is the recovery — the Bolt is on a cooldown, so the turn after it fires the crossbowman
-## can only Crank (a weak hunker) or chip. The punish window lands AFTER the shot: eat the
-## bolt, then burst it while it reloads. Fragile, so that window usually closes the fight.
-static func corrupted_crossbowman(mult := 1.0) -> EnemyData:
+## is the recovery -- the Thrust is on a cooldown, so the turn after it commits the pikeman
+## can only Brace (a weak hunker) or jab. The punish window lands AFTER the lunge: eat the
+## thrust, then burst it while it recovers its guard. Fragile, so that window usually closes
+## the fight.
+static func corrupted_pikeman(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
-		# The signature: heavy + partially block-piercing. Cooldown 2 forces the reload
-		# rhythm, so it can't chain bolts and the post-shot punish window is reliable.
-		_move("Heavy Bolt", EnemyMove.IntentType.ATTACK,
+		# The signature: heavy + partially block-piercing. Cooldown 2 forces the recovery
+		# rhythm, so it can't chain thrusts and the post-lunge punish window is reliable.
+		_move("Pike Thrust", EnemyMove.IntentType.ATTACK,
 			[_dmg_pierce(_scale(11, mult), 5)], 2.2, 2),
-		# The reload / punish window — it hunkers to crank the windlass, barely a threat.
-		_move("Crank Reload", EnemyMove.IntentType.DEFEND,
+		# The recovery / punish window -- it levels the pike and braces, barely a threat.
+		_move("Brace", EnemyMove.IntentType.DEFEND,
 			[_block(_scale(5, mult))], 1.4),
-		# A weak quick shot so a reload turn isn't completely free for you.
-		_move("Snap Shot", EnemyMove.IntentType.ATTACK,
+		# A weak jab so a recovery turn isn't completely free for you.
+		_move("Jab", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(5, mult))], 0.8),
 	]
-	return _enemy("Corrupted Crossbowman", _scale(32, mult), moves)
+	return _enemy("Corrupted Pikeman", _scale(32, mult), moves)
 
 
 ## Hollow Herald (Low HP). The escalation engine: it raises a corrupted standard that hands
@@ -767,7 +768,7 @@ static func _dmg_x(v: int, hits: int) -> DamageEffect:
 
 
 ## Piercing attack: `pierce` of the hit bypasses the player's block (the Corrupted
-## Crossbowman's bolt). The rest soaks block normally.
+## Pikeman's thrust). The rest soaks block normally.
 static func _dmg_pierce(v: int, pierce: int) -> DamageEffect:
 	var e := DamageEffect.new()
 	e.value = v
