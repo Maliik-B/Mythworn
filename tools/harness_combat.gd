@@ -73,7 +73,7 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 			return blk
 		# A glass Water deck has no block — its defense is EVASION and CONTROL. Model
 		# that so the pole isn't read as far more fragile than a real player would run it:
-		# Intangible (Soulstep) negates the whole incoming turn, and a Freeze deletes the
+		# Intangible (Slip the Tide) negates the whole incoming turn, and a Freeze deletes the
 		# biggest attacker's action. Reserve both for a genuine spike (they're scarce /
 		# exhausting), not routine chip.
 		if biggest >= SPIKE:

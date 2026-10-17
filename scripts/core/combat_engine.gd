@@ -513,7 +513,7 @@ func deal_damage(target: CombatantStats, base_amount: int,
 
 	amount = maxi(0, amount)
 
-	# Intangible clamps any single damage source to 1. Emo Hybrid's "Soulstep"
+	# Intangible clamps any single damage source to 1. Emo Hybrid's "Slip the Tide"
 	# uses this for a deliberately defensive turn skip.
 	if amount > 0 and target.has_status(StatusEffects.INTANGIBLE):
 		amount = 1

@@ -463,16 +463,16 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	undertow.flavor_text = "The pull is quiet. By the time they feel it, they're already tired."
 	pool.append(undertow)
 
-	# Soulstep replaces the old Riverstep (which granted Poise — block-adjacent, i.e.
-	# Physical's turf). Water's defensive answer is EVASION, not armor: one turn where
-	# every hit is reduced to 1, then it's gone. Exhausts, so it's a one-shot panic read,
-	# not a repeatable wall — the high-variance identity in a single card.
-	var soulstep := _pcard("Soulstep", 1, CardData.CardType.SKILL,
+	# Slip the Tide (was Soulstep — no "soul" angle fits Cairn) replaces the old Riverstep
+	# (which granted Poise — block-adjacent, i.e. Physical's turf). Water's defensive answer is
+	# EVASION, not armor: one turn where every hit is reduced to 1, then it's gone. Exhausts, so
+	# it's a one-shot panic read, not a repeatable wall — the high-variance identity in a card.
+	var slip := _pcard("Slip the Tide", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.PRIMARY,
 		[_status_self(StatusEffects.INTANGIBLE, 2), _passion(4)], true)
-	soulstep.flavor_text = "For a breath he isn't quite there. The blow passes through the ache."
-	pool.append(soulstep)
+	slip.flavor_text = "For a breath I'm not quite there. The blow passes through the ache."
+	pool.append(slip)
 
 	# Cascade — Water's signature y≥3 multi-hit (content pass #2). Strikes three times, so
 	# it's the natural home for the Overflow power (Blazing → an extra strike per stack) and
