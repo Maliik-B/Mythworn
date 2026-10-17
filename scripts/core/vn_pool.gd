@@ -30,17 +30,18 @@ static func build_sendoff(_character: CharacterData) -> VNData:
 	return vn
 
 
-## A returning-run send-off: one liaison only, since the two-liaison version is the
-## first-run introduction. Each liaison's beats self-frame (Records / Dispatch), so there
-## is no shared opener. The caller picks the liaison (random per run) and grants that
-## liaison's gift.
+## A returning-run send-off: one liaison only (the two-liaison version is the first-run
+## introduction). On a return the liaison KNOWS they've sent you out before, so these beats
+## skip the Camelot briefing and the introductions and play as a regular morning dispatching
+## chaos: a quick, familiar handover and a little understated encouragement. The caller picks
+## the liaison (random per run) and grants that liaison's gift.
 static func build_sendoff_single(_character: CharacterData, liaison: StringName) -> VNData:
 	var vn := VNData.new()
 	vn.title = "Before Deployment"
 	if liaison == &"neve":
-		_add_neve_beats(vn)
+		_add_neve_return_beats(vn)
 	else:
-		_add_bram_beats(vn)
+		_add_bram_return_beats(vn)
 	return vn
 
 
@@ -66,6 +67,28 @@ static func _add_neve_beats(vn: VNData) -> void:
 	vn.add_beat("Neve", "Those are the worst kind.", C_NEVE)
 	vn.add_beat("", "She writes something small in the back of a battered notebook, the way other people check a watch, and hands you the rest of your supplies.", C_NARRATION)
 	vn.add_beat("Neve", "Go on. Come back in one piece. You're bad at that.", C_NEVE)
+
+
+## Bram, returning run: no re-briefing (you know the file), the lore-decay running gag, and a
+## dry vote of confidence that passes for warmth out of Records.
+static func _add_bram_return_beats(vn: VNData) -> void:
+	vn.add_beat("", "The Records desk. The Camelot folder is already on the corner, squared to the edge. Bram saw you coming.", C_NARRATION)
+	vn.add_beat("Bram", "You know the file. Same realm, same weapon-of-heroes footnote, same half of it gone stale since you last read it.", C_BRAM)
+	vn.add_beat("You", "Comforting.", C_KEEPER)
+	vn.add_beat("Bram", "It's the work. Nothing out there holds still long enough to be worth learning properly.", C_BRAM)
+	vn.add_beat("Bram", "You keep walking back in here, though. I've started counting on it. Don't make a liar of me.", C_BRAM)
+
+
+## Neve, returning run: she skips the speech you've both heard, reads you over the way she
+## always does, and sends you off with the blunt affection of a veteran who's done this before.
+static func _add_neve_return_beats(vn: VNData) -> void:
+	vn.add_beat("", "Dispatch. Neve has the kit packed already. Probably had it packed since the last time.", C_NARRATION)
+	vn.add_beat("Neve", "Camelot again. I won't do the speech. You've heard the speech.", C_NEVE)
+	vn.add_beat("You", "Everyone smiles while they take something off me.", C_KEEPER)
+	vn.add_beat("Neve", "See. You listen.", C_NEVE)
+	vn.add_beat("", "She looks you over, taking an inventory only she can read.", C_NARRATION)
+	vn.add_beat("Neve", "Still not sleeping. I'm not going to keep saying it.", C_NEVE)
+	vn.add_beat("Neve", "Go on, you know the way out. Come back the same number of pieces you left in.", C_NEVE)
 
 
 ## The Camelot realm-entry — "A Realm Divided": arrival at a realm in crisis, then the
