@@ -29,6 +29,30 @@ enum EffectType {
 	GOLD_ON_COMBAT_END,     # value = bonus gold awarded after each combat
 	HEAL_ON_COMBAT_END,     # value = HP healed after each combat
 	CLUTCH_HEAL,            # value = HP healed the first time you drop below half HP in a combat
+	SKIP_NODE,              # value = map nodes one charge passes over (active only)
+}
+
+
+## Where an active title's charge is spent: the unit of play one use covers.
+## Scope and period are separate axes. "One shot, N uses, cooldown" conflates them,
+## which is why the old active_uses_per_combat field could only express one cell of
+## the grid (scope and period both per-combat) and could not express a node skip that
+## comes back each act. See docs/TITLE_DESIGN.md section 4.1.
+enum ActiveScope {
+	COMBAT,  # spent inside a fight
+	NODE,    # spent on the map, against a node
+	ACT,     # spent once somewhere in the act
+	RUN,     # spent once in the run
+}
+
+## How often an active title's charges come back.
+enum ActivePeriod {
+	NEVER,   # one-shot; what is spent is gone for the run
+	COMBAT,  # refreshes at the start of each fight
+	ACT,     # refreshes at the start of each act (the default; it is self-correcting,
+	         # because an unspent charge walking into the act boss is visibly wasted)
+	REALM,   # refreshes on entering a realm
+	RUN,     # refreshes once per run, so effectively at run start
 }
 
 @export var title_id: StringName = &""
@@ -67,11 +91,22 @@ enum EffectType {
 
 @export_group("Active Effect")
 ## Titles may grant a usable active ability in addition to (or instead of) a passive.
+## Unlike the passive, the active block does NOT scale with tier: get_value_for_tier
+## returns one integer, so a tier can only differ in magnitude, and the interesting
+## degradation for a charge title is in its PERIOD (refreshes at home, does not refresh
+## abroad, comes back on reclamation). The schema has no room for that yet, which is the
+## second reason the first consumable is a personality title. See TITLE_DESIGN 6.3.
 @export var has_active: bool = false
 @export var active_effect: EffectType = EffectType.NONE
 @export var active_value: int = 0
-@export var active_uses_per_combat: int = 1
+## Charges granted per period, and the two axes that say what a charge is for.
+@export var active_charges: int = 1
+@export var active_scope: ActiveScope = ActiveScope.COMBAT
+@export var active_period: ActivePeriod = ActivePeriod.ACT
 @export_multiline var active_description: String = ""
+## The line shown when the charge is actually spent. Lives on the title so a new
+## consumable ships its own voice instead of needing a branch in map_scene.
+@export_multiline var use_flavor: String = ""
 
 
 # --- Convenience accessors ---
@@ -121,3 +156,8 @@ func get_value_for_tier(tier: Tier) -> int:
 ## True if this is a realm title (can degrade) versus a personality title (cannot).
 func is_realm_title() -> bool:
 	return category == Category.REALM
+
+
+## True if this title carries a spendable active, as opposed to a polled passive.
+func has_active_effect() -> bool:
+	return has_active and active_effect != EffectType.NONE and active_charges > 0

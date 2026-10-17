@@ -82,6 +82,10 @@ signal title_equipped(slot: int, previous_id: StringName, new_id: StringName)
 ## Emitted when a title's effective tier changes (degrade on leave, returning on come-back, reclamation, etc.)
 signal title_tier_changed(title_id: StringName, new_tier: int)
 
+## An active title's charge was spent. Carries what is left in the current period so a
+## map-screen widget can redraw its count, and so the use can raise its own flavor line.
+signal title_active_spent(title_id: StringName, charges_remaining: int)
+
 ## Emitted when the player toggles Excalibur between Sword and Sight modes.
 ## new_mode is one of RunManager.ExcaliburMode.SWORD / SIGHT.
 signal excalibur_mode_changed(new_mode: int)

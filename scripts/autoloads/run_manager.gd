@@ -88,6 +88,12 @@ var _title_reclaimed: Dictionary[StringName, bool] = {}
 # How much max HP the currently-equipped titles have added. Tracked so we can apply
 # deltas cleanly when titles change tier or are swapped out, without double-counting.
 var _title_applied_max_hp_bonus: int = 0
+# Active-title charges remaining in the current period. title_id -> charges left.
+# Only titles with an active block are tracked. Titles are a pull model everywhere else
+# (every passive is polled at its use site through get_title_passive_total), so this is
+# the one piece of title state that is pushed: it is spent, it runs out, and the map has
+# to be able to see it. Refreshed on the period boundary by _refresh_title_charges.
+var _title_active_charges: Dictionary[StringName, int] = {}
 
 # --- Excalibur dual-mode ---
 # Sword (0) adds the Excalibur power card to the player's draw pile at start of
@@ -193,6 +199,9 @@ func _ready() -> void:
 	# Listen for combat completion to apply title-based post-combat effects
 	# (gold and healing bonuses from equipped titles).
 	Events.combat_won.connect(_on_combat_won)
+	# Per-act charges come back when the act does. Act 1 is seeded by start_run and by
+	# award_title, since act_started only fires on an act transition.
+	Events.act_started.connect(_on_act_started_refresh_charges)
 
 
 func add_gold(amount: int) -> void:
@@ -267,6 +276,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	_title_has_returned.clear()
 	_title_reclaimed.clear()
 	_title_applied_max_hp_bonus = 0
+	_title_active_charges.clear()
 
 	# Build starting deck (deep copy so upgrades don't modify templates)
 	current_deck.clear()
@@ -576,6 +586,10 @@ func award_title(title_id: StringName) -> bool:
 		push_warning("award_title: unknown title id '%s'" % title_id)
 		return false
 	earned_title_ids.append(title_id)
+	# A title earned mid-act arrives with its charges, so the event that grants it can
+	# spend one immediately (the Vigil's dawn skip does exactly that).
+	if data.has_active_effect():
+		_title_active_charges[title_id] = data.active_charges
 	# Realm titles earned in their origin realm start at Original tier (default state).
 	# Personality titles always use Original tier.
 	if data.category == TitleData.Category.REALM:
@@ -660,6 +674,63 @@ func get_title_passive_total(effect: TitleData.EffectType) -> int:
 		var tier := get_title_tier(data.title_id)
 		total += data.get_value_for_tier(tier)
 	return total
+
+
+## Charges an active title has left in the current period. 0 for a title that has no
+## active block, is unknown, or has spent everything it had.
+func get_title_active_charges(title_id: StringName) -> int:
+	return _title_active_charges.get(title_id, 0)
+
+
+## True if the player can spend a charge of this title right now. A title has to be
+## WORN to be spent, not merely earned: the two slots are the whole point of the system.
+func can_spend_title_charge(title_id: StringName) -> bool:
+	if not active_title_slots.has(title_id):
+		return false
+	var data := TitlePool.get_title(title_id)
+	if not data or not data.has_active_effect():
+		return false
+	return get_title_active_charges(title_id) > 0
+
+
+## Spend one charge of an equipped active title and apply its effect.
+## Returns false and changes nothing if the title cannot be spent right now.
+func spend_title_charge(title_id: StringName) -> bool:
+	if not can_spend_title_charge(title_id):
+		return false
+	var data := TitlePool.get_title(title_id)
+	var remaining: int = get_title_active_charges(title_id) - 1
+	_title_active_charges[title_id] = remaining
+	_apply_title_active(data)
+	Events.title_active_spent.emit(title_id, remaining)
+	return true
+
+
+## Internal: route an active title's effect to the state it actually sets. Kept small on
+## purpose. A new active effect belongs here and in TitleData.EffectType, nowhere else.
+func _apply_title_active(data: TitleData) -> void:
+	match data.active_effect:
+		TitleData.EffectType.SKIP_NODE:
+			pending_skip_node = true
+		_:
+			push_warning("spend_title_charge: unhandled active effect on '%s'" % data.title_id)
+
+
+## Internal: refresh the charges of every earned title whose period just came round.
+## Earned rather than equipped on purpose: a title left in the pack still refills, so
+## swapping one in does not hand the player a charge that the act already spent.
+func _refresh_title_charges(period: TitleData.ActivePeriod) -> void:
+	for title_id in earned_title_ids:
+		var data := TitlePool.get_title(title_id)
+		if not data or not data.has_active_effect():
+			continue
+		if data.active_period != period:
+			continue
+		_title_active_charges[title_id] = data.active_charges
+
+
+func _on_act_started_refresh_charges(_act_number: int) -> void:
+	_refresh_title_charges(TitleData.ActivePeriod.ACT)
 
 
 ## Internal: update title tier tracking when the player changes realms.
