@@ -2036,7 +2036,7 @@ func _play_quest_reveal(node: MapNode) -> void:
 		"deenlarge_t": REVEAL_DEENLARGE_T,
 	}, _quest_swap_cb(btn, node))
 
-	_show_objective_toast(_quest_reveal_toast(node.quest_payoff_id))
+	_show_map_toast(_quest_reveal_toast(node.quest_payoff_id))
 
 
 ## Flip-midpoint callback: swap the payoff node into its armed quest-glyph look.
@@ -2074,8 +2074,33 @@ func _quest_ambush_event(quest_id: StringName) -> StringName:
 	return &""
 
 
-## A brief centered objective line that fades in, holds, and fades out below the header.
-func _show_objective_toast(text: String) -> void:
+## Where a transient toast sits. Objective reveals clear the floating header at the top;
+## a title spending itself wants the bottom, clear of the map it has just changed.
+enum ToastAnchor { TOP, BOTTOM }
+
+const TOAST_TOP_OFFSET := 174.0     # clear of the floating header
+const TOAST_BOTTOM_OFFSET := -132.0  # up off the bottom edge
+
+## A brief centered line that fades in, holds 2.4s, and fades out. Pass dismissible to let
+## a click clear it early, which an active title's flavor wants and an objective reveal
+## does not. The band is full width but only the text itself takes mouse input, so a
+## dismissible toast cannot swallow clicks meant for the map underneath it.
+##
+## The status line is deliberately not used for this surface: info_label is overwritten by
+## the next hover or node-state refresh, which is why "You took the shortcut, skipping
+## ahead." does not survive long enough to be read. Transient flavor wants the toast.
+func _show_map_toast(text: String, anchor := ToastAnchor.TOP, dismissible := false) -> void:
+	var holder := CenterContainer.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	if anchor == ToastAnchor.BOTTOM:
+		holder.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+		holder.offset_top = TOAST_BOTTOM_OFFSET
+	else:
+		holder.offset_top = TOAST_TOP_OFFSET
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.modulate.a = 0.0
+	add_child(holder)
+
 	var toast = Label.new()
 	toast.text = text
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2083,16 +2108,26 @@ func _show_objective_toast(text: String) -> void:
 	toast.add_theme_color_override("font_color", QUEST_GLYPH_COLOR)
 	toast.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	toast.add_theme_constant_override("outline_size", 5)
-	toast.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	toast.offset_top = 174  # clear of the floating header
 	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	toast.modulate.a = 0.0
-	add_child(toast)
+	holder.add_child(toast)
+
 	var tw := create_tween()
-	tw.tween_property(toast, "modulate:a", 1.0, 0.45)
+	tw.tween_property(holder, "modulate:a", 1.0, 0.45)
 	tw.tween_interval(2.4)
-	tw.tween_property(toast, "modulate:a", 0.0, 0.7)
-	tw.tween_callback(toast.queue_free)
+	tw.tween_property(holder, "modulate:a", 0.0, 0.7)
+	tw.tween_callback(holder.queue_free)
+
+	if dismissible:
+		# Only the text takes the click, so the rest of the band stays transparent to the map.
+		toast.mouse_filter = Control.MOUSE_FILTER_STOP
+		toast.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		toast.gui_input.connect(func(event: InputEvent) -> void:
+			if not (event is InputEventMouseButton and event.pressed):
+				return
+			if tw.is_valid():
+				tw.kill()
+			holder.queue_free()
+		)
 
 
 # ============================================================
