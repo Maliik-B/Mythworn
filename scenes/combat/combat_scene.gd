@@ -27,6 +27,7 @@ var pile_popup: PanelContainer
 var selected_card: CardData = null
 var card_nodes: Dictionary = {} # CardData -> PanelContainer
 var enemy_nodes: Dictionary = {} # EnemyCombatState -> PanelContainer
+var _enemy_anims: Dictionary = {} # EnemyCombatState -> animator state dict (see _build_enemy_portrait)
 var _hand_coins: Dictionary = {} # CardData -> halo-coin Panel (pole cards only), for threshold fades
 
 
@@ -36,43 +37,83 @@ var _hover_popup: PanelContainer
 var _status_pin: PanelContainer  # click-pinned status/effect description (see _show_status_pin)
 var _is_animating_card := false
 
-# Sprite portrait mapping: enemy_name -> [sprite_path, region_x, region_y, region_w, region_h]
-# Regions are tight crops around the actual sprite content (with padding)
-const ENEMY_SPRITES = {
-	"Slime": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Mushroom/Idle.png", 58, 56, 36, 52],
-	"Goblin": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
-	"Orc Brute": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
-	"Realm Guardian": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/Flight.png", 50, 54, 56, 46],
-	# Camelot regular roster (placeholder CC0 mappings; real per-enemy art is the
-	# B5 track item. Some sprites are shared as stand-ins until then.)
-	"Corrupted Knight": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
-	"Court Conspirator": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
-	"Siege Golem": ["res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/Idle.png", 12, 12, 62, 52],
-	"Realm Shade": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/Flight.png", 50, 54, 56, 46],
-	# Camelot elites + Act-1 boss (placeholder CC0; distinct per-enemy art is B5).
-	"Champion of the Usurper": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
-	"The False Prophet": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
-	"Sir Caedmon": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
-	"Hollow Warden": ["res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/Idle.png", 12, 12, 62, 52],
-	"Fable's End": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
-	# New Sep/Oct-2026 roster (thickening + content furnishing). CC0 stand-ins chosen so no
-	# paired composition shows two identical sprites -- e.g. the Pikeman is a Goblin so
-	# pikeman_knight reads as a goblin + a skeleton, and the Herald is the robed Wizard so
-	# herald_knight doesn't double the skeleton. Distinct per-enemy art is the B5 track item.
-	"Man-at-Arms": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
-	"Corrupted Squire": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
-	"Prophet's Acolyte": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
-	"Corrupted Pikeman": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
-	"Hollow Herald": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
-	"Rotting Knight": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
-	# New elites (both solo nodes, so no in-fight sprite clash).
-	"The Iron Verdict": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/Idle.png", 52, 42, 62, 66],
-	"The Hollow Prelate": ["res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/Idle.png", 100, 64, 72, 110],
+# Enemy sprite animation. Each enemy maps to a "sprite set" (one LuizMelo sheet folder),
+# and each set lists its strips as [file, frame_count, fps]. Every strip is a horizontal
+# row of square cells (cell size = the PNG's height); the animator (see _process /
+# _anim_tick) steps the AtlasTexture region across the row. `zoom` scales the whole cell
+# inside a fixed, clipped portrait box so the character reads large enough: the monster
+# placeholder sheets carry a lot of motion padding, where the real per-enemy human art
+# frames tighter and will want less zoom. Real per-enemy art is the B5 track -- these are
+# shared CC0 stand-ins until it lands.
+const PORTRAIT_BOX := 130.0
+
+const SPRITE_SETS := {
+	"goblin": {
+		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/",
+		"cell": 150, "zoom": 2.2,
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+	},
+	"skeleton": {
+		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/",
+		"cell": 150, "zoom": 1.8,
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+	},
+	"flyingeye": {
+		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/",
+		"cell": 150, "zoom": 2.0,
+		"anims": {"idle": ["Flight.png", 8, 10], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+	},
+	"mushroom": {
+		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Mushroom/",
+		"cell": 150, "zoom": 2.2,
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+	},
+	"worm": {
+		"dir": "res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/",
+		"cell": 90, "zoom": 1.4,
+		"anims": {"idle": ["Idle.png", 9, 10], "attack": ["Attack.png", 16, 16], "hit": ["Get Hit.png", 3, 12], "death": ["Death.png", 8, 10]},
+	},
+	"wizard2": {
+		"dir": "res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/",
+		"cell": 250, "zoom": 1.8,
+		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 12], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
+	},
+}
+
+# enemy_name -> sprite set. Shared CC0 stand-ins chosen so no paired composition shows two
+# identical sprites -- e.g. the Pikeman is a goblin so pikeman_knight reads goblin + skeleton,
+# and the Herald is the robed wizard so herald_knight doesn't double the skeleton. Distinct
+# per-enemy art is the B5 track item.
+const ENEMY_SPRITE_SET := {
+	"Slime": "mushroom",
+	"Goblin": "goblin",
+	"Orc Brute": "skeleton",
+	"Realm Guardian": "flyingeye",
+	# Camelot regular roster.
+	"Corrupted Knight": "skeleton",
+	"Court Conspirator": "goblin",
+	"Siege Golem": "worm",
+	"Realm Shade": "flyingeye",
+	# Camelot elites + Act-1 boss.
+	"Champion of the Usurper": "skeleton",
+	"The False Prophet": "wizard2",
+	"Sir Caedmon": "wizard2",
+	"Hollow Warden": "worm",
+	"Fable's End": "wizard2",
+	# Sep/Oct-2026 roster (thickening + content furnishing).
+	"Man-at-Arms": "skeleton",
+	"Corrupted Squire": "goblin",
+	"Prophet's Acolyte": "wizard2",
+	"Corrupted Pikeman": "goblin",
+	"Hollow Herald": "wizard2",
+	"Rotting Knight": "skeleton",
+	"The Iron Verdict": "skeleton",
+	"The Hollow Prelate": "wizard2",
 	# Raider questline band: the Boar reads big (worm sheet) vs the two small goblin raiders.
-	"The Boar": ["res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/Idle.png", 12, 12, 62, 52],
-	"Weald Raider": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/Idle.png", 52, 58, 46, 50],
+	"The Boar": "worm",
+	"Weald Raider": "goblin",
 	# The Reliquary chapel beast -- ethereal/reforming, so the floating-eye sheet.
-	"The Shattered Choir": ["res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/Flight.png", 50, 54, 56, 46],
+	"The Shattered Choir": "flyingeye",
 }
 # Card icon mapping: card_name -> full res:// path
 # Card art icons live in CardVisuals (single source, shared with the reward screen
@@ -91,6 +132,113 @@ func _ready() -> void:
 	_build_ui()
 	_connect_events()
 	_start_combat()
+
+
+# ============================================================
+# ENEMY SPRITE ANIMATION
+# Idle loops; attack/hit/death play once (on combat events) then fall back to idle.
+# Driven from _process so a single loop ticks every live enemy animator.
+# ============================================================
+
+func _process(delta: float) -> void:
+	if _enemy_anims.is_empty():
+		return
+	for enemy in _enemy_anims:
+		_anim_tick(_enemy_anims[enemy], delta)
+
+
+## Builds the animated portrait for an enemy and registers its animator in _enemy_anims.
+## The cell is drawn oversized inside a fixed, clipped box so the character fills the frame
+## and its motion padding spills out of view rather than shrinking the sprite.
+func _build_enemy_portrait(set_key: String, enemy) -> Control:
+	var sset: Dictionary = SPRITE_SETS[set_key]
+	var cell: int = sset["cell"]
+	var zoom: float = sset["zoom"]
+	# Preload every strip once so state swaps are instant.
+	var textures := {}
+	for state in sset["anims"]:
+		textures[state] = load(sset["dir"] + sset["anims"][state][0])
+	var atlas := AtlasTexture.new()
+	atlas.atlas = textures["idle"]
+	atlas.region = Rect2(0, 0, cell, cell)
+
+	var box := Control.new()
+	box.custom_minimum_size = Vector2(PORTRAIT_BOX, PORTRAIT_BOX)
+	box.clip_contents = true
+	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var portrait := TextureRect.new()
+	portrait.texture = atlas
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var inner := PORTRAIT_BOX * zoom
+	portrait.size = Vector2(inner, inner)
+	portrait.position = Vector2((PORTRAIT_BOX - inner) / 2.0, (PORTRAIT_BOX - inner) / 2.0)
+	box.add_child(portrait)
+
+	var anim := {
+		"set": set_key, "cell": cell, "atlas": atlas, "rect": portrait,
+		"textures": textures, "state": "idle", "frame": 0, "elapsed": 0.0,
+		"frames": 1, "fps": 7.0, "loop": true,
+	}
+	_enemy_anims[enemy] = anim
+	_anim_set_state(anim, "idle")
+	return box
+
+
+## Switches an animator to a state (idle/attack/hit/death). Only idle loops; the others
+## play through once and _anim_tick returns them to idle.
+func _anim_set_state(anim: Dictionary, state: String) -> void:
+	var sset: Dictionary = SPRITE_SETS[anim["set"]]
+	if not sset["anims"].has(state):
+		state = "idle"
+	var info: Array = sset["anims"][state]
+	anim["atlas"].atlas = anim["textures"][state]
+	anim["frames"] = int(info[1])
+	anim["fps"] = float(info[2])
+	anim["loop"] = (state == "idle")
+	anim["state"] = state
+	anim["frame"] = 0
+	anim["elapsed"] = 0.0
+	_anim_apply_frame(anim)
+
+
+func _anim_apply_frame(anim: Dictionary) -> void:
+	var cell: int = anim["cell"]
+	anim["atlas"].region = Rect2(anim["frame"] * cell, 0, cell, cell)
+
+
+func _anim_tick(anim: Dictionary, delta: float) -> void:
+	if not is_instance_valid(anim.get("rect")):
+		return
+	var fps: float = anim["fps"]
+	if fps <= 0.0:
+		return
+	anim["elapsed"] += delta
+	var frame_time := 1.0 / fps
+	while anim["elapsed"] >= frame_time:
+		anim["elapsed"] -= frame_time
+		anim["frame"] = int(anim["frame"]) + 1
+		if anim["frame"] >= int(anim["frames"]):
+			if anim["loop"]:
+				anim["frame"] = 0
+			else:
+				# One-shot done: hold its last frame a beat, then return to idle.
+				anim["frame"] = int(anim["frames"]) - 1
+				_anim_apply_frame(anim)
+				_anim_set_state(anim, "idle")
+				return
+		_anim_apply_frame(anim)
+
+
+## Plays a one-shot state on an enemy's animator (no-op if it has none, or is dead).
+func _enemy_play(enemy, state: String) -> void:
+	var anim = _enemy_anims.get(enemy)
+	if anim == null or not is_instance_valid(anim.get("rect")):
+		return
+	if anim["state"] == "death":
+		return
+	_anim_set_state(anim, state)
 
 
 func _input(event: InputEvent) -> void:
@@ -1482,20 +1630,11 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	vbox.add_theme_constant_override("separation", 6)
 	panel.add_child(vbox)
 
-	# Enemy portrait area — sprite from spritesheet
-	var sprite_info = ENEMY_SPRITES.get(enemy.enemy_data.enemy_name)
-	if sprite_info:
-		var sheet: Texture2D = load(sprite_info[0])
-		var atlas = AtlasTexture.new()
-		atlas.atlas = sheet
-		atlas.region = Rect2(sprite_info[1], sprite_info[2], sprite_info[3], sprite_info[4])
-		var portrait = TextureRect.new()
-		portrait.texture = atlas
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		portrait.custom_minimum_size = Vector2(120, 120)
-		vbox.add_child(portrait)
+	# Enemy portrait area -- animated spritesheet (idle loops; attack/hit/death play on
+	# combat events, then fall back to idle). See SPRITE_SETS / _build_enemy_portrait.
+	var set_key: String = ENEMY_SPRITE_SET.get(enemy.enemy_data.enemy_name, "")
+	if set_key != "" and SPRITE_SETS.has(set_key):
+		vbox.add_child(_build_enemy_portrait(set_key, enemy))
 	else:
 		# Fallback for unknown enemies
 		var portrait = PanelContainer.new()
@@ -2129,6 +2268,7 @@ func _log_relic_activations(trigger: RelicData.RelicTrigger) -> void:
 # ============================================================
 
 func _on_combat_started() -> void:
+	_enemy_anims.clear()
 	for enemy in combat_engine.enemies:
 		var panel = _create_enemy_panel(enemy)
 		enemy_container.add_child(panel)
@@ -2179,6 +2319,10 @@ func _on_enemy_action_started(enemy, move) -> void:
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		t.tween_property(epanel, "scale", Vector2(1.0, 1.0), 0.20).set_trans(Tween.TRANS_QUAD)
 		_float_move_callout(epanel, move.move_name)
+	# Play the attack strip for offensive intents; defends/buffs stay on idle.
+	if move.intent_type == EnemyMove.IntentType.ATTACK \
+			or move.intent_type == EnemyMove.IntentType.ATTACK_DEBUFF:
+		_enemy_play(enemy, "attack")
 
 
 ## A Frozen enemy forfeits its turn. Mirror the move-callout beat with a "Frozen!"
@@ -2248,6 +2392,9 @@ func _on_enemy_damaged(enemy, amount: int, new_hp: int) -> void:
 	RunManager.run_stats["damage_dealt"] = RunManager.run_stats.get("damage_dealt", 0) + amount
 	var panel = enemy_nodes.get(enemy)
 	_spawn_damage_number("-%d" % amount, Color(1.0, 0.3, 0.2), panel)
+	# Flinch on a real hit; a killing blow skips straight to the death throe below.
+	if amount > 0 and new_hp > 0:
+		_enemy_play(enemy, "hit")
 	_refresh_ui()
 
 
@@ -2266,6 +2413,8 @@ func _on_enemy_healed(enemy, amount: int, new_hp: int) -> void:
 func _on_enemy_died(enemy) -> void:
 	_log("[color=green]%s defeated![/color]" % enemy.enemy_data.enemy_name)
 	RunManager.run_stats["enemies_killed"] = RunManager.run_stats.get("enemies_killed", 0) + 1
+	# Play the death strip under the fade-out _animate_enemy_death runs on the panel.
+	_enemy_play(enemy, "death")
 	# Boss death beat: a final line as the enemy falls (e.g. Caedmon, freed from the
 	# compulsion — the Act-2 Puppeteer tease). Float it BEFORE _animate_enemy_death erases
 	# the panel from enemy_nodes; the combat log keeps a permanent copy either way.
