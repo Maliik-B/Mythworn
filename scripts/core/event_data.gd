@@ -68,7 +68,7 @@ class EventChoice extends RefCounted:
 	## If non-empty, taking this choice queues a ONE-SHOT boon applied at the start of the
 	## player's NEXT combat, then cleared (RunManager.pending_combat_boon). The id's effect
 	## lives in CombatEngine._apply_pending_combat_boon; its player-facing label lives in
-	## event_scene._combat_boon_label (keep the two in sync). Used by the Wandering Spirit
+	## event_scene._combat_boon_label (keep the two in sync). Used by the Shade at the Cross
 	## (wandering_vigor = start your next fight with +2 Strength).
 	var grants_combat_boon: StringName = &""
 	## When card_reward is true, biases the pick-1-of-3 toward a school: &"primary" or

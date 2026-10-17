@@ -1303,7 +1303,7 @@ func _test_thurible() -> void:
 
 
 ## Event restructures (Oct 2026): the Tourney wager is a real win/lose gamble; its court ride
-## costs HP; and the Wandering Spirit's power option is a one-shot next-combat boon that opens the
+## costs HP; and the Shade at the Cross's power option is a one-shot next-combat boon that opens the
 ## next fight with +2 Strength and then clears.
 func _test_event_reworks() -> void:
 	var tourney: EventData = null
@@ -1311,7 +1311,7 @@ func _test_event_reworks() -> void:
 	for ev in EventPool._build_pool():
 		if ev.event_name == "The Tourney":
 			tourney = ev
-		elif ev.event_name == "Wandering Spirit":
+		elif ev.event_name == "The Shade at the Cross":
 			spirit = ev
 	# The wager is a bet now (win/lose gold, both outcomes written), not a flat payout.
 	var wager: EventData.EventChoice = tourney.choices[0] if tourney else null
@@ -1326,13 +1326,13 @@ func _test_event_reworks() -> void:
 				ride = ch
 	_check("The Tourney court ride costs HP and is court-gated with a card reward",
 		ride != null and ride.hp_change < 0 and ride.card_reward)
-	# The Wandering Spirit's power option is now a one-shot next-combat boon.
+	# The Shade at the Cross's power option is now a one-shot next-combat boon.
 	var lend: EventData.EventChoice = null
 	if spirit:
 		for ch in spirit.choices:
 			if ch.grants_combat_boon != &"":
 				lend = ch
-	_check("The Wandering Spirit grants the wandering_vigor next-combat boon",
+	_check("The Shade at the Cross grants the wandering_vigor next-combat boon",
 		lend != null and lend.grants_combat_boon == &"wandering_vigor"
 		and lend.max_hp_change == 0)
 
@@ -1523,16 +1523,16 @@ func _test_liaison_relics() -> void:
 
 
 ## Refusals with teeth (Oct 2026): walking away / refusing now carries a cost. Tier 1 -- the
-## folk/liaison walk-aways lose standing (or Passion for the factionless Wounded Traveler); Tier 2
-## -- the Wandering Spirit's banish wedges a permanent unplayable curse into the run deck.
+## folk/liaison walk-aways lose standing (or Passion for the factionless Man Off the Field);
+## Tier 2 -- scattering the Shade at the Cross wedges a permanent unplayable curse into the deck.
 func _test_refusals() -> void:
 	var by_name := {}
 	for ev in EventPool._build_pool():
 		by_name[ev.event_name] = ev
 
 	# Tier 1: the pure walk-aways that used to cost nothing now bite.
-	var wounded_walk := _choice_by_text(by_name["Wounded Traveler"], "Walk away")
-	_check("Wounded Traveler's walk-away costs Passion",
+	var wounded_walk := _choice_by_text(by_name["The Man Off the Field"], "Keep walking")
+	_check("The Man Off the Field's keep-walking costs Passion",
 		wounded_walk != null and wounded_walk.passion_change < 0)
 	var plea_walk := _choice_by_text(by_name["The Peasant's Plea"], "Walk on")
 	_check("Peasant's Plea walk-on costs the people's favor",
@@ -1545,8 +1545,8 @@ func _test_refusals() -> void:
 		scrip_leave != null and scrip_leave.standing_change < 0)
 
 	# Tier 2: the banish is a lingering curse now.
-	var banish := _choice_by_text(by_name["Wandering Spirit"], "Banish")
-	_check("Wandering Spirit's banish wedges a curse into the deck",
+	var banish := _choice_by_text(by_name["The Shade at the Cross"], "Scatter him")
+	_check("The Shade at the Cross's scattering wedges a curse into the deck",
 		banish != null and banish.grants_curse == &"clinging_grief")
 
 	# The curse card builds unplayable + NEGATIVE; an unknown id is null.

@@ -262,7 +262,7 @@ func _apply_pending_combat_boon() -> void:
 	RunManager.pending_combat_boon = &""
 	match boon:
 		&"wandering_vigor":
-			# The Wandering Spirit lends its strength for one fight: open with +2 Strength.
+			# The Shade at the Cross lends his courage for one fight: open with +2 Strength.
 			apply_status_effect(player_stats, StatusEffects.STRENGTH, 2)
 		_:
 			push_warning("Unknown pending_combat_boon: %s" % boon)

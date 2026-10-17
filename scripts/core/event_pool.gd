@@ -28,13 +28,11 @@ static func get_random_event_filtered(rng: RandomNumberGenerator, allow_treasure
 static func _build_pool() -> Array[EventData]:
 	var pool: Array[EventData] = []
 
-	pool.append(_wounded_traveler())
-	pool.append(_ancient_shrine())
+	pool.append(_man_off_the_field())
+	pool.append(_the_still_mere())
 	pool.append(_forgotten_library())
-	pool.append(_ominous_statue())
-	pool.append(_wandering_spirit())
-	pool.append(_training_grounds())
-	pool.append(_suspicious_chest())
+	pool.append(_shade_at_the_cross())
+	pool.append(_the_tiltyard())
 	pool.append(_campfire_remnants())
 	pool.append(_peasants_plea())
 	pool.append(_scriptorium())
@@ -49,30 +47,55 @@ static func _build_pool() -> Array[EventData]:
 # EVENT DEFINITIONS
 # ============================================================
 
-static func _wounded_traveler() -> EventData:
+## A reflavor of the generic Wounded Traveler. He is a man-at-arms off the field where Caedmon's
+## own champion broke, so the Act-1 boss gets seeded by what a witness actually saw rather than by
+## narration. Option 1 keeps The Merciful, the earliest and plainest of its grant sites. Option 3's
+## self-deception is the one lie the man personally disproved two lines earlier, which makes the
+## refusal specific and checkable instead of a vague shrug.
+static func _man_off_the_field() -> EventData:
 	var e = EventData.new()
-	e.event_name = "Wounded Traveler"
-	e.description = "A traveler lies wounded by the roadside, clutching a leather pouch. They look up at you with desperate eyes.\n\n\"Please... help me. I can pay.\""
+	e.event_name = "The Man Off the Field"
+	e.description = ("A man drags himself along the roadside ditch with one leg bound up in a "
+		+ "surcoat he has torn for the purpose. You half-know the device on it, one of the lesser "
+		+ "Camelot houses. He was a man-at-arms by the look of him, and he went where men-at-arms "
+		+ "have been going.\n\n\"You're walking the wrong way,\" he says, when he gets a look at "
+		+ "your face. \"Everyone with any sense is walking the way I came.\" He works a ring off a "
+		+ "finger swollen fat around it and holds it up between two knuckles. \"I can pay. I just "
+		+ "can't do the next mile on my own, and there's nobody else on this road. I've been "
+		+ "counting.\"")
 
 	var c1 = EventData.EventChoice.new()
-	c1.text = "Tend to their wounds (Lose 5 HP)"
-	c1.result_text = "You bandage their injuries. Grateful, they press a handful of coins into your palm before limping away."
+	c1.text = "Splint it, and ask him what he ran from. (Lose 5 HP)"
+	c1.result_text = ("You set the leg with his own scabbard for a splint and get his arm over your "
+		+ "shoulder, and he pays you in talk the whole mile as well as in the ring. He was in the "
+		+ "line when their own champion broke. Not broke and ran. Broke and kept fighting, badly, "
+		+ "wrong, the way a hand works a puppet it has never watched a man use. \"His guard went "
+		+ "first,\" he says. \"Then his face went. He was still winning.\" He does not know he is "
+		+ "describing the thing you are walking toward, and you decide not to tell him.")
 	c1.hp_change = -5
 	c1.gold_change = 30
 	c1.passion_change = 3
 	c1.awarded_title_id = &"the_merciful"
 
 	var c2 = EventData.EventChoice.new()
-	c2.text = "Take their pouch and leave"
-	c2.result_text = "You snatch the pouch. The traveler says nothing, but their eyes follow you as you walk away."
+	c2.text = "Take the ring. Tell him the road is busier than he thinks."
+	c2.result_text = ("You take the ring and you tell him the road is busier than he thinks, and he "
+		+ "thanks you for it, which is the worst part of the whole transaction. He has no leg to "
+		+ "chase you with. He does have eyes, and they are on your back the entire length of the "
+		+ "rise, and you can still feel the exact spot they were resting for a good while after the "
+		+ "hedgerow takes him out of sight.")
 	c2.gold_change = 20
 	c2.passion_change = -5
 
+	# Refusal with teeth: the lie is the one he disproved himself, two lines earlier, with "I've
+	# been counting." So the self-deception is specific and checkable rather than a vague shrug.
 	var c3 = EventData.EventChoice.new()
-	c3.text = "Walk away"
-	c3.result_text = ("You continue on your path. Some problems aren't yours to solve, you tell "
-		+ "yourself, and the telling costs you a little something to keep believing.")
-	c3.passion_change = -3  # leaving someone you could have helped hardens you
+	c3.text = "Keep walking. Leave him even the ring."
+	c3.result_text = ("You keep your legs moving and you do not take his ring, and you tell yourself "
+		+ "somebody will be along for him shortly. He told you how long he had been counting. You "
+		+ "heard him say it. The arithmetic walks up the rise with you and is still there at the top, "
+		+ "and it is not the kind of sum that gets easier for being carried.")
+	c3.passion_change = -3
 
 	e.choices.append(c1)
 	e.choices.append(c2)
@@ -80,28 +103,53 @@ static func _wounded_traveler() -> EventData:
 	return e
 
 
-static func _ancient_shrine() -> EventData:
+## A rework of the generic Ancient Shrine into water-country: the Lady under a still mere, and
+## the pool's one carrier of wonder and beauty. The whole event turns on whether you let the
+## water offer or take it yourself, so the Water-school card is gated behind waiting rather than
+## behind a cost. No corruption beat; this is a place the rot has not been told about yet.
+static func _the_still_mere() -> EventData:
 	var e = EventData.new()
-	e.event_name = "Ancient Shrine"
-	e.description = "A crumbling stone shrine stands among twisted roots. Faded runes pulse with faint light. The air hums with old power.\n\nYou sense it could still grant a boon... for a price."
+	e.event_name = "The Still Mere"
+	e.description = ("The road drops into a green hollow you had no idea was there, and at the "
+		+ "bottom of it lies a mere so still it has swallowed the whole sky and kept it. Reeds. "
+		+ "Dragonflies stitching the warm air. After the grey miles behind you it is nearly too much "
+		+ "to look at, a place the rot has simply not been told about yet.\n\nSomething pales under "
+		+ "the surface, out where the water goes deep. Not a fish. It rises the way a held breath "
+		+ "rises, unhurried, until an arm breaks the mere without putting a ripple on it and holds "
+		+ "there, open-handed, waiting, with something just under the light.")
 
 	var c1 = EventData.EventChoice.new()
-	c1.text = "Pray at the shrine"
-	c1.result_text = "Warmth floods through you as the runes flare. Your spirit feels renewed."
-	c1.hp_change = 10
-	c1.passion_change = 5
+	c1.text = "Don't reach. Wait, and see what the water offers."
+	c1.result_text = ("You do not reach. You wait, which is what the place seems to be asking for, "
+		+ "and the hand comes to you. What it presses into your palm is cool and certain and gone to "
+		+ "water the instant you look straight at it, but your hands keep the knowing of it: a way "
+		+ "of moving you did not have this morning. When you look up, the mere is only a mere. You "
+		+ "could nearly believe you dreamed the entire green hollow, except for what your hands now "
+		+ "know how to do without being told.")
+	c1.card_reward = true
+	c1.card_reward_school = &"primary"
+	c1.passion_change = 4
 
 	var c2 = EventData.EventChoice.new()
-	c2.text = "Desecrate it for materials"
-	c2.result_text = "You pry gems from the stonework. The light dies. Something in the air shifts, disappointed."
-	c2.gold_change = 40
-	c2.passion_change = -8
+	c2.text = "Kneel, drink, and leave something behind for it. (Lose 10 Gold)"
+	c2.result_text = ("You cup the water and drink, and it is the cold of deep springs and it goes "
+		+ "all the way down to your heels. You leave a coin in the shallows afterwards, because it "
+		+ "feels wrong to take from a place like this one and leave nothing, a small courtesy for one "
+		+ "you have been shown. You walk up out of the hollow steadier than you walked into it, and "
+		+ "you do not look back, in case it is gone.")
+	c2.gold_change = -10
+	c2.hp_change = 12
+	c2.passion_change = 3
 
 	var c3 = EventData.EventChoice.new()
-	c3.text = "Study the runes carefully"
-	c3.result_text = "The runes reveal forgotten knowledge. A new technique crystallizes in your mind."
+	c3.text = "Wade out and take it yourself. (Lose 4 HP)"
+	c3.result_text = ("You wade out and close your hand on the thing before it is offered. The water "
+		+ "goes cold, and then dark, fast, the way a face closes. It is yours. It is. But the cold "
+		+ "stays up in your arm long after the hollow is behind you, and the green place does not "
+		+ "feel like a gift when you think back on it. It feels like somewhere you stole from.")
 	c3.card_reward = true
-	c3.awarded_title_id = &"the_calculating"
+	c3.hp_change = -4
+	c3.passion_change = -6
 
 	e.choices.append(c1)
 	e.choices.append(c2)
@@ -237,9 +285,10 @@ static func _scriptorium() -> EventData:
 static func _the_tourney() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Tourney"
-	e.description = ("The tourney field is loud and bright in a realm gone quiet and gray everywhere "
-		+ "else, and that is the first wrong thing about it. The grandstand is full. Pennants snap in "
-		+ "a stiff wind. Down the lists two knights couch their lances and ride, and the crowd makes "
+	e.description = ("The tourney field is loud and bright, and that is the first wrong thing about "
+		+ "it. You have walked three days through a realm that has forgotten how to make noise, and "
+		+ "here is a whole field of it: pennants, trumpets, a crowd in its colours, as though nobody "
+		+ "has told them. Down the lists two knights couch their lances and ride, and the crowd makes "
 		+ "the noise crowds make.\n\nLook closer and you see how many of the cheering faces hold too "
 		+ "still, and how the black creeps up under one champion's gorget where his squire keeps "
 		+ "worrying the strap to hide it. A herald takes wagers at the rail. A marshal takes names for "
@@ -306,9 +355,11 @@ static func _last_cart_out() -> EventData:
 	e.event_name = "The Last Cart Out"
 	e.description = ("The village is emptying the way water leaves a cracked basin, quick at first "
 		+ "and then a slow hopeless trickle of the people who had least to pack. The corruption is "
-		+ "two valleys off and coming. You can see it as a grayness in the far tree line that does "
-		+ "not move the way weather moves. In the square too few carts are being loaded by too many "
-		+ "hands.\n\nNeve is in the thick of it with a battered notebook, sending each cart off in "
+		+ "two valleys off and coming. You cannot see it yet. You can tell exactly where it is "
+		+ "anyway, by the quiet: no birds over that stretch of wood, not one, and the cattle have "
+		+ "all drifted to the far fences and stand there with their heads low and their backs to "
+		+ "the trees, refusing to look at what is behind them. In the square too few carts are "
+		+ "being loaded by too many hands.\n\nNeve is in the thick of it with a battered notebook, sending each cart off in "
 		+ "its turn and marking something down as it rolls. She is not dressed for the field and does "
 		+ "not seem to care. When she sees you her face does something complicated. \"Of course it's "
 		+ "you. It's always you where it's worst.\" She jerks her chin at a stalled wagon. \"Don't "
@@ -356,64 +407,55 @@ static func _last_cart_out() -> EventData:
 	return e
 
 
-static func _ominous_statue() -> EventData:
+## A reflavor of the generic Wandering Spirit: a knight who knelt at a wayside cross rather than
+## meet what came up the valley, and never got up again. Carries the realm's chivalric-honour
+## register with no corruption beat. The sword in the grass is a specific object with a reason it
+## is still lying there (nobody uses this track), and option 2 points at it so the image pays off
+## instead of just decorating. Locale is a crossroads, not a chapel.
+static func _shade_at_the_cross() -> EventData:
 	var e = EventData.new()
-	e.event_name = "Ominous Statue"
-	e.description = "A towering obsidian statue looms before you. Its hollow eyes seem to peer into your soul. A basin at its feet is stained dark.\n\nCarved text reads: \"Offer of the flesh, reward of the spirit.\""
+	e.event_name = "The Shade at the Cross"
+	e.description = ("A wayside cross stands where two tracks meet, and a man kneels at the foot of "
+		+ "it who is not all the way there. You can see the grain of the wood through his shoulders. "
+		+ "The sword he knelt down beside is still lying in the grass where he let go of it, and "
+		+ "nobody has come along this track in long enough for the weather to have had the whole "
+		+ "thing: pitted black, the edge gone to crumbs, the grip rotted off the tang and only the "
+		+ "wire left. He does not look up.\n\n\"I put it down there,\" he says, as though you had "
+		+ "asked. \"The thing came up the valley and I found I had nothing in me to meet it with, so "
+		+ "I knelt here to pray instead, and the praying never finished. Will you hear how a man gets "
+		+ "to this? I have had nobody to tell. The ones who come past don't stop, and I don't blame "
+		+ "them, and I would like very much to be blamed by somebody.\"")
 
 	var c1 = EventData.EventChoice.new()
-	c1.text = "Offer your blood (Lose 8 HP)"
-	c1.result_text = "Pain lances through you as the statue drinks. In return, power surges into your body."
-	c1.hp_change = -8
-	c1.max_hp_change = 5
-	c1.card_reward = true
-
-	var c2 = EventData.EventChoice.new()
-	c2.text = "Offer gold (Lose 15 gold)"
-	c2.result_text = "The coins dissolve in the basin. The statue's gaze softens, and you feel lighter."
-	c2.gold_change = -15
-	c2.hp_change = 15
-
-	var c3 = EventData.EventChoice.new()
-	c3.text = "Smash it"
-	c3.result_text = "The statue shatters. Shards of obsidian rain down, and dark energy crackles across your skin."
-	c3.gold_change = 20
-	c3.passion_change = -6
-	c3.hp_change = -3
-
-	e.choices.append(c1)
-	e.choices.append(c2)
-	e.choices.append(c3)
-	return e
-
-
-static func _wandering_spirit() -> EventData:
-	var e = EventData.new()
-	e.event_name = "Wandering Spirit"
-	e.description = "A translucent figure drifts between the trees, humming a melancholy tune. It notices you and pauses.\n\n\"Traveler... will you hear my story? I have been alone so long.\""
-
-	var c1 = EventData.EventChoice.new()
-	c1.text = "Listen to their story"
-	c1.result_text = "The spirit shares a tale of love and loss. As it fades, you feel your resolve harden."
+	c1.text = "Kneel with him and hear it out."
+	c1.result_text = ("You kneel in the wet grass and let him tell it: the whole shabby, human shape "
+		+ "of the thing, the courage that was simply not there when it was called for. When it is "
+		+ "told, something in him comes unclenched that has been clenched a long time, and he thins "
+		+ "out into the evening noticeably lighter than he was. What he leaves behind settles into "
+		+ "you as a kind of steadiness. You will not kneel here. Not you, not at a crossroads, not "
+		+ "for years.")
 	c1.max_hp_change = 3
 	c1.passion_change = 4
-	c1.awarded_title_id = &"the_gracious"  # hearing out the lonely dead -- grace, not mercy
+	c1.awarded_title_id = &"the_gracious"  # hearing out the lonely dead: grace, not mercy
 
 	var c2 = EventData.EventChoice.new()
-	c2.text = "Ask it to lend you its strength for the road ahead."
-	c2.result_text = ("The spirit hesitates, then lays a cold hand against your sword-arm. The chill "
-		+ "sinks in and settles there, patient, waiting for the next time you draw steel. It will "
-		+ "carry you through one hard fight, the spirit says, and then it will be spent, the way it is "
-		+ "spent itself.")
+	c2.text = "Ask him to lend you the courage he never spent."
+	c2.result_text = ("He looks at the sword in the grass, then at the one on your hip. \"Let me "
+		+ "spend on you what I couldn't spend on myself,\" he says, and lays a cold hand on your "
+		+ "sword-arm. The chill goes in past the sleeve and settles there to wait for the next time "
+		+ "you draw. One hard fight it will carry you. Then it will be spent, the way he was spent, "
+		+ "and you will be on your own with it again.")
 	c2.grants_combat_boon = &"wandering_vigor"
 
-	# Refusal with teeth (higher tier): dismissing the grieving spirit for loot leaves a
-	# lingering curse -- a permanent unplayable card. The gold is real, but so is the price.
+	# Refusal with teeth (higher tier): scattering him for the gilt leaves a lingering curse, a
+	# permanent unplayable card. The gold is real, but so is the price.
 	var c3 = EventData.EventChoice.new()
-	c3.text = "Banish the spirit"
-	c3.result_text = ("You dispel the spirit with a wave, and its essence scatters into glittering "
-		+ "motes you gather up off the ground. But not all of it scatters. Something of what it "
-		+ "carried catches in you like a burr, cold and unspent, and settles in to stay.")
+	c3.text = "Scatter him, and get the gilt off the cross."
+	c3.result_text = ("You wave him apart and he goes like breath off a window, and you work the old "
+		+ "gold leaf off the cross with your knife while the going is good. Not all of him scatters. "
+		+ "Some of whatever kept him kneeling catches in you the way a burr catches, cold and "
+		+ "unfinished and unspent, and it is still there in the morning, and it is still there the "
+		+ "week after that.")
 	c3.gold_change = 25
 	c3.passion_change = -4
 	c3.grants_curse = &"clinging_grief"
@@ -424,56 +466,54 @@ static func _wandering_spirit() -> EventData:
 	return e
 
 
-static func _training_grounds() -> EventData:
+## A rework of the generic Training Grounds, kept in Camelot because a tiltyard is not generic
+## furniture: the pell, the quintain and the butts are the apparatus of chivalric training, which
+## is this realm's own subject matter. Empty is better still, since the men who drilled here went
+## where the player is going. It carries resolve and quiet hope, the register nothing else in the
+## pool covers, and option 3 is a genuinely warm mundane beat. Mechanics are unchanged from the
+## original, so the rework carries no balance risk.
+static func _the_tiltyard() -> EventData:
 	var e = EventData.new()
-	e.event_name = "Training Grounds"
-	e.description = "An abandoned training yard. Wooden dummies, rusted weights, and a weapon rack still stand. You could hone your skills here."
+	e.event_name = "The Tiltyard"
+	e.description = ("The yard behind the manor wall still has its gate standing open. The pell is "
+		+ "there, the man-high oak post squires beat at until the arm learns a stroke without being "
+		+ "asked, scarred white on every face and splintered down one side. The quintain still stands "
+		+ "at the far end with its arm swung round and stopped, the sandbag counterweight long since "
+		+ "split and bled out into the grass. The archery butts have gone to seed. And somebody has "
+		+ "stacked the practice harness against the wall in its proper order, every piece where it "
+		+ "belongs, the way men leave a place they fully intend to come back to.\n\nNobody is "
+		+ "coming back to this one. You know where the men who trained here went. You are walking "
+		+ "the road they took.")
 
 	var c1 = EventData.EventChoice.new()
-	c1.text = "Train intensely (Lose 3 HP)"
-	c1.result_text = "Sweat and effort pay off. You feel sharper, more capable."
+	c1.text = "Strip to your shirt and work the pell. (Lose 3 HP)"
+	c1.result_text = ("You go at the post the way you were taught, or the way somebody was taught, "
+		+ "and after a while it stops being effort and starts being rhythm. The oak gives you nothing "
+		+ "back, which is the entire point of oak. By the time your arms are shaking there is a "
+		+ "stroke in them that was not in them this morning. Somebody's stroke, worked into this post "
+		+ "across years of afternoons, and yours now, because there is nobody else left to come and "
+		+ "have it.")
 	c1.hp_change = -3
 	c1.card_reward = true
+	c1.passion_change = 2
 
 	var c2 = EventData.EventChoice.new()
-	c2.text = "Scavenge the equipment"
-	c2.result_text = "You find some serviceable gear and a few coins among the debris."
+	c2.text = "Take the harness. It's good kit and it's going to rot."
+	c2.result_text = ("It is good harness, better than yours in places, and in a month it will be "
+		+ "rust and mould and mouse-nest. So you take what fits and bundle the rest to sell on down "
+		+ "the road. You do have to unstack it to do that. Putting a dead man's kit out of the order "
+		+ "he left it in is a smaller thing than it feels like, and it feels like something.")
 	c2.gold_change = 20
+	c2.passion_change = -2
 
 	var c3 = EventData.EventChoice.new()
-	c3.text = "Rest in the shade"
-	c3.result_text = "You take a moment to breathe. Sometimes that's enough."
+	c3.text = "Put your back to the wall and do nothing at all."
+	c3.result_text = ("You sit against the south wall, where the stone has been holding the sun all "
+		+ "afternoon, and you do not train and you do not take anything. For a quarter of an hour the "
+		+ "only thing happening anywhere in the world is a blackbird working the seeded butts for "
+		+ "grubs. Then you get up and go on. It was enough. You will think about that quarter of an "
+		+ "hour again later, at a considerably worse time, and it will still be enough.")
 	c3.hp_change = 8
-
-	e.choices.append(c1)
-	e.choices.append(c2)
-	e.choices.append(c3)
-	return e
-
-
-static func _suspicious_chest() -> EventData:
-	var e = EventData.new()
-	e.event_name = "Suspicious Chest"
-	e.description = "A gilded chest sits in the middle of an empty clearing. No traps visible. No guards. Just a chest, gleaming in the light.\n\nToo good to be true?"
-
-	var c1 = EventData.EventChoice.new()
-	c1.text = "Open it carefully"
-	c1.result_text = "A hidden needle pricks your finger, but the chest's contents are worth it."
-	c1.hp_change = -4
-	c1.gold_change = 35
-	c1.card_reward = true
-
-	var c2 = EventData.EventChoice.new()
-	c2.text = "Smash it open"
-	c2.result_text = "The chest explodes with force! Coins scatter everywhere."
-	c2.hp_change = -8
-	c2.gold_change = 50
-
-	var c3 = EventData.EventChoice.new()
-	c3.text = "Leave it alone"
-	c3.result_text = "Wisdom is knowing when not to act. You walk on, unscathed."
-	c3.passion_change = 2
-	c3.awarded_title_id = &"the_calculating"
 
 	e.choices.append(c1)
 	e.choices.append(c2)

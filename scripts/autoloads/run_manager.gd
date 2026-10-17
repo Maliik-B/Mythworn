@@ -51,7 +51,7 @@ var pending_vn_next: String = "res://scenes/map/map_scene.tscn"
 var pending_map_boon: StringName = &""
 ## A one-shot boon queued by an event, applied at the START of the next combat and then
 ## cleared (CombatEngine._apply_pending_combat_boon). StringName id; &"" = nothing pending.
-## The Wandering Spirit queues &"wandering_vigor" (+2 Strength for that one fight).
+## The Shade at the Cross queues &"wandering_vigor" (+2 Strength for that one fight).
 var pending_combat_boon: StringName = &""
 ## When true, the next map node the player enters is passed through: position advances and the
 ## node is marked visited, but its content (combat/shop/event/...) is skipped. Set by the

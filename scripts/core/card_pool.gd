@@ -761,7 +761,7 @@ static func get_curse_card(id: StringName) -> CardData:
 	return null
 
 
-## The Wandering Spirit's parting curse: you sent it off with its grief unspoken, and some of
+## The Shade at the Cross's parting curse: you scattered him with his grief unspoken, and some of
 ## it stayed. An unplayable card that just crowds your hand -- the price of the cold dismissal.
 static func _curse_clinging_grief() -> CardData:
 	var c := CardData.new()

@@ -769,7 +769,7 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.standing_change != 0:
 		RunManager.change_realm_standing(RunManager.current_realm_id, choice.standing_change)
 
-	# Queue a one-shot boon for the next combat (the Wandering Spirit's lent strength).
+	# Queue a one-shot boon for the next combat (the Shade at the Cross's lent courage).
 	if choice.grants_combat_boon != &"":
 		RunManager.pending_combat_boon = choice.grants_combat_boon
 
