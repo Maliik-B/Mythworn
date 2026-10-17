@@ -16,12 +16,24 @@ extends Node
 const TRIALS := 300
 const MAX_TURNS := 60
 const COMMIT_TARGET := 50    # when "committing", hold Passion at/above Blazing (+50)
+const FAILSAFE_QUIT_SECONDS := 180.0  # hard self-destruct if a run errors + idles (see _ready)
 
 var _character: CharacterData
 var _cbt := HarnessCombat.new()  # shared greedy-player combat policy
 
 
 func _ready() -> void:
+	# Failsafe self-destruct. If any report below errors out, _ready returns without reaching
+	# the clean quit() and a headless process would otherwise idle forever -- an orphan that
+	# piles up across runs until it exhausts memory and takes the machine (and other sessions)
+	# down with it. This timer fires once frames resume after such an early return and force-
+	# quits. (Belt-and-suspenders with the recommended CLI --quit-after; the bounded trial loops
+	# guard the only other hang path.)
+	get_tree().create_timer(FAILSAFE_QUIT_SECONDS).timeout.connect(
+		func() -> void:
+			push_error("combat_harness failsafe timeout — forcing quit")
+			get_tree().quit(1))
+
 	print("\n===============================================================")
 	print(" Fable combat harness — REAL engine, %d trials/scenario" % TRIALS)
 	print(" player %d HP / %d energy   Passion axis -100..+100 (Blazing >= +50)" % [
@@ -31,6 +43,7 @@ func _ready() -> void:
 
 	_report_regulars()
 	_report_elite()
+	_report_barrow_warden()
 	_report_poles()
 	_report_prophet()
 	_report_boss()
@@ -64,6 +77,12 @@ func _report_regulars() -> void:
 func _report_elite() -> void:
 	print("\nELITE — Champion of the Usurper (mid deck):")
 	_bar("Champion", _run(_mid_deck(), ["champion"], 0, true))
+
+
+func _report_barrow_warden() -> void:
+	print("\nEVENT FIGHT — The Barrow-Warden (Campfire treasure, optional):")
+	_bar("fresh deck", _run(_fresh_deck(), ["barrow"], 0, false))
+	_bar("mid deck", _run(_mid_deck(), ["barrow"], 0, false))
 
 
 func _report_prophet() -> void:
@@ -291,6 +310,7 @@ func _build_enemies(keys: Array) -> Array[EnemyData]:
 			"champion": out.append(EnemyPool.champion_of_the_usurper())
 			"prophet": out.append(EnemyPool.false_prophet())
 			"caedmon": out.append(EnemyPool.sir_caedmon())
+			"barrow": out.append(EnemyPool.the_barrow_warden())
 			"wall": out.append(_wall())
 	return out
 

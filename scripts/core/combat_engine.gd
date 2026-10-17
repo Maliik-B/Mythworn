@@ -170,6 +170,19 @@ func _disconnect_whiplash() -> void:
 		Events.passion_tier_changed.disconnect(_on_passion_tier_changed_whiplash)
 
 
+## Deterministic teardown. The engine listens on the global Events.passion_tier_changed autoload
+## for the fight's duration; the per-feature disconnects only fire on a CLEAN battle end. If the
+## engine is freed another way -- the balance harness disposing a trial, or the player leaving a
+## combat mid-fight -- those connections would otherwise dangle on a destroyed Node, and the next
+## tier change emitted into a freed receiver is a hard crash (intermittent SIGILL). Disconnecting
+## in _exit_tree (which free()/scene-change always triggers) guarantees no stale connection
+## survives this object, no matter how the combat ended. Idempotent via the is_connected guards.
+func _exit_tree() -> void:
+	_disconnect_whiplash()
+	if Events.passion_tier_changed.is_connected(_on_passion_tier_changed_btk):
+		Events.passion_tier_changed.disconnect(_on_passion_tier_changed_btk)
+
+
 ## Compute and emit the Be the King result on a crown-stakes win. Stores the
 ## raw score + tier on RunManager so the crown / abdication scene can read
 ## them for the narrative reveal, and folds the score into kings_reputation
@@ -471,6 +484,10 @@ func deal_damage(target: CombatantStats, base_amount: int,
 
 	# Title damage bonus: flat damage added to all player attacks (not enemies).
 	# Applied before zone penalty so the penalty scales the boosted total uniformly.
+	# INTENDED, not a bug: this is per HIT, not per card -- it sits on the same line as
+	# Strength, so a multi-hit card adds it once per hit (The Sword's Bearer at +3 pays
+	# +6 on Twin Strike and +12 on Cascade). Multi-hit decks are meant to be able to
+	# point themselves at it; that per-hit scaling is the title's whole synergy hook.
 	# Momentum (relic) rides the same block: the bonus accrued earlier this turn is added here,
 	# so it scales under zones like the title bonus. _momentum is 0 on the turn's first hit.
 	if source == player_stats:
