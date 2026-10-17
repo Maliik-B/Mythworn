@@ -16,8 +16,8 @@ const CARD_ICONS = {
 	"Strike": _CR + "tile000.png", "Stagger": _CR + "tile025.png",
 	"Noxious Strike": _CUS + "noxious_strike.png", "Wide Arc": _CR + "tile004.png",
 	# Outpouring (Water starter) + the Water pool use the neutral card frame until Water art lands.
-	"Crushing Blow": _CR + "tile008.png", "Paired Strikes": _CUS + "twin_strike.png",
-	"Sweep": _CR + "tile011.png", "Reckless Swing": _CR + "tile035.png",
+	"Paired Strikes": _CUS + "twin_strike.png",
+	"Sweep": _CR + "tile011.png",
 	"Havoc": _CR + "tile041.png", "Poison Fang": _CUS + "poison_fang.png",
 	"Armor Break": _CR + "tile016.png",
 	"Execute": _CR + "tile012.png",
@@ -25,7 +25,6 @@ const CARD_ICONS = {
 	"Rampage": _CR + "tile050.png", "Devastating Blow": _CR + "tile030.png",
 	"Defend": _ITV + "shield.png", "Meditate": _CUS + "meditate.png",
 	"Bracing Blow": _ITV + "gem_blue.png", "Shield Wall": _ITV + "gauntlet.png",
-	"Battle Cry": _CUS + "battle_cry.png", "Bolster": _ITV + "helmet.png",
 	"Dark Pact": _CUS + "dark_pact.png", "Inner Fire": _CUS + "inner_fire.png",
 	"Weaken": _ITV + "scroll_red.png", "Second Wind": _CR + "tile083.png",
 	"Phantom Guard": _CUS + "apparition.png",

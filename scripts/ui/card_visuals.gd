@@ -16,10 +16,8 @@ const CARD_ICONS := {
 	"Wide Arc": _CR + "tile004.png",
 	# Outpouring + the Water pool use the neutral frame until Water art lands.
 	# Generic attacks
-	"Crushing Blow": _CR + "tile008.png",
 	"Paired Strikes": _CUS + "twin_strike.png",
 	"Sweep": _CR + "tile011.png",
-	"Reckless Swing": _CR + "tile035.png",
 	"Havoc": _CR + "tile041.png",
 	"Poison Fang": _CUS + "poison_fang.png",
 	"Armor Break": _CR + "tile016.png",
@@ -35,8 +33,6 @@ const CARD_ICONS := {
 	# Generic skills
 	"Bracing Blow": _ITV + "gem_blue.png",
 	"Shield Wall": _ITV + "gauntlet.png",
-	"Battle Cry": _CUS + "battle_cry.png",
-	"Bolster": _ITV + "helmet.png",
 	"Dark Pact": _CUS + "dark_pact.png",
 	"Inner Fire": _CUS + "inner_fire.png",
 	"Weaken": _ITV + "scroll_red.png",

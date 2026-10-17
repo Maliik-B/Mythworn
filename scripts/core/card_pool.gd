@@ -247,11 +247,6 @@ static func _build_generic_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
 	# -- COMMON ATTACKS --
-	# Crushing Blow: a big single hit → −2 (Physical's lane; Strength/Vuln reward it).
-	pool.append(_card("Crushing Blow", 2, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
-		[_damage(13), _passion(-2)]))
-
 	# Paired Strikes: buffed 3x2 -> 4x2 (#9 — it was a dead pick at 6 for 1). The
 	# single-target 2-hit chip that scales cleanly with Vulnerable. (#16 card-tier: the
 	# "flexible weak-1" common — see Bracing Blow for the dmg-OR-block twin.) Leans −2
@@ -266,10 +261,6 @@ static func _build_generic_pool() -> Array[CardData]:
 		CardData.TargetType.ALL_ENEMIES, CardData.CardRarity.COMMON,
 		[_damage(9), _status(StatusEffects.WEAK, 1), _passion(2)]))
 
-	pool.append(_card("Reckless Swing", 0, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
-		[_damage(5), _passion(-2)]))
-
 	# -- COMMON SKILLS --
 	# #16 card-intensity tiers: Bracing Blow and Shield Wall are the deliberate
 	# "weak-1 / weak-2" pair. Bracing Blow is the FLEXIBLE one — 5 dmg + 5 block fits
@@ -283,12 +274,6 @@ static func _build_generic_pool() -> Array[CardData]:
 	pool.append(_card("Shield Wall", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.COMMON,
 		[_block(8), _passion(2)]))
-
-	# Free to play: cycles itself (draw 1) for a little block. Leans +2 (block-utility,
-	# Water's floor).
-	pool.append(_card("Battle Cry", 0, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, CardData.CardRarity.COMMON,
-		[_block(3), _draw(1), _passion(2)]))
 
 	# -- UNCOMMON ATTACKS --
 	# Havoc: the biggest neutral single hit → −2 (squarely Physical's big-single lane).
@@ -312,15 +297,6 @@ static func _build_generic_pool() -> Array[CardData]:
 		[_damage(8), _status(StatusEffects.VULNERABLE, 1), _passion(-2)]))
 
 	# -- UNCOMMON SKILLS --
-	# Nudged 12 -> 10 block so it isn't a strictly-better Defend-at-uncommon. Its
-	# identity rider is a small -3 Passion: block/defense reads as the steadying
-	# secondary (Hollow) side, so Bolster commits you toward it — the deliberate
-	# tension of the passion system (off-type value has a passion cost), and the
-	# clean separator from neutral Defend, which never touches Passion.
-	pool.append(_card("Bolster", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
-		[_block(10), _passion(-3)]))
-
 	pool.append(_card("Dark Pact", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		[_draw(2), _passion(-5)]))

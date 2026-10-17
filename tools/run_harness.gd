@@ -334,8 +334,8 @@ func _card_score(c: CardData) -> int:
 
 
 ## True if a card grants any Block — the survival floor a committed Water drafter still
-## reaches for (Shield Wall / Bolster / Phantom Guard / Bracing Blow), since the Water
-## pole itself no longer carries block.
+## reaches for (Shield Wall / Phantom Guard / Bracing Blow), since the Water pole itself
+## no longer carries block.
 func _grants_block(c: CardData) -> bool:
 	for e in c.get_active_effects():
 		if e is BlockEffect:
