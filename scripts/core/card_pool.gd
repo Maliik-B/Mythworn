@@ -173,7 +173,7 @@ static func _get_tier_reward_choices(rng: RandomNumberGenerator,
 ## Picks unique cards from a pool with rarity weighting.
 static func _pick_from_pool(pool: Array[CardData], rng: RandomNumberGenerator,
 		count: int) -> Array[CardData]:
-	pool.shuffle()
+	RngManager.shuffle(pool, rng)
 
 	var picked: Array[CardData] = []
 	var rarity = _roll_rarity(rng)

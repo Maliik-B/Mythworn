@@ -20,6 +20,17 @@ func setup_run(seed_value: int) -> void:
 	map_rng.seed = hash(str(seed_value) + "map")
 
 
+## In-place Fisher-Yates shuffle drawn from `rng`. Array.shuffle() draws from Godot's global
+## RNG instead, which is seeded fresh in every process, so a shuffle that decides gameplay has
+## to come through here or the same seed stops giving the same run.
+func shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
+	for i in range(arr.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
+
+
 func generate_seed() -> int:
 	randomize()
 	return randi()

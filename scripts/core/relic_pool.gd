@@ -201,7 +201,7 @@ static func get_reward_choices(rng: RandomNumberGenerator, count: int = 3,
 			filtered.append(relic)
 
 	# Shuffle and pick with rarity weighting
-	filtered.shuffle()
+	RngManager.shuffle(filtered, rng)
 	var picked: Array[RelicData] = []
 	var rarity = _roll_rarity(rng)
 
@@ -237,7 +237,7 @@ static func get_boss_reward_choices(rng: RandomNumberGenerator,
 			if not owned:
 				boss_relics.append(relic)
 
-	boss_relics.shuffle()
+	RngManager.shuffle(boss_relics, rng)
 	var result: Array[RelicData] = []
 	for i in mini(3, boss_relics.size()):
 		result.append(boss_relics[i])

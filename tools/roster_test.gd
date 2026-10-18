@@ -57,6 +57,7 @@ func _ready() -> void:
 	await _test_chilled_freeze()
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
+	_test_rewards_follow_the_run_seed()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -2198,3 +2199,29 @@ func _fight_instant_combat(policy: HarnessCombat) -> void:
 			break
 		eng.end_player_turn()
 	eng.free()
+
+
+## Rewards are a function of the run seed. Card and relic rewards used to shuffle their pool
+## with Array.shuffle(), which draws from Godot's global RNG, seeded fresh in every process, so
+## the same run seed offered different rewards in every session and run_harness gave different
+## numbers on every run of the same code. Rolls every reward table twice off the same run seed
+## with the global RNG set to two different states, and requires the same offer both times.
+func _test_rewards_follow_the_run_seed() -> void:
+	var owned := RunManager.get_owned_relic_names()
+	var offers: Array[String] = []
+	for global_seed in [1, 987654321]:
+		seed(global_seed)
+		RngManager.setup_run(42)
+		var names: PackedStringArray = []
+		for c in CardPool.get_reward_choices(RngManager.loot_rng, 3):
+			names.append(c.card_name)
+		for c in CardPool.get_boss_reward_choices(RngManager.loot_rng):
+			names.append(c.card_name)
+		for r in RelicPool.get_reward_choices(RngManager.loot_rng, 3, owned):
+			names.append(r.relic_name)
+		for r in RelicPool.get_boss_reward_choices(RngManager.loot_rng, owned):
+			names.append(r.relic_name)
+		offers.append(", ".join(names))
+	randomize()
+	_check("the same run seed offers the same card + relic rewards whatever the global RNG holds",
+		offers[0] == offers[1] and offers[0] != "")
