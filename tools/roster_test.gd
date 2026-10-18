@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_combat_retains_nothing()
 	_test_rewards_follow_the_run_seed()
 	_test_harness_policy_spends_energy_well()
+	_test_harness_policy_reads_incoming()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -2229,12 +2230,16 @@ func _test_rewards_follow_the_run_seed() -> void:
 
 
 ## The harness player spends a turn's energy on the most damage it can buy, rather than on the
-## biggest single card, and counts the Sword's Bearer bonus once per hit. Small hands with a
-## known best answer, all NEUTRAL cards so the Passion zone stays out of the arithmetic.
+## biggest single card, and reads each attack the way deal_damage resolves it. Small hands with
+## a known best answer against a plain 100-HP target, NEUTRAL cards unless a check is about the
+## Passion zone. (The estimate is also checked against the engine across whole harness runs,
+## where it matched every attack that did not kill a target.)
 func _test_harness_policy_spends_energy_well() -> void:
 	var policy := HarnessCombat.new()
 	var eng := CombatEngine.new()
 	eng.player_stats = CombatantStats.new(80, 80)
+	var target := EnemyCombatState.new(_dummy_attacker())
+	eng.enemies.append(target)
 	var big := _neutral_attack("Big", 2, 14)
 	var small: Array = [_neutral_attack("Small A", 1, 9), _neutral_attack("Small B", 1, 9),
 		_neutral_attack("Small C", 1, 9)]
@@ -2257,7 +2262,99 @@ func _test_harness_policy_spends_energy_well() -> void:
 	eng._sword_base = 2
 	_check("the title bonus is counted once per hit: 3 x (4+2) = 18, 1 x (14+2) = 16",
 		policy._card_est_damage(eng, triple) == 18 and policy._card_est_damage(eng, big) == 16)
+	eng._sword_base = 0
+
+	# Momentum: every hit lifts every later hit this turn, so a plan landing 4 hits gains
+	# 0+1+2+3 = 6 on top of its cards (12 + 9). Blooded Edge's first-hit bonus counts once.
+	eng._momentum_per_hit = 1
+	eng.energy = 2
+	plan = policy._best_attack_plan(eng, [triple, small[0]])
+	_check("Momentum's climb is counted across the whole plan: 12 + 9 + 6 = 27", plan[0] == 27)
+	eng._momentum_per_hit = 0
+	eng._blooded_edge_pending = 6
+	plan = policy._best_attack_plan(eng, [big])
+	_check("Blooded Edge is added once to a plan that attacks: 14 + 6 = 20", plan[0] == 20)
+	eng._blooded_edge_pending = 0
+
+	# The target: Vulnerable x1.5 and Intangible's 1 per hit on the lowest enemy, and an area
+	# attack landing on every living enemy.
+	var second := EnemyCombatState.new(_dummy_attacker())
+	eng.enemies.append(second)
+	target.stats.current_hp = 50
+	target.stats.apply_status(StatusEffects.VULNERABLE, 1)
+	var sweep := _neutral_attack("Sweep", 1, 5)
+	sweep.target_type = CardData.TargetType.ALL_ENEMIES
+	_check("a single attack hits the lowest enemy's Vulnerable: 10 -> 15",
+		policy._card_est_damage(eng, _neutral_attack("Ten", 1, 10)) == 15)
+	_check("an area attack lands on every living enemy: 7 (Vulnerable) + 5 = 12",
+		policy._card_est_damage(eng, sweep) == 12)
+	target.stats.remove_status(StatusEffects.VULNERABLE)
+	target.stats.apply_status(StatusEffects.INTANGIBLE, 1)
+	_check("an Intangible target takes 1 per hit: Triple deals 3",
+		policy._card_est_damage(eng, triple) == 3)
+	target.stats.remove_status(StatusEffects.INTANGIBLE)
+
+	# The Passion zone at a lean tier is the engine's x1.12, not the extreme's x1.25, and a
+	# damage rider's Passion-distance bonus is part of the base.
+	var saved_passion: int = RunManager.passion.current_value
+	RunManager.passion.current_value = 30  # Inspired for the test character
+	var water := _neutral_attack("Water Ten", 1, 10)
+	water.personality = CardData.PersonalityType.PRIMARY
+	_check("an on-type card at Inspired gets x1.12: 10 -> 11", policy._card_est_damage(eng, water) == 11)
+	var carried := _neutral_attack("Carried", 1, 4)
+	carried.effects[0].passion_bonus_divisor = 10
+	_check("the Passion-distance rider adds 30 / 10 = 3: 4 -> 7",
+		policy._card_est_damage(eng, carried) == 7)
+	RunManager.passion.current_value = saved_passion
 	eng.free()
+
+
+## The harness player reads an enemy's intent the way the engine will resolve it on the enemy
+## turn. Each case predicts, then runs the player's real end-of-turn tick and the enemy's real
+## action, and compares. The player's own statuses lose a stack before any enemy acts.
+func _test_harness_policy_reads_incoming() -> void:
+	var policy := HarnessCombat.new()
+	for case in [
+		["player Vulnerable 1 has worn off before the hit", StatusEffects.VULNERABLE, 1, 0, 0],
+		["player Vulnerable 2 still amplifies it", StatusEffects.VULNERABLE, 2, 0, 0],
+		["player Intangible 1 has worn off before the hit", StatusEffects.INTANGIBLE, 1, 0, 0],
+		["player Intangible 2 holds each hit to 1", StatusEffects.INTANGIBLE, 2, 0, 0],
+		["a pierce goes through block", null, 0, 5, 30],
+	]:
+		var eng := CombatEngine.new()
+		eng.player_stats = CombatantStats.new(80, 80)
+		if case[1] != null:
+			eng.player_stats.apply_status(case[1], case[2])
+		eng.player_stats.block = case[4]
+		var enemy := EnemyCombatState.new(_dummy_attacker())
+		var move := EnemyMove.new()
+		var hit := DamageEffect.new()
+		hit.value = 11
+		hit.hits = 2
+		hit.pierce = case[3]
+		move.effects.append(hit)
+		enemy.current_intent = move
+		eng.enemies.append(enemy)
+		var predicted: Array = policy._intent_damage(eng, enemy)
+		eng.tick_end_of_turn(eng.player_stats)
+		var hp_before := eng.player_stats.current_hp
+		var total_before := hp_before + eng.player_stats.block
+		eng.execute_enemy_turn(enemy)
+		var taken := total_before - (eng.player_stats.current_hp + eng.player_stats.block)
+		var through_block := hp_before - eng.player_stats.current_hp
+		var ok: bool = predicted[0] == taken
+		if case[3] > 0:
+			ok = ok and predicted[1] == through_block
+		_check("incoming: %s (predicted %s, engine %d)" % [case[0], str(predicted), taken], ok)
+		eng.free()
+	var frozen_eng := CombatEngine.new()
+	frozen_eng.player_stats = CombatantStats.new(80, 80)
+	var frozen := EnemyCombatState.new(_dummy_attacker())
+	frozen.select_intent()
+	frozen.stats.apply_status(StatusEffects.STUN, 1)
+	_check("a Frozen enemy threatens nothing, since it forfeits its action",
+		policy._intent_damage(frozen_eng, frozen) == [0, 0])
+	frozen_eng.free()
 
 
 func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:

@@ -70,15 +70,17 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	var living := _living(eng)
 	if living.is_empty():
 		return null
-	var player_vuln := eng.player_stats.has_status(StatusEffects.VULNERABLE)
 	var incoming := 0
+	var piercing := 0  # the part of incoming that block cannot stop
 	var biggest := 0
 	for en in living:
-		var d := _intent_damage(en, player_vuln)
-		incoming += d
-		biggest = maxi(biggest, d)
+		var d := _intent_damage(eng, en)
+		incoming += d[0]
+		piercing += d[1]
+		biggest = maxi(biggest, d[0])
 	var block := eng.player_stats.block
-	var unblocked := maxi(0, incoming - block)
+	var blockable := incoming - piercing
+	var unblocked := maxi(0, blockable - block) + piercing
 	var hp := eng.player_stats.current_hp
 	var maxhp := eng.player_stats.max_hp
 
@@ -99,12 +101,14 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	if living.size() == 1:
 		can_lethal = plan[0] >= living[0].stats.current_hp + living[0].stats.block
 
-	# 1) Survive: block a telegraphed spike or a hit that drops us below the margin.
+	# 1) Survive: block a telegraphed spike or a hit that drops us below the margin. Block is
+	# only worth playing against the part of the hit it can stop; a pierce goes straight through.
 	var threatened := biggest >= SPIKE or float(hp - unblocked) < SAFETY_FRAC * maxhp
-	if not can_lethal and threatened and block < incoming - CHIP_TOLERANCE:
-		var blk := _cheapest(playable.filter(_gives_block))
-		if blk != null:
-			return blk
+	if not can_lethal and threatened and unblocked > CHIP_TOLERANCE:
+		if blockable - block > CHIP_TOLERANCE:
+			var blk := _cheapest(playable.filter(_gives_block))
+			if blk != null:
+				return blk
 		# A glass Water deck has no block — its defense is EVASION and CONTROL. Model
 		# that so the pole isn't read as far more fragile than a real player would run it:
 		# Intangible (Slip the Tide) negates the whole incoming turn, and a Freeze deletes the
@@ -159,8 +163,8 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	if first != null:
 		return first
 
-	# 5) Leftover energy: keep blocking if a hit is still coming.
-	if block < incoming:
+	# 5) Leftover energy: keep blocking if a hit block can stop is still coming.
+	if block < blockable:
 		var blk2 := _cheapest(playable.filter(_gives_block))
 		if blk2 != null:
 			return blk2
@@ -168,85 +172,160 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	return null
 
 
-## Attack damage the enemy's telegraphed intent will deal, mirroring deal_damage's
-## Strength -> Weak -> Vulnerable order so the policy blocks the right amount.
-func _intent_damage(enemy: EnemyCombatState, player_vuln: bool) -> int:
-	if enemy.current_intent == null:
-		return 0
+## What the enemy's telegraphed intent will do to the player, as [damage, the part of it that
+## pierces block], hit by hit in deal_damage's order: Strength, Weak, then the player's
+## Vulnerable and Intangible. The player's own statuses lose a stack at the end of the player's
+## turn, before any enemy acts, so one counts only if it has a second stack to survive that. A
+## Frozen enemy forfeits its action, so it threatens nothing this turn.
+func _intent_damage(eng: CombatEngine, enemy: EnemyCombatState) -> Array:
+	if enemy.current_intent == null or enemy.stats.has_status(StatusEffects.STUN):
+		return [0, 0]
 	var estr := enemy.stats.get_status_stacks(StatusEffects.STRENGTH)
 	var eweak := enemy.stats.has_status(StatusEffects.WEAK)
+	var player_vuln := eng.player_stats.get_status_stacks(StatusEffects.VULNERABLE) >= 2
+	var player_intangible := eng.player_stats.get_status_stacks(StatusEffects.INTANGIBLE) >= 2
 	var dmg := 0
+	var pierced := 0
 	for e in enemy.current_intent.effects:
 		if e is DamageEffect:
-			var per := e.value + estr
+			var per: int = e._effective_value() + estr
 			if eweak:
 				per = int(per * 0.75)
-			dmg += maxi(0, per) * e.hits
-	if player_vuln:
-		dmg = int(dmg * 1.5)
-	return dmg
+			if player_vuln:
+				per = int(per * 1.5)
+			per = maxi(0, per)
+			if per > 0 and player_intangible:
+				per = 1
+			dmg += per * e.hits
+			pierced += mini(e.pierce, per) * e.hits
+	return [dmg, pierced]
 
 
-## Effective single-target damage of a player attack card, including Strength, Weak, the
-## Sword's Bearer per-hit bonus, and the Passion zone modifier, in deal_damage's order, so the
-## policy values on-type cards and multi-hits correctly. Leaving the title bonus out had the
-## policy ranking a single big hit over a multi-hit that the title makes worth more.
+## What a player attack would deal if played now. See _card_strike.
 func _card_est_damage(eng: CombatEngine, card: CardData, x_energy: int = -1) -> int:
-	var pstr := eng.player_stats.get_status_stacks(StatusEffects.STRENGTH)
-	var pweak := eng.player_stats.has_status(StatusEffects.WEAK)
-	var title_bonus := eng.sword_bonus()
-	var total := 0
+	return _card_strike(eng, card, x_energy)[0]
+
+
+## What a player attack would do if played now, as [damage, hits landed], hit by hit the way
+## deal_damage resolves it: the effect's base with its Passion-distance rider, + Strength, then
+## Weak, + the Sword's Bearer bonus and the Momentum built so far this turn, then the card's
+## Passion zone, then each target's Vulnerable or Intangible. The hits are the effect's own (X
+## for an X-cost card, at x_energy or all the energy left) plus Overflow's extras at Blazing,
+## landing on the lowest enemy, which is what play_turn targets, or on every living enemy for an
+## area attack. Momentum's further climb and Blooded Edge belong to the turn and the combat
+## rather than to one card, so _best_attack_plan adds them once to the plan as a whole.
+func _card_strike(eng: CombatEngine, card: CardData, x_energy: int = -1) -> Array:
+	var targets: Array[EnemyCombatState] = []
+	if card.target_type == CardData.TargetType.ALL_ENEMIES:
+		targets = _living(eng)
+	else:
+		var low := _lowest(eng)
+		if low != null:
+			targets.append(low)
+	var ps := eng.player_stats
+	var pstr := ps.get_status_stacks(StatusEffects.STRENGTH)
+	var pweak := ps.has_status(StatusEffects.WEAK)
+	var flat := eng.sword_bonus() + eng._momentum
+	var zone := CombatEngine.zone_multiplier(card.personality)
+	var overflow := 0
+	if ps.has_power(Powers.OVERFLOW) and RunManager.get_passion_tier() == PassionState.Tier.BLAZING:
+		overflow = ps.get_power_stacks(Powers.OVERFLOW)
+	var damage := 0
+	var landed := 0
 	for e in card.get_active_effects():
-		if e is DamageEffect:
-			var per := e.value + pstr
-			if pweak:
-				per = int(per * 0.75)
-			per += title_bonus
-			per = _zone_adjust(per, card.personality)
-			# X-cost torrent (Maelstrom): strikes once per energy on cast, so value it at
-			# the energy it would spend (x_energy, or all of it right now), not a flat hit.
-			var reps: int = e.hits
-			if e.x_scaled:
-				reps = eng.energy if x_energy < 0 else x_energy
-			total += maxi(0, per) * reps
-	return total
+		if not e is DamageEffect:
+			continue
+		var hits: int = e.hits
+		if e.x_scaled:
+			hits = eng.energy if x_energy < 0 else x_energy
+		if hits > 1:
+			hits += overflow
+		var per: int = e._effective_value() + pstr
+		if pweak:
+			per = int(per * 0.75)
+		per = int((per + flat) * zone)
+		for t in targets:
+			var hit := per
+			if t.stats.has_status(StatusEffects.VULNERABLE):
+				hit = int(hit * 1.5)
+			hit = maxi(0, hit)
+			if hit > 0 and t.stats.has_status(StatusEffects.INTANGIBLE):
+				hit = 1
+			damage += hit * hits
+			landed += hits
+	return [damage, landed]
 
 
 ## The most damage the energy left this turn can buy from these attacks, as [damage, cards]:
 ## a 0/1 knapsack over energy cost, so two cheap hits can beat one expensive one. An X-cost
 ## card spends whatever is left when it is played, so it is weighed on top of each cheaper
 ## fixed-cost set. Ties keep hand order, which keeps the choice deterministic.
+##
+## With the Momentum relic every hit raises every later hit this turn, so a set's worth also
+## depends on how many hits it lands in total: the t-th hit carries t times the per-hit bonus
+## on top of what _card_strike counted. The knapsack then also tracks hits, and the plan adds
+## that climb once. Blooded Edge's first-hit bonus is added once to any plan that attacks.
+## Both are counted before the zone and Vulnerable multipliers, the one approximation left.
 func _best_attack_plan(eng: CombatEngine, attacks: Array) -> Array:
 	var cap: int = eng.energy
-	var best: Array = []  # best[e]: the most damage from fixed-cost attacks for at most e energy
-	for e in cap + 1:
-		best.append([0, []])
+	var per_hit: int = eng._momentum_per_hit
+	var fixed: Array = []
 	var x_cards: Array = []
 	for c in attacks:
 		if c.x_cost:
 			x_cards.append(c)
-			continue
-		var cost: int = c.energy_cost
-		var dmg := _card_est_damage(eng, c)
-		for e in range(cap, cost - 1, -1):
-			var with_c: int = best[e - cost][0] + dmg
-			if with_c > best[e][0]:
-				best[e] = [with_c, best[e - cost][1] + [c]]
-	var plan: Array = best[cap]
-	for x in x_cards:
+		else:
+			fixed.append(c)
+	var plan: Array
+	if per_hit <= 0:
+		var best: Array = []  # best[e]: the most damage from fixed-cost attacks for at most e energy
 		for e in cap + 1:
-			var with_x: int = best[e][0] + _card_est_damage(eng, x, cap - e)
-			if with_x > plan[0]:
-				plan = [with_x, best[e][1] + [x]]
+			best.append([0, []])
+		for c in fixed:
+			var cost: int = c.energy_cost
+			var dmg := _card_est_damage(eng, c)
+			for e in range(cap, cost - 1, -1):
+				var with_c: int = best[e - cost][0] + dmg
+				if with_c > best[e][0]:
+					best[e] = [with_c, best[e - cost][1] + [c]]
+		plan = best[cap]
+		for x in x_cards:
+			for e in cap + 1:
+				var with_x: int = best[e][0] + _card_est_damage(eng, x, cap - e)
+				if with_x > plan[0]:
+					plan = [with_x, best[e][1] + [x]]
+	else:
+		# table[e][hits]: the most damage from fixed-cost attacks landing exactly that many hits
+		# for at most e energy.
+		var table: Array = []
+		for e in cap + 1:
+			table.append({0: [0, []]})
+		for c in fixed:
+			var cost: int = c.energy_cost
+			var s := _card_strike(eng, c)
+			for e in range(cap, cost - 1, -1):
+				var before: Dictionary = table[e - cost].duplicate()
+				for h in before:
+					var cand: int = before[h][0] + s[0]
+					var hh: int = h + s[1]
+					if not table[e].has(hh) or cand > table[e][hh][0]:
+						table[e][hh] = [cand, before[h][1] + [c]]
+		plan = [0, []]
+		for h in table[cap]:
+			var v: int = table[cap][h][0] + per_hit * h * (h - 1) / 2
+			if v > plan[0]:
+				plan = [v, table[cap][h][1]]
+		for x in x_cards:
+			for e in cap + 1:
+				var xs := _card_strike(eng, x, cap - e)
+				for h in table[e]:
+					var total_hits: int = h + xs[1]
+					var v: int = table[e][h][0] + xs[0] + per_hit * total_hits * (total_hits - 1) / 2
+					if v > plan[0]:
+						plan = [v, table[e][h][1] + [x]]
+	if eng._blooded_edge_pending > 0 and not plan[1].is_empty():
+		plan = [plan[0] + eng._blooded_edge_pending, plan[1]]
 	return plan
-
-
-func _zone_adjust(amount: int, pers: CardData.PersonalityType) -> int:
-	if CombatEngine.zone_bonus_active(pers):
-		return int(amount * 1.25)
-	if CombatEngine.is_zone_penalized(pers):
-		return int(amount * 0.75)
-	return amount
 
 
 func _gives_block(c: CardData) -> bool:
