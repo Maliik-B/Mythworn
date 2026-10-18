@@ -859,16 +859,18 @@ func _show_card_reward(school: StringName = &"") -> void:
 	header.add_theme_color_override("font_color", Color(0.9, 0.8, 0.4))
 	follow_up_container.add_child(header)
 
-	# A tome choice biases the three cards toward one school; otherwise a normal mixed reward.
+	# A tome choice biases the cards toward one school; otherwise a normal mixed reward.
+	# The Gracious adds one more option to whichever offer this is.
+	var pick_count := 3 + RunManager.get_card_reward_bonus()
 	var cards: Array[CardData]
 	if school == &"primary":
 		cards = CardPool.get_school_reward_choices(
-			RngManager.loot_rng, CardData.PersonalityType.PRIMARY, 3)
+			RngManager.loot_rng, CardData.PersonalityType.PRIMARY, pick_count)
 	elif school == &"secondary":
 		cards = CardPool.get_school_reward_choices(
-			RngManager.loot_rng, CardData.PersonalityType.SECONDARY, 3)
+			RngManager.loot_rng, CardData.PersonalityType.SECONDARY, pick_count)
 	else:
-		cards = CardPool.get_reward_choices(RngManager.loot_rng, 3)
+		cards = CardPool.get_reward_choices(RngManager.loot_rng, pick_count)
 
 	# The 3 reward cards always fit, so center them across the full width. (A
 	# ScrollContainer here pinned the row to the left, since it sizes its child to

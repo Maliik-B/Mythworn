@@ -45,6 +45,11 @@ var _blooded_edge_pending: int = 0
 var _clutch_heal: int = 0
 var _clutch_used: bool = false
 
+## The Merciful title: HP restored each time an enemy dies (0 unless the title is equipped).
+## Cached at combat start like the clutch heal, rather than polled on every death, because
+## get_title_passive_total rebuilds the whole title registry on each call.
+var _mercy_heal: int = 0
+
 ## Momentum relic: a within-turn damage ramp. _momentum_per_hit is the per-hit bonus from the
 ## relic's value (0 unless held); _momentum is the bonus accrued so far THIS turn, added to each
 ## player attack and reset at the start of every player turn. Read directly, like Blooded Edge.
@@ -104,6 +109,8 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	# The Compassionate: arm the once-per-combat clutch heal from the equipped title (0 if unworn).
 	_clutch_heal = RunManager.get_title_passive_total(TitleData.EffectType.CLUTCH_HEAL)
 	_clutch_used = false
+	# The Merciful: arm the per-death mend from the equipped title (0 if unworn).
+	_mercy_heal = RunManager.get_title_passive_total(TitleData.EffectType.HEAL_ON_ENEMY_DEATH)
 	# Momentum: prime the per-hit ramp from the relic (0 if unheld); the accrued bonus starts empty.
 	var mom := RunManager.get_relic("Momentum")
 	_momentum_per_hit = mom.value if mom else 0
@@ -117,6 +124,11 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	# actually holds Whiplash (checked in the handler). Disconnected at combat end.
 	if not Events.passion_tier_changed.is_connected(_on_passion_tier_changed_whiplash):
 		Events.passion_tier_changed.connect(_on_passion_tier_changed_whiplash)
+	# The Merciful listens on enemy deaths for the fight. Same teardown discipline as the
+	# tier listener above, and for the same reason: this is a global signal and a freed
+	# engine still connected to it is a hard crash.
+	if _mercy_heal > 0 and not Events.enemy_died.is_connected(_on_enemy_died_mercy):
+		Events.enemy_died.connect(_on_enemy_died_mercy)
 	Events.combat_started.emit()
 	_process_relics(RelicData.RelicTrigger.ON_COMBAT_START)
 	_apply_pending_combat_boon()
@@ -170,6 +182,20 @@ func _disconnect_whiplash() -> void:
 		Events.passion_tier_changed.disconnect(_on_passion_tier_changed_whiplash)
 
 
+func _disconnect_mercy() -> void:
+	if Events.enemy_died.is_connected(_on_enemy_died_mercy):
+		Events.enemy_died.disconnect(_on_enemy_died_mercy)
+
+
+## The Merciful: a body goes down and the title mends you for it, while the fight is still
+## happening. Dead players are not healed, and a mend that would do nothing is skipped by
+## heal_combatant itself.
+func _on_enemy_died_mercy(_enemy) -> void:
+	if _mercy_heal <= 0 or player_stats == null or player_stats.is_dead():
+		return
+	heal_combatant(player_stats, _mercy_heal)
+
+
 ## Deterministic teardown. The engine listens on the global Events.passion_tier_changed autoload
 ## for the fight's duration; the per-feature disconnects only fire on a CLEAN battle end. If the
 ## engine is freed another way -- the balance harness disposing a trial, or the player leaving a
@@ -179,6 +205,7 @@ func _disconnect_whiplash() -> void:
 ## survives this object, no matter how the combat ended. Idempotent via the is_connected guards.
 func _exit_tree() -> void:
 	_disconnect_whiplash()
+	_disconnect_mercy()
 	if Events.passion_tier_changed.is_connected(_on_passion_tier_changed_btk):
 		Events.passion_tier_changed.disconnect(_on_passion_tier_changed_btk)
 
@@ -844,6 +871,7 @@ func check_battle_end() -> void:
 	if player_stats.is_dead():
 		phase = Phase.BATTLE_LOST
 		_disconnect_whiplash()
+		_disconnect_mercy()
 		Events.combat_lost.emit()
 		return
 
@@ -856,6 +884,7 @@ func check_battle_end() -> void:
 	if all_dead:
 		phase = Phase.BATTLE_WON
 		_disconnect_whiplash()
+		_disconnect_mercy()
 		# Resolve BTK BEFORE emitting combat_won so RunManager.last_btk_score
 		# is populated when other listeners (RunManager._on_combat_won, etc.)
 		# react. The crown_decision_scene reads these fields on its own _ready

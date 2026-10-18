@@ -147,6 +147,14 @@ static func _build_outlander_of_camelot() -> TitleData:
 	return t
 
 
+## Mercy pays out on the dying rather than on the aftermath. It was heal 3 after each combat,
+## a flat always-on with nothing to play around; per-death it pays 3 on a solo elite and 9 on a
+## three-body fight, so its value depends on what is in front of you. It resolves IN combat, on
+## the death, which makes kill order a real decision: focusing a weak body down early starts
+## the healing sooner, and that decision is the whole reason to prefer this to a lump at the
+## end. It pays least where healing matters most, since bosses are single bodies, and that is
+## deliberate -- it keeps the cheapest title from becoming a universal sustain crutch.
+## TITLE_DESIGN 5.10.
 static func _build_the_merciful() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"the_merciful"
@@ -156,18 +164,24 @@ static func _build_the_merciful() -> TitleData:
 	t.accent_color = NEUTRAL_ACCENT
 
 	t.original_name = "The Merciful"
-	t.original_description = "You spared those you didn't have to. Heal 3 HP after each combat."
+	t.original_description = "You spared those you didn't have to. Heal 3 HP each time an enemy dies."
 	t.original_value = 3
 
-	t.passive_effect = TitleData.EffectType.HEAL_ON_COMBAT_END
+	t.passive_effect = TitleData.EffectType.HEAL_ON_ENEMY_DEATH
 	t.passive_scales_with_tier = false
 	return t
 
 
 ## A second kindness title, split off from The Merciful so a run's repeat good-acts aren't wasted
 ## on a title you already hold. Where mercy is sparing a life in peril, grace is generosity given
-## freely -- paying a stranger's debt, hearing out the lonely, pardoning a village. Distinct from
-## the mercy-heal lane: open hands leave you with a fuller measure. Personality trait; never degrades.
+## freely -- paying a stranger's debt, hearing out the lonely, pardoning a village.
+##
+## The world puts more in front of you because you put more in front of it. This is the only
+## title that touches rewards, it carries no combat power at all, and its value depends on how
+## specific the build is: a focused deck wants the wider net most, which is the latent axis
+## doing real work. It was +5 max HP, which duplicated Camelot's Champion's lane and was pure
+## immediate power -- and worse, its own grant site paid max HP twice. Personality; never
+## degrades. TITLE_DESIGN 5.6.
 static func _build_the_gracious() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"the_gracious"
@@ -177,10 +191,11 @@ static func _build_the_gracious() -> TitleData:
 	t.accent_color = NEUTRAL_ACCENT
 
 	t.original_name = "The Gracious"
-	t.original_description = "You met need with open hands when you didn't have to. +5 max HP."
-	t.original_value = 5
+	t.original_description = ("You met need with open hands when you didn't have to. "
+		+ "Card rewards offer one more card to choose from.")
+	t.original_value = 1
 
-	t.passive_effect = TitleData.EffectType.MAX_HP_BONUS
+	t.passive_effect = TitleData.EffectType.CARD_REWARD_CHOICES
 	t.passive_scales_with_tier = false
 	return t
 

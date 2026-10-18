@@ -17,10 +17,12 @@ func _ready() -> void:
 
 	# Boss rewards (pending_act_complete is set on boss nodes) get the richer offer:
 	# a guaranteed rare + uncommon-or-better, instead of the tier-split hallway reward.
+	# The Gracious widens either offer by one card; the row is an HBox, so it just gets wider.
+	var reward_count := 3 + RunManager.get_card_reward_bonus()
 	if RunManager.pending_act_complete:
-		card_choices = CardPool.get_boss_reward_choices(RngManager.loot_rng)
+		card_choices = CardPool.get_boss_reward_choices(RngManager.loot_rng, reward_count)
 	else:
-		card_choices = CardPool.get_reward_choices(RngManager.loot_rng)
+		card_choices = CardPool.get_reward_choices(RngManager.loot_rng, reward_count)
 	_build_ui()
 
 

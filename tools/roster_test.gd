@@ -1179,6 +1179,35 @@ func _test_reliquary() -> void:
 		comp != null and comp.category == TitleData.Category.PERSONALITY
 		and comp.passive_effect == TitleData.EffectType.CLUTCH_HEAL and comp.original_value == 8
 		and merc != null and merc.passive_effect != comp.passive_effect)
+	_check("The Merciful heals per enemy death (3), off the post-combat lane",
+		merc != null and merc.passive_effect == TitleData.EffectType.HEAL_ON_ENEMY_DEATH
+		and merc.original_value == 3)
+
+	# End-to-end: two bodies, two deaths, two mends, while the fight is still running.
+	RunManager.award_title(&"the_merciful")
+	RunManager.equip_title(0, &"the_merciful")
+	var keng := CombatEngine.new()
+	add_child(keng)
+	keng.start_combat([], 50, 50, [_dummy_attacker(), _dummy_attacker()])
+	keng.player_stats.current_hp = 20
+	keng.deal_damage(keng.enemies[0].stats, 999, keng.player_stats)
+	var after_one := keng.player_stats.current_hp
+	keng.deal_damage(keng.enemies[1].stats, 999, keng.player_stats)
+	var after_two := keng.player_stats.current_hp
+	_check("The Merciful mends on each death during the fight (20 -> 23 -> 26)",
+		after_one == 23 and after_two == 26)
+	keng.free()
+	# Freeing the engine must leave none of ITS handlers on the global death signal. The
+	# signal itself keeps listeners for the life of the game (AudioManager is an autoload),
+	# so the check is for the engine's own callable rather than for an empty list.
+	var mercy_dangling := false
+	for conn in Events.enemy_died.get_connections():
+		var cb: Callable = conn["callable"]
+		if cb.get_method() == &"_on_enemy_died_mercy":
+			mercy_dangling = true
+	_check("a freed engine leaves no dangling enemy_died connection", not mercy_dangling)
+	RunManager.equip_title(0, &"")
+	RunManager.earned_title_ids.erase(&"the_merciful")
 
 
 ## The Oct-2026 title/relic reworks, end-to-end through the real engine:
@@ -1572,10 +1601,37 @@ func _test_refusals() -> void:
 func _test_title_split() -> void:
 	var grace := TitlePool.get_title(&"the_gracious")
 	var merc := TitlePool.get_title(&"the_merciful")
-	_check("The Gracious is a MAX_HP_BONUS personality title (5), distinct from The Merciful's heal",
+	_check("The Gracious widens card rewards by 1 (personality), distinct from The Merciful's heal",
 		grace != null and grace.category == TitleData.Category.PERSONALITY
-		and grace.passive_effect == TitleData.EffectType.MAX_HP_BONUS and grace.original_value == 5
+		and grace.passive_effect == TitleData.EffectType.CARD_REWARD_CHOICES
+		and grace.original_value == 1
 		and merc != null and grace.passive_effect != merc.passive_effect)
+	# Equipped, it reads through the one accessor every reward site uses.
+	var saved_slots := RunManager.active_title_slots.duplicate()
+	var had_grace := RunManager.earned_title_ids.has(&"the_gracious")
+	RunManager.award_title(&"the_gracious")
+	RunManager.equip_title(0, &"the_gracious")
+	var bonus_worn := RunManager.get_card_reward_bonus()
+	RunManager.equip_title(0, &"")
+	var bonus_bare := RunManager.get_card_reward_bonus()
+	_check("The Gracious adds a reward option only while worn",
+		bonus_worn == 1 and bonus_bare == 0)
+	# A widened reward really does offer the extra card rather than silently capping at 3.
+	var wide := CardPool.get_reward_choices(RngManager.loot_rng, 4)
+	_check("a widened card reward offers 4 distinct cards", wide.size() == 4)
+	RunManager.active_title_slots = saved_slots
+	if not had_grace:
+		RunManager.earned_title_ids.erase(&"the_gracious")
+	# The Shade at the Cross must not pay max HP on the same option that grants the title.
+	var shade_grant: EventData.EventChoice = null
+	for ev in EventPool._build_pool():
+		if ev.event_name != "The Shade at the Cross":
+			continue
+		for ch in ev.choices:
+			if ch.awarded_title_id == &"the_gracious":
+				shade_grant = ch
+	_check("The Shade at the Cross no longer pays max HP alongside The Gracious",
+		shade_grant != null and shade_grant.max_hp_change == 0)
 	var grants_gracious := 0
 	var grants_merciful := 0
 	for ev in EventPool._build_pool():

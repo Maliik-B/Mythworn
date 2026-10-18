@@ -733,6 +733,13 @@ func _on_act_started_refresh_charges(_act_number: int) -> void:
 	_refresh_title_charges(TitleData.ActivePeriod.ACT)
 
 
+## Extra card options the equipped titles add to a card reward (The Gracious). Reward sites
+## widen their pick by this. The shop deliberately does not read it: buying a card is a
+## purchase, not a reward, and widening the stock would be a discount in disguise.
+func get_card_reward_bonus() -> int:
+	return get_title_passive_total(TitleData.EffectType.CARD_REWARD_CHOICES)
+
+
 ## Internal: update title tier tracking when the player changes realms.
 func _update_title_tiers_on_realm_change(previous_realm: StringName, new_realm: StringName) -> void:
 	var tier_changed := false

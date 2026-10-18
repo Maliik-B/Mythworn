@@ -434,7 +434,6 @@ static func _shade_at_the_cross() -> EventData:
 		+ "out into the evening noticeably lighter than he was. What he leaves behind settles into "
 		+ "you as a kind of steadiness. You will not kneel here. Not you, not at a crossroads, not "
 		+ "for years.")
-	c1.max_hp_change = 3
 	c1.passion_change = 4
 	c1.awarded_title_id = &"the_gracious"  # hearing out the lonely dead: grace, not mercy
 

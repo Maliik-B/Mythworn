@@ -30,6 +30,8 @@ enum EffectType {
 	HEAL_ON_COMBAT_END,     # value = HP healed after each combat
 	CLUTCH_HEAL,            # value = HP healed the first time you drop below half HP in a combat
 	SKIP_NODE,              # value = map nodes one charge passes over (active only)
+	CARD_REWARD_CHOICES,    # value = extra card options offered at a card reward
+	HEAL_ON_ENEMY_DEATH,    # value = HP healed each time an enemy dies, resolved in combat
 }
 
 
