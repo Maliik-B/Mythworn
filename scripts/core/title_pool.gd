@@ -217,10 +217,12 @@ static func _build_the_calculating() -> TitleData:
 	return t
 
 
-## Earned by refusing to let a memory fade -- winning the chapel-beast fight at The Reliquary.
-## Deliberately distinct from The Merciful (a post-combat heal): compassion here is a CLUTCH
-## mend -- the first time a fight drives you below half HP, it catches you. A personality trait;
-## never degrades.
+## Earned at the Last Cart Out, for getting under the miller's axle and lifting until the square
+## is empty. Re-homed there from The Reliquary, which pays The Unforgetting instead, and it lands
+## on one of the three sites that used to grant The Merciful, so the kindness lane gets less
+## repetitive in the same move. Deliberately distinct from mercy's per-death mend: compassion
+## here is a CLUTCH heal, catching you the first time a fight drives you below half HP, which is
+## what carrying other people through a bad day leaves you with. Personality; never degrades.
 static func _build_the_compassionate() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"the_compassionate"
@@ -238,9 +240,19 @@ static func _build_the_compassionate() -> TitleData:
 	return t
 
 
-## Earned at the run's end for holding the people's line (high folk standing) through the
-## realm. A personality trait, not a realm office -- it doesn't fade when you leave Camelot,
-## because it's who you are, not a post you held. The people tend their champion's hurts.
+## Earned the moment folk standing crosses PEOPLES_CHAMPION_THRESHOLD, which the pledge plus
+## one pro-folk act will do, so it arrives mid-act with nodes left to spend it on. It used to be
+## granted after the boss, which in a one-act demo meant a route title handed over on the ending
+## screen with no route left. Earning it before the crown scene also makes that scene a real
+## trade: the crown is something you take INSTEAD of what you already are.
+##
+## A personality trait, not a realm office. It doesn't fade when you leave Camelot, because it
+## is who you are and not a post you held. It was heal 4 after each combat, one point off The
+## Merciful in the same lane and strictly dominating it, which wasted the rarest grant in the
+## game on an upgrade to a common title. Now it lives where its fiction always was: the people
+## tend their champion, so the villages host him, and a night under their roof is worth two.
+## Mended AND seen to his gear, which means a player wearing it needs no sustain title and the
+## other slot goes to a fighting title. TITLE_DESIGN 5.2.
 static func _build_peoples_champion() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"peoples_champion"
@@ -250,9 +262,10 @@ static func _build_peoples_champion() -> TitleData:
 	t.accent_color = PEOPLES_ACCENT
 
 	t.original_name = "The People's Champion"
-	t.original_description = "You stood with the common folk and would not be made their king. Heal 4 HP after each combat."
-	t.original_value = 4
+	t.original_description = ("You stood with the common folk and would not be made their king. "
+		+ "The villages host you: a rest site grants both its choices.")
+	t.original_value = 1
 
-	t.passive_effect = TitleData.EffectType.HEAL_ON_COMBAT_END
+	t.passive_effect = TitleData.EffectType.REST_TAKES_BOTH
 	t.passive_scales_with_tier = false
 	return t

@@ -379,7 +379,7 @@ static func _last_cart_out() -> EventData:
 	c1.hp_change = -4
 	c1.passion_change = 5
 	c1.standing_change = 7
-	c1.awarded_title_id = &"the_merciful"
+	c1.awarded_title_id = &"the_compassionate"
 	c1.grants_liaison_relic = &"neve"
 
 	var c2 = EventData.EventChoice.new()

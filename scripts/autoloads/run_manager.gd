@@ -825,6 +825,7 @@ func set_realm_standing(realm_id: StringName, value: int) -> void:
 		return
 	realm_standing[realm_id] = value
 	Events.realm_standing_changed.emit(realm_id, old_value, value)
+	_check_peoples_champion(realm_id)
 
 
 ## Nudge a realm's court<->folk standing by a signed delta: positive toward the people,
@@ -837,6 +838,17 @@ func change_realm_standing(realm_id: StringName, delta: int) -> void:
 	var new_value := old_value + delta
 	realm_standing[realm_id] = new_value
 	Events.realm_standing_changed.emit(realm_id, old_value, new_value)
+	_check_peoples_champion(realm_id)
+
+
+## Internal: hand over The People's Champion the first time standing crosses its bar. Called
+## from both standing writers, so there is no path that moves standing without checking.
+## award_title dedupes, so this is safe to call on every change, and the terminal awards at the
+## crown and demo-end scenes stay where they are as harmless no-ops.
+func _check_peoples_champion(realm_id: StringName) -> void:
+	if not is_peoples_champion(realm_id):
+		return
+	award_title(&"peoples_champion")
 
 
 ## True if the player holds the given realm's people's favor (standing at/above the

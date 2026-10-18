@@ -7,6 +7,15 @@ var choice_container: HBoxContainer
 var deck_container: Control
 var titles_overlay: Control
 
+# The People's Champion: the folk host their champion well enough that a night is worth both
+# choices rather than one. Held on the scene rather than polled, so swapping the title off at
+# the banners mid-rest cannot take back a choice already spent.
+var heal_btn: Button
+var upgrade_btn: Button
+var _rest_takes_both := false
+var _heal_taken := false
+var _upgrade_taken := false
+
 
 func _ready() -> void:
 	_build_ui()
@@ -77,15 +86,26 @@ void fragment() {
 	main_vbox.add_child(choice_container)
 
 	var heal_amount = int(RunManager.max_hp * 0.3)
-	_add_choice_button("Rest", "Heal %d HP (30%%)" % heal_amount,
+	heal_btn = _add_choice_button("Rest", "Heal %d HP (30%%)" % heal_amount,
 		Color(0.3, 0.8, 0.4), _on_heal)
 
 	var has_upgradable = _get_upgradable_cards().size() > 0
-	var upgrade_btn = _add_choice_button("Smith", "Upgrade a card",
+	upgrade_btn = _add_choice_button("Smith", "Upgrade a card",
 		Color(0.9, 0.6, 0.2), _on_upgrade)
 	if not has_upgradable:
 		upgrade_btn.modulate = Color(0.4, 0.4, 0.4)
 		upgrade_btn.disabled = true
+
+	# The People's Champion turns one night into both, and says so where the choice is made.
+	_rest_takes_both = RunManager.get_title_passive_total(
+		TitleData.EffectType.REST_TAKES_BOTH) > 0
+	if _rest_takes_both:
+		var hosted = Label.new()
+		hosted.text = "They will not hear of you taking only one. Rest AND smith."
+		hosted.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hosted.add_theme_font_size_override("font_size", 16)
+		hosted.add_theme_color_override("font_color", Color(0.82, 0.68, 0.32))
+		main_vbox.add_child(hosted)
 
 	# Free side-actions, set apart below the two rest choices so it's clear they
 	# don't consume the rest: manage titles and peek at the map. Banners and the
@@ -221,7 +241,8 @@ func _on_heal() -> void:
 	info_label.text = "Healed %d HP! (HP: %d / %d)" % [
 		heal_amount, RunManager.current_hp, RunManager.max_hp]
 	info_label.add_theme_color_override("font_color", Color(0.3, 0.9, 0.4))
-	_show_done()
+	_heal_taken = true
+	_finish_choice()
 
 
 # ============================================================
@@ -384,12 +405,39 @@ func _upgrade_card(index: int) -> void:
 	info_label.text = "Upgraded %s!" % card.card_name
 	info_label.add_theme_color_override("font_color", Color(0.9, 0.6, 0.2))
 	deck_container.visible = false
-	_show_done()
+	_upgrade_taken = true
+	_finish_choice()
 
 
 # ============================================================
 # DONE
 # ============================================================
+
+## One rest choice has resolved. Normally that ends the night. While The People's Champion is
+## worn the other choice stays open, so the rest only ends once both are spent, or once the one
+## still standing has nothing to offer (no upgradable cards left in the deck).
+func _finish_choice() -> void:
+	if _rest_takes_both and _other_choice_available():
+		choice_container.visible = true
+		deck_container.visible = false
+		if _heal_taken:
+			heal_btn.disabled = true
+			heal_btn.modulate = Color(0.4, 0.4, 0.4)
+		if _upgrade_taken:
+			upgrade_btn.disabled = true
+			upgrade_btn.modulate = Color(0.4, 0.4, 0.4)
+		return
+	_show_done()
+
+
+## True if the choice the player has NOT taken yet is still worth offering.
+func _other_choice_available() -> bool:
+	if not _heal_taken:
+		return true
+	if not _upgrade_taken and _get_upgradable_cards().size() > 0:
+		return true
+	return false
+
 
 func _show_done() -> void:
 	choice_container.visible = false

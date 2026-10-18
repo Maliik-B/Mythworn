@@ -1643,6 +1643,18 @@ func _test_title_split() -> void:
 	_check("kindness grants are spread across events (both The Gracious and The Merciful appear)",
 		grants_gracious >= 1 and grants_merciful >= 1)
 
+	# The Compassionate's home moved out of the Reliquary and onto the route: the Last Cart
+	# Out's wholehearted help, which was one of The Merciful's three redundant grant sites.
+	var cart_grant: EventData.EventChoice = null
+	for ev in EventPool._build_pool():
+		if ev.event_name != "The Last Cart Out":
+			continue
+		for ch in ev.choices:
+			if ch.awarded_title_id == &"the_compassionate":
+				cart_grant = ch
+	_check("The Last Cart Out's lift pays The Compassionate (re-homed off the Reliquary)",
+		cart_grant != null and cart_grant.standing_change > 0)
+
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth
 ## ordinary event while the rest stay random. The ordinal advances once per ordinary event,
@@ -1745,6 +1757,7 @@ func _test_vn_data() -> void:
 	var folk_init: int = entry.choices[1].config.standing_init
 	_check("people's-champion bar sits above the folk pledge alone",
 		RunManager.PEOPLES_CHAMPION_THRESHOLD > folk_init)
+	var held_pc_before := RunManager.earned_title_ids.has(&"peoples_champion")
 	RunManager.set_realm_standing(&"camelot", folk_init + 12)
 	var champ_reached := RunManager.is_peoples_champion(&"camelot")
 	RunManager.set_realm_standing(&"camelot", folk_init)
@@ -1752,12 +1765,30 @@ func _test_vn_data() -> void:
 	_check("pledge + one pro-folk act makes a people's champion; the pledge alone does not",
 		champ_reached and champ_not_from_pledge)
 	RunManager.realm_standing.clear()
+	# Crossing the bar above now grants the title as a side effect; keep the fixture clean.
+	if not held_pc_before:
+		RunManager.earned_title_ids.erase(&"peoples_champion")
 
-	# The People's Champion ending title exists as a (non-degrading) personality trait.
+	# The People's Champion is a route title now (a rest grants both choices), not a third
+	# post-combat heal, and it is handed over the moment standing crosses the bar rather than
+	# after the boss -- in a one-act demo the post-boss award arrived with no nodes left.
 	var pc := TitlePool.get_title(&"peoples_champion")
-	_check("The People's Champion title exists (personality)",
+	_check("The People's Champion is a route title (a rest grants both choices)",
 		pc != null and pc.category == TitleData.Category.PERSONALITY
-		and pc.original_name == "The People's Champion")
+		and pc.original_name == "The People's Champion"
+		and pc.passive_effect == TitleData.EffectType.REST_TAKES_BOTH)
+	var had_pc := RunManager.earned_title_ids.has(&"peoples_champion")
+	RunManager.earned_title_ids.erase(&"peoples_champion")
+	RunManager.realm_standing.clear()
+	RunManager.change_realm_standing(&"camelot", RunManager.PEOPLES_CHAMPION_THRESHOLD - 1)
+	var not_yet := not RunManager.earned_title_ids.has(&"peoples_champion")
+	RunManager.change_realm_standing(&"camelot", 1)
+	var awarded_on_cross := RunManager.earned_title_ids.has(&"peoples_champion")
+	_check("The People's Champion is awarded on the standing crossing, not after the boss",
+		not_yet and awarded_on_cross)
+	RunManager.realm_standing.clear()
+	if not had_pc:
+		RunManager.earned_title_ids.erase(&"peoples_champion")
 
 	# Run-start queue: send-off -> entry -> map (what vn_scene._finish walks).
 	RunManager.pending_vn = sendoff
@@ -1989,7 +2020,13 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/act/act_transition_scene.gd",
 			"res://scenes/settings/settings_scene.gd",
 			"res://scenes/demo/demo_end_scene.gd",
-			"res://scenes/vn/vn_scene.gd"]:
+			"res://scenes/vn/vn_scene.gd",
+			"res://scenes/rest/rest_scene.gd",
+			"res://scenes/camelot/crown_decision_scene.gd",
+			"res://scenes/reward/relic_reward_scene.gd",
+			"res://scenes/game_over/game_over_scene.gd",
+			"res://scenes/title/title_screen.gd",
+			"res://scenes/splash/splash_scene.gd"]:
 		var scr = load(path)
 		var compiled: bool = scr != null and scr is GDScript and scr.reload() == OK
 		_check("compiles: %s" % path, compiled)

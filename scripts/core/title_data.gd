@@ -32,6 +32,7 @@ enum EffectType {
 	SKIP_NODE,              # value = map nodes one charge passes over (active only)
 	CARD_REWARD_CHOICES,    # value = extra card options offered at a card reward
 	HEAL_ON_ENEMY_DEATH,    # value = HP healed each time an enemy dies, resolved in combat
+	REST_TAKES_BOTH,        # value > 0 = a rest site grants both its choices, not one
 }
 
 
