@@ -1,20 +1,22 @@
-extends SceneTree
+extends Node
 ## Headless analysis of map PATH variety (not just visual layout). For several
 ## seeds it enumerates every start→boss path and reports the per-path node-type
 ## composition, so we can see whether path CHOICE is meaningful (paths differ in
 ## enemy density / shop / rest / elite counts) or homogeneous (every path ~same).
-## Run: godot --headless --path D:\Applications\Fable --script res://tools/map_path_analysis.gd
+## Run: godot --headless --path D:\Applications\Fable res://tools/map_path_analysis.tscn --quit-after 200
+## A scene rather than a --script tool because MapGenerator shuffles through the RngManager
+## autoload, and --script mode loads no autoloads.
 
 const TYPE_NAMES := ["Combat", "Elite", "Rest", "Shop", "Event", "Mystery", "Boss", "Sword"]
 
 
-func _init() -> void:
+func _ready() -> void:
 	for s in [101, 202, 303]:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = s
 		var map: MapData = MapGenerator.generate(rng, &"camelot", 1)
 		_report(map, s)
-	quit()
+	get_tree().quit()
 
 
 func _report(map: MapData, s: int) -> void:

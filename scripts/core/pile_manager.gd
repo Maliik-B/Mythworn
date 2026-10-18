@@ -21,11 +21,7 @@ func setup(deck: Array[CardData]) -> void:
 
 
 func shuffle_draw_pile() -> void:
-	for i in range(draw_pile.size() - 1, 0, -1):
-		var j = RngManager.deck_rng.randi_range(0, i)
-		var temp = draw_pile[i]
-		draw_pile[i] = draw_pile[j]
-		draw_pile[j] = temp
+	RngManager.shuffle(draw_pile, RngManager.deck_rng)
 
 
 ## Draw a single card. Reshuffles discard into draw if empty.

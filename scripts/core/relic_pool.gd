@@ -177,11 +177,7 @@ static func get_liaison_relic_choices(liaison: StringName, rng: RandomNumberGene
 	for relic in _build_liaison_pool(liaison):
 		if relic.relic_name not in exclude_names:
 			filtered.append(relic)
-	for i in range(filtered.size() - 1, 0, -1):
-		var j := rng.randi_range(0, i)
-		var tmp := filtered[i]
-		filtered[i] = filtered[j]
-		filtered[j] = tmp
+	RngManager.shuffle(filtered, rng)
 	return filtered.slice(0, mini(count, filtered.size()))
 
 

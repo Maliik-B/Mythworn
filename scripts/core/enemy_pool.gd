@@ -186,7 +186,7 @@ static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData
 	var mult := _act_mult() * difficulty_mult
 	if _elite_bag.is_empty():
 		_elite_bag = ["champion", "prophet", "verdict", "prelate"]
-		_shuffle_bag(_elite_bag)
+		RngManager.shuffle(_elite_bag, RngManager.enemy_rng)
 	var pick: String = _elite_bag.pop_back()
 	var result: Array[EnemyData] = []
 	match pick:
@@ -199,16 +199,6 @@ static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData
 		_:
 			result.append(champion_of_the_usurper(mult))
 	return result
-
-
-## Deterministic Fisher-Yates using the run-seeded enemy RNG (Array.shuffle() would use
-## the global RNG and break run reproducibility).
-static func _shuffle_bag(arr: Array) -> void:
-	for i in range(arr.size() - 1, 0, -1):
-		var j := RngManager.enemy_rng.randi_range(0, i)
-		var tmp = arr[i]
-		arr[i] = arr[j]
-		arr[j] = tmp
 
 
 ## Clears per-run encounter memory — the elite shuffle-bag and the last-combat key — so

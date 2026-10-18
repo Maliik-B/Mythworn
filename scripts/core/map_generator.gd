@@ -138,7 +138,7 @@ static func _apply_pledge_transform(map: MapData, rng: RandomNumberGenerator,
 	var extra := roundi((elite_frequency_mult - 1.0) * ELITE_ADD_SCALE)
 	if extra > 0:
 		var candidates := _combat_nodes_for_upgrade(map)
-		_rng_shuffle(candidates, rng)
+		RngManager.shuffle(candidates, rng)
 		var n := mini(mini(extra, MAX_ELITES_ADDED), candidates.size())
 		for i in n:
 			var id: int = candidates[i]
@@ -167,15 +167,6 @@ static func _combat_nodes_for_upgrade(map: MapData) -> Array[int]:
 				and node.floor_num >= 2 and node.floor_num <= map.floor_count - 3:
 			out.append(id)
 	return out
-
-
-## Deterministic Fisher-Yates using the run's seeded rng (Array.shuffle uses the global one).
-static func _rng_shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
-	for i in range(arr.size() - 1, 0, -1):
-		var j := rng.randi_range(0, i)
-		var tmp = arr[i]
-		arr[i] = arr[j]
-		arr[j] = tmp
 
 
 ## Gives each node a small sub-cell offset so the rendered graph looks hand-placed
@@ -282,7 +273,7 @@ static func _place_raider_questline(map: MapData, rng: RandomNumberGenerator) ->
 		if n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT:
 			continue
 		givers.append(id)
-	_rng_shuffle(givers, rng)
+	RngManager.shuffle(givers, rng)
 
 	# For the first giver that has a valid downstream payoff, place both and stop.
 	for giver_id in givers:
@@ -312,7 +303,7 @@ static func _pick_quest_payoff(map: MapData, giver: MapNode, rng: RandomNumberGe
 		cands.append(id)
 	if cands.is_empty():
 		return -1
-	_rng_shuffle(cands, rng)
+	RngManager.shuffle(cands, rng)
 	return cands[0]
 
 
@@ -358,7 +349,7 @@ static func pick_treasure_payoff(map: MapData, from_id: int, rng: RandomNumberGe
 	var cands := _treasure_candidates(map, from_id)
 	if cands.is_empty():
 		return -1
-	_rng_shuffle(cands, rng)
+	RngManager.shuffle(cands, rng)
 	return cands[0]
 
 
