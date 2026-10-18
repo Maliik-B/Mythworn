@@ -13,7 +13,7 @@ extends Node
 ## Run headless:
 ##   godot --headless --path D:\Applications\Fable res://tools/run_harness.tscn
 ##
-## MODEL of a Water-committing player (greedy policy) — sets bands; playtest finalizes.
+## MODEL of a Water-committing player (the shared planning policy) — sets bands; playtest finalizes.
 
 const RUNS := 100
 const MAX_TURNS := 60

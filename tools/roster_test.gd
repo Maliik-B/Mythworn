@@ -58,10 +58,9 @@ func _ready() -> void:
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
 	_test_rewards_follow_the_run_seed()
-	_test_harness_policy_spends_energy_well()
-	_test_harness_policy_reads_incoming()
-	_test_harness_policy_nets_enraged_lash()
-	_test_harness_policy_wastes_no_overkill()
+	_test_harness_copy_matches_engine()
+	_test_harness_copy_card_rules()
+	_test_harness_policy_decides()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -2231,132 +2230,307 @@ func _test_rewards_follow_the_run_seed() -> void:
 		offers[0] == offers[1] and offers[0] != "")
 
 
-## The harness player spends a turn's energy on the most damage it can buy, rather than on the
-## biggest single card, and reads each attack the way deal_damage resolves it. Small hands with
-## a known best answer against a plain 100-HP target, NEUTRAL cards unless a check is about the
-## Passion zone. (The estimate is also checked against the engine across whole harness runs,
-## where it matched every attack that did not kill a target.)
-func _test_harness_policy_spends_energy_well() -> void:
+## The harness player's copy of the fight against the engine itself. Each case sets up a real
+## combat, predicts the enemy turn on the policy's copy, lets the engine run it, and compares
+## the player's HP and the enemy's HP, Frozen and fall. (The per-card copy is also checked
+## against the engine on every attack of whole harness runs.)
+func _test_harness_copy_matches_engine() -> void:
 	var policy := HarnessCombat.new()
-	var eng := CombatEngine.new()
-	eng.player_stats = CombatantStats.new(80, 80)
-	var target := EnemyCombatState.new(_dummy_attacker())
-	eng.enemies.append(target)
-	var big := _neutral_attack("Big", 2, 14)
-	var small: Array = [_neutral_attack("Small A", 1, 9), _neutral_attack("Small B", 1, 9),
-		_neutral_attack("Small C", 1, 9)]
-	eng.energy = 3
-	var plan: Array = policy._best_attack_plan(eng, [big] + small)
-	_check("3 energy buys three 1-cost 9s (27) over the 2-cost 14 and a 9 (23)",
-		plan[0] == 27 and not plan[1].has(big))
-	eng.energy = 2
-	plan = policy._best_attack_plan(eng, [big, small[0]])
-	_check("2 energy with one 9 in hand still buys the 14", plan[0] == 14 and plan[1] == [big])
-	var torrent := _neutral_attack("Torrent", 0, 5)
-	torrent.x_cost = true
-	torrent.effects[0].x_scaled = true
-	eng.energy = 3
-	plan = policy._best_attack_plan(eng, [torrent, small[0]])
-	_check("an X-cost card is valued on the energy left to it and goes last (9 + 5x2 = 19 > 5x3)",
-		plan[0] == 19 and plan[1].back() == torrent)
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_titles := RunManager.active_title_slots.duplicate()
+	RunManager.relics.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	for case in [
+		# label, player status, stacks, player block, pierce, enemy status, stacks, enemy HP
+		["player Vulnerable 1 has worn off before the hit", StatusEffects.VULNERABLE, 1, 0, 0, null, 0, 100],
+		["player Vulnerable 2 still amplifies it", StatusEffects.VULNERABLE, 2, 0, 0, null, 0, 100],
+		["player Intangible 1 has worn off before the hit", StatusEffects.INTANGIBLE, 1, 0, 0, null, 0, 100],
+		["player Intangible 2 holds each hit to 1", StatusEffects.INTANGIBLE, 2, 0, 0, null, 0, 100],
+		["a pierce goes through block", null, 0, 30, 5, null, 0, 100],
+		["a Frozen enemy forfeits its action", null, 0, 0, 0, StatusEffects.STUN, 1, 100],
+		["Poison fells an enemy before it can act", null, 0, 0, 0, StatusEffects.POISON, 25, 20],
+		["Chilled at 10 bites after the action and freezes", null, 0, 0, 0, StatusEffects.CHILLED, 10, 100],
+	]:
+		var foe := _one_move_enemy("Striker", 100, 11, 2, case[4])
+		var eng := _policy_fight([], 80, [foe])
+		var en: EnemyCombatState = eng.enemies[0]
+		en.stats.current_hp = case[7]
+		if case[1] != null:
+			eng.player_stats.apply_status(case[1], case[2])
+		eng.player_stats.block = case[3]
+		if case[5] != null:
+			en.stats.apply_status(case[5], case[6])
+		var line := policy._line_copy(eng)
+		policy._sim_enemy_turn(eng, policy._context(eng, false, 0), line)
+		eng.end_player_turn()
+		var f: Dictionary = line["foes"][0]
+		var ok: bool = line["php"] == eng.player_stats.current_hp \
+			and f["hp"] == en.stats.current_hp and f["dead"] == en.stats.is_dead() \
+			and f["stun"] == en.stats.get_status_stacks(StatusEffects.STUN)
+		_check("copy vs engine: %s (copy HP %d, engine %d)" % [case[0], line["php"],
+			eng.player_stats.current_hp], ok)
+		eng.free()
+	RunManager.relics.assign(saved_relics)
+	RunManager.active_title_slots.assign(saved_titles)
+
+
+## The per-card copy on hands with known numbers: the title bonus once per hit, the lean zone,
+## the Passion-distance rider, Vulnerable and Intangible targets, area attacks, Enraged lash only
+## through block, Momentum's climb, Blooded Edge once, and a boss's lifebar breaking mid-card.
+func _test_harness_copy_card_rules() -> void:
+	var policy := HarnessCombat.new()
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_titles := RunManager.active_title_slots.duplicate()
+	var saved_passion: int = RunManager.passion.current_value
+	RunManager.relics.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	RunManager.passion.current_value = 0
+	var eng := _policy_fight([], 80, [_one_move_enemy("Target", 100, 0)])
+	var target: EnemyCombatState = eng.enemies[0]
 	var triple := _neutral_attack("Triple", 1, 4)
 	triple.effects[0].hits = 3
+	var big := _neutral_attack("Big", 2, 14)
 	eng._sword_base = 2
-	_check("the title bonus is counted once per hit: 3 x (4+2) = 18, 1 x (14+2) = 16",
-		policy._card_est_damage(eng, triple) == 18 and policy._card_est_damage(eng, big) == 16)
+	_check("the title bonus lands once per hit: 3 x (4+2) = 18, 1 x (14+2) = 16",
+		_copy_strike(policy, eng, triple)[0] == 18 and _copy_strike(policy, eng, big)[0] == 16)
 	eng._sword_base = 0
-
-	# Momentum: every hit lifts every later hit this turn, so a plan landing 4 hits gains
-	# 0+1+2+3 = 6 on top of its cards (12 + 9). Blooded Edge's first-hit bonus counts once.
-	eng._momentum_per_hit = 1
-	eng.energy = 2
-	plan = policy._best_attack_plan(eng, [triple, small[0]])
-	_check("Momentum's climb is counted across the whole plan: 12 + 9 + 6 = 27", plan[0] == 27)
-	eng._momentum_per_hit = 0
-	eng._blooded_edge_pending = 6
-	plan = policy._best_attack_plan(eng, [big])
-	_check("Blooded Edge is added once to a plan that attacks: 14 + 6 = 20", plan[0] == 20)
-	eng._blooded_edge_pending = 0
-
-	# The target: Vulnerable x1.5 and Intangible's 1 per hit on the lowest enemy, and an area
-	# attack landing on every living enemy.
-	var second := EnemyCombatState.new(_dummy_attacker())
-	eng.enemies.append(second)
-	target.stats.current_hp = 50
-	target.stats.apply_status(StatusEffects.VULNERABLE, 1)
-	var sweep := _neutral_attack("Sweep", 1, 5)
-	sweep.target_type = CardData.TargetType.ALL_ENEMIES
-	_check("a single attack hits the lowest enemy's Vulnerable: 10 -> 15",
-		policy._card_est_damage(eng, _neutral_attack("Ten", 1, 10)) == 15)
-	_check("an area attack lands on every living enemy: 7 (Vulnerable) + 5 = 12",
-		policy._card_est_damage(eng, sweep) == 12)
-	target.stats.remove_status(StatusEffects.VULNERABLE)
-	target.stats.apply_status(StatusEffects.INTANGIBLE, 1)
-	_check("an Intangible target takes 1 per hit: Triple deals 3",
-		policy._card_est_damage(eng, triple) == 3)
-	target.stats.remove_status(StatusEffects.INTANGIBLE)
-
-	# The Passion zone at a lean tier is the engine's x1.12, not the extreme's x1.25, and a
-	# damage rider's Passion-distance bonus is part of the base.
-	var saved_passion: int = RunManager.passion.current_value
 	RunManager.passion.current_value = 30  # Inspired for the test character
 	var water := _neutral_attack("Water Ten", 1, 10)
 	water.personality = CardData.PersonalityType.PRIMARY
-	_check("an on-type card at Inspired gets x1.12: 10 -> 11", policy._card_est_damage(eng, water) == 11)
+	_check("an on-type card at Inspired gets x1.12: 10 -> 11", _copy_strike(policy, eng, water)[0] == 11)
 	var carried := _neutral_attack("Carried", 1, 4)
 	carried.effects[0].passion_bonus_divisor = 10
-	_check("the Passion-distance rider adds 30 / 10 = 3: 4 -> 7",
-		policy._card_est_damage(eng, carried) == 7)
-	RunManager.passion.current_value = saved_passion
+	_check("the Passion-distance rider adds 30 / 10 = 3: 4 -> 7", _copy_strike(policy, eng, carried)[0] == 7)
+	RunManager.passion.current_value = 0
+	target.stats.apply_status(StatusEffects.INTANGIBLE, 1)
+	_check("an Intangible target takes 1 per hit: Triple deals 3", _copy_strike(policy, eng, triple)[0] == 3)
+	target.stats.remove_status(StatusEffects.INTANGIBLE)
+	target.stats.apply_status(StatusEffects.ENRAGED, 3)
+	target.stats.block = 5
+	_check("Enraged 3 behind block 5: the first hit is absorbed, two lash for 6 HP",
+		_copy_strike(policy, eng, triple)[1] == 6)
+	target.stats.remove_status(StatusEffects.ENRAGED)
+	target.stats.block = 0
+	eng._momentum_per_hit = 1
+	var line := policy._line_copy(eng)
+	var ctx := policy._context(eng, false, 0)
+	policy._sim_card(eng, ctx, triple, line)
+	policy._sim_card(eng, ctx, big, line)
+	_check("Momentum climbs every hit: 4+5+6 then 14+3 = 32", 100 - line["foes"][0]["hp"] == 32)
+	eng._momentum_per_hit = 0
+	eng._blooded_edge_pending = 6
+	line = policy._line_copy(eng)
+	policy._sim_card(eng, policy._context(eng, false, 0), triple, line)
+	_check("Blooded Edge lands once, on the first hit: 4+6 then 4, 4 = 18", 100 - line["foes"][0]["hp"] == 18)
 	eng.free()
 
+	var pair := _policy_fight([], 80, [_one_move_enemy("Low", 40, 0), _one_move_enemy("High", 40, 0)])
+	pair.enemies[0].stats.apply_status(StatusEffects.VULNERABLE, 1)
+	var sweep := _neutral_attack("Sweep", 1, 5)
+	sweep.target_type = CardData.TargetType.ALL_ENEMIES
+	_check("an area attack lands on every enemy: 7 (Vulnerable) + 5 = 12", _copy_strike(policy, pair, sweep)[0] == 12)
+	pair.free()
 
-## The harness player reads an enemy's intent the way the engine will resolve it on the enemy
-## turn. Each case predicts, then runs the player's real end-of-turn tick and the enemy's real
-## action, and compares. The player's own statuses lose a stack before any enemy acts.
-func _test_harness_policy_reads_incoming() -> void:
+	var boss_data := _one_move_enemy("Bars", 10, 0)
+	boss_data.phase_hps.assign([10, 50])
+	boss_data.phase_enter_enraged.assign([0, 1])
+	boss_data.phase_enter_damage.assign([0, 18])
+	var beng := _policy_fight([], 80, [boss_data])
+	var quad := _neutral_attack("Quad", 1, 4)
+	quad.effects[0].hits = 4
+	line = policy._line_copy(beng)
+	policy._sim_card(beng, policy._context(beng, false, 0), quad, line)
+	_check("a bar breaking mid-card: the third 4 breaks the 10-HP bar (2 past it lost), the fourth lands on the fresh 50; entry lash 18, and the breaking hit and the fourth each lash 1",
+		line["foes"][0]["phase"] == 1 and line["foes"][0]["hp"] == 46 and line["php"] == 80 - 18 - 1 - 1)
+	beng.free()
+	RunManager.passion.current_value = saved_passion
+	RunManager.relics.assign(saved_relics)
+	RunManager.active_title_slots.assign(saved_titles)
+
+
+## The harness player's choices on hands with a known best play under the one currency (HP
+## lost over the fight): energy spent on the most damage, block against a light hitter and
+## attack against a heavy one, the enemy whose death saves most hit first, a kill credited with
+## the blow it prevents, lash weighed at the fight's own rate, Strength bought for a long fight
+## and not for a short one, no plan that dies when one survives, the Passion pole, overkill,
+## and Sight using the move it shows.
+func _test_harness_policy_decides() -> void:
 	var policy := HarnessCombat.new()
-	for case in [
-		["player Vulnerable 1 has worn off before the hit", StatusEffects.VULNERABLE, 1, 0, 0],
-		["player Vulnerable 2 still amplifies it", StatusEffects.VULNERABLE, 2, 0, 0],
-		["player Intangible 1 has worn off before the hit", StatusEffects.INTANGIBLE, 1, 0, 0],
-		["player Intangible 2 holds each hit to 1", StatusEffects.INTANGIBLE, 2, 0, 0],
-		["a pierce goes through block", null, 0, 5, 30],
-	]:
-		var eng := CombatEngine.new()
-		eng.player_stats = CombatantStats.new(80, 80)
-		if case[1] != null:
-			eng.player_stats.apply_status(case[1], case[2])
-		eng.player_stats.block = case[4]
-		var enemy := EnemyCombatState.new(_dummy_attacker())
-		var move := EnemyMove.new()
-		var hit := DamageEffect.new()
-		hit.value = 11
-		hit.hits = 2
-		hit.pierce = case[3]
-		move.effects.append(hit)
-		enemy.current_intent = move
-		eng.enemies.append(enemy)
-		var predicted: Array = policy._intent_damage(eng, enemy)
-		eng.tick_end_of_turn(eng.player_stats)
-		var hp_before := eng.player_stats.current_hp
-		var total_before := hp_before + eng.player_stats.block
-		eng.execute_enemy_turn(enemy)
-		var taken := total_before - (eng.player_stats.current_hp + eng.player_stats.block)
-		var through_block := hp_before - eng.player_stats.current_hp
-		var ok: bool = predicted[0] == taken
-		if case[3] > 0:
-			ok = ok and predicted[1] == through_block
-		_check("incoming: %s (predicted %s, engine %d)" % [case[0], str(predicted), taken], ok)
-		eng.free()
-	var frozen_eng := CombatEngine.new()
-	frozen_eng.player_stats = CombatantStats.new(80, 80)
-	var frozen := EnemyCombatState.new(_dummy_attacker())
-	frozen.select_intent()
-	frozen.stats.apply_status(StatusEffects.STUN, 1)
-	_check("a Frozen enemy threatens nothing, since it forfeits its action",
-		policy._intent_damage(frozen_eng, frozen) == [0, 0])
-	frozen_eng.free()
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_titles := RunManager.active_title_slots.duplicate()
+	var saved_passion: int = RunManager.passion.current_value
+	RunManager.relics.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	RunManager.passion.current_value = 0
+
+	var big := _neutral_attack("Big", 2, 14)
+	var nines: Array = [_neutral_attack("Nine A", 1, 9), _neutral_attack("Nine B", 1, 9),
+		_neutral_attack("Nine C", 1, 9)]
+	var eng := _policy_fight([big] + nines, 80, [_one_move_enemy("Dummy", 100, 5)])
+	var plan: Array = policy._plan_turn(eng, policy._context(eng, false, 0), eng.piles.hand.duplicate())
+	_check("3 energy buys three 1-cost 9s (27), not the 2-cost 14 and a 9 (23)",
+		plan.size() == 3 and not plan.has(big))
+	eng.free()
+
+	for case in [["a heavy hitter (20 a turn): the 6 shortens the fight by more than 8 block saves", 20, "Strike"],
+			["a light hitter (5 a turn): 8 block saves more than the 6 shortens the fight", 5, "Guard"]]:
+		var duel := _policy_fight([_block_card("Guard", 1, 8), _neutral_attack("Strike", 1, 6)], 80,
+			[_one_move_enemy("Hitter", 100, case[1])])
+		duel.energy = 1
+		var pick := policy.choose_card(duel, false, 0)
+		_check("against %s" % case[0], pick != null and pick.card_name == case[2])
+		duel.free()
+
+	var two := _policy_fight([_neutral_attack("Strike", 1, 6)], 80,
+		[_one_move_enemy("Pest", 10, 4), _one_move_enemy("Brute", 30, 20)])
+	_check("the Brute (20 a turn, 30 HP) is hit before the Pest (4 a turn, 10 HP): most damage per HP first",
+		policy._focus_index(policy._line_copy(two)) == 1)
+	two.free()
+
+	var finish := _policy_fight([_block_card("Guard", 1, 8), _neutral_attack("Strike", 1, 6)], 80,
+		[_one_move_enemy("Wounded", 6, 15)])
+	finish.energy = 1
+	var kill := policy.choose_card(finish, false, 0)
+	_check("finishing a 6-HP enemy about to hit 15 beats blocking 8 of it", kill != null and kill.card_name == "Strike")
+	finish.free()
+
+	for case in [["a target hitting 2 a turn: 12 damage saves under 1 HP, the lash costs 9", 2, false],
+			["a target hitting 40 a turn: 12 damage saves about 13 HP, more than the 9 lash", 40, true]]:
+		var triple := _neutral_attack("Triple", 1, 4)
+		triple.effects[0].hits = 3
+		var raged := _policy_fight([triple], 80, [_one_move_enemy("Enraged", 100, case[1])])
+		raged.enemies[0].stats.apply_status(StatusEffects.ENRAGED, 3)
+		raged.energy = 1
+		var p := policy.choose_card(raged, false, 0)
+		_check("Enraged 3, %s" % case[0], (p != null) == case[2])
+		raged.free()
+
+	for case in [["a long fight (200 HP)", 200, "Whet"], ["a 6-HP enemy", 6, "Strike"]]:
+		var deck: Array = [_self_buff("Whet", StatusEffects.STRENGTH, 2)]
+		for i in 4:
+			deck.append(_neutral_attack("Strike", 1, 6))
+		var invest := _policy_fight(deck, 80, [_one_move_enemy("Wall", case[1], 10)])
+		invest.energy = 1
+		var p := policy.choose_card(invest, false, 0)
+		_check("+2 Strength or a 6 against %s: %s" % [case[0], case[2]], p != null and p.card_name == case[2])
+		invest.free()
+
+	var brink := _policy_fight([_block_card("Guard", 1, 8), _neutral_attack("Strike", 1, 6)], 25,
+		[_one_move_enemy("Killer", 100, 30)])
+	brink.energy = 1
+	var save := policy.choose_card(brink, false, 0)
+	_check("at 25 HP facing 30, the block that survives is played over the attack that dies",
+		save != null and save.card_name == "Guard")
+	brink.free()
+
+	var tide := _neutral_attack("Tide", 1, 6)
+	var push := PassionEffect.new()
+	push.value = 4
+	tide.effects.append(push)
+	var pole := _policy_fight([_neutral_attack("Strike", 1, 7), tide], 80, [_one_move_enemy("Dummy", 100, 5)])
+	pole.energy = 1
+	var free_pick := policy.choose_card(pole, false, 0)
+	var committed := policy.choose_card(pole, true, 50)
+	_check("uncommitted plays the bigger Strike; committed to +50 plays the Passion card",
+		free_pick != null and free_pick.card_name == "Strike" and committed != null and committed.card_name == "Tide")
+	pole.free()
+
+	var small := _neutral_attack("Small", 1, 6)
+	var over := _policy_fight([big, small], 80, [_one_move_enemy("Weak", 5, 10), _one_move_enemy("Tough", 30, 10)])
+	plan = policy._plan_turn(over, policy._context(over, false, 0), over.piles.hand.duplicate())
+	_check("the 6 finishes the 5-HP enemy and the 14 goes to the next, not 14 into 5 HP",
+		plan == [small, big])
+	over.free()
+
+	var seer := _one_move_enemy("Seer", 100, 20)
+	var rest := EnemyMove.new()
+	rest.move_name = "Rest"
+	seer.moves.append(rest)
+	var sight := _policy_fight([_neutral_attack("Strike", 1, 6)], 80, [seer])
+	sight.enemies[0].next_intent = rest
+	var line := policy._line_copy(sight)
+	var ctx := policy._context(sight, false, 0)
+	var blind := policy._future_loss(sight, ctx, line)
+	ctx["sight"] = true
+	_check("Sight shows the next move is a rest, so the next turn costs less than the average says",
+		policy._future_loss(sight, ctx, line) < blind)
+	sight.free()
+
+	RunManager.passion.current_value = saved_passion
+	RunManager.relics.assign(saved_relics)
+	RunManager.active_title_slots.assign(saved_titles)
+
+
+## A real combat for the policy checks: the given cards as the whole deck (five or fewer are all
+## in hand), each enemy telegraphing its first move and no next move rolled.
+func _policy_fight(cards: Array, hp: int, foes: Array) -> CombatEngine:
+	var eng := CombatEngine.new()
+	eng.instant = true
+	add_child(eng)
+	var deck: Array[CardData] = []
+	for c in cards:
+		deck.append(c)
+	var datas: Array[EnemyData] = []
+	for f in foes:
+		datas.append(f)
+	eng.start_combat(deck, hp, 80, datas)
+	for i in eng.enemies.size():
+		eng.enemies[i].current_intent = datas[i].moves[0]
+		eng.enemies[i].next_intent = null
+	return eng
+
+
+## [damage landed, HP the player lost] for one card played on the policy's copy.
+func _copy_strike(policy: HarnessCombat, eng: CombatEngine, card: CardData) -> Array:
+	var line := policy._line_copy(eng)
+	var before := policy._pool_total(line)
+	policy._sim_card(eng, policy._context(eng, false, 0), card, line)
+	return [int(before - policy._pool_total(line)), eng.player_stats.current_hp - line["php"]]
+
+
+## An enemy with a single move: an attack of `dmg` x `hits` (with `pierce`), or a do-nothing
+## move when dmg is 0.
+func _one_move_enemy(enemy_name: String, hp: int, dmg: int, hits: int = 1, pierce: int = 0) -> EnemyData:
+	var e := EnemyData.new()
+	e.enemy_name = enemy_name
+	e.max_health = hp
+	var m := EnemyMove.new()
+	m.move_name = "Hit"
+	m.intent_type = EnemyMove.IntentType.ATTACK
+	if dmg > 0:
+		var d := DamageEffect.new()
+		d.value = dmg
+		d.hits = hits
+		d.pierce = pierce
+		m.effects.append(d)
+	e.moves.append(m)
+	return e
+
+
+func _block_card(card_name: String, cost: int, block: int) -> CardData:
+	var c := CardData.new()
+	c.card_name = card_name
+	c.energy_cost = cost
+	c.card_type = CardData.CardType.SKILL
+	c.target_type = CardData.TargetType.SELF
+	var e := BlockEffect.new()
+	e.value = block
+	c.effects.append(e)
+	return c
+
+
+func _self_buff(card_name: String, status: StatusEffectData, stacks: int) -> CardData:
+	var c := CardData.new()
+	c.card_name = card_name
+	c.energy_cost = 1
+	c.card_type = CardData.CardType.SKILL
+	c.target_type = CardData.TargetType.SELF
+	var e := StatusApplyEffect.new()
+	e.status_effect = status
+	e.value = stacks
+	e.apply_to_source = true
+	c.effects.append(e)
+	return c
 
 
 func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:
@@ -2369,76 +2543,3 @@ func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:
 	e.value = dmg
 	c.effects.append(e)
 	return c
-
-
-## Against an Enraged target every hit that gets past block lashes the attacker for the stacks,
-## straight to HP, and the harness player prices that at one point of HP per point of damage. It
-## never plays an attack whose lash alone would finish it.
-func _test_harness_policy_nets_enraged_lash() -> void:
-	var policy := HarnessCombat.new()
-	var eng := CombatEngine.new()
-	eng.player_stats = CombatantStats.new(80, 80)
-	eng.piles = PileManager.new()
-	eng.piles.setup([])
-	var target := EnemyCombatState.new(_dummy_attacker())
-	target.stats.apply_status(StatusEffects.ENRAGED, 3)
-	target.stats.block = 5
-	eng.enemies.append(target)
-	var triple := _neutral_attack("Triple", 1, 4)
-	triple.effects[0].hits = 3
-	_check("block 5 absorbs the first hit, so only two of three hits lash: 2 x 3 = 6 HP",
-		policy._card_strike(eng, triple)[2] == 6)
-	target.stats.block = 0
-	var single := _neutral_attack("Single", 1, 8)
-	eng.energy = 1
-	var plan: Array = policy._best_attack_plan(eng, [triple, single])
-	_check("one 8 (lash 3, net 5) is preferred over three 4s (lash 9, net 3)",
-		plan[1] == [single] and plan[0] == 5 and plan[2] == 3)
-	eng.piles.hand.assign([triple])
-	eng.player_stats.current_hp = 9
-	_check("an attack whose lash (9) would finish a 9-HP player is not played",
-		policy.choose_card(eng, false, 50) == null)
-	eng.player_stats.current_hp = 10
-	_check("...and is played again at 10 HP", policy.choose_card(eng, false, 50) == triple)
-	eng.free()
-
-
-## When an enemy can be brought to 0 this turn, the harness player plans the whole sequence,
-## because the damage past a kill is lost and a boss's next lifebar starts fresh. Hands with a
-## known best order. (The sequenced simulation is also checked against the engine on every attack
-## of whole harness runs, kills and lifebar breaks included.)
-func _test_harness_policy_wastes_no_overkill() -> void:
-	var policy := HarnessCombat.new()
-	var eng := CombatEngine.new()
-	eng.player_stats = CombatantStats.new(80, 80)
-	var weak := EnemyCombatState.new(_dummy_attacker())
-	weak.stats.current_hp = 5
-	var tough := EnemyCombatState.new(_dummy_attacker())
-	tough.stats.current_hp = 30
-	eng.enemies.append(weak)
-	eng.enemies.append(tough)
-	var big := _neutral_attack("Big", 2, 14)
-	var small := _neutral_attack("Small", 1, 6)
-	eng.energy = 3
-	var plan: Array = policy._best_attack_plan(eng, [big, small])
-	_check("finish the 5-HP enemy with the 6 and send the 14 at the next (5 + 14 = 19, not 5 + 6)",
-		plan[1] == [small, big] and plan[0] == 19)
-	eng.free()
-
-	# A boss with a 10-HP first bar and a 50-HP second that turns Enraged 1 and lashes 18 on entry.
-	var boss_data := _dummy_attacker()
-	boss_data.phase_hps.assign([10, 50])
-	boss_data.phase_enter_enraged.assign([0, 1])
-	boss_data.phase_enter_damage.assign([0, 18])
-	var beng := CombatEngine.new()
-	beng.player_stats = CombatantStats.new(30, 80)
-	beng.enemies.append(EnemyCombatState.new(boss_data))
-	beng.energy = 3
-	plan = policy._best_attack_plan(beng, [big, small])
-	_check("break the bar with the 14 (4 past it lost), then the 6 on the fresh bar; both lash 1, the breaking hit too, since the phase changes first: 10 + 6 - 2 = 14",
-		plan[1] == [big, small] and plan[0] == 14 and plan[2] == 2)
-	beng.player_stats.current_hp = 18
-	plan = policy._best_attack_plan(beng, [big, small])
-	_check("at 18 HP the 18-point entry lash would kill, so the bar is left standing: the 6 alone",
-		plan[1] == [small] and plan[0] == 6)
-	beng.free()

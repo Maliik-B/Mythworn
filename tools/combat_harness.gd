@@ -11,7 +11,8 @@ extends Node
 ##
 ## Reports win%, turn counts, HP-lost bands, and Passion trajectory for calibration
 ## against docs/BALANCE_SNAPSHOTS.md and the sts-balance-targets north star. It is a
-## MODEL of a competent player (greedy policy), so it sets bands; playtest finalizes.
+## MODEL of a competent player (it plans each turn against the rest of the fight), so it sets
+## bands; playtest finalizes.
 
 const TRIALS := 300
 const MAX_TURNS := 60
@@ -19,7 +20,7 @@ const COMMIT_TARGET := 50    # when "committing", hold Passion at/above Blazing 
 const FAILSAFE_QUIT_SECONDS := 180.0  # hard self-destruct if a run errors + idles (see _ready)
 
 var _character: CharacterData
-var _cbt := HarnessCombat.new()  # shared greedy-player combat policy
+var _cbt := HarnessCombat.new()  # shared planning-player combat policy
 var _aborted := false            # set when a trial passes the memory ceiling
 
 
