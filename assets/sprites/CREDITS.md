@@ -12,6 +12,13 @@
 - **License**: CC0 (Creative Commons Zero)
 - **Source**: https://luizmelo.itch.io/fire-worm
 
+### Camelot roster (corruption-recolored) — LuizMelo
+These CC0 packs stand in for the Camelot demo enemies; the shipped strips are recolored
+(algorithmically, not AI) toward the hollowed greyed-gold corruption palette. CC0 permits
+modification and commercial use; credited here regardless.
+- **Medieval Warrior Pack** (Man-at-Arms): bearded armored warrior (idle, attack, hit, death).
+  CC0 — https://luizmelo.itch.io/medieval-warrior-pack
+
 ## Bosses
 
 ### Evil Wizard 2 — LuizMelo

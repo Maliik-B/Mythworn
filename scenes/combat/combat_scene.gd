@@ -78,6 +78,12 @@ const SPRITE_SETS := {
 		"cell": 250, "zoom": 1.8,
 		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 12], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
 	},
+	# Real Camelot per-enemy art (LuizMelo, CC0), corruption-recolored. Non-square frames.
+	"medieval_warrior": {
+		"dir": "res://assets/sprites/enemies/camelot/man_at_arms/",
+		"fw": 184, "fh": 137, "zoom": 1.5,
+		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 12], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
+	},
 }
 
 # enemy_name -> sprite set. Shared CC0 stand-ins chosen so no paired composition shows two
@@ -101,7 +107,7 @@ const ENEMY_SPRITE_SET := {
 	"Hollow Warden": "worm",
 	"Fable's End": "wizard2",
 	# Sep/Oct-2026 roster (thickening + content furnishing).
-	"Man-at-Arms": "skeleton",
+	"Man-at-Arms": "medieval_warrior",
 	"Corrupted Squire": "goblin",
 	"Prophet's Acolyte": "wizard2",
 	"Corrupted Pikeman": "goblin",
@@ -152,7 +158,9 @@ func _process(delta: float) -> void:
 ## and its motion padding spills out of view rather than shrinking the sprite.
 func _build_enemy_portrait(set_key: String, enemy) -> Control:
 	var sset: Dictionary = SPRITE_SETS[set_key]
-	var cell: int = sset["cell"]
+	# Frame cell: square sets give just "cell"; packs with non-square frames give fw/fh.
+	var fw: int = int(sset.get("fw", sset.get("cell", 150)))
+	var fh: int = int(sset.get("fh", sset.get("cell", 150)))
 	var zoom: float = sset["zoom"]
 	# Preload every strip once so state swaps are instant.
 	var textures := {}
@@ -160,7 +168,7 @@ func _build_enemy_portrait(set_key: String, enemy) -> Control:
 		textures[state] = load(sset["dir"] + sset["anims"][state][0])
 	var atlas := AtlasTexture.new()
 	atlas.atlas = textures["idle"]
-	atlas.region = Rect2(0, 0, cell, cell)
+	atlas.region = Rect2(0, 0, fw, fh)
 
 	var box := Control.new()
 	box.custom_minimum_size = Vector2(PORTRAIT_BOX, PORTRAIT_BOX)
@@ -177,7 +185,7 @@ func _build_enemy_portrait(set_key: String, enemy) -> Control:
 	box.add_child(portrait)
 
 	var anim := {
-		"set": set_key, "cell": cell, "atlas": atlas, "rect": portrait,
+		"set": set_key, "fw": fw, "fh": fh, "atlas": atlas, "rect": portrait,
 		"textures": textures, "state": "idle", "frame": 0, "elapsed": 0.0,
 		"frames": 1, "fps": 7.0, "loop": true,
 	}
@@ -204,8 +212,8 @@ func _anim_set_state(anim: Dictionary, state: String) -> void:
 
 
 func _anim_apply_frame(anim: Dictionary) -> void:
-	var cell: int = anim["cell"]
-	anim["atlas"].region = Rect2(anim["frame"] * cell, 0, cell, cell)
+	var fw: int = int(anim["fw"])
+	anim["atlas"].region = Rect2(anim["frame"] * fw, 0, fw, int(anim["fh"]))
 
 
 func _anim_tick(anim: Dictionary, delta: float) -> void:
