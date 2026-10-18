@@ -20,9 +20,12 @@ const FAILSAFE_QUIT_SECONDS := 180.0  # hard self-destruct if a run errors + idl
 
 var _character: CharacterData
 var _cbt := HarnessCombat.new()  # shared greedy-player combat policy
+var _aborted := false            # set when a trial passes the memory ceiling
 
 
 func _ready() -> void:
+	# No sound: every play() here would be kept until the run ends (see AudioManager.enabled).
+	AudioManager.enabled = false
 	# Failsafe self-destruct. If any report below errors out, _ready returns without reaching
 	# the clean quit() and a headless process would otherwise idle forever -- an orphan that
 	# piles up across runs until it exhausts memory and takes the machine (and other sessions)
@@ -41,16 +44,15 @@ func _ready() -> void:
 	print("===============================================================")
 	_character = _build_emo_hybrid()
 
-	_report_regulars()
-	_report_elite()
-	_report_barrow_warden()
-	_report_poles()
-	_report_prophet()
-	_report_boss()
-	_report_physical()
-	_report_regen_check()
-	_report_swords_bearer()
+	for report in [_report_regulars, _report_elite, _report_barrow_warden, _report_poles,
+			_report_prophet, _report_boss, _report_physical, _report_regen_check,
+			_report_swords_bearer]:
+		report.call()
+		if _aborted:
+			print("\n== harness ABORTED at the memory ceiling; rows after the error are nan ==\n")
+			return
 
+	print("\n  %s" % _cbt.memory_summary())
 	print("\n== harness done ==\n")
 	get_tree().quit()
 
@@ -98,7 +100,7 @@ func _report_prophet() -> void:
 	# Ramp probe: start dispassionate (0), commit — how fast to Blazing, and does it stick?
 	var ramp := _run(_mid_deck(), ["prophet"], 0, true)
 	print("  ramp from 0 (commit): avg turns-to-Blazing %s, end-Passion %.1f (%s)" % [
-		_ttb_str(ramp), ramp["passion_mean"], _tier_name(int(round(ramp["passion_mean"])))])
+		_ttb_str(ramp), ramp["passion_mean"], _tier_name(ramp["passion_mean"])])
 
 
 ## Symmetry check: a Water build should climb to Blazing (+), a Physical build should
@@ -116,7 +118,7 @@ func _report_poles() -> void:
 
 func _pole_bar(label: String, r: Dictionary) -> void:
 	print("  %-26s win %5.1f%%  end-Passion %6.1f (%s)  reaches extreme: %s" % [
-		label, r["winrate"], r["passion_mean"], _tier_name(int(round(r["passion_mean"]))),
+		label, r["winrate"], r["passion_mean"], _tier_name(r["passion_mean"]),
 		_ttb_str(r)])
 
 
@@ -131,7 +133,7 @@ func _report_boss() -> void:
 		var r := _run(row[1], ["caedmon"], row[2], true, COMMIT_TARGET, row[3])
 		print("  %-24s win %5.1f%%  turns %4.1f  HP-lost avg %4.1f p90 %3.0f  end-Passion %.1f (%s)" % [
 			row[0], r["winrate"], r["turns_mean"], r["hp_lost_mean"], r["hp_lost_p90"],
-			r["passion_mean"], _tier_name(int(round(r["passion_mean"])))])
+			r["passion_mean"], _tier_name(r["passion_mean"])])
 
 
 ## Content-pass-#2 feel-test: the same fights measured against a committed PHYSICAL build
@@ -153,7 +155,7 @@ func _report_physical() -> void:
 		var r := _run(row[1], ["caedmon"], row[2], true, -50, row[3])
 		print("  %-24s win %5.1f%%  turns %4.1f  HP-lost avg %4.1f p90 %3.0f  end-Passion %.1f (%s)" % [
 			row[0], r["winrate"], r["turns_mean"], r["hp_lost_mean"], r["hp_lost_p90"],
-			r["passion_mean"], _tier_name(int(round(r["passion_mean"])))])
+			r["passion_mean"], _tier_name(r["passion_mean"])])
 
 
 ## Iron Rations balance probe: the relic reworked to +2 HP at the start of each turn. Run on a
@@ -175,8 +177,8 @@ func _report_regen_check() -> void:
 	_regen_bar("Caedmon, realistic   (+Iron Rations)", boss_reg)
 	_regen_bar("Rotting+Shade        (no Rations)", reg_base)
 	_regen_bar("Rotting+Shade        (+Iron Rations)", reg_reg)
-	print("  read: healthy if +Rations shaves HP-lost modestly and nudges win%% -- not if HP-lost")
-	print("        collapses toward 0 or win%% jumps from a real risk to a near-certainty.")
+	print("  read: healthy if +Rations shaves HP-lost modestly and nudges win% -- not if HP-lost")
+	print("        collapses toward 0 or win% jumps from a real risk to a near-certainty.")
 
 
 func _regen_bar(label: String, r: Dictionary) -> void:
@@ -227,8 +229,14 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 	var ttb_sum := 0
 	var ttb_count := 0
 	for s in TRIALS:
+		if _aborted:
+			return _aborted_result()
 		var r := _simulate(deck, enemy_keys, s, start_passion, commit, commit_target,
 			grant_excalibur, extra_relic, extra_title)
+		if not _cbt.within_memory_ceiling("%s trial %d" % [enemy_keys, s]):
+			_aborted = true
+			get_tree().quit(1)
+			return _aborted_result()
 		turns_sum += r["turns"]
 		passion_sum += r["passion"]
 		if r["ttb"] >= 0:
@@ -255,6 +263,15 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 		"passion_mean": float(passion_sum) / TRIALS,
 		"ttb_mean": (float(ttb_sum) / ttb_count) if ttb_count > 0 else -1.0,
 		"ttb_frac": float(ttb_count) / TRIALS,
+	}
+
+
+## What _run hands back once the ceiling has tripped: every number nan, so a row printed after
+## the abort cannot be mistaken for a measurement.
+func _aborted_result() -> Dictionary:
+	return {
+		"winrate": NAN, "turns_mean": NAN, "hp_lost_mean": NAN, "hp_lost_p90": NAN,
+		"passion_mean": NAN, "ttb_mean": NAN, "ttb_frac": NAN,
 	}
 
 
@@ -523,18 +540,25 @@ func _bar(label: String, r: Dictionary) -> void:
 
 
 func _prophet_bar(label: String, r: Dictionary) -> void:
-	var tier_txt := _tier_name(int(round(r["passion_mean"])))
+	var tier_txt := _tier_name(r["passion_mean"])
 	var verdict := "HOLDS Blazing" if r["passion_mean"] >= COMMIT_TARGET else "gets centered"
+	if is_nan(r["passion_mean"]):
+		verdict = "nan"
 	print("  %-20s win %5.1f%%  turns %4.1f  HP-lost avg %4.1f  end-Passion %5.1f (%s) -> %s" % [
 		label, r["winrate"], r["turns_mean"], r["hp_lost_mean"],
 		r["passion_mean"], tier_txt, verdict])
 
 
 func _ttb_str(r: Dictionary) -> String:
+	if is_nan(r["ttb_mean"]):
+		return "nan"
 	if r["ttb_mean"] < 0:
 		return "never"
 	return "%.1f (%d%% of runs reach it)" % [r["ttb_mean"], int(round(r["ttb_frac"] * 100))]
 
 
-func _tier_name(v: int) -> String:
-	return PassionState.tier_name(RunManager.get_passion_tier_for_value(v))
+## Tier name for a mean Passion, rounded to the nearest whole point; nan after an abort.
+func _tier_name(v: float) -> String:
+	if is_nan(v):
+		return "nan"
+	return PassionState.tier_name(RunManager.get_passion_tier_for_value(int(round(v))))

@@ -14,6 +14,8 @@ func _check(label: String, ok: bool) -> void:
 
 
 func _ready() -> void:
+	# No sound: every play() here would be kept until the test ends (see AudioManager.enabled).
+	AudioManager.enabled = false
 	print("\n== Camelot roster behavior check ==")
 	_setup_run_state()
 	_test_opener()
@@ -53,6 +55,8 @@ func _ready() -> void:
 	_test_boss_reward()
 	await _test_frozen_skips()
 	await _test_chilled_freeze()
+	_test_inner_fire_copies_itself()
+	_test_combat_retains_nothing()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -2108,3 +2112,89 @@ func _test_cooldown() -> void:
 			double_slam = true
 		last_was_slam = is_slam
 	_check("Siege Slam (cd 2) never fires back-to-back", not double_slam)
+
+
+## Inner Fire adds copies of itself. Its AddCardEffect used to point at the card carrying it,
+## a card -> effect -> card cycle that refcounting never frees, so every build of the generic
+## pool (each card reward, the boss reward, the shop) leaked one Inner Fire for the life of the
+## process. The copy is built by id now. Checks that the copy is exactly what it was before (the
+## base card, even off an upgraded one, and able to copy itself in turn) and that building the
+## pool leaves nothing behind.
+func _test_inner_fire_copies_itself() -> void:
+	var fire := _card_by_name(CardPool._build_generic_pool(), "Inner Fire")
+	var points_at_itself := false
+	var add: AddCardEffect = null
+	if fire:
+		for e in fire.effects:
+			if e is AddCardEffect:
+				add = e
+				points_at_itself = e.card_to_add == fire
+	_check("Inner Fire carries a copy effect that does not point at the card itself",
+		add != null and not points_at_itself)
+	if add == null:
+		return
+	_check("Inner Fire's copy text is unchanged",
+		add.get_description() == "Add a copy of Inner Fire to your discard pile.")
+
+	var eng := CombatEngine.new()
+	eng.piles = PileManager.new()
+	eng.piles.setup([])
+	add.apply(null, null, eng)
+	var up := fire.duplicate_card()
+	up.upgrade_card()
+	for e in up.get_active_effects():
+		if e is AddCardEffect:
+			e.apply(null, null, eng)
+	var copies := eng.piles.discard_pile
+	var copies_copy := false
+	if copies.size() == 2:
+		for e in copies[0].effects:
+			copies_copy = copies_copy or (e is AddCardEffect and e.card_id == &"inner_fire")
+	_check("playing Inner Fire, or Inner Fire+, drops a base Inner Fire into discard",
+		copies.size() == 2 and copies.all(func(c): return c.card_name == "Inner Fire" \
+			and not c.upgraded and c.school == fire.school))
+	_check("the copy can copy itself in turn", copies_copy)
+	eng.free()
+
+	var before := int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	for i in 5:
+		CardPool._build_generic_pool()
+	var after := int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	_check("building the generic pool 5 times leaves no objects behind (%d -> %d)" % [
+		before, after], after == before)
+
+
+## The batch harnesses run every trial inside one synchronous _ready, so whatever a finished
+## combat leaves behind piles up over thousands of them; sound did, and took combat_harness to
+## 6.9 GB. Fights a few real instant combats the way the harness does and checks the object
+## count comes back to where it started. The first fight is a warm-up, since a first combat can
+## build things once (caches, registries) that are meant to stay.
+func _test_combat_retains_nothing() -> void:
+	var policy := HarnessCombat.new()
+	_fight_instant_combat(policy)
+	var before := int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	for i in 5:
+		_fight_instant_combat(policy)
+	var after := int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	_check("five finished instant combats leave no objects behind (%d -> %d)" % [before, after],
+		after == before)
+
+
+## One instant combat driven by the harness policy, in its own function so every local it
+## made is gone when it returns and the caller's object count sees only what was kept.
+func _fight_instant_combat(policy: HarnessCombat) -> void:
+	var eng := CombatEngine.new()
+	eng.instant = true
+	add_child(eng)
+	var deck: Array[CardData] = []
+	for c in CharacterPool.emo_starting_deck():
+		deck.append(c.duplicate_card())
+	eng.start_combat(deck, 80, 80, [EnemyPool.corrupted_knight(), EnemyPool.realm_shade()])
+	var turns := 0
+	while eng.phase == CombatEngine.Phase.PLAYER_TURN and turns < 60:
+		turns += 1
+		policy.play_turn(eng, false, 50)
+		if eng.phase != CombatEngine.Phase.PLAYER_TURN:
+			break
+		eng.end_player_turn()
+	eng.free()

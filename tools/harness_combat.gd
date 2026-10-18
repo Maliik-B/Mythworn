@@ -11,6 +11,39 @@ const SAFETY_FRAC := 0.35    # below this fraction of max HP, block hard
 const CHIP_TOLERANCE := 5    # incoming HP the player will eat before over-blocking
 const SPIKE := 12            # a single telegraphed hit >= this is worth blocking
 
+## Memory ceiling for the batch harnesses. They run every trial inside one synchronous _ready,
+## so --quit-after (which counts frames) and the failsafe timer cannot stop them, and anything
+## a trial leaves behind piles up until the run ends. A healthy combat_harness run holds about
+## 2,000 objects and 26 MB of static memory from its first trial to its last; run_harness sits
+## close to that. The bounds are about five times that: never reached by a healthy run, and
+## crossed within the first couple of hundred trials by the audio leak that once took a full run
+## to 6.9 GB.
+const CEILING_OBJECTS := 10000
+const CEILING_STATIC_MB := 128
+
+var peak_objects := 0
+var peak_static_mb := 0.0
+
+
+## Samples the process against the memory ceiling and keeps the peak for memory_summary().
+## Returns false, after a push_error naming where it happened, once either bound is passed;
+## the caller stops its trials and quits non-zero.
+func within_memory_ceiling(where: String) -> bool:
+	var objects := int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	var static_mb := Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
+	peak_objects = maxi(peak_objects, objects)
+	peak_static_mb = maxf(peak_static_mb, static_mb)
+	if objects <= CEILING_OBJECTS and static_mb <= CEILING_STATIC_MB:
+		return true
+	push_error("memory ceiling passed at %s: %d objects (ceiling %d), %.1f MB static (ceiling %d MB). Something a trial creates is being kept; aborting instead of letting it grow." % [
+		where, objects, CEILING_OBJECTS, static_mb, CEILING_STATIC_MB])
+	return false
+
+
+func memory_summary() -> String:
+	return "memory: peak %d objects, %.1f MB static (ceiling %d objects, %d MB)" % [
+		peak_objects, peak_static_mb, CEILING_OBJECTS, CEILING_STATIC_MB]
+
 
 ## Play one full player turn: keep choosing+playing cards until nothing useful
 ## remains or energy runs out. commit_target is the Passion (>=) a "committing"

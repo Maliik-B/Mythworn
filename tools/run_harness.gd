@@ -30,9 +30,12 @@ const LAYOUT := [
 
 var _cbt := HarnessCombat.new()
 var _character: CharacterData
+var _aborted := false  # set when a combat passes the memory ceiling
 
 
 func _ready() -> void:
+	# No sound: every play() here would be kept until the run ends (see AudioManager.enabled).
+	AudioManager.enabled = false
 	print("\n===============================================================")
 	print(" Fable RUN harness — %d runs, real Act-1 walk (%d nodes)" % [RUNS, LAYOUT.size()])
 	print("===============================================================")
@@ -41,8 +44,12 @@ func _ready() -> void:
 	var agg := _fresh_agg()
 	for r in RUNS:
 		_walk_run(r, agg)
+		if _aborted:
+			print("\n== run harness ABORTED at the memory ceiling in run %d; no report ==\n" % r)
+			return
 	_report(agg)
 
+	print("\n  %s" % _cbt.memory_summary())
 	print("\n== run harness done ==\n")
 	get_tree().quit()
 
@@ -97,7 +104,7 @@ func _walk_run(seed_val: int, agg: Dictionary) -> void:
 		min_p = mini(min_p, p)
 		max_p = maxi(max_p, p)
 		tiers_seen[RunManager.get_passion_tier()] = true
-		if died_floor >= 0:
+		if died_floor >= 0 or _aborted:
 			break
 
 	# Fold this run into the aggregate.
@@ -146,6 +153,9 @@ func _run_combat(enemies: Array[EnemyData]) -> bool:
 	if won:
 		eng.process_combat_end_relics()  # combat-end heals/gold apply to the post-fight HP
 	eng.free()
+	if not _cbt.within_memory_ceiling("run %d, after a combat" % RngManager.run_seed):
+		_aborted = true
+		get_tree().quit(1)
 	return won
 
 

@@ -20,6 +20,14 @@ var sounds: Dictionary = {}
 var music_tracks: Dictionary = {}
 var current_music: String = ""
 
+## False makes play_sfx and play_music do nothing. The headless batch tools (combat_harness,
+## run_harness, roster_test) turn it off before they start. They run thousands of combats
+## inside one synchronous _ready, and every play() creates an AudioStreamPlayback, holding
+## a ~20 KB QOA decode buffer, that the AudioServer only lets go of once the main loop runs
+## again. No frame runs until the tool is finished, so every sound of every trial was kept:
+## about 6.9 GB resident on a full combat_harness run.
+var enabled := true
+
 
 func _ready() -> void:
 	# Create music player
@@ -102,7 +110,7 @@ func _connect_signals() -> void:
 
 ## Play a named sound effect. Silently skips if sound not loaded.
 func play_sfx(sound_name: String, volume_db: float = 0.0) -> void:
-	if sound_name not in sounds:
+	if not enabled or sound_name not in sounds:
 		return
 	var player = sfx_players[sfx_index]
 	player.stream = sounds[sound_name]
@@ -117,7 +125,7 @@ func play_sfx(sound_name: String, volume_db: float = 0.0) -> void:
 
 ## Play a named music track. Does nothing if already playing that track.
 func play_music(track_name: String, volume_db: float = -6.0) -> void:
-	if track_name == current_music:
+	if not enabled or track_name == current_music:
 		return
 	if track_name not in music_tracks:
 		return

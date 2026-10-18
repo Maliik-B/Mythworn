@@ -301,22 +301,7 @@ static func _build_generic_pool() -> Array[CardData]:
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		[_draw(2), _passion(-5)]))
 
-	# Inner Fire — StS "Anger"-style passion engine: free to play, stokes Passion,
-	# and drops a fresh copy of itself into the discard pile. The self-replication
-	# is the cost — it clogs the deck as it ramps you toward your zone. The copy's
-	# AddCardEffect points back at this prototype, so every clone re-clones on play.
-	# NOTE: that back-pointer is an intentional prototype self-reference cycle. It
-	# never frees (one card, app-lifetime pool) → accounts for a small bump in the
-	# harness's "resources still in use at exit" count. Per-combat clones don't
-	# cycle (their AddCardEffect just shares this prototype), so they free normally.
-	var inner_fire = _card("Inner Fire", 0, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
-		[_block(5), _passion(5)])
-	var inner_fire_copy = AddCardEffect.new()
-	inner_fire_copy.card_to_add = inner_fire
-	inner_fire_copy.to_discard = true
-	inner_fire.effects.append(inner_fire_copy)
-	pool.append(inner_fire)
+	pool.append(_inner_fire())
 
 	# Weaken: pure Weak control → +2 (Water's lane).
 	pool.append(_card("Weaken", 1, CardData.CardType.SKILL,
@@ -366,16 +351,46 @@ static func _build_generic_pool() -> Array[CardData]:
 	# stay school-less = no symbol. These cards are personality-NEUTRAL, so the symbol renders
 	# FLAT (identity only, no zone glow/coin) — see combat_scene._make_resonance_sigil.
 	for c in pool:
-		var lean := 0
-		for e in c.effects:
-			if e is PassionEffect:
-				lean += e.value
-		if lean > 0:
-			c.school = CardData.PersonalityType.PRIMARY
-		elif lean < 0:
-			c.school = CardData.PersonalityType.SECONDARY
+		_set_school_from_lean(c)
 
 	return pool
+
+
+static func _set_school_from_lean(c: CardData) -> void:
+	var lean := 0
+	for e in c.effects:
+		if e is PassionEffect:
+			lean += e.value
+	if lean > 0:
+		c.school = CardData.PersonalityType.PRIMARY
+	elif lean < 0:
+		c.school = CardData.PersonalityType.SECONDARY
+
+
+## Builds a fresh card by id, for an effect that has to name a card rather than hold one
+## (AddCardEffect.card_id). Unknown id returns null.
+static func build_card(id: StringName) -> CardData:
+	match id:
+		&"inner_fire":
+			return _inner_fire()
+	return null
+
+
+## Inner Fire — StS "Anger"-style passion engine: free to play, stokes Passion,
+## and drops a fresh copy of itself into the discard pile. The self-replication
+## is the cost — it clogs the deck as it ramps you toward your zone. The copy is
+## built by id rather than cloned from the card being played, so it is always the
+## base card: an upgraded Inner Fire+ still adds a plain Inner Fire.
+static func _inner_fire() -> CardData:
+	var c := _card("Inner Fire", 0, CardData.CardType.SKILL,
+		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
+		[_block(5), _passion(5)])
+	var copy := AddCardEffect.new()
+	copy.card_id = &"inner_fire"
+	copy.to_discard = true
+	c.effects.append(copy)
+	_set_school_from_lean(c)
+	return c
 
 
 # ============================================================
