@@ -64,8 +64,8 @@ func play_turn(eng: CombatEngine, commit: bool, commit_target: int) -> void:
 
 
 ## The single best card to play right now, or null to end the turn. Priority:
-## survive a spike -> hold the pole (commit) -> set up Vulnerable -> maximise damage
-## -> spend leftover energy on block.
+## survive a spike -> hold the pole (commit) -> set up Vulnerable -> the most damage the
+## energy left can buy -> spend leftover energy on block.
 func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardData:
 	var living := _living(eng)
 	if living.is_empty():
@@ -89,14 +89,15 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	if playable.is_empty():
 		return null
 
-	# Lethal check is only trustworthy for a single target (burst doesn't split).
+	# The most damage this turn's energy can buy, as [damage, cards]. Lethal is judged on it
+	# rather than on every attack in hand, which could add up to more than the energy pays
+	# for. The lethal check is only trustworthy for a single target (burst doesn't split).
+	var attacks := playable.filter(func(c): return c.card_type == CardData.CardType.ATTACK \
+			and _card_est_damage(eng, c) > 0)
+	var plan := _best_attack_plan(eng, attacks)
 	var can_lethal := false
 	if living.size() == 1:
-		var burst := 0
-		for c in playable:
-			if c.card_type == CardData.CardType.ATTACK:
-				burst += _card_est_damage(eng, c)
-		can_lethal = burst >= living[0].stats.current_hp + living[0].stats.block
+		can_lethal = plan[0] >= living[0].stats.current_hp + living[0].stats.block
 
 	# 1) Survive: block a telegraphed spike or a hit that drops us below the margin.
 	var threatened := biggest >= SPIKE or float(hp - unblocked) < SAFETY_FRAC * maxhp
@@ -146,12 +147,17 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 		if vuln != null:
 			return vuln
 
-	# 4) Biggest effective damage on the lowest-HP enemy.
-	var atks := playable.filter(func(c): return c.card_type == CardData.CardType.ATTACK \
-			and _card_est_damage(eng, c) > 0)
-	if not atks.is_empty():
-		atks.sort_custom(func(a, b): return _card_est_damage(eng, a) > _card_est_damage(eng, b))
-		return atks[0]
+	# 4) The most damage the energy left can buy, on the lowest-HP enemy. Play the plan's
+	# biggest hit first; an X-cost card goes last, since it spends whatever is left.
+	var first: CardData = null
+	for c in plan[1]:
+		if not c.x_cost and (first == null \
+				or _card_est_damage(eng, c) > _card_est_damage(eng, first)):
+			first = c
+	if first == null and not plan[1].is_empty():
+		first = plan[1][0]
+	if first != null:
+		return first
 
 	# 5) Leftover energy: keep blocking if a hit is still coming.
 	if block < incoming:
@@ -185,7 +191,7 @@ func _intent_damage(enemy: EnemyCombatState, player_vuln: bool) -> int:
 ## Sword's Bearer per-hit bonus, and the Passion zone modifier, in deal_damage's order, so the
 ## policy values on-type cards and multi-hits correctly. Leaving the title bonus out had the
 ## policy ranking a single big hit over a multi-hit that the title makes worth more.
-func _card_est_damage(eng: CombatEngine, card: CardData) -> int:
+func _card_est_damage(eng: CombatEngine, card: CardData, x_energy: int = -1) -> int:
 	var pstr := eng.player_stats.get_status_stacks(StatusEffects.STRENGTH)
 	var pweak := eng.player_stats.has_status(StatusEffects.WEAK)
 	var title_bonus := eng.sword_bonus()
@@ -198,12 +204,41 @@ func _card_est_damage(eng: CombatEngine, card: CardData) -> int:
 			per += title_bonus
 			per = _zone_adjust(per, card.personality)
 			# X-cost torrent (Maelstrom): strikes once per energy on cast, so value it at
-			# the energy it would spend right now, not a flat single hit.
+			# the energy it would spend (x_energy, or all of it right now), not a flat hit.
 			var reps: int = e.hits
 			if e.x_scaled:
-				reps = eng.energy
+				reps = eng.energy if x_energy < 0 else x_energy
 			total += maxi(0, per) * reps
 	return total
+
+
+## The most damage the energy left this turn can buy from these attacks, as [damage, cards]:
+## a 0/1 knapsack over energy cost, so two cheap hits can beat one expensive one. An X-cost
+## card spends whatever is left when it is played, so it is weighed on top of each cheaper
+## fixed-cost set. Ties keep hand order, which keeps the choice deterministic.
+func _best_attack_plan(eng: CombatEngine, attacks: Array) -> Array:
+	var cap: int = eng.energy
+	var best: Array = []  # best[e]: the most damage from fixed-cost attacks for at most e energy
+	for e in cap + 1:
+		best.append([0, []])
+	var x_cards: Array = []
+	for c in attacks:
+		if c.x_cost:
+			x_cards.append(c)
+			continue
+		var cost: int = c.energy_cost
+		var dmg := _card_est_damage(eng, c)
+		for e in range(cap, cost - 1, -1):
+			var with_c: int = best[e - cost][0] + dmg
+			if with_c > best[e][0]:
+				best[e] = [with_c, best[e - cost][1] + [c]]
+	var plan: Array = best[cap]
+	for x in x_cards:
+		for e in cap + 1:
+			var with_x: int = best[e][0] + _card_est_damage(eng, x, cap - e)
+			if with_x > plan[0]:
+				plan = [with_x, best[e][1] + [x]]
+	return plan
 
 
 func _zone_adjust(amount: int, pers: CardData.PersonalityType) -> int:

@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
 	_test_rewards_follow_the_run_seed()
+	_test_harness_policy_spends_energy_well()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -2225,3 +2226,47 @@ func _test_rewards_follow_the_run_seed() -> void:
 	randomize()
 	_check("the same run seed offers the same card + relic rewards whatever the global RNG holds",
 		offers[0] == offers[1] and offers[0] != "")
+
+
+## The harness player spends a turn's energy on the most damage it can buy, rather than on the
+## biggest single card, and counts the Sword's Bearer bonus once per hit. Small hands with a
+## known best answer, all NEUTRAL cards so the Passion zone stays out of the arithmetic.
+func _test_harness_policy_spends_energy_well() -> void:
+	var policy := HarnessCombat.new()
+	var eng := CombatEngine.new()
+	eng.player_stats = CombatantStats.new(80, 80)
+	var big := _neutral_attack("Big", 2, 14)
+	var small: Array = [_neutral_attack("Small A", 1, 9), _neutral_attack("Small B", 1, 9),
+		_neutral_attack("Small C", 1, 9)]
+	eng.energy = 3
+	var plan: Array = policy._best_attack_plan(eng, [big] + small)
+	_check("3 energy buys three 1-cost 9s (27) over the 2-cost 14 and a 9 (23)",
+		plan[0] == 27 and not plan[1].has(big))
+	eng.energy = 2
+	plan = policy._best_attack_plan(eng, [big, small[0]])
+	_check("2 energy with one 9 in hand still buys the 14", plan[0] == 14 and plan[1] == [big])
+	var torrent := _neutral_attack("Torrent", 0, 5)
+	torrent.x_cost = true
+	torrent.effects[0].x_scaled = true
+	eng.energy = 3
+	plan = policy._best_attack_plan(eng, [torrent, small[0]])
+	_check("an X-cost card is valued on the energy left to it and goes last (9 + 5x2 = 19 > 5x3)",
+		plan[0] == 19 and plan[1].back() == torrent)
+	var triple := _neutral_attack("Triple", 1, 4)
+	triple.effects[0].hits = 3
+	eng._sword_base = 2
+	_check("the title bonus is counted once per hit: 3 x (4+2) = 18, 1 x (14+2) = 16",
+		policy._card_est_damage(eng, triple) == 18 and policy._card_est_damage(eng, big) == 16)
+	eng.free()
+
+
+func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:
+	var c := CardData.new()
+	c.card_name = card_name
+	c.energy_cost = cost
+	c.card_type = CardData.CardType.ATTACK
+	c.target_type = CardData.TargetType.SINGLE_ENEMY
+	var e := DamageEffect.new()
+	e.value = dmg
+	c.effects.append(e)
+	return c
