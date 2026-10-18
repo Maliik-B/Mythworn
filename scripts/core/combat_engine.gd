@@ -56,6 +56,19 @@ var _mercy_heal: int = 0
 var _momentum: int = 0
 var _momentum_per_hit: int = 0
 
+## The Sword's Bearer: the per-hit damage bonus from equipped titles. _sword_base is the tier
+## value (0 unless a damage title is worn), cached at combat start rather than polled on every
+## hit because get_title_passive_total rebuilds the whole title registry on each call. At
+## Original tier the base doubles with the turn count, capped at SWORD_MAX_DOUBLINGS, which is
+## what keeps a long fight from squaring the per-hit multiplier. Degraded tiers stay flat.
+var _sword_base: int = 0
+var _sword_escalates := false
+
+## Three doublings, so the curve keeps its whole character through turn 8 and the unbounded
+## tail goes away. The lever, if +8 a hit proves too hot against the harness, is this cap and
+## not the schedule: the feel lives in the curve and the risk lives in the top step.
+const SWORD_MAX_DOUBLINGS := 3
+
 ## The Thurible relic (Reliquary): the per-turn Passion swing magnitude, primed from the
 ## relic's value (0 unless held). At the start of each player turn combat pushes Passion by
 ## this amount, signed by the pole the player chose on the map (RunManager.thurible_mode).
@@ -111,6 +124,9 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	_clutch_used = false
 	# The Merciful: arm the per-death mend from the equipped title (0 if unworn).
 	_mercy_heal = RunManager.get_title_passive_total(TitleData.EffectType.HEAL_ON_ENEMY_DEATH)
+	# The Sword's Bearer: arm the per-hit bonus and whether this tier escalates (0 if unworn).
+	_sword_base = RunManager.get_title_passive_total(TitleData.EffectType.DAMAGE_BONUS_FLAT)
+	_sword_escalates = RunManager.title_damage_bonus_escalates()
 	# Momentum: prime the per-hit ramp from the relic (0 if unheld); the accrued bonus starts empty.
 	var mom := RunManager.get_relic("Momentum")
 	_momentum_per_hit = mom.value if mom else 0
@@ -175,6 +191,29 @@ func _on_passion_tier_changed_whiplash(_old_tier: int, _new_tier: int) -> void:
 	var n := Powers.WHIPLASH_DRAW * player_stats.get_power_stacks(Powers.WHIPLASH)
 	for card in piles.draw_cards(n):
 		Events.card_drawn.emit(card)
+
+
+## The Sword's Bearer's bonus for the current turn. Flat at a degraded tier; at full tier it
+## doubles on a doubling timer, so the interval between steps doubles along with the value:
+## turn 1 pays the base, turn 2 twice it, turn 4 four times, turn 8 eight times, and there it
+## stops. Formally base * 2^min(floor(log2(turn)), SWORD_MAX_DOUBLINGS). Resets with the fight,
+## because turn_number does.
+func sword_bonus() -> int:
+	if _sword_base <= 0:
+		return 0
+	if not _sword_escalates:
+		return _sword_base
+	var doublings := 0
+	while doublings < SWORD_MAX_DOUBLINGS and turn_number >= (2 << doublings):
+		doublings += 1
+	return _sword_base * (1 << doublings)
+
+
+## Tell the combat UI where the two escalating per-hit bonuses stand. Called when either can
+## have moved: the start of a player turn (the sword steps, Momentum resets) and each hit the
+## player lands (Momentum climbs).
+func _emit_damage_ramp() -> void:
+	Events.damage_ramp_changed.emit(sword_bonus(), _momentum)
 
 
 func _disconnect_whiplash() -> void:
@@ -246,6 +285,7 @@ func start_player_turn() -> void:
 
 	energy = MAX_ENERGY
 	_momentum = 0  # Momentum relic: the within-turn damage ramp resets each player turn.
+	_emit_damage_ramp()  # the sword may have stepped on this turn boundary, and Momentum reset
 	player_stats.reset_block()
 	tick_start_of_turn(player_stats)
 
@@ -509,16 +549,16 @@ func deal_damage(target: CombatantStats, base_amount: int,
 		if source.has_status(StatusEffects.WEAK):
 			amount = int(amount * 0.75)
 
-	# Title damage bonus: flat damage added to all player attacks (not enemies).
-	# Applied before zone penalty so the penalty scales the boosted total uniformly.
+	# Title damage bonus: damage added to all player attacks (not enemies). Applied before the
+	# zone penalty so the penalty scales the boosted total uniformly.
 	# INTENDED, not a bug: this is per HIT, not per card -- it sits on the same line as
-	# Strength, so a multi-hit card adds it once per hit (The Sword's Bearer at +3 pays
-	# +6 on Twin Strike and +12 on Cascade). Multi-hit decks are meant to be able to
-	# point themselves at it; that per-hit scaling is the title's whole synergy hook.
+	# Strength, so a multi-hit card adds it once per hit. Multi-hit decks are meant to be able
+	# to point themselves at it; that per-hit scaling is the title's whole synergy hook, and it
+	# is why the bonus opens at +1 rather than at +3.
 	# Momentum (relic) rides the same block: the bonus accrued earlier this turn is added here,
 	# so it scales under zones like the title bonus. _momentum is 0 on the turn's first hit.
 	if source == player_stats:
-		amount += RunManager.get_title_passive_total(TitleData.EffectType.DAMAGE_BONUS_FLAT)
+		amount += sword_bonus()
 		amount += _momentum
 
 	# Blooded Edge: the first attack damage the player lands this combat hits harder. Gated
@@ -562,6 +602,7 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	# multi-hit card ramps mid-combo. Gated to the player striking an enemy; reset each turn.
 	if _momentum_per_hit > 0 and source == player_stats and target != player_stats:
 		_momentum += _momentum_per_hit
+		_emit_damage_ramp()
 
 	# Enraged: a struck combatant strikes its attacker back for its Enraged stacks.
 	# Ignores block (a raw lash) and fires per hit, so multi-hit bursts cost more — the

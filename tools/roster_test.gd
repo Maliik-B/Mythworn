@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_new_events()
 	_test_reliquary()
 	_test_title_relic_reworks()
+	_test_swords_bearer_curve()
 	_test_thurible()
 	_test_event_reworks()
 	_test_liaison_relics()
@@ -2031,6 +2032,68 @@ func _test_scene_scripts_compile() -> void:
 		var compiled: bool = scr != null and scr is GDScript and scr.reload() == OK
 		_check("compiles: %s" % path, compiled)
 
+
+
+## The Sword's Bearer (Oct 2026): the flat +3 became a per-hit bonus that doubles on a doubling
+## timer, capped at three doublings and reset per combat, so the title is weak in the first few
+## turns where fights are decided and only reaches its ceiling in a long one. The escalation is
+## Original tier only; a degraded sword keeps a flat bonus, since the one-integer tier schema
+## can shrink a value but cannot reshape a curve.
+func _test_swords_bearer_curve() -> void:
+	var sb := TitlePool.get_title(&"swords_bearer")
+	_check("The Sword's Bearer opens at +1 per hit (down from a flat +3)",
+		sb != null and sb.original_value == 1
+		and sb.passive_effect == TitleData.EffectType.DAMAGE_BONUS_FLAT)
+
+	var had := RunManager.earned_title_ids.has(&"swords_bearer")
+	RunManager.award_title(&"swords_bearer")
+	RunManager.equip_title(0, &"swords_bearer")
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [_dummy_attacker()])
+
+	# turn -> expected bonus. The interval between steps doubles with the value, and the
+	# fourth doubling never arrives: turn 16 pays the same +8 as turn 8.
+	var schedule := {1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 7: 4, 8: 8, 12: 8, 16: 8, 40: 8}
+	var curve_ok := true
+	var reported := ""
+	for t in schedule:
+		eng.turn_number = t
+		var got: int = eng.sword_bonus()
+		if got != schedule[t]:
+			curve_ok = false
+			reported += " t%d=%d(want %d)" % [t, got, schedule[t]]
+	_check("the sword doubles on turns 2, 4 and 8, then stops (+1/+2/+4/+8)%s" % reported,
+		curve_ok)
+
+	# Per HIT, not per card: the whole reason the curve opens at +1 instead of +3.
+	eng.turn_number = 8
+	var dummy := eng.enemies[0].stats
+	var before := dummy.current_hp
+	for _i in 4:
+		eng.deal_damage(dummy, 3, eng.player_stats)
+	_check("the bonus lands per hit (four hits of 3 at +8 take 44)",
+		before - dummy.current_hp == 44)
+
+	# A degraded sword (worn outside Camelot) keeps a flat bonus at its own tier value.
+	var saved_realm := RunManager.current_realm_id
+	RunManager.current_realm_id = &"yggdrasil"
+	var flat_eng := CombatEngine.new()
+	add_child(flat_eng)
+	flat_eng.start_combat([], 50, 50, [_dummy_attacker()])
+	flat_eng.turn_number = 8
+	var degraded_bonus: int = flat_eng.sword_bonus()
+	flat_eng.turn_number = 1
+	var degraded_opening: int = flat_eng.sword_bonus()
+	_check("a degraded sword stays flat (no doubling outside its realm)",
+		degraded_bonus == sb.degraded_value and degraded_opening == sb.degraded_value)
+	flat_eng.free()
+	RunManager.current_realm_id = saved_realm
+
+	eng.free()
+	RunManager.equip_title(0, &"")
+	if not had:
+		RunManager.earned_title_ids.erase(&"swords_bearer")
 
 func _test_cooldown() -> void:
 	# Siege Slam has cooldown 2: it must not fire on consecutive enemy turns.

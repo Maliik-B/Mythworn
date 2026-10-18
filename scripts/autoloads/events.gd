@@ -86,6 +86,13 @@ signal title_tier_changed(title_id: StringName, new_tier: int)
 ## map-screen widget can redraw its count, and so the use can raise its own flavor line.
 signal title_active_spent(title_id: StringName, charges_remaining: int)
 
+## The player's escalating per-hit damage bonuses moved: The Sword's Bearer's doubling timer
+## (which climbs with the turn count and resets each combat) and the Momentum relic's ramp
+## (which climbs with each hit and resets each turn). Both are numbers the player cannot play
+## around unless the combat UI draws them, and they move at different moments, so one signal
+## carries both and the readout redraws off it.
+signal damage_ramp_changed(sword_bonus: int, momentum_bonus: int)
+
 ## Emitted when the player toggles Excalibur between Sword and Sight modes.
 ## new_mode is one of RunManager.ExcaliburMode.SWORD / SIGHT.
 signal excalibur_mode_changed(new_mode: int)

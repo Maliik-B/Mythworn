@@ -49,6 +49,7 @@ func _ready() -> void:
 	_report_boss()
 	_report_physical()
 	_report_regen_check()
+	_report_swords_bearer()
 
 	print("\n== harness done ==\n")
 	get_tree().quit()
@@ -183,13 +184,42 @@ func _regen_bar(label: String, r: Dictionary) -> void:
 		label, r["winrate"], r["turns_mean"], r["hp_lost_mean"], r["hp_lost_p90"]])
 
 
+## The Sword's Bearer, measured for the first time. Every published Caedmon win rate was
+## taken WITHOUT this title, because the harness excluded it by comment, so the post-sword
+## numbers were higher than anything we had ever tuned against by an unknown amount.
+##
+## The output is a CURVE rather than a number, because the title's value is now a function of
+## fight length: the per-hit bonus opens at +1 and doubles on turns 2, 4 and 8. A short regular
+## should come out WEAKER than the old flat +3, an elite about the same, and a long boss fight
+## stronger. Each row is the same fight run twice off the same seeds, bare and then wearing the
+## title, so the delta is the real size of the title at that duration.
+func _report_swords_bearer() -> void:
+	print("\nTHE SWORD'S BEARER - per-hit bonus +1/+2/+4/+8, doubling on turns 2/4/8:")
+	print("  (same seeds bare vs worn; the delta IS the title at that fight length)")
+	for row in [
+		["Regular: Knight + Shade", _fresh_deck(), ["knight", "shade"], 0, false],
+		["Elite: Champion", _mid_deck(), ["champion"], 0, false],
+		["Boss: Caedmon, realistic", _boss_deck(), ["caedmon"], 50, true],
+	]:
+		var bare := _run(row[1], row[2], row[3], true, COMMIT_TARGET, row[4])
+		var worn := _run(row[1], row[2], row[3], true, COMMIT_TARGET, row[4], "",
+			&"swords_bearer")
+		print("  %-26s turns %4.1f   win %5.1f%% -> %5.1f%%  (%+5.1f)   HP-lost %4.1f -> %4.1f  (%+5.1f)" % [
+			row[0], bare["turns_mean"],
+			bare["winrate"], worn["winrate"], worn["winrate"] - bare["winrate"],
+			bare["hp_lost_mean"], worn["hp_lost_mean"],
+			worn["hp_lost_mean"] - bare["hp_lost_mean"]])
+	print("  Cap is 3 doublings (+8). If +8 reads too hot, the lever is the cap, not the")
+	print("  schedule: the feel lives in the curve and the risk lives in the top step.")
+
+
 # ============================================================
 # TRIAL RUNNER + AGGREGATION
 # ============================================================
 
 func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 		commit: bool, commit_target: int = COMMIT_TARGET, grant_excalibur := false,
-		extra_relic: String = "") -> Dictionary:
+		extra_relic: String = "", extra_title: StringName = &"") -> Dictionary:
 	var wins := 0
 	var hp_lost: Array[int] = []
 	var turns_sum := 0
@@ -198,7 +228,7 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 	var ttb_count := 0
 	for s in TRIALS:
 		var r := _simulate(deck, enemy_keys, s, start_passion, commit, commit_target,
-			grant_excalibur, extra_relic)
+			grant_excalibur, extra_relic, extra_title)
 		turns_sum += r["turns"]
 		passion_sum += r["passion"]
 		if r["ttb"] >= 0:
@@ -232,19 +262,25 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 ## reach the COMMITTED extreme tier (Blazing for a +target, Hollow for a -target).
 func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		start_passion: int, commit: bool, commit_target: int = COMMIT_TARGET,
-		grant_excalibur := false, extra_relic: String = "") -> Dictionary:
+		grant_excalibur := false, extra_relic: String = "",
+		extra_title: StringName = &"") -> Dictionary:
 	# Minimal run-state reset (mirrors roster_test; avoids start_run's realm/title
-	# machinery which is irrelevant to a single combat).
+	# machinery which is irrelevant to a single combat). Titles ARE cleared, because a
+	# slot left set would carry a title into every later trial and quietly rewrite the
+	# whole report.
 	RunManager.current_character = _character
 	RunManager.current_act = 1
 	RunManager.relics.clear()
 	RunManager.pending_act_complete = false
+	RunManager.active_title_slots = [&"", &""]
 	RunManager.passion = PassionState.new()
 	RunManager.passion.current_value = start_passion
 	RngManager.setup_run(seed_val)
 	# A realistic end-of-Act-1 boss loadout: Excalibur (Sword mode, injects its 14-dmg
-	# card) plus a couple of relics a player would have picked up by the boss. Still does
-	# NOT model the Sword's Bearer title (+3/attack), which would ease the fight further.
+	# card) plus a couple of relics a player would have picked up by the boss. Titles are
+	# NOT part of this loadout on purpose: pass extra_title to isolate one, which is how
+	# the sword's curve is measured below. Every win rate printed without extra_title is a
+	# bare-headed number.
 	if grant_excalibur:
 		RunManager.excalibur_mode = RunManager.ExcaliburMode.SWORD
 		RunManager.add_relic(RelicPool.get_relic_by_name("Excalibur"))
@@ -256,6 +292,13 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		var er := RelicPool.get_relic_by_name(extra_relic)
 		if er:
 			RunManager.add_relic(er)
+	# An optional equipped title, for single-variable isolation the same way extra_relic
+	# works. The slot is set directly rather than through equip_title, which would require
+	# the title to be in earned_title_ids and would drag in the max-HP recompute; no title
+	# measured this way touches max HP. current_realm_id stays at its camelot default, so a
+	# Camelot realm title resolves to its Original tier and escalates.
+	if extra_title != &"":
+		RunManager.active_title_slots[0] = extra_title
 
 	var eng := CombatEngine.new()
 	eng.instant = true

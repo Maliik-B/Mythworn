@@ -733,6 +733,20 @@ func _on_act_started_refresh_charges(_act_number: int) -> void:
 	_refresh_title_charges(TitleData.ActivePeriod.ACT)
 
 
+## True if an equipped per-hit damage title is at its full tier, which is the only tier whose
+## bonus escalates. The schema can give a tier a smaller number but not a different shape, so
+## this one title's curve is gated in code; a degraded sword keeps a flat bonus at its own
+## value. See TITLE_DESIGN 5.12 and the rider-block note in 6.3.
+func title_damage_bonus_escalates() -> bool:
+	for slot in range(TITLE_SLOT_COUNT):
+		var data := get_equipped_title(slot)
+		if not data or data.passive_effect != TitleData.EffectType.DAMAGE_BONUS_FLAT:
+			continue
+		if get_title_tier(data.title_id) == TitleData.Tier.ORIGINAL:
+			return true
+	return false
+
+
 ## Extra card options the equipped titles add to a card reward (The Gracious). Reward sites
 ## widen their pick by this. The shop deliberately does not read it: buying a card is a
 ## purchase, not a reward, and widening the stock would be a discount in disguise.

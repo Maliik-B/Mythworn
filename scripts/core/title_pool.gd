@@ -103,6 +103,22 @@ static func _build_camelots_champion() -> TitleData:
 	return t
 
 
+## The realm's signature title, off the Excalibur quest at the centre of the map. Its bonus is
+## applied inside deal_damage on the same line as Strength, so it is per HIT and not per card:
+## a multi-hit card adds it once per hit. That is intended, and it is the only per-hit damage
+## source in the game, which is what earns it the top tier.
+##
+## The flat +3 was never measured (the harness excluded it by comment), and its real problem was
+## not its ceiling but its floor: it made the EARLY turns easier, and fights are decided in the
+## first three or four. So the bonus now doubles on a doubling timer, +1 on turn 1, +2 from turn
+## 2, +4 from turn 4, +8 from turn 8, capped at three doublings and reset every combat. A
+## four-turn regular averages about +2.25 a hit, which is weaker than the flat version; a
+## twelve-turn boss averages about +5 with the tail at +8, which is stronger, and only there.
+## Weak where the game is decided, legendary where a legendary sword should feel it.
+##
+## The escalation is ORIGINAL tier only, gated in code, because the one-integer tier schema can
+## express a smaller number but not a different SHAPE. Degraded and Returning keep a flat bonus
+## at their own values. TITLE_DESIGN 5.4 and 5.12.
 static func _build_swords_bearer() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"swords_bearer"
@@ -112,8 +128,9 @@ static func _build_swords_bearer() -> TitleData:
 	t.accent_color = HERALDIC_ACCENT
 
 	t.original_name = "The Sword's Bearer"
-	t.original_description = "The blade answers to how you hold it — as edge, or as eye. (+3 damage to all attacks)"
-	t.original_value = 3
+	t.original_description = ("The blade answers to how you hold it, as edge, or as eye. It wakes "
+		+ "as a fight runs long: +1 damage per hit, doubling on turns 2, 4 and 8.")
+	t.original_value = 1
 
 	t.degraded_name = "Vagrant of Renown"
 	t.degraded_description = "Even far from Camelot, the weight of the sword's memory lends your strikes purpose. (+1 damage)"
