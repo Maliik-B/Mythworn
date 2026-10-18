@@ -181,17 +181,21 @@ func _intent_damage(enemy: EnemyCombatState, player_vuln: bool) -> int:
 	return dmg
 
 
-## Effective single-target damage of a player attack card, including Strength, Weak,
-## and the Passion zone modifier (so the policy values on-type cards correctly).
+## Effective single-target damage of a player attack card, including Strength, Weak, the
+## Sword's Bearer per-hit bonus, and the Passion zone modifier, in deal_damage's order, so the
+## policy values on-type cards and multi-hits correctly. Leaving the title bonus out had the
+## policy ranking a single big hit over a multi-hit that the title makes worth more.
 func _card_est_damage(eng: CombatEngine, card: CardData) -> int:
 	var pstr := eng.player_stats.get_status_stacks(StatusEffects.STRENGTH)
 	var pweak := eng.player_stats.has_status(StatusEffects.WEAK)
+	var title_bonus := eng.sword_bonus()
 	var total := 0
 	for e in card.get_active_effects():
 		if e is DamageEffect:
 			var per := e.value + pstr
 			if pweak:
 				per = int(per * 0.75)
+			per += title_bonus
 			per = _zone_adjust(per, card.personality)
 			# X-cost torrent (Maelstrom): strikes once per energy on cast, so value it at
 			# the energy it would spend right now, not a flat single hit.
