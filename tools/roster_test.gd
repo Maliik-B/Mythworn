@@ -60,6 +60,7 @@ func _ready() -> void:
 	_test_rewards_follow_the_run_seed()
 	_test_harness_policy_spends_energy_well()
 	_test_harness_policy_reads_incoming()
+	_test_harness_policy_nets_enraged_lash()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -2367,3 +2368,35 @@ func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:
 	e.value = dmg
 	c.effects.append(e)
 	return c
+
+
+## Against an Enraged target every hit that gets past block lashes the attacker for the stacks,
+## straight to HP, and the harness player prices that at one point of HP per point of damage. It
+## never plays an attack whose lash alone would finish it.
+func _test_harness_policy_nets_enraged_lash() -> void:
+	var policy := HarnessCombat.new()
+	var eng := CombatEngine.new()
+	eng.player_stats = CombatantStats.new(80, 80)
+	eng.piles = PileManager.new()
+	eng.piles.setup([])
+	var target := EnemyCombatState.new(_dummy_attacker())
+	target.stats.apply_status(StatusEffects.ENRAGED, 3)
+	target.stats.block = 5
+	eng.enemies.append(target)
+	var triple := _neutral_attack("Triple", 1, 4)
+	triple.effects[0].hits = 3
+	_check("block 5 absorbs the first hit, so only two of three hits lash: 2 x 3 = 6 HP",
+		policy._card_strike(eng, triple)[2] == 6)
+	target.stats.block = 0
+	var single := _neutral_attack("Single", 1, 8)
+	eng.energy = 1
+	var plan: Array = policy._best_attack_plan(eng, [triple, single])
+	_check("one 8 (lash 3, net 5) is preferred over three 4s (lash 9, net 3)",
+		plan[1] == [single] and plan[0] == 5 and plan[2] == 3)
+	eng.piles.hand.assign([triple])
+	eng.player_stats.current_hp = 9
+	_check("an attack whose lash (9) would finish a 9-HP player is not played",
+		policy.choose_card(eng, false, 50) == null)
+	eng.player_stats.current_hp = 10
+	_check("...and is played again at 10 HP", policy.choose_card(eng, false, 50) == triple)
+	eng.free()

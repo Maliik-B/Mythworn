@@ -84,9 +84,11 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	var hp := eng.player_stats.current_hp
 	var maxhp := eng.player_stats.max_hp
 
+	# An attack whose Enraged lash alone would finish the player is never played, by any step.
 	var playable: Array[CardData] = []
 	for c in eng.piles.hand:
-		if not c.unplayable and c.energy_cost <= eng.energy:
+		if not c.unplayable and c.energy_cost <= eng.energy \
+				and not (c.card_type == CardData.CardType.ATTACK and _card_strike(eng, c)[2] >= hp):
 			playable.append(c)
 	if playable.is_empty():
 		return null
@@ -99,7 +101,8 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	var plan := _best_attack_plan(eng, attacks)
 	var can_lethal := false
 	if living.size() == 1:
-		can_lethal = plan[0] >= living[0].stats.current_hp + living[0].stats.block
+		can_lethal = plan[0] + plan[2] >= living[0].stats.current_hp + living[0].stats.block \
+			and plan[2] < hp
 
 	# 1) Survive: block a telegraphed spike or a hit that drops us below the margin. Block is
 	# only worth playing against the part of the hit it can stop; a pierce goes straight through.
@@ -206,14 +209,15 @@ func _card_est_damage(eng: CombatEngine, card: CardData, x_energy: int = -1) -> 
 	return _card_strike(eng, card, x_energy)[0]
 
 
-## What a player attack would do if played now, as [damage, hits landed], hit by hit the way
-## deal_damage resolves it: the effect's base with its Passion-distance rider, + Strength, then
-## Weak, + the Sword's Bearer bonus and the Momentum built so far this turn, then the card's
+## What a player attack would do if played now, as [damage, hits landed, lash], hit by hit the
+## way deal_damage resolves it: the effect's base with its Passion-distance rider, + Strength,
+## then Weak, + the Sword's Bearer bonus and the Momentum built so far this turn, then the card's
 ## Passion zone, then each target's Vulnerable or Intangible. The hits are the effect's own (X
 ## for an X-cost card, at x_energy or all the energy left) plus Overflow's extras at Blazing,
 ## landing on the lowest enemy, which is what play_turn targets, or on every living enemy for an
-## area attack. Momentum's further climb and Blooded Edge belong to the turn and the combat
-## rather than to one card, so _best_attack_plan adds them once to the plan as a whole.
+## area attack. Lash is the HP an Enraged target strikes back for: its stacks, on every hit that
+## gets past its block, straight to HP. Momentum's further climb and Blooded Edge belong to the
+## turn and the combat rather than to one card, so _best_attack_plan adds them once to the plan.
 func _card_strike(eng: CombatEngine, card: CardData, x_energy: int = -1) -> Array:
 	var targets: Array[EnemyCombatState] = []
 	if card.target_type == CardData.TargetType.ALL_ENEMIES:
@@ -232,6 +236,10 @@ func _card_strike(eng: CombatEngine, card: CardData, x_energy: int = -1) -> Arra
 		overflow = ps.get_power_stacks(Powers.OVERFLOW)
 	var damage := 0
 	var landed := 0
+	var lash := 0
+	var block_left := {}  # an Enraged target's block, spent hit by hit to find which hits get through
+	for t in targets:
+		block_left[t] = t.stats.block
 	for e in card.get_active_effects():
 		if not e is DamageEffect:
 			continue
@@ -253,13 +261,24 @@ func _card_strike(eng: CombatEngine, card: CardData, x_energy: int = -1) -> Arra
 				hit = 1
 			damage += hit * hits
 			landed += hits
-	return [damage, landed]
+			# Enraged lashes the attacker for its stacks on every hit that gets past block.
+			var enraged := t.stats.get_status_stacks(StatusEffects.ENRAGED)
+			if enraged > 0:
+				for i in hits:
+					var direct := mini(e.pierce, hit)
+					var absorbed := mini(block_left[t], hit - direct)
+					block_left[t] -= absorbed
+					if hit - absorbed > 0:
+						lash += enraged
+	return [damage, landed, lash]
 
 
-## The most damage the energy left this turn can buy from these attacks, as [damage, cards]:
-## a 0/1 knapsack over energy cost, so two cheap hits can beat one expensive one. An X-cost
-## card spends whatever is left when it is played, so it is weighed on top of each cheaper
-## fixed-cost set. Ties keep hand order, which keeps the choice deterministic.
+## The best use of the energy left this turn on these attacks, as [value, cards, lash]: a 0/1
+## knapsack over energy cost, so two cheap hits can beat one expensive one. A card is worth its
+## damage less the HP an Enraged target lashes back for it, one point of HP per point of damage;
+## lash is that HP for the whole plan, so the plan's raw damage is value + lash. An X-cost card
+## spends whatever is left when it is played, so it is weighed on top of each cheaper fixed-cost
+## set. Ties keep hand order, which keeps the choice deterministic.
 ##
 ## With the Momentum relic every hit raises every later hit this turn, so a set's worth also
 ## depends on how many hits it lands in total: the t-th hit carries t times the per-hit bonus
@@ -278,53 +297,55 @@ func _best_attack_plan(eng: CombatEngine, attacks: Array) -> Array:
 			fixed.append(c)
 	var plan: Array
 	if per_hit <= 0:
-		var best: Array = []  # best[e]: the most damage from fixed-cost attacks for at most e energy
+		var best: Array = []  # best[e]: the best plan from fixed-cost attacks for at most e energy
 		for e in cap + 1:
-			best.append([0, []])
+			best.append([0, [], 0])
 		for c in fixed:
 			var cost: int = c.energy_cost
-			var dmg := _card_est_damage(eng, c)
+			var s := _card_strike(eng, c)
 			for e in range(cap, cost - 1, -1):
-				var with_c: int = best[e - cost][0] + dmg
+				var with_c: int = best[e - cost][0] + s[0] - s[2]
 				if with_c > best[e][0]:
-					best[e] = [with_c, best[e - cost][1] + [c]]
+					best[e] = [with_c, best[e - cost][1] + [c], best[e - cost][2] + s[2]]
 		plan = best[cap]
 		for x in x_cards:
 			for e in cap + 1:
-				var with_x: int = best[e][0] + _card_est_damage(eng, x, cap - e)
+				var xs := _card_strike(eng, x, cap - e)
+				var with_x: int = best[e][0] + xs[0] - xs[2]
 				if with_x > plan[0]:
-					plan = [with_x, best[e][1] + [x]]
+					plan = [with_x, best[e][1] + [x], best[e][2] + xs[2]]
 	else:
-		# table[e][hits]: the most damage from fixed-cost attacks landing exactly that many hits
+		# table[e][hits]: the best plan from fixed-cost attacks landing exactly that many hits
 		# for at most e energy.
 		var table: Array = []
 		for e in cap + 1:
-			table.append({0: [0, []]})
+			table.append({0: [0, [], 0]})
 		for c in fixed:
 			var cost: int = c.energy_cost
 			var s := _card_strike(eng, c)
 			for e in range(cap, cost - 1, -1):
 				var before: Dictionary = table[e - cost].duplicate()
 				for h in before:
-					var cand: int = before[h][0] + s[0]
+					var cand: int = before[h][0] + s[0] - s[2]
 					var hh: int = h + s[1]
 					if not table[e].has(hh) or cand > table[e][hh][0]:
-						table[e][hh] = [cand, before[h][1] + [c]]
-		plan = [0, []]
+						table[e][hh] = [cand, before[h][1] + [c], before[h][2] + s[2]]
+		plan = [0, [], 0]
 		for h in table[cap]:
 			var v: int = table[cap][h][0] + per_hit * h * (h - 1) / 2
 			if v > plan[0]:
-				plan = [v, table[cap][h][1]]
+				plan = [v, table[cap][h][1], table[cap][h][2]]
 		for x in x_cards:
 			for e in cap + 1:
 				var xs := _card_strike(eng, x, cap - e)
 				for h in table[e]:
 					var total_hits: int = h + xs[1]
-					var v: int = table[e][h][0] + xs[0] + per_hit * total_hits * (total_hits - 1) / 2
+					var v: int = table[e][h][0] + xs[0] - xs[2] \
+						+ per_hit * total_hits * (total_hits - 1) / 2
 					if v > plan[0]:
-						plan = [v, table[e][h][1] + [x]]
+						plan = [v, table[e][h][1] + [x], table[e][h][2] + xs[2]]
 	if eng._blooded_edge_pending > 0 and not plan[1].is_empty():
-		plan = [plan[0] + eng._blooded_edge_pending, plan[1]]
+		plan = [plan[0] + eng._blooded_edge_pending, plan[1], plan[2]]
 	return plan
 
 
