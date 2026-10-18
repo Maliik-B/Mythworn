@@ -10,6 +10,7 @@ extends RefCounted
 const SAFETY_FRAC := 0.35    # below this fraction of max HP, block hard
 const CHIP_TOLERANCE := 5    # incoming HP the player will eat before over-blocking
 const SPIKE := 12            # a single telegraphed hit >= this is worth blocking
+const SEQUENCE_LIMIT := 6     # attacks in hand above which the exact sequenced search is skipped
 
 ## Memory ceiling for the batch harnesses. They run every trial inside one synchronous _ready,
 ## so --quit-after (which counts frames) and the failsafe timer cannot stop them, and anything
@@ -93,14 +94,15 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 	if playable.is_empty():
 		return null
 
-	# The most damage this turn's energy can buy, as [damage, cards]. Lethal is judged on it
-	# rather than on every attack in hand, which could add up to more than the energy pays
-	# for. The lethal check is only trustworthy for a single target (burst doesn't split).
+	# The best use of this turn's energy, as [value, cards in the order to play them, lash].
+	# Lethal is judged on its raw damage rather than on every attack in hand, which could add up
+	# to more than the energy pays for. It is only trustworthy for a single target (burst doesn't
+	# split), and only a target with no lifebar left dies: breaking a boss's bar is not a kill.
 	var attacks := playable.filter(func(c): return c.card_type == CardData.CardType.ATTACK \
 			and _card_est_damage(eng, c) > 0)
 	var plan := _best_attack_plan(eng, attacks)
 	var can_lethal := false
-	if living.size() == 1:
+	if living.size() == 1 and not living[0].can_advance_phase():
 		can_lethal = plan[0] + plan[2] >= living[0].stats.current_hp + living[0].stats.block \
 			and plan[2] < hp
 
@@ -154,17 +156,10 @@ func choose_card(eng: CombatEngine, commit: bool, commit_target: int) -> CardDat
 		if vuln != null:
 			return vuln
 
-	# 4) The most damage the energy left can buy, on the lowest-HP enemy. Play the plan's
-	# biggest hit first; an X-cost card goes last, since it spends whatever is left.
-	var first: CardData = null
-	for c in plan[1]:
-		if not c.x_cost and (first == null \
-				or _card_est_damage(eng, c) > _card_est_damage(eng, first)):
-			first = c
-	if first == null and not plan[1].is_empty():
-		first = plan[1][0]
-	if first != null:
-		return first
+	# 4) The best use of the energy left: play the plan's first card. The rest is re-planned
+	# after it lands.
+	if not plan[1].is_empty():
+		return plan[1][0]
 
 	# 5) Leftover energy: keep blocking if a hit block can stop is still coming.
 	if block < blockable:
@@ -273,6 +268,190 @@ func _card_strike(eng: CombatEngine, card: CardData, x_energy: int = -1) -> Arra
 	return [damage, landed, lash]
 
 
+## The best use of the energy left this turn on these attacks, as [value, cards in the order to
+## play them, lash]. Most turns cannot finish anything, and then nothing an attack does can be
+## wasted and the knapsack below is exact. When an enemy could be brought to 0, damage stops
+## adding up card by card: the hit that finishes an enemy loses whatever it had left, a single-
+## target card keeps striking the body with the rest of its hits, the next card swings at the
+## next lowest enemy, and a boss breaking a lifebar starts the next one fresh. So in those turns
+## the plan comes from trying every order of the affordable attacks against a copy of the enemy
+## line (_sequenced_plan). A kill on the last enemy ends the fight, so nothing after it is wasted
+## and the knapsack stands; so does a hand of more than SEQUENCE_LIMIT attacks, which is rare.
+func _best_attack_plan(eng: CombatEngine, attacks: Array) -> Array:
+	var plan := _knapsack_plan(eng, attacks)
+	if attacks.size() <= SEQUENCE_LIMIT and _kill_in_reach(eng, plan[0] + plan[2]):
+		return _sequenced_plan(eng, attacks)
+	return [plan[0], _play_order(eng, plan[1]), plan[2]]
+
+
+## True if raw damage could bring some enemy to 0 this turn in a fight that would go on after it.
+func _kill_in_reach(eng: CombatEngine, raw: int) -> bool:
+	var living := _living(eng)
+	if living.size() == 1 and not living[0].can_advance_phase():
+		return false
+	for en in living:
+		if raw >= en.stats.current_hp + en.stats.block:
+			return true
+	return false
+
+
+## The knapsack's cards in the order to play them: the biggest hit first, so a turn cut short has
+## already landed its best card, and an X-cost card last, since it spends whatever is left.
+func _play_order(eng: CombatEngine, cards: Array) -> Array:
+	var first: CardData = null
+	for c in cards:
+		if not c.x_cost and (first == null \
+				or _card_est_damage(eng, c) > _card_est_damage(eng, first)):
+			first = c
+	if first == null:
+		return cards
+	var ordered: Array = [first]
+	for c in cards:
+		if c != first:
+			ordered.append(c)
+	return ordered
+
+
+## The best order of attacks for this turn, as [value, cards in order, lash], found by playing
+## every affordable sequence against a copy of the enemy line. Value is the damage that actually
+## came off block and HP, less lash at one point of HP per point of damage. A sequence that would
+## kill the player, by lash or by the lash a boss deals entering a new lifebar, is never chosen;
+## that entry lash is not otherwise counted against a plan, because breaking the bar is the only
+## way through the fight and a one-turn player charged for it would learn never to break it.
+## Two copies of the same card are interchangeable, so only the first is tried at each step.
+func _sequenced_plan(eng: CombatEngine, attacks: Array) -> Array:
+	var best: Array = [0, [], 0]
+	_sequence_search(eng, attacks, [], eng.energy, _line_copy(eng), 0, 0, best)
+	return best
+
+
+func _sequence_search(eng: CombatEngine, attacks: Array, order: Array, energy: int,
+		line: Dictionary, value: int, lash: int, best: Array) -> void:
+	var tried := {}
+	for c in attacks:
+		if order.has(c) or tried.has(c.card_name):
+			continue
+		if not c.x_cost and c.energy_cost > energy:
+			continue
+		tried[c.card_name] = true
+		var next: Dictionary = line.duplicate(true)
+		var r := _play_on_line(eng, c, next, energy)
+		var next_lash: int = lash + r[1]
+		if next_lash + next["entry_lash"] >= eng.player_stats.current_hp:
+			continue
+		var next_value: int = value + r[0] - r[1]
+		var next_order: Array = order + [c]
+		if next_value > best[0]:
+			best[0] = next_value
+			best[1] = next_order
+			best[2] = next_lash
+		if not c.x_cost:
+			_sequence_search(eng, attacks, next_order, energy - c.energy_cost, next,
+				next_value, next_lash, best)
+
+
+## The enemy line as the sequenced search sees it: what a hit reads and changes on each enemy,
+## the turn's Momentum and Blooded Edge, and the entry lash the plan has drawn so far.
+func _line_copy(eng: CombatEngine) -> Dictionary:
+	var foes: Array = []
+	for en in eng.enemies:
+		foes.append({
+			"hp": en.stats.current_hp, "block": en.stats.block,
+			"vuln": en.stats.has_status(StatusEffects.VULNERABLE),
+			"intangible": en.stats.has_status(StatusEffects.INTANGIBLE),
+			"enraged": en.stats.get_status_stacks(StatusEffects.ENRAGED),
+			"phase": en.phase_index, "data": en.enemy_data, "dead": en.stats.is_dead(),
+		})
+	return {"foes": foes, "momentum": eng._momentum, "blooded": eng._blooded_edge_pending,
+		"entry_lash": 0}
+
+
+## Plays one attack against the copied line the way play_card and deal_damage would, hit by hit,
+## and returns [damage that came off block and HP, lash]. A single-target card strikes the lowest
+## living enemy, as play_turn picks it, with every hit even after it falls; an area attack strikes
+## every enemy still standing when each of its effects resolves. A hit that brings a boss to 0
+## breaks the bar: the next starts full, with no block, its statuses cleared and its entry Enraged
+## (which the breaking hit already lashes with, since the engine changes phase first), and the
+## player takes the entry lash, kept in the line's entry_lash.
+func _play_on_line(eng: CombatEngine, card: CardData, line: Dictionary, energy: int) -> Array:
+	var ps := eng.player_stats
+	var pstr := ps.get_status_stacks(StatusEffects.STRENGTH)
+	var pweak := ps.has_status(StatusEffects.WEAK)
+	var sword := eng.sword_bonus()
+	var zone := CombatEngine.zone_multiplier(card.personality)
+	var per_hit: int = eng._momentum_per_hit
+	var overflow := 0
+	if ps.has_power(Powers.OVERFLOW) and RunManager.get_passion_tier() == PassionState.Tier.BLAZING:
+		overflow = ps.get_power_stacks(Powers.OVERFLOW)
+	var foes: Array = line["foes"]
+	var single := -1
+	if card.target_type != CardData.TargetType.ALL_ENEMIES:
+		for i in foes.size():
+			if not foes[i]["dead"] and (single < 0 or foes[i]["hp"] < foes[single]["hp"]):
+				single = i
+		if single < 0:
+			return [0, 0]
+	var landed := 0
+	var lash := 0
+	for e in card.get_active_effects():
+		if not e is DamageEffect:
+			continue
+		var hits: int = e.hits
+		if e.x_scaled:
+			hits = energy
+		if hits > 1:
+			hits += overflow
+		var targets: Array = []
+		if single >= 0:
+			targets.append(single)
+		else:
+			for i in foes.size():
+				if not foes[i]["dead"]:
+					targets.append(i)
+		for i in targets:
+			var f: Dictionary = foes[i]
+			for h in hits:
+				var amount: int = e._effective_value() + pstr
+				if pweak:
+					amount = int(amount * 0.75)
+				amount += sword + line["momentum"]
+				if line["blooded"] > 0:
+					amount += line["blooded"]
+					line["blooded"] = 0
+				amount = int(amount * zone)
+				if f["vuln"]:
+					amount = int(amount * 1.5)
+				amount = maxi(0, amount)
+				if amount > 0 and f["intangible"]:
+					amount = 1
+				var direct := mini(e.pierce, amount)
+				var absorbed: int = mini(f["block"], amount - direct)
+				f["block"] -= absorbed
+				var through: int = amount - absorbed
+				var hp_before: int = f["hp"]
+				f["hp"] = maxi(0, hp_before - through)
+				landed += absorbed + hp_before - f["hp"]
+				if f["hp"] == 0 and not f["dead"]:
+					var data: EnemyData = f["data"]
+					if data.phase_hps.size() > f["phase"] + 1:
+						f["phase"] += 1
+						f["hp"] = data.phase_hps[f["phase"]]
+						f["block"] = 0
+						f["vuln"] = false
+						f["intangible"] = false
+						f["enraged"] = data.phase_enter_enraged[f["phase"]] \
+							if data.phase_enter_enraged.size() > f["phase"] else 0
+						if data.phase_enter_damage.size() > f["phase"]:
+							line["entry_lash"] += data.phase_enter_damage[f["phase"]]
+					else:
+						f["dead"] = true
+				if per_hit > 0:
+					line["momentum"] += per_hit
+				if through > 0 and f["enraged"] > 0:
+					lash += f["enraged"]
+	return [landed, lash]
+
+
 ## The best use of the energy left this turn on these attacks, as [value, cards, lash]: a 0/1
 ## knapsack over energy cost, so two cheap hits can beat one expensive one. A card is worth its
 ## damage less the HP an Enraged target lashes back for it, one point of HP per point of damage;
@@ -285,7 +464,7 @@ func _card_strike(eng: CombatEngine, card: CardData, x_energy: int = -1) -> Arra
 ## on top of what _card_strike counted. The knapsack then also tracks hits, and the plan adds
 ## that climb once. Blooded Edge's first-hit bonus is added once to any plan that attacks.
 ## Both are counted before the zone and Vulnerable multipliers, the one approximation left.
-func _best_attack_plan(eng: CombatEngine, attacks: Array) -> Array:
+func _knapsack_plan(eng: CombatEngine, attacks: Array) -> Array:
 	var cap: int = eng.energy
 	var per_hit: int = eng._momentum_per_hit
 	var fixed: Array = []

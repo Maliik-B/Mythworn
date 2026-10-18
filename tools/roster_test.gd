@@ -61,6 +61,7 @@ func _ready() -> void:
 	_test_harness_policy_spends_energy_well()
 	_test_harness_policy_reads_incoming()
 	_test_harness_policy_nets_enraged_lash()
+	_test_harness_policy_wastes_no_overkill()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -2400,3 +2401,44 @@ func _test_harness_policy_nets_enraged_lash() -> void:
 	eng.player_stats.current_hp = 10
 	_check("...and is played again at 10 HP", policy.choose_card(eng, false, 50) == triple)
 	eng.free()
+
+
+## When an enemy can be brought to 0 this turn, the harness player plans the whole sequence,
+## because the damage past a kill is lost and a boss's next lifebar starts fresh. Hands with a
+## known best order. (The sequenced simulation is also checked against the engine on every attack
+## of whole harness runs, kills and lifebar breaks included.)
+func _test_harness_policy_wastes_no_overkill() -> void:
+	var policy := HarnessCombat.new()
+	var eng := CombatEngine.new()
+	eng.player_stats = CombatantStats.new(80, 80)
+	var weak := EnemyCombatState.new(_dummy_attacker())
+	weak.stats.current_hp = 5
+	var tough := EnemyCombatState.new(_dummy_attacker())
+	tough.stats.current_hp = 30
+	eng.enemies.append(weak)
+	eng.enemies.append(tough)
+	var big := _neutral_attack("Big", 2, 14)
+	var small := _neutral_attack("Small", 1, 6)
+	eng.energy = 3
+	var plan: Array = policy._best_attack_plan(eng, [big, small])
+	_check("finish the 5-HP enemy with the 6 and send the 14 at the next (5 + 14 = 19, not 5 + 6)",
+		plan[1] == [small, big] and plan[0] == 19)
+	eng.free()
+
+	# A boss with a 10-HP first bar and a 50-HP second that turns Enraged 1 and lashes 18 on entry.
+	var boss_data := _dummy_attacker()
+	boss_data.phase_hps.assign([10, 50])
+	boss_data.phase_enter_enraged.assign([0, 1])
+	boss_data.phase_enter_damage.assign([0, 18])
+	var beng := CombatEngine.new()
+	beng.player_stats = CombatantStats.new(30, 80)
+	beng.enemies.append(EnemyCombatState.new(boss_data))
+	beng.energy = 3
+	plan = policy._best_attack_plan(beng, [big, small])
+	_check("break the bar with the 14 (4 past it lost), then the 6 on the fresh bar; both lash 1, the breaking hit too, since the phase changes first: 10 + 6 - 2 = 14",
+		plan[1] == [big, small] and plan[0] == 14 and plan[2] == 2)
+	beng.player_stats.current_hp = 18
+	plan = policy._best_attack_plan(beng, [big, small])
+	_check("at 18 HP the 18-point entry lash would kill, so the bar is left standing: the 6 alone",
+		plan[1] == [small] and plan[0] == 6)
+	beng.free()
