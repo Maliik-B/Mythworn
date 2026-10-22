@@ -96,9 +96,9 @@ const ENEMY_SPRITE_SET := {
 	"Orc Brute": "skeleton",
 	"Realm Guardian": "flyingeye",
 	# Camelot regular roster.
-	"Corrupted Knight": "skeleton",
+	"Unmarked Knight": "skeleton",
 	"Court Conspirator": "goblin",
-	"Siege Golem": "worm",
+	"Empty Harness": "worm",
 	"Realm Shade": "flyingeye",
 	# Camelot elites + Act-1 boss.
 	"Champion of the Usurper": "skeleton",
@@ -108,11 +108,11 @@ const ENEMY_SPRITE_SET := {
 	"Fable's End": "wizard2",
 	# Sep/Oct-2026 roster (thickening + content furnishing).
 	"Man-at-Arms": "medieval_warrior",
-	"Corrupted Squire": "goblin",
+	"Masterless Squire": "goblin",
 	"Prophet's Acolyte": "wizard2",
-	"Corrupted Pikeman": "goblin",
+	"Bannerless Pikeman": "goblin",
 	"Hollow Herald": "wizard2",
-	"Rotting Knight": "skeleton",
+	"Wasting Knight": "skeleton",
 	"The Iron Verdict": "skeleton",
 	"The Hollow Prelate": "wizard2",
 	# Raider questline band: the Boar reads big (worm sheet) vs the two small goblin raiders.
@@ -1976,7 +1976,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 			if heal_eff is HealEffect and heal_eff.apply_to_source:
 				value_str = " Heal %d" % heal_eff.value
 				break
-		# An attack that also debuffs (the Rotting Knight's festering strike) keeps the
+		# An attack that also debuffs (the Wasting Knight's wasting cut) keeps the
 		# attack's damage readout but takes the crossed glyph and names the status.
 		if enemy.current_intent.intent_type == EnemyMove.IntentType.ATTACK_DEBUFF:
 			icon = "⚔☠"

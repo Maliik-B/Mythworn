@@ -94,8 +94,8 @@ func _names_over_rolls(data: EnemyData, hp: int, rolls: int) -> Dictionary:
 
 func _test_opener() -> void:
 	var enc := EnemyPool.get_combat_encounter(0)
-	_check("combat opener is a lone Corrupted Knight",
-		enc.size() == 1 and enc[0].enemy_name == "Corrupted Knight")
+	_check("combat opener is a lone Unmarked Knight",
+		enc.size() == 1 and enc[0].enemy_name == "Unmarked Knight")
 
 
 func _test_elite_and_boss_identity() -> void:
@@ -245,22 +245,22 @@ func _test_passion_pull() -> void:
 
 func _test_curse() -> void:
 	var curse := EnemyPool._corruption_curse()
-	_check("Corruption is unplayable + NEGATIVE",
+	_check("Unwritten is unplayable + NEGATIVE",
 		curse.unplayable and curse.personality == CardData.PersonalityType.NEGATIVE)
 	_check("duplicate_card preserves unplayable", curse.duplicate_card().unplayable)
 	var shade := EnemyPool.realm_shade()
 	var has_corrupt := false
 	for m in shade.moves:
-		if m.move_name == "Corrupt":
+		if m.move_name == "Unwrite":
 			has_corrupt = true
-	_check("Realm Shade has a Corrupt move", has_corrupt)
+	_check("Realm Shade has an Unwrite move", has_corrupt)
 	# The full chain: AddCardEffect -> engine.add_card_to_pile -> draw pile.
 	var eng := CombatEngine.new()
 	eng.piles = PileManager.new()
 	eng.piles.setup([])
 	var eff = EnemyPool._add_curse()
 	eff.apply(null, null, eng)
-	_check("Corrupt shuffles one unplayable card into the draw pile",
+	_check("Unwrite shuffles one unplayable card into the draw pile",
 		eng.piles.draw_pile.size() == 1 and eng.piles.draw_pile[0].unplayable)
 	eng.free()
 
@@ -432,8 +432,8 @@ func _test_new_regulars() -> void:
 		maa.enemy_name == "Man-at-Arms" and _has_move(maa, "Overhead Chop"))
 
 	var squire := EnemyPool.corrupted_squire()
-	_check("Corrupted Squire exists with Expose Weakness",
-		squire.enemy_name == "Corrupted Squire" and _has_move(squire, "Expose Weakness"))
+	_check("Masterless Squire exists with Expose Weakness",
+		squire.enemy_name == "Masterless Squire" and _has_move(squire, "Expose Weakness"))
 
 	var acolyte := EnemyPool.prophets_acolyte()
 	_check("Prophet's Acolyte exists with Sap Will",
@@ -455,7 +455,7 @@ func _test_new_regulars() -> void:
 
 
 ## The Oct-2026 content-furnishing enemies: the reach-pierce Pikeman, the escalation
-## Hollow Herald, the Poison-stacking Rotting Knight, and the self-healing Hollow Prelate
+## Hollow Herald, the Poison-stacking Wasting Knight, and the self-healing Hollow Prelate
 ## elite. Each is checked for its signature mechanic end-to-end through the real engine.
 func _test_content_enemies() -> void:
 	# Pikeman: the Pike Thrust carries pierce, and a piercing hit bypasses part of block.
@@ -486,14 +486,14 @@ func _test_content_enemies() -> void:
 
 	# Hollow Herald: the banner buffs ALL allies' Strength and compounds each turn it fires.
 	var herald := EnemyPool.hollow_herald()
-	var standard := _move_by_name(herald, "Corrupt Standard")
+	var standard := _move_by_name(herald, "Blank Standard")
 	var is_banner := false
 	if standard:
 		for e in standard.effects:
 			if e is StatusApplyEffect and e.apply_to_allies \
 					and e.status_effect == StatusEffects.STRENGTH:
 				is_banner = true
-	_check("Herald's Corrupt Standard buffs all allies' Strength", standard != null and is_banner)
+	_check("Herald's Blank Standard buffs all allies' Strength", standard != null and is_banner)
 
 	var heng := CombatEngine.new()
 	add_child(heng)
@@ -505,17 +505,17 @@ func _test_content_enemies() -> void:
 		and heng.enemies[0].stats.get_status_stacks(StatusEffects.STRENGTH) == 2)
 	heng.free()
 
-	# Rotting Knight: Miasma stacks Poison on the player, which then bleeds through on tick.
+	# Wasting Knight: the Waste stacks Poison on the player, which then bleeds through on tick.
 	var rot := EnemyPool.rotting_knight()
-	_check("Rotting Knight exists with Festering Cut + Miasma",
-		rot.enemy_name == "Rotting Knight"
-		and _has_move(rot, "Festering Cut") and _has_move(rot, "Miasma"))
+	_check("Wasting Knight exists with Wasting Cut + The Waste",
+		rot.enemy_name == "Wasting Knight"
+		and _has_move(rot, "Wasting Cut") and _has_move(rot, "The Waste"))
 	var reng := CombatEngine.new()
 	add_child(reng)
 	reng.start_combat([], 50, 50, [EnemyPool.rotting_knight()])
-	_move_by_name(rot, "Miasma").effects[0].apply(
+	_move_by_name(rot, "The Waste").effects[0].apply(
 		reng.enemies[0].stats, reng.player_stats, reng)
-	_check("Miasma puts 5 Poison on the player (front-loaded rework)",
+	_check("The Waste puts 5 Poison on the player (front-loaded rework)",
 		reng.player_stats.get_status_stacks(StatusEffects.POISON) == 5)
 	reng.tick_start_of_turn(reng.player_stats)
 	_check("Poison bleeds through on tick (HP -5, Poison 5 -> 4)",
@@ -2104,18 +2104,18 @@ func _test_swords_bearer_curve() -> void:
 		RunManager.earned_title_ids.erase(&"swords_bearer")
 
 func _test_cooldown() -> void:
-	# Siege Slam has cooldown 2: it must not fire on consecutive enemy turns.
+	# Hollow Blow has cooldown 2: it must not fire on consecutive enemy turns.
 	var golem := EnemyPool.siege_golem()
 	var st := EnemyCombatState.new(golem)
 	var last_was_slam := false
 	var double_slam := false
 	for i in 40:
 		st.select_intent()
-		var is_slam := st.current_intent.move_name == "Siege Slam"
+		var is_slam := st.current_intent.move_name == "Hollow Blow"
 		if is_slam and last_was_slam:
 			double_slam = true
 		last_was_slam = is_slam
-	_check("Siege Slam (cd 2) never fires back-to-back", not double_slam)
+	_check("Hollow Blow (cd 2) never fires back-to-back", not double_slam)
 
 
 ## Inner Fire adds copies of itself. Its AddCardEffect used to point at the card carrying it,

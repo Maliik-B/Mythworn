@@ -65,7 +65,7 @@ const _COMBAT_POOL := [
 static func get_combat_encounter(floor_num: int, difficulty_mult: float = 1.0) -> Array[EnemyData]:
 	var mult := _encounter_mult(floor_num, difficulty_mult)
 
-	# Curated easy opener: a lone Corrupted Knight. The clean teacher, solo, so a
+	# Curated easy opener: a lone Unmarked Knight. The clean teacher, solo, so a
 	# first-timer meets attack/guard/rally with nothing else going on.
 	if floor_num <= 1:
 		_last_key = "knight_solo"
@@ -243,7 +243,8 @@ static func get_boss(difficulty_mult: float = 1.0) -> Array[EnemyData]:
 # CAMELOT REGULAR ENEMIES
 # ============================================================
 
-## Corrupted Knight (Med HP). The clean teacher: attack, guard (block + a little
+## Unmarked Knight (Med HP). A knight whose shield has gone plain: whatever he swore to is
+## gone and the drill remains. The clean teacher: attack, guard (block + a little
 ## Strength), and an occasional Rally that stacks more Strength. No Passion play.
 ## Left alone it snowballs, which is the lesson: this is the enemy that punishes
 ## you for not closing fights out.
@@ -258,7 +259,7 @@ static func corrupted_knight(mult := 1.0) -> EnemyData:
 		_move("Rally", EnemyMove.IntentType.BUFF,
 			[_self_status(StatusEffects.STRENGTH, 2)], 0.7, 2),
 	]
-	return _enemy("Corrupted Knight", _scale(46, mult), moves)
+	return _enemy("Unmarked Knight", _scale(46, mult), moves)
 
 
 ## Court Conspirator (Low HP). The Passion threat made legible early: debuffs, plus
@@ -286,25 +287,26 @@ static func court_conspirator(mult := 1.0) -> EnemyData:
 	return _enemy("Court Conspirator", _scale(26, mult), moves)
 
 
-## Siege Golem (High HP). Slow and almost defenseless, but telegraphs a heavy Slam
-## on a 2-3 turn rhythm. A block-timing / burst-window check: race it down or eat
-## the Slam when you can spare the block.
+## Empty Harness (High HP). A full suit of plate with no one inside, still walking the
+## wall. Slow and almost defenseless, but telegraphs a heavy blow on a 2-3 turn rhythm.
+## A block-timing / burst-window check: race it down or eat the blow when you can spare
+## the block. (The builder keeps its old name; the shipped name changed in the naming pass.)
 static func siege_golem(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
-		_move("Grind", EnemyMove.IntentType.ATTACK,
+		_move("Gauntlet", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(8, mult))], 2.0),
 		_move("Crushing Step", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(12, mult))], 1.0),
 		# The telegraph. Cooldown 2 spaces the big hits out so they read as a rhythm
 		# to block around rather than a random spike.
-		_move("Siege Slam", EnemyMove.IntentType.ATTACK,
+		_move("Hollow Blow", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(18, mult))], 1.6, 2),
 	]
-	return _enemy("Siege Golem", _scale(72, mult), moves)
+	return _enemy("Empty Harness", _scale(72, mult), moves)
 
 
 ## Realm Shade (Med HP). Evasive: it self-blocks (Shroud) and chips with Weak. Its
-## signature Corrupt move shuffles a dead Corruption card into your draw pile,
+## signature Unwrite move shuffles a blank Unwritten card into your draw pile,
 ## polluting your tempo. Often fought in pairs, which is the demo's multi-enemy intro.
 static func realm_shade(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
@@ -314,9 +316,9 @@ static func realm_shade(mult := 1.0) -> EnemyData:
 			[_block(_scale(7, mult))], 1.4),
 		_move("Hex", EnemyMove.IntentType.DEBUFF,
 			[_status(StatusEffects.WEAK, 1)], 1.0),
-		# The signature: shuffle a dead Corruption into the draw pile. Cooldown keeps
-		# a pair of Shades from burying you in curses.
-		_move("Corrupt", EnemyMove.IntentType.DEBUFF,
+		# The signature: shuffle a blank Unwritten card into the draw pile. Cooldown keeps
+		# a pair of Shades from burying you in blanks.
+		_move("Unwrite", EnemyMove.IntentType.DEBUFF,
 			[_add_curse()], 1.1, 2),
 	]
 	return _enemy("Realm Shade", _scale(34, mult), moves)
@@ -340,7 +342,8 @@ static func man_at_arms(mult := 1.0) -> EnemyData:
 	return _enemy("Man-at-Arms", _scale(44, mult), moves)
 
 
-## Corrupted Squire (Low HP). A fast, fragile harasser whose signature Expose Weakness
+## Masterless Squire (Low HP). A squire whose knight is gone, reckless because no one is
+## holding him to anything. A fast, fragile harasser whose signature Expose Weakness
 ## puts VULNERABLE on the PLAYER — so his own follow-ups (and any bruiser he's paired
 ## with) hit much harder. The priority-kill puzzle made about damage instead of Passion:
 ## drop him before the Vulnerable stacks turn a partner's hit into a spike (added Sep 2026,
@@ -356,7 +359,7 @@ static func corrupted_squire(mult := 1.0) -> EnemyData:
 		_move("Reckless Charge", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(11, mult))], 1.1, 2),
 	]
-	return _enemy("Corrupted Squire", _scale(24, mult), moves)
+	return _enemy("Masterless Squire", _scale(24, mult), moves)
 
 
 ## Prophet's Acolyte (Med HP). A low-damage cultist — one of the False Prophet's
@@ -379,7 +382,8 @@ static func prophets_acolyte(mult := 1.0) -> EnemyData:
 	return _enemy("Prophet's Acolyte", _scale(34, mult), moves)
 
 
-## Corrupted Pikeman (Low-Med HP). The reach-pierce threat: a heavy Pike Thrust that punches
+## Bannerless Pikeman (Low-Med HP). The company's banner is gone; he holds the line of a
+## line that no longer exists. The reach-pierce threat: a heavy Pike Thrust that punches
 ## through part of your block, so turtling behind a wall doesn't fully answer it. Its catch
 ## is the recovery -- the Thrust is on a cooldown, so the turn after it commits the pikeman
 ## can only Brace (a weak hunker) or jab. The punish window lands AFTER the lunge: eat the
@@ -398,10 +402,11 @@ static func corrupted_pikeman(mult := 1.0) -> EnemyData:
 		_move("Jab", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(5, mult))], 0.8),
 	]
-	return _enemy("Corrupted Pikeman", _scale(32, mult), moves)
+	return _enemy("Bannerless Pikeman", _scale(32, mult), moves)
 
 
-## Hollow Herald (Low HP). The escalation engine: it raises a corrupted standard that hands
+## Hollow Herald (Low HP). The escalation engine: it raises a blank standard (nothing on
+## it, and they rally to it anyway) that hands
 ## Strength to the WHOLE group every turn it stands, so a paired bruiser's damage climbs the
 ## longer the Herald lives. That makes it the priority kill — unlike the Court Conspirator's
 ## occasional one-shot rally, the Herald's banner compounds each turn. Fragile on its own;
@@ -410,7 +415,7 @@ static func hollow_herald(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
 		# The banner: +1 Strength to every living enemy (self included) each turn. High
 		# weight + no cooldown so it fires most turns and the group's damage snowballs.
-		_move("Corrupt Standard", EnemyMove.IntentType.BUFF,
+		_move("Blank Standard", EnemyMove.IntentType.BUFF,
 			[_ally_status(StatusEffects.STRENGTH, 1)], 2.2),
 		# A little chip so it isn't purely passive while it waves the banner.
 		_move("Hollow Toll", EnemyMove.IntentType.ATTACK,
@@ -419,24 +424,26 @@ static func hollow_herald(mult := 1.0) -> EnemyData:
 	return _enemy("Hollow Herald", _scale(30, mult), moves)
 
 
-## Rotting Knight (Med HP). The plague bruiser and the roster's only Poison source: its
-## festering strikes and miasma stack Poison on you, so it threatens on a timer even through
-## block. A body you can't just out-turtle — the longer it lives, the more the poison bleeds
-## you, so it rewards closing the fight instead of grinding it. Sells the realm's rot.
+## Wasting Knight (Med HP). A knight the rot is still thinning, whose wound thins you: the
+## attrition bruiser and the roster's only Poison source. Its wasting cut and the Waste stack
+## Poison on you, so it threatens on a timer even through block. A body you can't just
+## out-turtle: the longer it lives, the more the poison bleeds you, so it rewards closing the
+## fight instead of grinding it. (The builder keeps its old name; the shipped name changed in
+## the naming pass.)
 static func rotting_knight(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
-		_move("Rusted Strike", EnemyMove.IntentType.ATTACK,
+		_move("Dull Strike", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(8, mult))], 1.8),
-		# Festering strike: damage that also leaves Poison. Cooldown paces the stacking so
+		# Wasting cut: damage that also leaves Poison. Cooldown paces the stacking so
 		# it climbs as a rhythm rather than spiking out of a fresh deck's reach.
-		_move("Festering Cut", EnemyMove.IntentType.ATTACK_DEBUFF,
+		_move("Wasting Cut", EnemyMove.IntentType.ATTACK_DEBUFF,
 			[_dmg(_scale(6, mult)), _status(StatusEffects.POISON, 3)], 1.4, 2),
-		# Pure poison application — a front-loaded miasma that bleeds hardest the turn it lands
-		# (dmg = stacks, −1/turn) and bypasses block entirely. The timer you have to race.
-		_move("Miasma", EnemyMove.IntentType.DEBUFF,
+		# Pure poison application: the Waste, front-loaded, bleeds hardest the turn it lands
+		# (dmg = stacks, -1/turn) and bypasses block entirely. The timer you have to race.
+		_move("The Waste", EnemyMove.IntentType.DEBUFF,
 			[_status(StatusEffects.POISON, 5)], 1.1, 2),
 	]
-	return _enemy("Rotting Knight", _scale(44, mult), moves)
+	return _enemy("Wasting Knight", _scale(44, mult), moves)
 
 
 # ============================================================
@@ -819,22 +826,23 @@ static func _passion_center(strength: float) -> Resource:
 	return e
 
 
-## A dead, unplayable Corruption card — the Realm Shade's deck pollution. It just
+## A blank, unplayable Unwritten card: the Realm Shade's deck pollution. It just
 ## clogs a hand slot for the rest of the combat (per-combat only; never persists).
+## (The helper keeps its old name; the card's shipped name changed in the naming pass.)
 static func _corruption_curse() -> CardData:
 	var c := CardData.new()
-	c.card_name = "Corruption"
+	c.card_name = "Unwritten"
 	c.card_type = CardData.CardType.SKILL
 	c.rarity = CardData.CardRarity.COMMON
 	c.energy_cost = 0
 	c.unplayable = true
 	c.personality = CardData.PersonalityType.NEGATIVE
 	c.target_type = CardData.TargetType.NONE
-	c.description = "Unplayable. A shard of the realm's rot, clogging your hand."
+	c.description = "Unplayable. Nothing is written on it. There was something, once."
 	return c
 
 
-## AddCardEffect that shuffles a fresh Corruption into the player's draw pile.
+## AddCardEffect that shuffles a fresh Unwritten card into the player's draw pile.
 static func _add_curse() -> Resource:
 	var e = AddCardEffectScript.new()
 	e.card_to_add = _corruption_curse()

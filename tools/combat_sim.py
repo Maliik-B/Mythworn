@@ -162,7 +162,7 @@ def M(name, weight, effects, cd=0, lo=0.0, hi=1.0):
 
 ENEMIES = {
     # --- Regulars ---
-    "Corrupted Knight": dict(hp=46, moves=[
+    "Unmarked Knight": dict(hp=46, moves=[
         M("Vanguard Strike", 2.0, [("dmg", 7)]),
         M("Oathbound Guard", 1.2, [("block", 6), ("str", 1)]),
         M("Rally", 0.7, [("str", 2)], cd=2),
@@ -174,23 +174,23 @@ ENEMIES = {
         M("Whisper", 2.2, [("passion", -4), ("weak", 1)], cd=3),
         M("Rally the Court", 1.1, [("ally_str", 1)], cd=2),
     ]),
-    "Siege Golem": dict(hp=72, moves=[
-        M("Grind", 2.0, [("dmg", 8)]),
+    "Empty Harness": dict(hp=72, moves=[
+        M("Gauntlet", 2.0, [("dmg", 8)]),
         M("Crushing Step", 1.0, [("dmg", 12)]),
-        M("Siege Slam", 1.6, [("dmg", 18)], cd=2),
+        M("Hollow Blow", 1.6, [("dmg", 18)], cd=2),
     ]),
     "Realm Shade": dict(hp=34, moves=[
         M("Fade Strike", 1.5, [("dmg", 6)]),
         M("Shroud", 1.4, [("block", 7)]),
         M("Hex", 1.0, [("weak", 1)]),
-        M("Corrupt", 1.1, [("weak", 1)], cd=2),   # approximates the deck-pollution tempo hit
+        M("Unwrite", 1.1, [("weak", 1)], cd=2),   # approximates the deck-pollution tempo hit
     ]),
     "Man-at-Arms": dict(hp=44, moves=[
         M("Halberd Swing", 2.0, [("dmg", 9)]),
         M("Raise Shield", 1.0, [("block", 8)]),
         M("Overhead Chop", 1.4, [("dmg", 14)], cd=2),
     ]),
-    "Corrupted Squire": dict(hp=24, moves=[
+    "Masterless Squire": dict(hp=24, moves=[
         M("Harry", 1.6, [("dmg", 5)]),
         M("Expose Weakness", 1.4, [("vuln", 1)], cd=2),
         M("Reckless Charge", 1.1, [("dmg", 11)], cd=2),
@@ -743,14 +743,14 @@ if __name__ == "__main__":
 
     print("REGULAR ENCOUNTERS (fresh Water starter deck):")
     for lbl, comp in [
-        ("Knight (solo opener)", ["Corrupted Knight"]),
-        ("Knight + Conspirator", ["Corrupted Knight", "Court Conspirator"]),
+        ("Knight (solo opener)", ["Unmarked Knight"]),
+        ("Knight + Conspirator", ["Unmarked Knight", "Court Conspirator"]),
         ("2 Realm Shades", ["Realm Shade", "Realm Shade"]),
-        ("Siege Golem (solo)", ["Siege Golem"]),
-        ("Golem + Conspirator", ["Siege Golem", "Court Conspirator"]),
-        ("Knight + Shade", ["Corrupted Knight", "Realm Shade"]),
+        ("Empty Harness (solo)", ["Empty Harness"]),
+        ("Harness + Conspirator", ["Empty Harness", "Court Conspirator"]),
+        ("Knight + Shade", ["Unmarked Knight", "Realm Shade"]),
         ("Man-at-Arms + Acolyte", ["Man-at-Arms", "Prophet's Acolyte"]),
-        ("Knight + Squire", ["Corrupted Knight", "Corrupted Squire"]),
+        ("Knight + Squire", ["Unmarked Knight", "Masterless Squire"]),
     ]:
         bar(lbl, run(FRESH_DECK, comp))
 

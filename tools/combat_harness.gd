@@ -69,11 +69,11 @@ func _report_regulars() -> void:
 		["Knight (solo opener)", ["knight"]],
 		["Knight + Conspirator", ["knight", "conspirator"]],
 		["2 Realm Shades", ["shade", "shade"]],
-		["Siege Golem (solo)", ["golem"]],
-		["Golem + Conspirator", ["golem", "conspirator"]],
+		["Empty Harness (solo)", ["golem"]],
+		["Harness + Conspirator", ["golem", "conspirator"]],
 		["Knight + Shade", ["knight", "shade"]],
-		["Rotting Knight (solo)", ["rotting"]],
-		["Rotting Knight + Shade", ["rotting", "shade"]],
+		["Wasting Knight (solo)", ["rotting"]],
+		["Wasting Knight + Shade", ["rotting", "shade"]],
 	]:
 		_bar(row[0], _run(deck, row[1], 0, false))
 

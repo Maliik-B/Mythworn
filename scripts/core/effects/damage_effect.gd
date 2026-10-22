@@ -9,7 +9,7 @@ extends CardEffect
 @export var x_scaled: bool = false
 ## Piercing: this many points of the hit bypass the target's block and land straight
 ## on HP; the rest soaks block normally. Per hit, so a multi-hit pierce is rare by
-## design. The Corrupted Pikeman's thrust is the canonical user -- a guard-breaking
+## design. The Bannerless Pikeman's thrust is the canonical user -- a guard-breaking
 ## lunge whose punish window is the recovery that follows.
 @export var pierce: int = 0
 ## Passion-scaled bonus: when > 0, every this-many points of Passion distance from center

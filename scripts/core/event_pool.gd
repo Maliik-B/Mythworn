@@ -303,11 +303,11 @@ static func _the_tourney() -> EventData:
 	c1.gamble_win_gold = 40
 	c1.gamble_lose_gold = -25
 	c1.gamble_win_text = ("You back the man with no device on his shield, and the stands laugh at you "
-		+ "for it, until he puts the rotting noble in the dirt and stands over him breathing clean "
+		+ "for it, until he puts the noble gone grey in the dirt and stands over him breathing clean "
 		+ "and hard. The herald counts out your winnings with a sour face. Across the field the "
 		+ "commoner catches your eye and touches two fingers to his brow.")
 	c1.gamble_lose_text = ("You back the man with no device on his shield, and for three passes he "
-		+ "rides like he will shame the lot of them. Then the rotting noble's lance catches him "
+		+ "rides like he will shame the lot of them. Then the grey noble's lance catches him "
 		+ "under the arm and he goes down and is slow to rise. The herald rakes in your stake without "
 		+ "meeting your eye. Across the field they get the commoner back to his knees; he finds you in "
 		+ "the crowd anyway, and touches two fingers to his brow.")
