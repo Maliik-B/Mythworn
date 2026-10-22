@@ -69,12 +69,12 @@ func _build_sword_in_stone_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Sword in the Stone"
 	e.description = ("A blade stands in a block of worn granite, sunk to the hilt. Something is hunched "
-		+ "over it, and it raises its head as you come near. A champion, once. You can still read the "
-		+ "heraldry on the ruined surcoat, under everything that has grown over it since.\n\nThe chaos "
-		+ "has gone all through him. Black veins climb his throat. One arm has swollen to near twice "
-		+ "the size of the other. His eyes have filmed over to a flat white, and he does not so much "
-		+ "stand as brace, like a man holding a door shut from the inside. When he sees you, he "
-		+ "snarls.\n\nThe sword's hilt catches the light, then goes dull. The metal settles deeper "
+		+ "over it, and it lifts its head as you come near. A champion, once. The surcoat is plain cloth "
+		+ "now. Whatever was on it has gone, and the cloth has not faded so much as been let go of."
+		+ "\n\nThere is nothing in his face. His eyes are open and no one is looking out of them. He "
+		+ "does not so much stand as brace, like a man holding a door shut from the inside who has "
+		+ "forgotten which side of it he is on. When you move, he moves. The snarl comes up out of him "
+		+ "from a long way down.\n\nThe sword's hilt catches the light, then goes dull. The metal settles deeper "
 		+ "into the stone, the way a hand draws back from a thing it will not touch. The blade has "
 		+ "not chosen him. It has been waiting.")
 
@@ -100,9 +100,9 @@ func _build_sword_in_stone_event() -> EventData:
 func _build_sword_guardian_won_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Beast Unmade"
-	e.description = ("As the last blow lands, the chaos within him seems to ebb. The black veins fade "
-		+ "back under his skin. His swollen arm eases. For one borrowed breath a man is left where the "
-		+ "beast was, clear-eyed and frightened.\n\n\"Caedmon.\" He gets the name out like it costs "
+	e.description = ("As the last blow lands, something comes back into the cloth of his surcoat, faint, "
+		+ "a shape you could almost read. His eyes find you. For one borrowed breath a man is left where "
+		+ "the beast was, clear-eyed and frightened.\n\n\"Caedmon.\" He gets the name out like it costs "
 		+ "him. \"I went to face Sir Caedmon. I had put down better men than him. I thought it would "
 		+ "be quick.\" A wet laugh. \"But he does not fight like a man. Halfway through, something "
 		+ "took the reins of him. His guard just dropped. He came at me like a thing with no fear "
@@ -675,7 +675,8 @@ func _start_event_combat(key: StringName) -> void:
 	match key:
 		&"sword_guardian":
 			RunManager.pending_enemies.clear()
-			RunManager.pending_enemies.append(EnemyPool.champion_of_the_usurper())
+			for guardian in EnemyPool.get_sword_guardian():
+				RunManager.pending_enemies.append(guardian)
 			RunManager.pending_gold_reward = 0
 			RunManager.pending_relic_reward = false
 			RunManager.pending_relic_is_boss = false

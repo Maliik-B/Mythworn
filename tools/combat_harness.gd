@@ -45,7 +45,7 @@ func _ready() -> void:
 	print("===============================================================")
 	_character = _build_emo_hybrid()
 
-	for report in [_report_regulars, _report_elite, _report_barrow_warden, _report_poles,
+	for report in [_report_regulars, _report_elite, _report_guardian, _report_barrow_warden, _report_poles,
 			_report_prophet, _report_boss, _report_physical, _report_regen_check,
 			_report_swords_bearer]:
 		report.call()
@@ -81,6 +81,11 @@ func _report_regulars() -> void:
 func _report_elite() -> void:
 	print("\nELITE — Champion of the Usurper (mid deck):")
 	_bar("Champion", _run(_mid_deck(), ["champion"], 0, true))
+
+
+func _report_guardian() -> void:
+	print("\nQUEST FIGHT — The Beast at the Stone (the Sword in the Stone, mid deck):")
+	_bar("Beast at the Stone", _run(_mid_deck(), ["guardian"], 0, true))
 
 
 func _report_barrow_warden() -> void:
@@ -176,8 +181,8 @@ func _report_regen_check() -> void:
 	var reg_reg := _run(_mid_deck(), ["rotting", "shade"], 0, false, COMMIT_TARGET, false, "Iron Rations")
 	_regen_bar("Caedmon, realistic   (no Rations)", boss_base)
 	_regen_bar("Caedmon, realistic   (+Iron Rations)", boss_reg)
-	_regen_bar("Rotting+Shade        (no Rations)", reg_base)
-	_regen_bar("Rotting+Shade        (+Iron Rations)", reg_reg)
+	_regen_bar("Wasting+Shade        (no Rations)", reg_base)
+	_regen_bar("Wasting+Shade        (+Iron Rations)", reg_reg)
 	print("  read: healthy if +Rations shaves HP-lost modestly and nudges win% -- not if HP-lost")
 	print("        collapses toward 0 or win% jumps from a real risk to a near-certainty.")
 
@@ -369,6 +374,7 @@ func _build_enemies(keys: Array) -> Array[EnemyData]:
 			"shade": out.append(EnemyPool.realm_shade())
 			"rotting": out.append(EnemyPool.rotting_knight())
 			"champion": out.append(EnemyPool.champion_of_the_usurper())
+			"guardian": out.append(EnemyPool.sword_guardian())
 			"prophet": out.append(EnemyPool.false_prophet())
 			"caedmon": out.append(EnemyPool.sir_caedmon())
 			"barrow": out.append(EnemyPool.the_barrow_warden())

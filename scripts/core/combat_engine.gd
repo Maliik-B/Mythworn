@@ -621,6 +621,17 @@ func apply_block(target: CombatantStats, amount: int) -> void:
 	Events.block_gained.emit(target, actual)
 
 
+## A flat HP loss a combatant inflicts on itself (a DamageEffect with apply_to_source: the
+## Beast at the Stone's Breaking Blow). Skips every modifier and block, so the cost is the
+## number on the move, and goes through _on_damage_dealt so the bar updates and a bar that
+## empties this way breaks or kills exactly as one the player emptied would.
+func self_damage(stats: CombatantStats, amount: int) -> void:
+	if amount <= 0 or stats.is_dead():
+		return
+	stats.take_direct_damage(amount)
+	_on_damage_dealt(stats, amount)
+
+
 ## Mends a combatant up to its max HP, clamped to the missing HP, and emits the matching
 ## heal signal so the UI refreshes the bar. Used by the Hollow Prelate's self-heal AND by
 ## player heal cards (the memory card "The House That Was") -- routing a player heal through

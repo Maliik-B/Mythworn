@@ -649,6 +649,81 @@ static func the_barrow_warden(mult := 1.0) -> EnemyData:
 
 
 # ============================================================
+# CAMELOT QUEST FIGHT — The Beast at the Stone (the Sword in the Stone's guardian)
+# ============================================================
+
+## The guardian in the run's act scaling, for the Sword in the Stone event's fight.
+static func get_sword_guardian() -> Array[EnemyData]:
+	var result: Array[EnemyData] = []
+	result.append(sword_guardian(_act_mult()))
+	return result
+
+
+## The Beast at the Stone (two bars, elite weight). A champion who went to face Caedmon,
+## came back with nothing behind the eyes, and has crouched over the sword since. Phase 1
+## is what his training still does on its own: a measured strike, a practiced guard, a
+## drilled three-hit combo, a feint that leaves you Weak, a moment to set his feet. Phase 2
+## is the same body with the fighter gone, and it runs down as his bar does: the guard is
+## the first thing lost, then the combo sheds a hit per band (4x3, then 6x2, then nothing)
+## while the single swing grows, until under a third of the bar all that is left is a
+## reckless blow and a Breaking Blow that costs him 8 of his own HP every time he throws
+## it. Brace survives in every band as a thin reflex, the one thing left in him. No
+## transition lash, no Strength, no Enraged: he is not Caedmon, nothing is pushing him.
+## Loses to burst less than Caedmon by design (a mid-run optional fight), and the cost of
+## the fight is the hits you take reading the conversion. Harness-calibration target.
+static func sword_guardian(mult := 1.0) -> EnemyData:
+	var phase1: Array[EnemyMove] = [
+		_move("Measured Strike", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(9, mult))], 1.8),
+		_move("Practiced Guard", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(10, mult))], 1.2),
+		_move("Drilled Combo", EnemyMove.IntentType.ATTACK,
+			[_dmg_x(_scale(4, mult), 3)], 1.5, 2),
+		# The craft: a light hit that leaves you Weak for the combo behind it.
+		_move("Feint", EnemyMove.IntentType.ATTACK_DEBUFF,
+			[_dmg(_scale(5, mult)), _status(StatusEffects.WEAK, 1)], 1.0, 2),
+		_move("Set His Feet", EnemyMove.IntentType.BUFF,
+			[_self_status(StatusEffects.STRENGTH, 1)], 0.6, 3),
+	]
+	# Phase 2 is gated by HP band on its own bar: the conversion is read off his health.
+	var phase2: Array[EnemyMove] = [
+		# Above two thirds: the combo is intact, the guard is gone.
+		_move("Drilled Combo", EnemyMove.IntentType.ATTACK,
+			[_dmg_x(_scale(4, mult), 3)], 2.0, 1, 0.66, 1.0),
+		_move("Wild Swing", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(12, mult))], 0.8, 0, 0.66, 1.0),
+		_move("Grasp", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.VULNERABLE, 1)], 0.9, 2, 0.66, 1.0),
+		_move("Brace", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(5, mult))], 0.5, 0, 0.66, 1.0),
+		# The middle band: the combo has lost a hit, the swing has grown.
+		_move("Unlearned Combo", EnemyMove.IntentType.ATTACK,
+			[_dmg_x(_scale(6, mult), 2)], 1.6, 1, 0.33, 0.66),
+		_move("Wild Swing", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(14, mult))], 1.4, 0, 0.33, 0.66),
+		_move("Grasp", EnemyMove.IntentType.DEBUFF,
+			[_status(StatusEffects.VULNERABLE, 1)], 0.7, 2, 0.33, 0.66),
+		_move("Brace", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(5, mult))], 0.4, 0, 0.33, 0.66),
+		# Under a third: no technique left. Each blow is the whole of him, and the
+		# Breaking Blow costs him 8 HP of his own, flat (CombatEngine.self_damage).
+		_move("Reckless Abandon", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(18, mult))], 1.8, 1, 0.0, 0.33),
+		_move("Breaking Blow", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(22, mult)), _self_dmg(8)], 1.4, 2, 0.0, 0.33),
+		_move("Brace", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(4, mult))], 0.3, 0, 0.0, 0.33),
+	]
+	var e := _enemy("The Beast at the Stone", _scale(44, mult), phase1)
+	e.phase_hps.assign([_scale(44, mult), _scale(44, mult)])
+	e.phase_movesets = [phase1, phase2]
+	# No line on the transition: he has nothing to say, and the event's prose carries the
+	# sound he makes. The follow-up beat (The Beast Unmade) is where words come back.
+	e.phase_lines.assign(["", ""])
+	return e
+
+
+# ============================================================
 # CAMELOT ACT-1 BOSS — Sir Caedmon, the Hollow Champion
 # ============================================================
 
@@ -770,6 +845,15 @@ static func _dmg_pierce(v: int, pierce: int) -> DamageEffect:
 	var e := DamageEffect.new()
 	e.value = v
 	e.pierce = pierce
+	return e
+
+
+## A flat HP cost the enemy pays for its own move (the Beast at the Stone's Breaking
+## Blow). apply_to_source lands the hit on the mover; the engine skips modifiers and block.
+static func _self_dmg(v: int) -> DamageEffect:
+	var e := DamageEffect.new()
+	e.value = v
+	e.apply_to_source = true
 	return e
 
 

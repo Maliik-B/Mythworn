@@ -102,6 +102,7 @@ const ENEMY_SPRITE_SET := {
 	"Realm Shade": "flyingeye",
 	# Camelot elites + Act-1 boss.
 	"Champion of the Usurper": "skeleton",
+	"The Beast at the Stone": "skeleton",
 	"The False Prophet": "wizard2",
 	"Sir Caedmon": "wizard2",
 	"Hollow Warden": "worm",
@@ -1826,6 +1827,35 @@ func _passion_intent_readout(move: EnemyMove) -> String:
 	return " Passion"
 
 
+## The recoil glyph: a move that costs its own user (the Beast at the Stone's Breaking Blow)
+## wears it beside the sword, and the cost beside the damage, so the body breaking is read
+## before it happens. The tooltip on the intent spells it out.
+const SELF_COST_GLYPH := "↯"
+
+
+## The flat HP a move costs its own user (a DamageEffect with apply_to_source), or 0.
+func _self_cost_of(move: EnemyMove) -> int:
+	for e in move.effects:
+		if e is DamageEffect and e.apply_to_source:
+			return e.value
+	return 0
+
+
+## The intent tooltip for a move that costs its user: what it does to you, then what it does
+## to him, with the recoil glyph as the thing to notice.
+func _self_cost_tooltip(move: EnemyMove, cost: int) -> String:
+	var to_you := ""
+	for e in move.effects:
+		if e is DamageEffect and not e.apply_to_source:
+			if e.hits > 1:
+				to_you = "Deals %d damage %d times to you. " % [e.value, e.hits]
+			else:
+				to_you = "Deals %d damage to you. " % e.value
+			break
+	return "%s\n%s%s Costs him %d HP, flat. The blow breaks the body that throws it." % [
+		move.move_name, to_you, SELF_COST_GLYPH, cost]
+
+
 ## Short single-line summary of an EnemyMove for the Sight-mode "Then:" preview.
 ## Strips the modifier-aware bracket form used in current-intent rendering —
 ## the next move hasn't resolved yet, so showing modified values is misleading.
@@ -1836,7 +1866,7 @@ func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String
 		EnemyMove.IntentType.ATTACK:
 			icon = "⚔"
 			for effect in move.effects:
-				if effect is DamageEffect:
+				if effect is DamageEffect and not effect.apply_to_source:
 					value_str = " %d" % effect.value
 					break
 		EnemyMove.IntentType.DEFEND:
@@ -1844,7 +1874,7 @@ func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String
 		EnemyMove.IntentType.ATTACK_DEBUFF:
 			icon = "⚔☠"
 			for effect in move.effects:
-				if effect is DamageEffect:
+				if effect is DamageEffect and not effect.apply_to_source:
 					value_str = " %d" % effect.value
 					break
 		EnemyMove.IntentType.DEBUFF:
@@ -1861,6 +1891,10 @@ func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String
 					break
 		EnemyMove.IntentType.UNKNOWN:
 			icon = "?"
+	var self_cost := _self_cost_of(move)
+	if self_cost > 0:
+		icon += SELF_COST_GLYPH
+		value_str += " (%s%d)" % [SELF_COST_GLYPH, self_cost]
 	# Name first, then the icon+value readout (kept inline for the compact "Then:" peek).
 	return "%s %s%s" % [move.move_name, icon, value_str]
 
@@ -1920,7 +1954,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 				icon = "⚔"
 				intent_color = Color(1.0, 0.4, 0.3)
 				for effect in enemy.current_intent.effects:
-					if effect is DamageEffect:
+					if effect is DamageEffect and not effect.apply_to_source:
 						var modified = effect.value
 						modified += enemy.stats.get_status_stacks(StatusEffects.STRENGTH)
 						if enemy.stats.has_status(StatusEffects.WEAK):
@@ -1970,6 +2004,20 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 			if pierce_eff is DamageEffect and pierce_eff.pierce > 0:
 				value_str += " (pierce %d)" % pierce_eff.pierce
 				break
+		# A blow that costs its own user (the Beast at the Stone's Breaking Blow) takes the recoil
+		# glyph beside the sword, the cost beside the damage, and a tooltip that spells it out.
+		# Labels ignore the mouse by default, so the tooltip needs them to pass it; the tooltip
+		# is cleared again on any move without a cost.
+		var self_cost := _self_cost_of(enemy.current_intent)
+		if self_cost > 0:
+			icon += SELF_COST_GLYPH
+			value_str += " (%s%d)" % [SELF_COST_GLYPH, self_cost]
+			intent_lbl.tooltip_text = _self_cost_tooltip(enemy.current_intent, self_cost)
+			intent_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
+			intent_name_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
+		else:
+			intent_lbl.tooltip_text = ""
+		intent_name_lbl.tooltip_text = intent_lbl.tooltip_text
 		# A self-heal intent (the Hollow Prelate) carries no status, so the BUFF branch
 		# leaves the readout blank — fill in the heal here so it's telegraphed.
 		for heal_eff in enemy.current_intent.effects:

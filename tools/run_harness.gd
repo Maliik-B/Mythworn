@@ -86,12 +86,12 @@ func _walk_run(seed_val: int, agg: Dictionary) -> void:
 					if node != "boss":
 						_draft_reward()
 			"sword":
-				# Sword-in-the-Stone guardian: beat the corrupted Champion mid-run to
-				# EARN Excalibur (it's no longer a free pickup). Losing here ends the run.
+				# Sword-in-the-Stone guardian: beat the Beast at the Stone mid-run to EARN
+				# Excalibur (it's no longer a free pickup). Losing here ends the run.
 				# The reward is the event's "Take up Excalibur", applied in the event's order:
 				# +3 Passion, The Sword's Bearer, then the relic. The player then wears the
 				# title, since nothing else this harness models competes for a slot.
-				if _run_combat([EnemyPool.champion_of_the_usurper()]):
+				if _run_combat(EnemyPool.get_sword_guardian()):
 					RunManager.change_passion(3)
 					RunManager.award_title(&"swords_bearer")
 					RunManager.add_relic(RelicPool.get_relic_by_name("Excalibur"))

@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_control_heal()
 	_test_new_regulars()
 	_test_content_enemies()
+	_test_sword_guardian()
 	_test_xcost_maelstrom()
 	_test_swing_relics()
 	_test_prophet_escalation()
@@ -1972,6 +1973,97 @@ func _test_chilled_freeze() -> void:
 
 ## A minimal enemy whose only move is a guaranteed 20-damage attack — so a skipped
 ## turn is unambiguous (any hit would show as lost player HP).
+## The Beast at the Stone: two bars; the drill in phase 1; phase 2 converting down its own
+## bar (the combo sheds a hit per band and is gone at the bottom); Breaking Blow costs him.
+func _test_sword_guardian() -> void:
+	var g := EnemyPool.sword_guardian()
+	_check("the Beast at the Stone fights in two bars",
+		g.is_multiphase() and g.phase_hps.size() == 2 and g.enemy_name == "The Beast at the Stone")
+	var p1: Array = g.phase_movesets[0]
+	var p2: Array = g.phase_movesets[1]
+	var guard := false
+	var combo := false
+	for m in p1:
+		if m.move_name == "Practiced Guard" and m.intent_type == EnemyMove.IntentType.DEFEND:
+			guard = true
+		if m.move_name == "Drilled Combo":
+			combo = true
+	_check("phase 1 keeps the drill (Practiced Guard + Drilled Combo)", guard and combo)
+	# The combo loses its hits down the second bar: 3 above 66%, 2 in the middle, none under 33%.
+	var combo_hits := {}
+	for m in p2:
+		for e in m.effects:
+			if e is DamageEffect and e.hits > 1 and not e.apply_to_source:
+				combo_hits[m.min_hp_percent] = e.hits
+	_check("the combo sheds a hit per band (3 -> 2 -> gone)",
+		combo_hits.get(0.66, 0) == 3 and combo_hits.get(0.33, 0) == 2 and not combo_hits.has(0.0))
+	# Rolling at the bottom of the second bar never produces a combo, and does produce the blows.
+	var seen := {}
+	for i in 200:
+		var st := EnemyCombatState.new(g)
+		st.advance_phase()
+		st.stats.current_hp = 10
+		st.select_intent()
+		seen[st.current_intent.move_name] = true
+	_check("under a third of the second bar: Reckless Abandon and Breaking Blow, no combo",
+		seen.has("Reckless Abandon") and seen.has("Breaking Blow")
+		and not seen.has("Drilled Combo") and not seen.has("Unlearned Combo"))
+	# Breaking Blow through the engine: 22 to the player, 8 off his own bar, flat.
+	var blow: EnemyMove = null
+	for m in p2:
+		if m.move_name == "Breaking Blow":
+			blow = m
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [EnemyPool.sword_guardian()])
+	var gs: EnemyCombatState = eng.enemies[0]
+	gs.advance_phase()
+	var his_hp: int = gs.stats.current_hp
+	var my_hp: int = eng.player_stats.current_hp
+	for e in blow.effects:
+		e.apply(gs.stats, eng.player_stats, eng)
+	_check("Breaking Blow hits the player for 22 and costs him 8",
+		eng.player_stats.current_hp == my_hp - 22 and gs.stats.current_hp == his_hp - 8)
+	# The self-cost is flat: Vulnerable on him does not scale it, and his block does not soak it.
+	eng.apply_status_effect(gs.stats, StatusEffects.VULNERABLE, 1)
+	gs.stats.gain_block(20)
+	his_hp = gs.stats.current_hp
+	for e in blow.effects:
+		if e is DamageEffect and e.apply_to_source:
+			e.apply(gs.stats, eng.player_stats, eng)
+	_check("the self-cost ignores his block and his Vulnerable (flat 8)",
+		gs.stats.current_hp == his_hp - 8 and gs.stats.block == 20)
+	# Emptying his last bar with his own blow kills him the normal way.
+	gs.stats.current_hp = 5
+	for e in blow.effects:
+		if e is DamageEffect and e.apply_to_source:
+			e.apply(gs.stats, eng.player_stats, eng)
+	_check("a Breaking Blow that empties his last bar kills him", gs.stats.is_dead())
+	eng.free()
+	# The harness copy resolves the blow the way the engine does: 22 to me, 8 off him.
+	var policy := HarnessCombat.new()
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_titles := RunManager.active_title_slots.duplicate()
+	RunManager.relics.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	var peng := _policy_fight([], 80, [EnemyPool.sword_guardian()])
+	var pen: EnemyCombatState = peng.enemies[0]
+	pen.advance_phase()
+	pen.stats.current_hp = 12
+	pen.current_intent = blow
+	pen.next_intent = blow
+	var pline := policy._line_copy(peng)
+	policy._sim_enemy_turn(peng, policy._context(peng, false, 0), pline)
+	peng.end_player_turn()
+	var pf: Dictionary = pline["foes"][0]
+	_check("copy vs engine: Breaking Blow (copy %d / his %d, engine %d / %d)" % [
+			pline["php"], pf["hp"], peng.player_stats.current_hp, pen.stats.current_hp],
+		pline["php"] == peng.player_stats.current_hp and pf["hp"] == pen.stats.current_hp)
+	peng.free()
+	RunManager.relics.assign(saved_relics)
+	RunManager.active_title_slots.assign(saved_titles)
+
+
 func _dummy_attacker() -> EnemyData:
 	var e := EnemyData.new()
 	e.enemy_name = "Test Dummy"

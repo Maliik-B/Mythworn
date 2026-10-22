@@ -19,6 +19,12 @@ extends CardEffect
 ## On-kill energy refund (StS "Feed"-style): when > 0, felling the target with this attack
 ## gives back this much energy. Used by the memory burst "Everything I Carried Out".
 @export var energy_on_kill: int = 0
+## Self-inflicted: the hit lands on the combatant performing the effect, not the target.
+## The Beast at the Stone's Breaking Blow uses it: a blow that costs the body that throws
+## it. Resolved as a flat loss through CombatEngine.self_damage (no Strength, no Weak, no
+## block, no lash), so the number on the intent is the number he pays. Player cards never
+## set this.
+@export var apply_to_source: bool = false
 
 
 ## The base hit before combat modifiers, folding in the Passion-distance bonus so both
@@ -30,6 +36,10 @@ func _effective_value() -> int:
 
 
 func apply(source, target, battle_state) -> void:
+	if apply_to_source:
+		if battle_state and source:
+			battle_state.self_damage(source, value)
+		return
 	var total_hits := hits
 	if x_scaled and battle_state:
 		total_hits = battle_state.current_x()
@@ -62,6 +72,8 @@ func _riders() -> String:
 
 func get_description() -> String:
 	var riders := _riders()
+	if apply_to_source:
+		return "Lose %d HP." % value
 	if x_scaled:
 		return "Deal %d damage X times (X = energy spent).%s" % [value, riders]
 	if hits > 1:

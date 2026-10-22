@@ -574,6 +574,13 @@ func _sim_enemy_turn(_eng: CombatEngine, ctx: Dictionary, line: Dictionary) -> v
 
 func _enemy_effect(ctx: Dictionary, line: Dictionary, f: Dictionary, e) -> void:
 	if e is DamageEffect:
+		# A blow that costs its user (the Beast at the Stone's Breaking Blow): a flat loss off
+		# its own HP, as CombatEngine.self_damage resolves it, breaking a bar the same way.
+		if e.apply_to_source:
+			f["hp"] = maxi(0, f["hp"] - e.value)
+			if f["hp"] == 0 and not f["dead"]:
+				_bar_down(ctx, line, f)
+			return
 		var base: int = e.value
 		for h in e.hits:
 			_enemy_strikes(line, f, base, e.pierce)
@@ -843,8 +850,13 @@ func _digest(data: EnemyData, phase: int) -> Dictionary:
 		var curses := 0
 		for e in m.effects:
 			if e is DamageEffect:
-				parts.append([e.value, e.hits])
-				hits += e.hits
+				if e.apply_to_source:
+					# A blow that costs its user: HP it loses each turn it throws it, which the
+					# race counts as healing below zero on its own bar.
+					heal -= e.value
+				else:
+					parts.append([e.value, e.hits])
+					hits += e.hits
 			elif e is StatusApplyEffect and e.status_effect == StatusEffects.STRENGTH:
 				if e.apply_to_allies:
 					ally_str += e.value
@@ -869,7 +881,7 @@ func _digest(data: EnemyData, phase: int) -> Dictionary:
 func _move_damage(m: EnemyMove, strength: int) -> float:
 	var d := 0.0
 	for e in m.effects:
-		if e is DamageEffect:
+		if e is DamageEffect and not e.apply_to_source:
 			d += maxi(0, e.value + strength) * e.hits
 	return d
 
