@@ -337,13 +337,13 @@ static func _build_generic_pool() -> Array[CardData]:
 	# StS-style: play → persistent effect in the powers slot for the rest of combat.
 	# Detachment: the center-as-a-build line (cool toward Steady, gain stacking Strength).
 	pool.append(_power_card("Detachment", 1, CardData.CardRarity.UNCOMMON,
-		Powers.DETACHMENT, "The quieter he gets, the harder he lands."))
+		Powers.DETACHMENT, "The quieter the hand, the harder it lands."))
 	# Conviction: rewards holding a pole with tempo (energy at the extremes).
 	pool.append(_power_card("Conviction", 1, CardData.CardRarity.UNCOMMON,
 		Powers.CONVICTION, "Certainty, once found, pays for itself."))
 	# Whiplash: rewards swinging the meter — cross a tier, draw a card.
 	pool.append(_power_card("Whiplash", 1, CardData.CardRarity.UNCOMMON,
-		Powers.WHIPLASH, "Every lurch of feeling hands him something new."))
+		Powers.WHIPLASH, "Every lurch of feeling puts something new in hand."))
 
 	# School (which pole SYMBOL each card wears) follows its Passion lean, since the generic
 	# pool's lane == lean: a Water-lane card leans + (→ PRIMARY / ≈), a Physical-lane card leans
@@ -417,7 +417,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		CardData.PersonalityType.PRIMARY,
 		[_damage(9), _passion(4)])
-	tidal.flavor_text = "The water answers before he asks. It always did."
+	tidal.flavor_text = "The water answers before I ask. It always did."
 	pool.append(tidal)
 
 	var ripple := _pcard("Ripple", 1, CardData.CardType.ATTACK,
@@ -436,7 +436,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
 		CardData.PersonalityType.PRIMARY,
 		[_status(StatusEffects.CHILLED, 5), _passion(3)])
-	creeping.flavor_text = "It gets into everything. You only notice once it's everywhere."
+	creeping.flavor_text = "It gets into everything. I only notice once it's everywhere."
 	pool.append(creeping)
 
 	# -- UNCOMMON --
@@ -474,7 +474,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.PRIMARY,
 		[_damage(4, 3), _status(StatusEffects.CHILLED, 3), _passion(4)])
-	cascade.flavor_text = "It falls in stages — each wave a little heavier than the last."
+	cascade.flavor_text = "It falls in stages, each wave a little heavier than the last."
 	pool.append(cascade)
 
 	# -- RARE --
@@ -500,7 +500,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 		CardData.PersonalityType.PRIMARY,
 		[_xdamage(5), _passion(6)])
 	maelstrom.x_cost = true
-	maelstrom.flavor_text = "He opens his hands and does not close them until it's over."
+	maelstrom.flavor_text = "I open my hands and do not close them until it's over."
 	pool.append(maelstrom)
 
 	# -- POWER (Water) --
@@ -551,7 +551,7 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.SECONDARY,
 		[_damage(14), _passion(-4)])
-	rampage.flavor_text = "No trick to it. He winds up, and it lands where he means it to."
+	rampage.flavor_text = "No trick to it. I wind up, and it lands where I mean it to."
 	pool.append(rampage)
 
 	pool.append(_pcard("Iron Curtain", 2, CardData.CardType.SKILL,
@@ -585,7 +585,7 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.SECONDARY,
 		[_status_self(StatusEffects.STRENGTH, 2), _passion(-3)])
-	whetstone.flavor_text = "He works the edge back into it, slow and certain, before it's needed."
+	whetstone.flavor_text = "I work the edge back into it, slow and certain, before it's needed."
 	pool.append(whetstone)
 
 	# -- RARE --
@@ -603,7 +603,7 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 	# Grounded: the Hollow payoff for a defensive wall build — while Hollow, gain block
 	# at the start of each turn.
 	pool.append(_power_card("Grounded", 1, CardData.CardRarity.UNCOMMON,
-		Powers.GROUNDED, "He plants himself where the blow will fall, and waits.",
+		Powers.GROUNDED, "I plant myself where the blow will fall, and wait.",
 		CardData.PersonalityType.SECONDARY, -3))
 
 	return pool
@@ -788,7 +788,7 @@ static func _curse_clinging_grief() -> CardData:
 	c.personality = CardData.PersonalityType.NEGATIVE
 	c.target_type = CardData.TargetType.NONE
 	c.description = "Unplayable. A grief that was not yours, clinging where you cannot set it down."
-	c.flavor_text = "You sent it away with everything still unsaid. Some of it came with you."
+	c.flavor_text = "I sent him away with everything still unsaid. Some of it came with me."
 	return c
 
 

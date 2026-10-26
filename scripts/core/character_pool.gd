@@ -63,7 +63,7 @@ static func emo_starting_deck() -> Array[CardData]:
 	var outpouring := _card("Outpouring", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, [_dmg(7), _pas(3)])
 	outpouring.personality = CardData.PersonalityType.PRIMARY
-	outpouring.flavor_text = "He lets it pour out of him. For a moment, the ache goes with it."
+	outpouring.flavor_text = "I let it pour out of me. For a moment, the ache goes with it."
 	deck.append(outpouring)
 
 	var riptide := _card("Riptide", 1, CardData.CardType.ATTACK,
@@ -87,7 +87,7 @@ static func emo_starting_deck() -> Array[CardData]:
 	var measured := _card("Measured Blow", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, [_dmg(10), _pas(-3)])
 	measured.personality = CardData.PersonalityType.SECONDARY
-	measured.flavor_text = "No flourish. He just makes it land."
+	measured.flavor_text = "No flourish. I just make it land."
 	deck.append(measured)
 
 	# Sunder — the Physical Vulnerable enabler (Vuln is Physical's setup now: a ×1.5
