@@ -235,7 +235,8 @@ static func _build_the_calculating() -> TitleData:
 
 
 ## Earned at the Last Cart Out, for getting under the miller's axle and lifting until the square
-## is empty. Re-homed there from The Reliquary, which pays The Unforgetting instead, and it lands
+## is empty. Re-homed there from The Reliquary, which still grants it as a stand-in until the
+## Route B title (TITLE_DESIGN 5.7) is built under a name that is not the reserved one, and it lands
 ## on one of the three sites that used to grant The Merciful, so the kindness lane gets less
 ## repetitive in the same move. Deliberately distinct from mercy's per-death mend: compassion
 ## here is a CLUTCH heal, catching you the first time a fight drives you below half HP, which is

@@ -40,7 +40,7 @@ static func _build_quest_pool() -> Array[RelicData]:
 	#    quest-only so they never appear in shops or reward rolls. Bram leans info, Neve
 	#    leans supplies. Modest, permanent-run relics; tune magnitudes in balance work.
 	pool.append(_relic("Bram's Briefing",
-		"Bram's Records file on Camelot — you know where they're soft. At the start of each combat, apply 1 Vulnerable to ALL enemies.",
+		"Bram's Records file on Camelot: you know where they're soft. At the start of each combat, apply 1 Vulnerable to ALL enemies.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.APPLY_VULNERABLE_ALL, 1))
 	pool.append(_relic("Neve's Kit",
@@ -74,7 +74,7 @@ static func _build_quest_pool() -> Array[RelicData]:
 	#    Leaden Vow (the fixed one-directional +/-2 commons) as the premium, flexible version.
 	#    (Supersedes the old Vigil Candle, which this reward replaced and which is now retired.)
 	pool.append(_relic("The Thurible",
-		"A chapel censer on its chain. Before each of your turns it swings your Passion toward the pole you choose — +3 toward Blazing, or -3 toward Hollow. Switch sides between fights.",
+		"A chapel censer on its chain. Before each of your turns it swings your Passion toward the pole you choose: +3 toward Blazing, or -3 toward Hollow. Switch sides between fights.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.NONE, 3))
 
@@ -305,7 +305,7 @@ static func _build_pool() -> Array[RelicData]:
 	# -- Swing gear (design pass Sep 2026): dedicated relics that swing Passion HARDER,
 	# so a build-around player commits to a pole in ~1 fight instead of the base ~2,
 	# while the plain deck's ramp is unchanged. One per direction so BOTH poles get gear.
-	# Wellspring also folds in #22: it was a Rare +1/turn that lost to Demon's Horn's
+	# Wellspring also folds in #22: it was a Rare +1/turn that lost to Gilt Spurs'
 	# +1 Strength/turn — now Uncommon and +2/turn, a real Blazing accelerant.
 	pool.append(_relic("Wellspring of Resolve", "Gain 2 Passion at the start of each turn (surges you toward Blazing).",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
@@ -320,11 +320,11 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 5))
 
-	pool.append(_relic("Thread of Fate", "Draw 1 additional card at the start of each turn.",
+	pool.append(_relic("Turned Page", "Draw 1 additional card at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.DRAW_CARDS, 1))
 
-	pool.append(_relic("Demon's Horn", "Gain 1 Strength at the start of each turn.",
+	pool.append(_relic("Gilt Spurs", "Gain 1 Strength at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_STRENGTH, 1))
 
