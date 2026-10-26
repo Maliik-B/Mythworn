@@ -290,9 +290,9 @@ static func _the_tourney() -> EventData:
 		+ "here is a whole field of it: pennants, trumpets, a crowd in its colours, as though nobody "
 		+ "has told them. Down the lists two knights couch their lances and ride, and the crowd makes "
 		+ "the noise crowds make.\n\nLook closer and you see how many of the cheering faces hold too "
-		+ "still, and how the black creeps up under one champion's gorget where his squire keeps "
-		+ "worrying the strap to hide it. A herald takes wagers at the rail. A marshal takes names for "
-		+ "the open challenge, and looks hard at who he lets past the rope.")
+		+ "still, and how one champion's shield has gone plain to the rim, and how his squire keeps "
+		+ "turning it from the stands as if that would hide it. Wagers pass hand to hand at the rail. "
+		+ "A marshal takes names for the open challenge, and looks hard at who he lets past the rope.")
 
 	var c1 = EventData.EventChoice.new()
 	c1.text = "Wager a purse on the commoner in the plain harness."
@@ -304,11 +304,11 @@ static func _the_tourney() -> EventData:
 	c1.gamble_lose_gold = -25
 	c1.gamble_win_text = ("You back the man with no device on his shield, and the stands laugh at you "
 		+ "for it, until he puts the noble gone grey in the dirt and stands over him breathing clean "
-		+ "and hard. The herald counts out your winnings with a sour face. Across the field the "
+		+ "and hard. The man at the rail counts out your winnings with a sour face. Across the field the "
 		+ "commoner catches your eye and touches two fingers to his brow.")
 	c1.gamble_lose_text = ("You back the man with no device on his shield, and for three passes he "
 		+ "rides like he will shame the lot of them. Then the grey noble's lance catches him "
-		+ "under the arm and he goes down and is slow to rise. The herald rakes in your stake without "
+		+ "under the arm and he goes down and is slow to rise. The man at the rail rakes in your stake without "
 		+ "meeting your eye. Across the field they get the commoner back to his knees; he finds you in "
 		+ "the crowd anyway, and touches two fingers to his brow.")
 	c1.passion_change = 2
@@ -333,7 +333,7 @@ static func _the_tourney() -> EventData:
 	var c3 = EventData.EventChoice.new()
 	c3.text = "Watch a single pass, then slip out and take the drovers' road. (Skip the next node)"
 	c3.result_text = ("You stay for one ride and leave while the crowd is still on its feet. Behind the "
-		+ "grandstand a drovers' track cuts the long bend off the king's road, and you take it at a hard "
+		+ "stands a drovers' track cuts the long bend off the king's road, and you take it at a hard "
 		+ "walk. You have seen enough of this place. The shortcut puts the next trouble on the road "
 		+ "well behind you.")
 	c3.passion_change = 3
@@ -354,7 +354,7 @@ static func _last_cart_out() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Last Cart Out"
 	e.description = ("The village is emptying the way water leaves a cracked basin, quick at first "
-		+ "and then a slow hopeless trickle of the people who had least to pack. The corruption is "
+		+ "and then a slow hopeless trickle of the people who had least to pack. The chaos is "
 		+ "two valleys off and coming. You cannot see it yet. You can tell exactly where it is "
 		+ "anyway, by the quiet: no birds over that stretch of wood, not one, and the cattle have "
 		+ "all drifted to the far fences and stand there with their heads low and their backs to "
@@ -371,7 +371,7 @@ static func _last_cart_out() -> EventData:
 	c1.result_text = ("You set your shoulder under the axle while the miller seats the wheel, and "
 		+ "you leave some skin behind doing it, but the cart rolls and the children and the "
 		+ "grandmother roll with it. Neve works you like a draft animal after that, cart to cart, "
-		+ "until the square stands empty and the gray is close enough to smell. \"There,\" she says, "
+		+ "until the square stands empty and the quiet is close enough to hear. \"There,\" she says, "
 		+ "breathless. \"Now you look how you ought to.\" She digs in her own pack and presses a piece "
 		+ "of her kit into your hands before you can wave it off. \"You'll want this worse than I "
 		+ "will, where you're going.\" Then she marks one last line in the notebook and does not let "
@@ -534,7 +534,7 @@ static func _peasants_plea() -> EventData:
 		+ "it. The people who come out to meet you come slow, the way you'd approach a strange "
 		+ "dog.\n\nAn old woman speaks for them. \"You came down the king's road with a sword on "
 		+ "you, so you're his or you're not. Either way, you'll want to hear it.\" She nods at the "
-		+ "cart. Grain sacks, a crate of thin hens, a strongbox. \"The collector rides in at dawn "
+		+ "cart. Grain sacks, a crate of thin hens, a coffer. \"The collector rides in at dawn "
 		+ "for the crown's share. He took the seed-corn last winter. He'll take it again, and we'll "
 		+ "be chewing the thatch by spring.\"\n\nA child watches from a doorway. Nobody tells them to "
 		+ "go inside.")
@@ -556,7 +556,7 @@ static func _peasants_plea() -> EventData:
 	c2.text = "Take the crown's share yourself, and your own cut with it."
 	c2.result_text = ("You tell them you will see the king's due collected. They are almost grateful, "
 		+ "until they understand you mean to carry it off tonight, ahead of the collector. You take "
-		+ "the strongbox and a measure of the grain. Nobody tries to stop a sword. By the time you "
+		+ "the coffer and a measure of the grain. Nobody tries to stop a sword. By the time you "
 		+ "reach the trees, the quiet behind you has a different weight to it.")
 	c2.gold_change = 45
 	c2.passion_change = -6
