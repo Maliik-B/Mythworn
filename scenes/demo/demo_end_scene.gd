@@ -133,8 +133,9 @@ func _send_off_text() -> String:
 			+ "market crowd, into the cool shadow of a borough wall, and you wait for the noise to "
 			+ "thin.")
 	else:
-		vignette = ("The realm is quiet behind you. Caedmon is down, the hand that moved him "
-			+ "answered for, and for the first time in a long while Camelot gets to be only itself.")
+		vignette = ("The realm is quiet behind you. Caedmon is down, whatever moved him has drawn "
+			+ "back out of reach for now, and for the first time in a long while Camelot gets to be only "
+			+ "itself.")
 
 	var tail := ("Your part in this telling is played out, and the tale does not go on past "
 		+ "here. Not yet. F.A.B.L.E. holds the rest of it the way they hold everything, close "
@@ -150,9 +151,9 @@ func _outcome_headline() -> String:
 	if RunManager.has_abdicated:
 		return "Abdicated the crown"
 	if RunManager.earned_title_ids.has(&"king_of_camelot"):
-		return "King of Camelot — the people's king" if RunManager.is_peoples_champion() else "King of Camelot"
+		return "King of Camelot, the people's king" if RunManager.is_peoples_champion() else "King of Camelot"
 	if RunManager.is_peoples_champion() and RunManager.has_excalibur():
-		return "Refused the crown — the People's Champion"
+		return "Refused the crown: the People's Champion"
 	if RunManager.is_peoples_champion():
 		return "The People's Champion"
 	if RunManager.earned_title_ids.has(&"camelots_champion"):
@@ -232,7 +233,7 @@ func _build_wishlist(vbox: VBoxContainer) -> void:
 	header.add_theme_color_override("font_color", Color(0.95, 0.82, 0.4))
 	vbox.add_child(header)
 
-	var btn := _make_button("Wishlist on Steam" if WISHLIST_URL != "" else "Wishlist — coming soon",
+	var btn := _make_button("Wishlist on Steam" if WISHLIST_URL != "" else "Wishlist: coming soon",
 		Vector2(300, 56))
 	if WISHLIST_URL != "":
 		btn.pressed.connect(_on_wishlist_pressed)

@@ -63,13 +63,13 @@ void fragment() {
 	var desc = Label.new()
 	if RunManager.is_peoples_champion():
 		# The people got to you first; the crown is still offered, but not only by the court.
-		desc.text = ("The boss is fallen, and Camelot kneels. But the court is not first to "
+		desc.text = ("Caedmon is fallen, and Camelot kneels. But the court is not first to "
 			+ "reach you. The common folk come up from the lower town in a slow tide, calling "
 			+ "your name with a word in front of it the courtiers would never have chosen. The "
 			+ "crown is still held out to you. It is only that now two different hands are holding "
 			+ "it, and they do not want the same thing from the one who takes it.\n\nDo you take it?")
 	else:
-		desc.text = ("The boss is fallen. Camelot kneels. The crown that has waited a generation "
+		desc.text = ("Caedmon is fallen. Camelot kneels. The crown that has waited a generation "
 			+ "for a hand worthy of it now waits for yours.\n\nDo you take it?")
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc.add_theme_font_size_override("font_size", 20)
