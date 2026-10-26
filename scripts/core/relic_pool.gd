@@ -320,11 +320,11 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 5))
 
-	pool.append(_relic("Turned Page", "Draw 1 additional card at the start of each turn.",
+	pool.append(_relic("Catchword", "The word at the foot of a page that tells you the next one before you turn it. Draw 1 additional card at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.DRAW_CARDS, 1))
 
-	pool.append(_relic("Gilt Spurs", "Gain 1 Strength at the start of each turn.",
+	pool.append(_relic("Gilt Spurs", "The spurs a knight is given the day he is made one. Gain 1 Strength at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_STRENGTH, 1))
 
