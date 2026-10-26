@@ -300,8 +300,7 @@ func _arm_campfire_treasure() -> void:
 ## Camelot's. Stepping through is Proposal A -- a deterministic trade, seen going in: a glimpse
 ## of a lost home (the memory card "The House That Was") for a cut of HP that the seeing takes.
 ## Cass names Anomalies and Fable without explaining what an anomaly is, and the lost home is
-## only glimpsed. Cass's pronouns stay unstated in every shipped line. The voice: flat,
-## unimpressed, already tired of you being here.
+## only glimpsed. Her voice: flat, unimpressed, already tired of you being here.
 func _build_room_that_isnt_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Room That Isn't"
@@ -311,24 +310,24 @@ func _build_room_that_isnt_event() -> EventData:
 		+ "wrong color for anywhere you've stood under a sky.\n\nThis isn't the rot. You know the rot "
 		+ "by now, the shields gone plain, the faces with no one behind them, the grey. This is "
 		+ "something else. Clean, and quiet, and wrong the way a word repeated too many times stops "
-		+ "being a word.\n\nSomeone is already there, leaning in a doorway that opens onto a room you "
-		+ "are fairly sure the corridor does not have space for, and does not look up from a sheaf of "
-		+ "notes. \"Cass. Anomalies.\" Said the way you'd say a department, because it is one. \"You're "
-		+ "the one they sent for the sword. This isn't your file. It's mine.\" Cass finally looks at "
-		+ "you, and something in your face makes the notes go down. \"...you feel it pulling, don't "
-		+ "you. Of course you do. Don't.\"")
+		+ "being a word.\n\nA woman is already there, leaning in a doorway that opens onto a room you "
+		+ "are fairly sure the corridor does not have space for. She doesn't look up from her notes. "
+		+ "\"Cass. Anomalies.\" She says it the way you'd say a department, because it is one. \"You're "
+		+ "the one they sent for the sword. This isn't your file. It's mine.\" She finally looks at "
+		+ "you, and something in your face makes her put the notes down. \"...you feel it pulling, "
+		+ "don't you. Of course you do. Don't.\"")
 
 	# Proposal A: the deterministic trade, cost shown up front. The glimpse of home grants the
 	# memory card; the seeing takes a cut of HP. Cass warns you off, and lets you choose anyway.
 	var step = EventData.EventChoice.new()
 	step.text = "Step through the door that shouldn't fit. (Lose 8 HP)"
-	step.result_text = ("Cass says your name once, flatly. The one you gave yourself. No hand "
-		+ "comes out to stop you. You step through, and for a moment you are "
+	step.result_text = ("Cass says your name once, flatly. The one you gave yourself. She "
+		+ "doesn't try to stop you with her hands. You step through, and for a moment you are "
 		+ "somewhere with a low roof and a particular light and the sense of a room you knew the "
 		+ "shape of without looking. You can't keep it. It goes the way they all go. But your hands "
 		+ "remember the shape of a door, and you come back carrying that much. It costs you. The "
 		+ "seeing always costs something. Cass watches you sway and says, not unkindly, \"I told "
-		+ "you,\" and writes something down. \"They never listen. I don't know why I still say it.\"")
+		+ "you.\" She writes something down. \"They never listen. I don't know why I still say it.\"")
 	step.hp_change = -8
 	step.granted_card_id = &"house_that_was"
 	e.choices.append(step)
@@ -339,16 +338,16 @@ func _build_room_that_isnt_event() -> EventData:
 	look.result_text = ("You stop at the edge of it and let yourself look and no further. It's "
 		+ "enough to ache and not enough to keep. After a while the wrongness of the light stops "
 		+ "feeling like an invitation and starts feeling like weather, and you can turn away from "
-		+ "weather. Cass nods, once, like you passed something that doesn't get graded out loud.")
+		+ "weather. Cass nods, once, like you passed something she doesn't bother grading out loud.")
 	look.passion_change = 5
 	e.choices.append(look)
 
-	# The safe read: let Cass walk you out. Nothing gained, nothing lost; Cass is plainly relieved.
+	# The safe read: let her walk you out. Nothing gained, nothing lost; she's plainly relieved.
 	var leave = EventData.EventChoice.new()
 	leave.text = "Let Cass walk you back out."
-	leave.result_text = ("\"Smart,\" Cass says, and means it, and walks you back down a corridor "
-		+ "that takes fewer steps to leave than it did to enter. At the door Cass almost says "
-		+ "something else, decides against it, and goes back to the notes. Behind you the room does "
+	leave.result_text = ("\"Smart,\" she says, and means it, and walks you back down a corridor "
+		+ "that takes fewer steps to leave than it did to enter. At the door she almost says "
+		+ "something else, decides against it, and goes back to her notes. Behind you the room does "
 		+ "whatever the room does when no one is looking at it.")
 	e.choices.append(leave)
 
