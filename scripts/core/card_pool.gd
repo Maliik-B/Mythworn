@@ -853,8 +853,12 @@ static func _memory_name_i_gave_myself() -> CardData:
 
 ## The Camelot hound's pool. Three tricks, one answer each to the bankability question: Fetch
 ## and Flush vanish (a banked free draw or a banked sweep is exactly the stockpile that recreates
-## the energy problem as a burst), Hold is bankable (it costs a hand slot to keep, and Weak does
-## not stack past its duration, so five of them gain nothing).
+## the energy problem as a burst), Hold is bankable. Its answer to "what stops a stockpile" is
+## not that Weak refuses to stack (it does stack, as duration: each Hold adds 2 turns of the same
+## 25% damage cut) but that the stockpile is slow and dear: a Hold arrives about once in eight turns,
+## each one costs an energy to play, and holding it spends a hand slot. If a long boss fight
+## proves that too cheap, the lever is Hold's cost or its stacks, and the sheet lists it as a
+## candidate for part 4's gamebreak search.
 static func build_hound_cards() -> Array[CardData]:
 	var cards: Array[CardData] = [_trick_fetch(), _trick_hold(), _trick_flush()]
 	return cards
@@ -869,8 +873,8 @@ static func _trick_fetch() -> CardData:
 	return c
 
 
-## It has a leg and does not mean to let go. Weak on one enemy; bankable, since holding it
-## spends a hand slot and the status gains nothing from being stockpiled.
+## It has a leg and does not mean to let go. Weak on one enemy; bankable, with the slow arrival
+## and the energy price standing in for a hard cap (see build_hound_cards).
 static func _trick_hold() -> CardData:
 	var c := _card("Hold", 1, CardData.CardType.SKILL, CardData.TargetType.SINGLE_ENEMY,
 		CardData.CardRarity.COMMON, [_status(StatusEffects.WEAK, 2)])

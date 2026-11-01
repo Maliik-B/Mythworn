@@ -308,7 +308,7 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		RunManager.excalibur_mode = RunManager.ExcaliburMode.SWORD
 		RunManager.add_relic(RelicPool.get_relic_by_name("Excalibur"))
 		RunManager.add_relic(RelicPool.get_relic_by_name("Iron Quill"))       # +1 Strength/combat
-		RunManager.add_relic(RelicPool.get_relic_by_name("Guardian's Sigil"))  # +5 Block/turn
+		RunManager.add_relic(RelicPool.get_relic_by_name("Chained Folio"))  # +5 Block/turn
 	# An optional extra relic by name (e.g. a liaison relic under test). Resolved via
 	# get_relic_by_name so quest/liaison pools work too.
 	if extra_relic != "":

@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_consumables()
 	_test_consumable_ui()
 	_test_pets()
+	_test_relic_names()
 	_test_liaison_relics()
 	_test_refusals()
 	_test_title_split()
@@ -1469,17 +1470,17 @@ func _test_liaison_relics() -> void:
 		bram.size() >= 4 and neve.size() >= 4)
 
 	# Neve's pool is the reworked survival kit: Iron Rations is now per-turn regen (not a flat
-	# Max-HP sponge), Marching Tonic is a Poise burst (not a Strength clone), and the duplicate
+	# Max-HP sponge), Hobnails (once Marching Tonic) is a Poise burst (not a Strength clone), and the duplicate
 	# Broken-In Boots is cut so one Poise relic owns the lane.
 	var neve_by := {}
 	for r in neve:
 		neve_by[r.relic_name] = r
 	var rations: RelicData = neve_by.get("Iron Rations")
-	var tonic: RelicData = neve_by.get("Marching Tonic")
+	var tonic: RelicData = neve_by.get("Hobnails")
 	_check("Iron Rations is per-turn regen (HEAL 2 at turn start, not Max HP)",
 		rations != null and rations.effect == RelicData.RelicEffect.HEAL
 		and rations.trigger == RelicData.RelicTrigger.ON_TURN_START and rations.value == 2)
-	_check("Marching Tonic is a Poise burst (+2 Dexterity/Poise at combat start, not Strength)",
+	_check("Hobnails is a Poise burst (+2 Dexterity/Poise at combat start, not Strength)",
 		tonic != null and tonic.effect == RelicData.RelicEffect.GAIN_DEXTERITY and tonic.value == 2)
 	_check("Broken-In Boots is cut (one Poise relic owns the lane)",
 		not neve_by.has("Broken-In Boots"))
@@ -3147,6 +3148,9 @@ func _test_pets() -> void:
 	_check("with no companion nothing arrives and the deck rng is untouched",
 		eng.piles.hand.is_empty() and RngManager.deck_rng.state == rng_before)
 	RunManager.set_pet(&"hound")
+	# Seeded, so the count is the same on every run (an unseeded deck rng made it a coin flip that
+	# could land outside any reasonable band): about 40% of 600 turns, with room for the variance.
+	RngManager.setup_run(9001)
 	var arrivals := 0
 	var from_pool := true
 	for _i in 600:
@@ -3239,3 +3243,50 @@ func _hound_arrivals(turns: int) -> String:
 			seen.append(c.card_name)
 	eng.free()
 	return ",".join(seen)
+
+
+## Q4 and the Neve collisions (part 3): the six generic-fantasy relic names are gone, the pool reads as
+## one family, every reward relic says what it is before it says what it does, and no description
+## promises a drawback the engine does not apply.
+func _test_relic_names() -> void:
+	var retired := ["Heartfruit", "Worn Talisman", "Guardian's Sigil", "Seer's Lens",
+		"Brand of Fury", "Diadem of Grace", "Field Dressing", "Marching Tonic"]
+	var renamed := ["Oak Boards", "Ruled Margin", "Chained Folio", "The Index", "Rubric",
+		"Flourish", "Linen Roll", "Hobnails"]
+	var none_left := true
+	for name in retired:
+		if RelicPool.get_relic_by_name(name) != null:
+			none_left = false
+	var all_resolve := true
+	for name in renamed:
+		if RelicPool.get_relic_by_name(name) == null:
+			all_resolve = false
+	_check("the eight retired relic names resolve to nothing", none_left)
+	_check("the eight new relic names resolve, in the reward pool and Neve's pool", all_resolve)
+
+	# Every reward relic opens with a sentence about the thing, then the mechanic: the description
+	# is longer than a bare mechanic line and ends on one (Catchword and Gilt Spurs set the pattern).
+	var bare: PackedStringArray = []
+	var uses_old_term: PackedStringArray = []
+	for relic in RelicPool._build_pool():
+		if relic.description.count(". ") < 1 and relic.description.count(".") < 2:
+			bare.append(relic.relic_name)
+		if relic.description.find("Dexterity") != -1:
+			uses_old_term.append(relic.relic_name)
+	_check("every reward relic has a leading line before its mechanic (bare: %s)" % ", ".join(bare),
+		bare.is_empty())
+	_check("no relic text says Dexterity where the game says Poise (%s)" % ", ".join(uses_old_term),
+		uses_old_term.is_empty())
+
+	# Rubric used to say it also made you Vulnerable, which was never applied. The text now says only
+	# what the relic does, and the effect matches.
+	var rubric := RelicPool.get_relic_by_name("Rubric")
+	_check("Rubric gives 2 Strength and promises no drawback it does not apply",
+		rubric != null and rubric.effect == RelicData.RelicEffect.GAIN_STRENGTH and rubric.value == 2
+		and rubric.description.find("Vulnerable") == -1)
+	var flourish := RelicPool.get_relic_by_name("Flourish")
+	var margin := RelicPool.get_relic_by_name("Ruled Margin")
+	_check("the two Poise relics say Poise and give it (1 and 3)",
+		flourish != null and margin != null and flourish.effect == RelicData.RelicEffect.GAIN_DEXTERITY
+		and flourish.value == 3 and flourish.description.find("Poise") != -1
+		and margin.value == 1 and margin.description.find("Poise") != -1)

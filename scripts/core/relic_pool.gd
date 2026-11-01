@@ -130,12 +130,12 @@ static func _build_bram_pool() -> Array[RelicData]:
 ## work, and it shows in what she packs.
 static func _build_neve_pool() -> Array[RelicData]:
 	var pool: Array[RelicData] = []
-	pool.append(_relic("Field Dressing",
-		"Neve packed the bandages you never remember to. Heal 8 HP after each combat.",
+	pool.append(_relic("Linen Roll",
+		"A roll of clean linen, packed the way Neve packs it, with a fresh length cut after every fight. Heal 8 HP after each combat.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.HEAL, 8))
 	# Was a flat +12 Max HP (a bland bigger-sponge); reworked to in-fight regen so it uses HP as
-	# a flowing resource, distinct from Field Dressing's between-fight top-up. HEAL on
+	# a flowing resource, distinct from Linen Roll's between-fight top-up. HEAL on
 	# ON_TURN_START is already handled by _apply_relic_effect, so this needs no engine work.
 	pool.append(_relic("Iron Rations",
 		"She overpacks the food and makes you eat on the march, whatever you say about it. Heal 2 HP at the start of each turn.",
@@ -149,8 +149,8 @@ static func _build_neve_pool() -> Array[RelicData]:
 	# turn, so the steadiness is real early and gone by the long grind -- a defensive burst, not a
 	# flat stat. (Replaced the old +1 Strength, a plain Iron Quill clone; and this absorbed the
 	# cut Broken-In Boots, so one Poise relic owns the lane instead of two.)
-	pool.append(_relic("Marching Tonic",
-		"A foul little flask she makes you drink before the hard roads; it squares the shoulders and steadies the hands, and the kick wears off as the fight wears on. Start each combat with 2 Poise.",
+	pool.append(_relic("Hobnails",
+		"Hobnails she has you drive into your boots before the hard roads. The footing is sure at the start and wears smooth as the fight wears on. Start each combat with 2 Poise.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_DEXTERITY, 2))
 	return pool
@@ -262,40 +262,40 @@ static func _build_pool() -> Array[RelicData]:
 	var pool: Array[RelicData] = []
 
 	# -- COMMON --
-	pool.append(_relic("Crimson Ink", "Heal 6 HP after each combat.",
+	pool.append(_relic("Crimson Ink", "Red ink that works its way back into whatever it touched. Heal 6 HP after each combat.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.HEAL, 6))
 
-	pool.append(_relic("Iron Quill", "Start each combat with 1 Strength.",
+	pool.append(_relic("Iron Quill", "A quill cut from iron, so the hand behind it does not tire. Start each combat with 1 Strength.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_STRENGTH, 1))
 
-	pool.append(_relic("Steadfast Binding", "Start each combat with 10 Block.",
+	pool.append(_relic("Steadfast Binding", "Cords pulled tight through the boards, so the leaves hold under any blow. Start each combat with 10 Block.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 10))
 
-	pool.append(_relic("Scattered Pages", "At the start of combat, apply 1 Vulnerable to ALL enemies.",
+	pool.append(_relic("Scattered Pages", "Leaves shaken loose from their gathering, so nothing stays where it was put. At the start of combat, apply 1 Vulnerable to ALL enemies.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.APPLY_VULNERABLE_ALL, 1))
 
-	pool.append(_relic("Tattered Veil", "At the start of combat, apply 1 Weak to ALL enemies.",
+	pool.append(_relic("Tattered Veil", "A veil worn to threads, and it drags at whoever it is thrown over. At the start of combat, apply 1 Weak to ALL enemies.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.APPLY_WEAK_ALL, 1))
 
 	# -- UNCOMMON --
-	pool.append(_relic("Worn Talisman", "Start each combat with 1 Dexterity.",
+	pool.append(_relic("Ruled Margin", "The ruled lines that keep a scribe's hand straight, pricked down the margin. Start each combat with 1 Poise.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_DEXTERITY, 1))
 
-	pool.append(_relic("Gilded Bookmark", "Gain 15 bonus Gold after each combat.",
+	pool.append(_relic("Gilded Bookmark", "A gilt ribbon laid in at the page where something is owed. Gain 15 bonus Gold after each combat.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.GAIN_GOLD, 15))
 
-	pool.append(_relic("Heartfruit", "Upon pickup, gain 14 Max HP.",
+	pool.append(_relic("Oak Boards", "Bound between boards of oak, a book outlasts the hand that wrote it. Upon pickup, gain 14 Max HP.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_PICKUP,
 		RelicData.RelicEffect.GAIN_MAX_HP, 14))
 
-	pool.append(_relic("Prologue Scroll", "Draw 2 additional cards at the start of combat.",
+	pool.append(_relic("Prologue Scroll", "The scroll a herald reads before anything begins, so everyone already knows the order of events. Draw 2 additional cards at the start of combat.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.DRAW_CARDS, 2))
 
@@ -307,16 +307,16 @@ static func _build_pool() -> Array[RelicData]:
 	# while the plain deck's ramp is unchanged. One per direction so BOTH poles get gear.
 	# Wellspring also folds in #22: it was a Rare +1/turn that lost to Gilt Spurs'
 	# +1 Strength/turn — now Uncommon and +2/turn, a real Blazing accelerant.
-	pool.append(_relic("Wellspring of Resolve", "Gain 2 Passion at the start of each turn (surges you toward Blazing).",
+	pool.append(_relic("Wellspring of Resolve", "Ink that wells up faster than the pen can use it. Gain 2 Passion at the start of each turn (surges you toward Blazing).",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_PASSION, 2))
 
-	pool.append(_relic("Leaden Vow", "Lose 2 Passion at the start of each turn (settles you toward Hollow).",
+	pool.append(_relic("Leaden Vow", "A vow sealed in lead, heavy enough to settle whatever it is hung on. Lose 2 Passion at the start of each turn (settles you toward Hollow).",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_PASSION, -2))
 
 	# -- RARE --
-	pool.append(_relic("Guardian's Sigil", "Gain 5 Block at the start of each turn.",
+	pool.append(_relic("Chained Folio", "A folio chained to its lectern so nothing could carry it off. Gain 5 Block at the start of each turn.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 5))
 
@@ -332,24 +332,24 @@ static func _build_pool() -> Array[RelicData]:
 	# Blooded Edge) -- each hit you land on an enemy raises your attack damage by `value` for
 	# the rest of the turn, reset at the start of your next turn. Rewards multi-hit chains.
 	pool.append(_relic("Momentum",
-		"During your turn, each hit you land on an enemy gives your attacks +1 damage until your turn ends.",
+		"A pen that runs faster with every stroke, until the line is finished. During your turn, each hit you land on an enemy gives your attacks +1 damage until your turn ends.",
 		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.NONE, 1))
 
 	# -- BOSS --
-	pool.append(_relic("Sanguine Tome", "Heal 12 HP after each combat.",
+	pool.append(_relic("Sanguine Tome", "A book bound in oxblood and kept open at the one page that mends. Heal 12 HP after each combat.",
 		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.HEAL, 12))
 
-	pool.append(_relic("Seer's Lens", "Draw 2 additional cards at the start of each turn.",
+	pool.append(_relic("The Index", "Every page cross-referenced, so what you need is already in your hand. Draw 2 additional cards at the start of each turn.",
 		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.DRAW_CARDS, 2))
 
-	pool.append(_relic("Brand of Fury", "Start each combat with 2 Strength. Apply 1 Vulnerable to yourself.",
+	pool.append(_relic("Rubric", "Written in red, so that nothing in it can be missed. Start each combat with 2 Strength.",
 		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_STRENGTH, 2))
 
-	pool.append(_relic("Diadem of Grace", "Start each combat with 3 Dexterity.",
+	pool.append(_relic("Flourish", "The flourish a steady hand leaves at the end of a stroke. Start each combat with 3 Poise.",
 		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_DEXTERITY, 3))
 
