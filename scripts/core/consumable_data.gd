@@ -21,7 +21,7 @@ enum Effect {
 	NEXT_ATTACK_BONUS,     # the first hit of the next card you play deals +`value`
 	PASSION_TOWARD_POLE,   # push Passion `value` toward the pole you already lean to
 	STRENGTH_THIS_FIGHT,   # +`value` Strength until the fight ends
-	WARD_FIRST_BLOW,       # the first blow against you this fight does not land
+	WARD_NEXT_BLOW,        # the next blow against you after it is used does not land
 	STANDING_SHIFT,        # add `value` to the realm's court/folk standing (+ folk, - court)
 	NONE,                  # quest items: spent by an event choice, not by the use button
 }

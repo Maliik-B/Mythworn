@@ -160,14 +160,15 @@ static func _relic_water() -> ConsumableData:
 	return c
 
 
-## The token a lady gives a knight to carry into the lists. A favour is worn into a fight
-## rather than used during one, so it is meant to be spent on the first turn. It is given, not
-## bought: event-only (the Tourney), never sold.
+## The token tied on someone riding into the lists. It turns the next blow after it is used, on
+## whatever turn the player picks, so with the enemy's intent on show it answers the hit the
+## player can see coming: the moment is the decision, which is the layer's whole identity. It is
+## given, not bought: event-only (the Tourney), never sold.
 static func _champions_favour() -> ConsumableData:
 	var c := _make(&"champions_favour", "A Champion's Favour",
-		"The first blow against you this fight does not land.",
-		"A lady's ribbon. It is worn into the lists, not used in them.",
-		ConsumableData.Kind.COMBAT_BOON, ConsumableData.Effect.WARD_FIRST_BLOW, 1)
+		"The next blow against you does not land.",
+		"A stranger's blue ribbon, tied on your sleeve at the rail. She never said what for.",
+		ConsumableData.Kind.COMBAT_BOON, ConsumableData.Effect.WARD_NEXT_BLOW, 1)
 	c.usable_in_combat = true
 	c.box = ConsumableData.Box.REALM
 	c.realm_id = &"camelot"

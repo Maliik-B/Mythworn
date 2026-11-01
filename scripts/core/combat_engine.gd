@@ -80,8 +80,8 @@ var _thurible_swing: int = 0
 ## _current_card like Blooded Edge, so a poison tick or a lash never spends it.
 var _blade_oil_pending: int = 0
 
-## A Champion's Favour (consumable): true while the favour is armed. The first blow that would
-## land on the player this fight does not, and the flag clears. Reset every combat.
+## A Champion's Favour (consumable): true while the favour is armed. The next blow that would
+## land on the player after it is used does not, and the flag clears. Reset every combat.
 var _favour_ward: bool = false
 
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
@@ -381,7 +381,7 @@ func can_use_consumable(item: ConsumableData) -> bool:
 			return player_stats.current_hp < player_stats.max_hp
 		ConsumableData.Effect.NEXT_ATTACK_BONUS:
 			return _blade_oil_pending == 0
-		ConsumableData.Effect.WARD_FIRST_BLOW:
+		ConsumableData.Effect.WARD_NEXT_BLOW:
 			return not _favour_ward
 		ConsumableData.Effect.PASSION_TOWARD_POLE:
 			return RunManager.passion != null
@@ -409,7 +409,7 @@ func use_consumable(item: ConsumableData) -> bool:
 			RunManager.change_passion(dir * item.value)
 		ConsumableData.Effect.STRENGTH_THIS_FIGHT:
 			apply_status_effect(player_stats, StatusEffects.STRENGTH, item.value)
-		ConsumableData.Effect.WARD_FIRST_BLOW:
+		ConsumableData.Effect.WARD_NEXT_BLOW:
 			_favour_ward = true
 		_:
 			return false
@@ -682,7 +682,7 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	if amount > 0 and target.has_status(StatusEffects.INTANGIBLE):
 		amount = 1
 
-	# A Champion's Favour: the first blow that would land on the player does not. Only an enemy's
+	# A Champion's Favour: the next blow that would land on the player does not. Only an enemy's
 	# attack can be turned (self-inflicted costs never come through here), and the favour is
 	# spent by the blow it turns, even if block would have soaked it.
 	if _favour_ward and target == player_stats and source != player_stats and amount > 0:

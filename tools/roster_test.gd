@@ -2870,7 +2870,7 @@ func _test_consumables() -> void:
 	_check("dead center leans Blazing", RunManager.passion.current_value == 12)
 	RunManager.passion.current_value = 0
 
-	# Relic-water in combat heals and drifts Passion; the favour turns the first blow only.
+	# Relic-water in combat heals and drifts Passion; the favour turns the next blow only.
 	var weng := _consumable_engine(30)
 	var cwater := ConsumablePool.get_consumable(&"relic_water")
 	RunManager.add_consumable(cwater)
@@ -2884,10 +2884,20 @@ func _test_consumables() -> void:
 	_check("the favour is armed and spent",
 		feng.use_consumable(favour) and RunManager.consumables.is_empty())
 	feng.execute_enemy_turn(feng.enemies[0])
-	_check("the first blow against the player does not land", feng.player_stats.current_hp == 50)
+	_check("the next blow against the player does not land", feng.player_stats.current_hp == 50)
 	feng.execute_enemy_turn(feng.enemies[0])
-	_check("the second blow does (the favour is spent by the first)",
+	_check("the blow after it does (the favour is spent by the one it turned)",
 		feng.player_stats.current_hp == 30)
+	# Used after a blow has already landed, it still turns the next one: it is the next blow,
+	# not the fight's first, which is what the item's text says.
+	var feng_late := _consumable_engine()
+	feng_late.execute_enemy_turn(feng_late.enemies[0])
+	var favour_late := ConsumablePool.get_consumable(&"champions_favour")
+	RunManager.add_consumable(favour_late)
+	feng_late.use_consumable(favour_late)
+	feng_late.execute_enemy_turn(feng_late.enemies[0])
+	_check("a favour used mid-fight turns the next blow, not only the first",
+		feng_late.player_stats.current_hp == 30)
 	var feng2 := _consumable_engine()
 	var favour2 := ConsumablePool.get_consumable(&"champions_favour")
 	RunManager.add_consumable(favour2)
