@@ -50,6 +50,7 @@ var deck_btn: Button
 var titles_btn: Button
 var excalibur_btn: Button  # Only visible when player holds Excalibur (Camelot quest reward)
 var thurible_btn: Button  # Only visible when player holds The Thurible (Reliquary censer relic)
+var consumable_bar: ConsumableBar  # The pack: two consumable slots, usable from the map
 var timer_label: Label
 var seed_label: Label
 var info_label: Label
@@ -857,6 +858,12 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	titles_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	titles_btn.pressed.connect(_on_titles_clicked)
 	bar.add_child(titles_btn)
+
+	# The pack. Heals and standing items are usable here; combat-only items wait, visibly.
+	consumable_bar = ConsumableBar.new()
+	consumable_bar.setup(ConsumableBar.Mode.MAP)
+	consumable_bar.item_used.connect(func(_item): _update_bottom_bar())
+	bar.add_child(consumable_bar)
 
 	# Excalibur mode toggle — only shown when the player holds Excalibur.
 	# Gold styling matches the Sword in the Stone node color so it reads as

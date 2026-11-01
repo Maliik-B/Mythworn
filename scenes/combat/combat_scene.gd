@@ -20,6 +20,8 @@ var draw_label: Button
 var discard_label: Button
 var exhaust_label: Button
 var end_turn_btn: Button
+## The pack, centred in the top bar: the held consumables, usable on the player's turn.
+var consumable_bar: ConsumableBar
 var log_text: RichTextLabel
 var pile_popup: PanelContainer
 
@@ -444,6 +446,17 @@ func _build_top_bar() -> HBoxContainer:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(spacer)
 
+	# The pack sits between the piles. The engine does not exist yet at build time; _start_combat
+	# hands it over, and until then every item reads as waiting.
+	consumable_bar = ConsumableBar.new()
+	consumable_bar.setup(ConsumableBar.Mode.COMBAT)
+	consumable_bar.item_used.connect(_on_consumable_used)
+	bar.add_child(consumable_bar)
+
+	var pack_spacer = Control.new()
+	pack_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.add_child(pack_spacer)
+
 	exhaust_label = _make_pile_button(Color(0.6, 0.5, 0.6))
 	exhaust_label.pressed.connect(_on_pile_clicked.bind("exhaust"))
 	bar.add_child(exhaust_label)
@@ -855,6 +868,7 @@ func _connect_events() -> void:
 	Events.passion_changed.connect(_on_passion_changed)
 	Events.status_applied.connect(_on_status_applied)
 	Events.status_removed.connect(_on_status_removed)
+	Events.combat_note.connect(_on_combat_note)
 
 
 # ============================================================
@@ -870,6 +884,7 @@ func _start_combat() -> void:
 	combat_engine = CombatEngine.new()
 	combat_engine.name = "CombatEngine"
 	add_child(combat_engine)
+	consumable_bar.engine = combat_engine
 
 	# Use pending enemies from map, or fall back to test enemies
 	var enemy_datas: Array[EnemyData] = []
@@ -2139,6 +2154,9 @@ func _refresh_ui() -> void:
 	var can_act = combat_engine.phase == CombatEngine.Phase.PLAYER_TURN
 	end_turn_btn.disabled = not can_act
 
+	# What the pack can do changes with HP and phase, so it redraws with everything else.
+	consumable_bar.refresh()
+
 
 # ============================================================
 # COMBAT LOG
@@ -2337,6 +2355,19 @@ func _on_combat_started() -> void:
 func _on_card_played(card: CardData, _target) -> void:
 	_log("Played [color=white]%s[/color]." % card.card_name)
 	RunManager.run_stats["cards_played"] = RunManager.run_stats.get("cards_played", 0) + 1
+	_refresh_ui()
+
+
+## A consumable was used from the pack: say so in the log. The effect's own readouts (a heal, a
+## status chip, the Passion bar) arrive through their usual signals; this only adds the line.
+func _on_consumable_used(item: ConsumableData) -> void:
+	_log("Used [color=white]%s[/color]. %s" % [item.display_name, item.description])
+	_refresh_ui()
+
+
+## A one-line note from a system with no log of its own (the Champion's Favour turning a blow).
+func _on_combat_note(text: String) -> void:
+	_log("[color=gold]%s[/color]" % text)
 	_refresh_ui()
 
 

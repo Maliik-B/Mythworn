@@ -67,13 +67,16 @@ static func _man_off_the_field() -> EventData:
 	var c1 = EventData.EventChoice.new()
 	c1.text = "Splint it, and ask him what he ran from. (Lose 5 HP)"
 	c1.result_text = ("You set the leg with his own scabbard for a splint and get his arm over your "
-		+ "shoulder, and he pays you in talk the whole mile as well as in the ring. He was in the "
+		+ "shoulder, and he pays you in talk the whole mile, and in the ring, and at the last stile "
+		+ "in a flat tin of salve out of his coat that a field surgeon pressed on him and he never "
+		+ "got round to opening. He was in the "
 		+ "line when their own champion broke. Not broke and ran. Broke and kept fighting, badly, "
 		+ "wrong, the way a hand works a puppet it has never watched a man use. \"His guard went "
 		+ "first,\" he says. \"Then his face went. He was still winning.\" He does not know he is "
 		+ "describing the thing you are walking toward, and you decide not to tell him.")
 	c1.hp_change = -5
-	c1.gold_change = 30
+	c1.gold_change = 20  # was 30 before the salve: the tin is part of what he pays with
+	c1.grants_consumable = &"traveller_salve"
 	c1.passion_change = 3
 	c1.awarded_title_id = &"the_merciful"
 
@@ -135,10 +138,13 @@ static func _the_still_mere() -> EventData:
 	c2.result_text = ("You cup the water and drink, and it is the cold of deep springs and it goes "
 		+ "all the way down to your heels. You leave a coin in the shallows afterwards, because it "
 		+ "feels wrong to take from a place like this one and leave nothing, a small courtesy for one "
-		+ "you have been shown. You walk up out of the hollow steadier than you walked into it, and "
-		+ "you do not look back, in case it is gone.")
+		+ "you have been shown. When you stand there is a stoppered vial on the flat stone by the "
+		+ "shallows, full of the mere and still cold, that was not there when you knelt. You walk up "
+		+ "out of the hollow steadier than you walked into it, and you do not look back, in case it "
+		+ "is gone.")
 	c2.gold_change = -10
-	c2.hp_change = 12
+	c2.hp_change = 6  # was 12 before the blessing: the vial is part of what the water gives back
+	c2.grants_consumable = &"bottled_blessing"
 	c2.passion_change = 3
 
 	var c3 = EventData.EventChoice.new()
@@ -300,17 +306,22 @@ static func _the_tourney() -> EventData:
 	# openly is the pro-folk gesture win or lose, so passion and standing land either way --
 	# only the gold rolls (gamble_win_gold / gamble_lose_gold).
 	c1.gamble_chance = 0.55
-	c1.gamble_win_gold = 40
+	c1.gamble_win_gold = 30  # was 40 before the favour: the ribbon is part of the winnings
 	c1.gamble_lose_gold = -25
 	c1.gamble_win_text = ("You back the man with no device on his shield, and the stands laugh at you "
 		+ "for it, until he puts the noble gone grey in the dirt and stands over him breathing clean "
 		+ "and hard. The man at the rail counts out your winnings with a sour face. Across the field the "
-		+ "commoner catches your eye and touches two fingers to his brow.")
+		+ "commoner catches your eye and touches two fingers to his brow. A woman who put her own purse on "
+		+ "him leans over the rail and ties a length of blue ribbon to your sleeve, and says nothing "
+		+ "about it.")
 	c1.gamble_lose_text = ("You back the man with no device on his shield, and for three passes he "
 		+ "rides like he will shame the lot of them. Then the grey noble's lance catches him "
 		+ "under the arm and he goes down and is slow to rise. The man at the rail rakes in your stake without "
 		+ "meeting your eye. Across the field they get the commoner back to his knees; he finds you in "
-		+ "the crowd anyway, and touches two fingers to his brow.")
+		+ "the crowd anyway, and touches two fingers to his brow. The woman beside you, who lost on him "
+		+ "too, unties the ribbon she meant for his lance and ties it on your sleeve instead, and does "
+		+ "not explain.")
+	c1.grants_consumable = &"champions_favour"
 	c1.passion_change = 2
 	c1.standing_change = 5
 
@@ -440,11 +451,13 @@ static func _shade_at_the_cross() -> EventData:
 	var c2 = EventData.EventChoice.new()
 	c2.text = "Ask him to lend you the courage he never spent."
 	c2.result_text = ("He looks at the sword in the grass, then at the one on your hip. \"Let me "
-		+ "spend on you what I couldn't spend on myself,\" he says, and lays a cold hand on your "
-		+ "sword-arm. The chill goes in past the sleeve and settles there to wait for the next time "
-		+ "you draw. One hard fight it will carry you. Then it will be spent, the way he was spent, "
-		+ "and you will be on your own with it again.")
-	c2.grants_combat_boon = &"wandering_vigor"
+		+ "spend on you what I couldn't spend on myself,\" he says, and closes your fist around "
+		+ "something that is not quite there. It sits in your palm as cold as a coin kept in a well, "
+		+ "and it does not fade. It waits for you to ask. One hard fight it will carry you. Then it "
+		+ "will be spent, the way he was spent, and you will be on your own with it again.")
+	# Held, not spent for you: the same courage the Shade used to lend at the start of the next
+	# fight, now carried until the player picks the fight. The part 3 migration that proves the layer.
+	c2.grants_consumable = &"unspent_courage"
 
 	# Refusal with teeth (higher tier): scattering him for the gilt leaves a lingering curse, a
 	# permanent unplayable card. The gold is real, but so is the price.
@@ -500,9 +513,11 @@ static func _the_tiltyard() -> EventData:
 	c2.text = "Take the harness. It's good kit and it's going to rot."
 	c2.result_text = ("It is good harness, better than yours in places, and in a month it will be "
 		+ "rust and mould and mouse-nest. So you take what fits and bundle the rest to sell on down "
-		+ "the road. You do have to unstack it to do that. Putting a dead man's kit out of the order "
+		+ "the road, and the flask of armourer's oil from the shelf behind it, which will not keep "
+		+ "either. You do have to unstack it to do that. Putting a dead man's kit out of the order "
 		+ "he left it in is a smaller thing than it feels like, and it feels like something.")
-	c2.gold_change = 20
+	c2.gold_change = 12  # was 20 before the oil: the flask is part of what the yard gives up
+	c2.grants_consumable = &"blade_oil"
 	c2.passion_change = -2
 
 	var c3 = EventData.EventChoice.new()
@@ -545,7 +560,9 @@ static func _peasants_plea() -> EventData:
 		+ "will expect, and he will not think to ask where it came from. That night the village "
 		+ "feeds you at its own thin table. An old campaigner who soldiered for the last king sits "
 		+ "with you late, showing you a trick of his he says the young ones never have the patience "
-		+ "to learn.")
+		+ "to learn. In the morning the old woman puts a loaf in your hands, still warm in its cloth, "
+		+ "because it is the one thing they have left to give.")
+	c1.grants_consumable = &"loaf"
 	c1.gold_change = -50
 	c1.passion_change = 5
 	c1.card_reward = true
@@ -596,7 +613,10 @@ static func _peasants_plea() -> EventData:
 	cc.result_text = ("You find the collector on the road at first light and tell him, in the "
 		+ "crown's name, that this village is forgiven its share this season. He doesn't like it. "
 		+ "But he knows whose voice you carry, and it is not one he can afford to argue with, so he "
-		+ "turns his cart around. The village will never learn how close it came. You will.")
+		+ "turns his cart around. He leaves you the writ he was meant to serve, the seal still on it, "
+		+ "because somebody will want to know who sent him home. The village will never learn how "
+		+ "close it came. You will.")
+	cc.grants_consumable = &"writ"
 	cc.requires_favor = &"court"
 	cc.passion_change = 3
 	cc.awarded_title_id = &"the_gracious"  # a gracious pardon in the crown's name
@@ -695,9 +715,11 @@ You sleep in the bedroll "
 	var loot = EventData.EventChoice.new()
 	loot.text = "Strip the camp and move on."
 	loot.result_text = ("You take what's worth carrying: the rope, a whetstone, a little coin sewn "
-		+ "into a bedroll against exactly this. Better your pack than the crows'. You leave the "
+		+ "into a bedroll against exactly this, and a supper of bread and hard meat wrapped in a dead "
+		+ "man's cloth that will keep. Better your pack than the crows'. You leave the "
 		+ "journal where it lies.")
-	loot.gold_change = 18
+	loot.gold_change = 10  # was 18 before the supper: the cloth is part of what the camp leaves
+	loot.grants_consumable = &"cold_supper"
 	loot.passion_change = -2
 	e.choices.append(loot)
 

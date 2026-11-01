@@ -7,6 +7,9 @@ var current_deck: Array[CardData] = []
 var relics: Array[RelicData] = []
 var equipment: Dictionary = {} # EquipmentData.EquipmentSlot -> EquipmentData (deprecated, see Titles)
 var perks: Array[PerkData] = []
+## Held consumables: the fourth power layer. A hard cap of CONSUMABLE_SLOTS, and no relic widens
+## it, so "which two" means the same thing from the first node to the last. See ConsumableData.
+var consumables: Array[ConsumableData] = []
 var gold: int = 0
 var current_act: int = 0
 var current_hp: int = 0
@@ -162,6 +165,10 @@ var active_quests: Dictionary = {}  # StringName -> {"revealed": bool, "complete
 const MAX_ACTS := 3
 const DEFAULT_STARTING_REALM: StringName = &"camelot"
 const TITLE_SLOT_COUNT := 2
+## The consumable cap. Deliberately the same shape as the title slots: with a fixed cap and no
+## inventory tech, an item's value never depends on what else is carried, and hoarding is handled
+## by the cap rather than by tuning.
+const CONSUMABLE_SLOTS := 2
 # Weighted-recent blend factor for King's Reputation updates.
 const KINGS_REP_WEIGHT_OLD := 0.4
 const KINGS_REP_WEIGHT_NEW := 0.6
@@ -219,6 +226,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	relics.clear()
 	equipment.clear()
 	perks.clear()
+	consumables.clear()
 	run_active = true
 	current_map = null
 	realm_config = RealmConfig.new()  # neutral until the realm-entry VN sets it
@@ -509,6 +517,7 @@ func set_current_realm(realm_id: StringName) -> void:
 		visited_realm_ids.append(realm_id)
 	if previous_id != realm_id:
 		_update_title_tiers_on_realm_change(previous_id, realm_id)
+		_expire_consumables_at_border(realm_id)
 		Events.realm_changed.emit(previous_id, realm_id)
 
 
@@ -572,6 +581,110 @@ func apply_liaison_gift(liaison: StringName) -> void:
 	var r := RelicPool.get_relic_by_name(relic_name)
 	if r:
 		add_relic(r)
+
+
+# --- Consumables ---
+
+## True if a slot is free. Events and shops ask this before handing something over, and open
+## the swap prompt (leave one behind) when it is false.
+func has_consumable_room() -> bool:
+	return consumables.size() < CONSUMABLE_SLOTS
+
+
+## Puts an item in the pack. Returns false and changes nothing if both slots are full.
+func add_consumable(item: ConsumableData) -> bool:
+	if item == null or not has_consumable_room():
+		return false
+	consumables.append(item)
+	Events.consumables_changed.emit()
+	return true
+
+
+## Throws an item away to free its slot. Returns false if it was not held. A quest item that
+## has nothing left to do is dropped this way, and so is any dud once the cap bites.
+func discard_consumable(item: ConsumableData) -> bool:
+	var index := consumables.find(item)
+	if index < 0:
+		return false
+	consumables.remove_at(index)
+	Events.consumables_changed.emit()
+	return true
+
+
+func has_consumable(id: StringName) -> bool:
+	return get_consumable_by_id(id) != null
+
+
+## The held item with this id, or null. Events gate options on it (the raider lair's chalice).
+func get_consumable_by_id(id: StringName) -> ConsumableData:
+	for c in consumables:
+		if c.id == id:
+			return c
+	return null
+
+
+## Spends a held item by id from an event choice (a quest item is spent where it is delivered,
+## not by the use button). Returns false if it was not held.
+func spend_consumable_by_id(id: StringName) -> bool:
+	var item := get_consumable_by_id(id)
+	return item != null and discard_consumable(item)
+
+
+## True if the item is usable from the map screen right now. A heal at full health is refused so
+## it is never wasted by a stray click.
+func can_use_consumable_on_map(item: ConsumableData) -> bool:
+	if item == null or not consumables.has(item) or not item.usable_on_map:
+		return false
+	match item.effect:
+		ConsumableData.Effect.HEAL, ConsumableData.Effect.HEAL_DRIFT_HOLLOW:
+			return current_hp < max_hp
+	return true
+
+
+## Uses a map-usable item and spends it. Combat-only items are refused here: the combat engine
+## owns their effects (CombatEngine.use_consumable).
+func use_consumable_on_map(item: ConsumableData) -> bool:
+	if not can_use_consumable_on_map(item):
+		return false
+	match item.effect:
+		ConsumableData.Effect.HEAL:
+			heal(item.value)
+		ConsumableData.Effect.HEAL_DRIFT_HOLLOW:
+			heal(item.value)
+			change_passion(-item.value2)
+		ConsumableData.Effect.STANDING_SHIFT:
+			change_realm_standing(current_realm_id, item.value)
+		_:
+			return false
+	discard_consumable(item)
+	return true
+
+
+## True if a quest item has nothing left to do: its questline is done, or its payoff node is
+## behind the player or gone from the map. The pack says so, and the player is meant to drop it.
+func is_consumable_spent(item: ConsumableData) -> bool:
+	if item == null or item.quest_id == &"":
+		return false
+	if is_quest_completed(item.quest_id) or not is_quest_active(item.quest_id):
+		return true
+	if current_map == null:
+		return false
+	return not MapGenerator.quest_payoff_ahead(current_map, item.quest_id)
+
+
+## Internal: a realm-exclusive item leaves the pack when the player crosses into a different
+## realm, unless it has an answer for what it means out there (expires_at_border false). The
+## default leans to expiry, case by case: an indulgence from Camelot's church means nothing under
+## the world-tree.
+func _expire_consumables_at_border(new_realm: StringName) -> void:
+	var kept: Array[ConsumableData] = []
+	for c in consumables:
+		var leaves: bool = c.expires_at_border and c.realm_id != &"" and c.realm_id != new_realm
+		if not leaves:
+			kept.append(c)
+	if kept.size() != consumables.size():
+		consumables = kept
+		Events.consumables_changed.emit()
 
 
 # --- Titles ---

@@ -102,6 +102,14 @@ signal excalibur_mode_changed(new_mode: int)
 ## RunManager.ThuribleMode.BLAZING / HOLLOW. The map UI re-renders the toggle on this.
 signal thurible_mode_changed(new_mode: int)
 
+## A one-line note for the combat log from a system that has no log of its own (a consumable's
+## effect firing mid-fight). The combat scene prints it; nothing else listens.
+signal combat_note(text: String)
+
+## Emitted whenever the held consumables change: one is picked up, used, discarded, or leaves the
+## pack at a realm border. The combat bar and the map bar both redraw off it.
+signal consumables_changed()
+
 ## Emitted when the player makes the Crown decision after defeating an act boss
 ## while holding Excalibur. took_crown=true → King of Camelot path;
 ## took_crown=false → refused, alternative paths (advisor, leave, wander).

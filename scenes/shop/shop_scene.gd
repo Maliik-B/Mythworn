@@ -5,6 +5,7 @@ extends Control
 const CARD_REMOVE_COST := 50
 const CARD_COUNT := 5
 const RELIC_COUNT := 2
+const CONSUMABLE_COUNT := 2
 ## Stacking cap for shop discounts from titles + future relics. See § Titles in GAME_DESIGN.md.
 const SHOP_DISCOUNT_CAP := 50
 
@@ -45,8 +46,13 @@ var shop_cards: Array[CardData] = []
 var card_prices: Dictionary = {} # CardData -> int
 var shop_relics: Array[RelicData] = []
 var relic_prices: Dictionary = {} # RelicData -> int
+## Consumables on offer: the shop's second source after events. Realm-fitting stock (a Camelot
+## shop sells Camelot's own items beside the generics), never combat drops.
+var shop_consumables: Array[ConsumableData] = []
+var consumable_prices: Dictionary = {} # ConsumableData -> int
 var card_row: HBoxContainer
 var relic_row: HBoxContainer
+var consumable_row: HBoxContainer
 var gold_label: Label
 var info_label: Label
 var deck_section: VBoxContainer
@@ -90,6 +96,16 @@ func _generate_shop() -> void:
 			RelicData.RelicRarity.RARE:
 				base = 150 + RngManager.loot_rng.randi_range(-10, 20)
 		relic_prices[relic] = _apply_discount(int(round(base * price_mult)), discount)
+
+	# Provisions are rolled LAST, so adding them leaves the cards and relics a seed already
+	# produced exactly as they were. Items the player already carries are not offered again.
+	var held_ids: Array[StringName] = []
+	for held in RunManager.consumables:
+		held_ids.append(held.id)
+	shop_consumables = ConsumablePool.get_shop_stock(
+		RngManager.loot_rng, RunManager.current_realm_id, CONSUMABLE_COUNT, held_ids)
+	for item in shop_consumables:
+		consumable_prices[item] = _apply_discount(int(round(item.price * price_mult)), discount)
 
 
 ## Aggregates discount from all sources (titles, future relics) and applies the
@@ -212,6 +228,17 @@ void fragment() {
 		_main_vbox.add_child(relic_row)
 
 		_refresh_shop_relics()
+
+	# ── Section: Provisions ──
+	if shop_consumables.size() > 0:
+		_add_section_header("Provisions", Color(0.75, 0.68, 0.4))
+
+		consumable_row = HBoxContainer.new()
+		consumable_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		consumable_row.add_theme_constant_override("separation", 20)
+		_main_vbox.add_child(consumable_row)
+
+		_refresh_shop_consumables()
 
 	# ── Divider ──
 	var divider = HSeparator.new()
@@ -763,6 +790,114 @@ func _on_shop_relic_input(event: InputEvent, relic: RelicData) -> void:
 	AudioManager.play_sfx("shop_buy")
 	_update_gold()
 	_refresh_shop_relics()
+
+
+# ============================================================
+# SHOP PROVISIONS (CONSUMABLES)
+# ============================================================
+
+func _refresh_shop_consumables() -> void:
+	if not consumable_row:
+		return
+	for child in consumable_row.get_children():
+		child.queue_free()
+	for item in shop_consumables:
+		consumable_row.add_child(_create_shop_consumable(item, consumable_prices[item]))
+
+
+func _create_shop_consumable(item: ConsumableData, price: int) -> PanelContainer:
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(240, 150)
+	var can_afford = RunManager.gold >= price
+	var border_color := Color(0.75, 0.68, 0.4)
+
+	var style = StyleBoxFlat.new()
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(3)
+	style.bg_color = Color(0.16, 0.13, 0.1)
+	style.border_color = border_color
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", style)
+	if not can_afford:
+		panel.modulate = Color(0.5, 0.5, 0.5)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 5)
+	panel.add_child(vbox)
+
+	var price_lbl = Label.new()
+	price_lbl.text = "%d gold" % price
+	price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	price_lbl.add_theme_font_size_override("font_size", 15)
+	price_lbl.add_theme_color_override("font_color",
+		Color(0.95, 0.85, 0.3) if can_afford else Color(0.7, 0.3, 0.3))
+	vbox.add_child(price_lbl)
+
+	var name_lbl = Label.new()
+	name_lbl.text = item.display_name
+	name_lbl.add_theme_font_size_override("font_size", 18)
+	name_lbl.add_theme_color_override("font_color", border_color)
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(name_lbl)
+
+	var tag_lbl = Label.new()
+	tag_lbl.text = item.use_context_label().trim_prefix("Use: ")
+	tag_lbl.add_theme_font_size_override("font_size", 11)
+	tag_lbl.add_theme_color_override("font_color", border_color.darkened(0.2))
+	tag_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(tag_lbl)
+
+	var desc_lbl = Label.new()
+	desc_lbl.text = item.description
+	desc_lbl.add_theme_font_size_override("font_size", 13)
+	desc_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(desc_lbl)
+
+	_ignore_mouse_recursive(vbox)
+
+	panel.gui_input.connect(_on_shop_consumable_input.bind(item))
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	if can_afford:
+		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	return panel
+
+
+func _on_shop_consumable_input(event: InputEvent, item: ConsumableData) -> void:
+	if not (event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	var price = consumable_prices.get(item, 0)
+	if RunManager.gold < price:
+		info_label.text = "Not enough gold!"
+		return
+
+	# A full pack asks first: you leave one thing behind (or the new one), and the gold only
+	# changes hands if the new one goes into the pack.
+	if RunManager.has_consumable_room():
+		RunManager.add_consumable(item)
+		_complete_consumable_purchase(item, price)
+		return
+	var swap := ConsumableSwap.open(self, item)
+	swap.resolved.connect(func(taken: bool):
+		if taken:
+			_complete_consumable_purchase(item, price)
+		else:
+			info_label.text = "You leave %s on the counter." % item.display_name)
+
+
+func _complete_consumable_purchase(item: ConsumableData, price: int) -> void:
+	RunManager.add_gold(-price)
+	shop_consumables.erase(item)
+	consumable_prices.erase(item)
+	info_label.text = "Bought %s!" % item.display_name
+	AudioManager.play_sfx("shop_buy")
+	_update_gold()
+	_refresh_shop_consumables()
 
 
 # ============================================================

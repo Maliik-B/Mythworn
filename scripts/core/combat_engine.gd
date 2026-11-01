@@ -75,6 +75,15 @@ const SWORD_MAX_DOUBLINGS := 3
 ## Read directly, like Blooded Edge / Momentum, since a fixed GAIN_PASSION value can't flip sign.
 var _thurible_swing: int = 0
 
+## Blade Oil (consumable): bonus damage owed to the first hit of the next attack card the player
+## plays. Set by use_consumable, spent on the first card-dealt hit after it, then 0. Gated on
+## _current_card like Blooded Edge, so a poison tick or a lash never spends it.
+var _blade_oil_pending: int = 0
+
+## A Champion's Favour (consumable): true while the favour is armed. The first blow that would
+## land on the player this fight does not, and the flag clears. Reset every combat.
+var _favour_ward: bool = false
+
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
 ## synchronously. The balance harness (tools/combat_harness) sets this so it can
 ## run thousands of trials against the REAL engine without waiting real seconds.
@@ -135,6 +144,9 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	# per-fight via RunManager.thurible_mode and applied at each player turn-start.
 	var thur := RunManager.get_relic("The Thurible")
 	_thurible_swing = thur.value if thur else 0
+	# Consumable effects are per fight: nothing armed carries in from a previous combat.
+	_blade_oil_pending = 0
+	_favour_ward = false
 	_arm_be_the_king(player_hp)
 	# Whiplash power listens on tier crossings for the fight; no-op unless the player
 	# actually holds Whiplash (checked in the handler). Disconnected at combat end.
@@ -333,6 +345,55 @@ func _apply_pending_combat_boon() -> void:
 			apply_status_effect(player_stats, StatusEffects.STRENGTH, 2)
 		_:
 			push_warning("Unknown pending_combat_boon: %s" % boon)
+
+
+## True if this held consumable can be used right now: it is the player's turn, the item is in the
+## pack and meant for combat, and using it would do something (a heal at full health, a favour
+## already armed and an oil already waiting are refused so a stray click never wastes one).
+func can_use_consumable(item: ConsumableData) -> bool:
+	if phase != Phase.PLAYER_TURN or item == null or not item.usable_in_combat:
+		return false
+	if not RunManager.consumables.has(item):
+		return false
+	match item.effect:
+		ConsumableData.Effect.HEAL, ConsumableData.Effect.HEAL_DRIFT_HOLLOW:
+			return player_stats.current_hp < player_stats.max_hp
+		ConsumableData.Effect.NEXT_ATTACK_BONUS:
+			return _blade_oil_pending == 0
+		ConsumableData.Effect.WARD_FIRST_BLOW:
+			return not _favour_ward
+		ConsumableData.Effect.PASSION_TOWARD_POLE:
+			return RunManager.passion != null
+	return true
+
+
+## Uses a held consumable and spends it. Costs no energy: the player picks the moment, which is
+## the whole identity of the layer. Heals go through heal_combatant so they show live (the
+## end-of-combat HP sync would otherwise overwrite a RunManager heal made mid-fight).
+func use_consumable(item: ConsumableData) -> bool:
+	if not can_use_consumable(item):
+		return false
+	match item.effect:
+		ConsumableData.Effect.HEAL:
+			heal_combatant(player_stats, item.value)
+		ConsumableData.Effect.HEAL_DRIFT_HOLLOW:
+			heal_combatant(player_stats, item.value)
+			RunManager.change_passion(-item.value2)
+		ConsumableData.Effect.NEXT_ATTACK_BONUS:
+			_blade_oil_pending = item.value
+		ConsumableData.Effect.PASSION_TOWARD_POLE:
+			# The pole you already lean to: at or above the dispassionate center that is
+			# Blazing (+), below it Hollow (-). Dead center leans Blazing.
+			var dir := 1 if RunManager.passion.current_value >= RunManager.passion_center() else -1
+			RunManager.change_passion(dir * item.value)
+		ConsumableData.Effect.STRENGTH_THIS_FIGHT:
+			apply_status_effect(player_stats, StatusEffects.STRENGTH, item.value)
+		ConsumableData.Effect.WARD_FIRST_BLOW:
+			_favour_ward = true
+		_:
+			return false
+	RunManager.discard_consumable(item)
+	return true
 
 
 ## Applies equipped title effects that fire at the start of each player turn.
@@ -568,6 +629,11 @@ func deal_damage(target: CombatantStats, base_amount: int,
 		amount += _blooded_edge_pending
 		_blooded_edge_pending = 0
 
+	# Blade Oil: the same shape, spent by the first card-dealt hit after the player poured it.
+	if source == player_stats and _current_card != null and _blade_oil_pending > 0:
+		amount += _blade_oil_pending
+		_blade_oil_pending = 0
+
 	# Zone modifier: at a committed extreme, the dominant personality's cards hit
 	# harder (+25%) and the off-type suffers (-25%). Only for player cards, never
 	# enemies or neutrals. The dispassionate middle is flat — no bonus, no penalty.
@@ -584,6 +650,14 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	# uses this for a deliberately defensive turn skip.
 	if amount > 0 and target.has_status(StatusEffects.INTANGIBLE):
 		amount = 1
+
+	# A Champion's Favour: the first blow that would land on the player does not. Only an enemy's
+	# attack can be turned (self-inflicted costs never come through here), and the favour is
+	# spent by the blow it turns, even if block would have soaked it.
+	if _favour_ward and target == player_stats and source != player_stats and amount > 0:
+		_favour_ward = false
+		amount = 0
+		Events.combat_note.emit("The favour turns the blow.")
 
 	# Piercing: a portion of the hit bypasses block and lands straight on HP; the
 	# remainder soaks block as usual. Clamped to the (post-modifier) amount so a

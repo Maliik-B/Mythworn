@@ -48,6 +48,8 @@ func _ready() -> void:
 	_test_swords_bearer_curve()
 	_test_thurible()
 	_test_event_reworks()
+	_test_consumables()
+	_test_consumable_ui()
 	_test_liaison_relics()
 	_test_refusals()
 	_test_title_split()
@@ -1365,17 +1367,21 @@ func _test_event_reworks() -> void:
 				ride = ch
 	_check("The Tourney court ride costs HP and is court-gated with a card reward",
 		ride != null and ride.hp_change < 0 and ride.card_reward)
-	# The Shade at the Cross's power option is now a one-shot next-combat boon.
+	# The Shade at the Cross's power option used to spend its courage for the player at the start of
+	# the next fight (a queued boon). Part 3 made it a HELD consumable, Unspent Courage, that the
+	# player spends: the same +2 Strength, with the moment chosen. See _test_consumables.
 	var lend: EventData.EventChoice = null
 	if spirit:
 		for ch in spirit.choices:
-			if ch.grants_combat_boon != &"":
+			if ch.grants_consumable != &"":
 				lend = ch
-	_check("The Shade at the Cross grants the wandering_vigor next-combat boon",
-		lend != null and lend.grants_combat_boon == &"wandering_vigor"
-		and lend.max_hp_change == 0)
+	_check("The Shade at the Cross grants the held Unspent Courage, not a queued boon",
+		lend != null and lend.grants_consumable == &"unspent_courage"
+		and lend.grants_combat_boon == &"" and lend.max_hp_change == 0)
 
-	# End-to-end: a queued boon opens the next fight with +2 Strength, then clears (one-shot).
+	# The queued-boon primitive itself stays (no shipped event uses it now, but the mechanism and
+	# its one-shot contract are still covered): a queued boon opens the next fight with +2 Strength,
+	# then clears.
 	RunManager.pending_combat_boon = &"wandering_vigor"
 	var beng := CombatEngine.new()
 	add_child(beng)
@@ -2635,3 +2641,465 @@ func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:
 	e.value = dmg
 	c.effects.append(e)
 	return c
+
+
+# ============================================================
+# CONSUMABLES AND PETS (part 3 of the demo road)
+# ============================================================
+
+## Clears the pack and the standing/passion state the consumable tests touch, so each block
+## starts from the same place and leaves nothing behind for the next one.
+func _reset_consumable_state() -> void:
+	RunManager.consumables.clear()
+	RunManager.realm_standing.clear()
+	RunManager.active_quests = {}
+	RunManager.current_map = null
+	RunManager.current_realm_id = &"camelot"
+	RunManager.max_hp = 80
+	RunManager.current_hp = 80
+	_setup_run_state()
+
+
+## A fresh engine over the test dummy (a 20-damage attacker with 100 HP), the player at `hp`/50.
+func _consumable_engine(hp: int = 50) -> CombatEngine:
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], hp, 50, [_dummy_attacker()])
+	return eng
+
+
+func _seeded(seed_value: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	return rng
+
+
+func _test_consumables() -> void:
+	_reset_consumable_state()
+
+	# --- The pool: every id builds, shops stock priced items only (quest and event-only items
+	# carry no price), and a realm's shop sells that realm's own items beside the generics.
+	var all_built := true
+	for id in ConsumablePool.all_ids():
+		var c := ConsumablePool.get_consumable(id)
+		if c == null or c.id != id or c.display_name == "" or c.description == "":
+			all_built = false
+	_check("every consumable id builds a named, described item", all_built)
+	_check("an unknown consumable id builds nothing", ConsumablePool.get_consumable(&"nope") == null)
+	_check("two fresh calls give two separate instances",
+		ConsumablePool.get_consumable(&"traveller_salve") != ConsumablePool.get_consumable(&"traveller_salve"))
+	var camelot_stock := ConsumablePool.shop_candidates(&"camelot")
+	var other_stock := ConsumablePool.shop_candidates(&"yggdrasil")
+	_check("a Camelot shop may sell Camelot's own items; another realm's shop may not",
+		&"relic_water" in camelot_stock and &"indulgence" in camelot_stock
+		and &"relic_water" not in other_stock and &"indulgence" not in other_stock)
+	_check("shops never sell the quest item or the event-only courage",
+		&"poisoned_chalice" not in camelot_stock and &"unspent_courage" not in camelot_stock)
+	var stock_a := ConsumablePool.get_shop_stock(_seeded(77), &"camelot", 2)
+	var stock_b := ConsumablePool.get_shop_stock(_seeded(77), &"camelot", 2)
+	_check("shop stock is two distinct items and follows the seed",
+		stock_a.size() == 2 and stock_a[0].id != stock_a[1].id
+		and stock_a[0].id == stock_b[0].id and stock_a[1].id == stock_b[1].id)
+	var excluded := ConsumablePool.get_shop_stock(_seeded(77), &"camelot", 2, [stock_a[0].id])
+	_check("a shop does not re-offer what the player already holds",
+		excluded.size() == 2 and excluded[0].id != stock_a[0].id and excluded[1].id != stock_a[0].id)
+
+	# --- The cap: two slots, no more, and a discard frees one.
+	var first := ConsumablePool.get_consumable(&"traveller_salve")
+	var second := ConsumablePool.get_consumable(&"cold_supper")
+	var third := ConsumablePool.get_consumable(&"blade_oil")
+	_check("the pack takes two consumables",
+		RunManager.add_consumable(first) and RunManager.add_consumable(second))
+	_check("a third is refused and the pack is unchanged",
+		not RunManager.has_consumable_room() and not RunManager.add_consumable(third)
+		and RunManager.consumables.size() == 2)
+	_check("discarding frees the slot",
+		RunManager.discard_consumable(first) and RunManager.has_consumable_room()
+		and RunManager.add_consumable(third) and RunManager.consumables.size() == 2)
+	_check("discarding something not held does nothing", not RunManager.discard_consumable(first))
+	_check("a held item is found by id", RunManager.has_consumable(&"blade_oil")
+		and not RunManager.has_consumable(&"traveller_salve"))
+	RunManager.consumables.clear()
+
+	# --- Map use: heals, the supper's map-only rule, standing swings, and the stray-click guard.
+	var salve := ConsumablePool.get_consumable(&"traveller_salve")
+	RunManager.add_consumable(salve)
+	RunManager.current_hp = 80
+	_check("a heal at full health is refused and the item is kept",
+		not RunManager.use_consumable_on_map(salve) and RunManager.consumables.has(salve))
+	RunManager.current_hp = 60
+	_check("the salve heals 12 on the map and is spent",
+		RunManager.use_consumable_on_map(salve) and RunManager.current_hp == 72
+		and RunManager.consumables.is_empty())
+	var supper := ConsumablePool.get_consumable(&"cold_supper")
+	RunManager.add_consumable(supper)
+	RunManager.current_hp = 50
+	_check("the cold supper is map-only and heals 20",
+		not supper.usable_in_combat and supper.usable_on_map
+		and RunManager.use_consumable_on_map(supper) and RunManager.current_hp == 70)
+	var oil := ConsumablePool.get_consumable(&"blade_oil")
+	RunManager.add_consumable(oil)
+	_check("a combat-only item cannot be used from the map",
+		not RunManager.use_consumable_on_map(oil) and RunManager.consumables.has(oil))
+	RunManager.consumables.clear()
+	var water := ConsumablePool.get_consumable(&"relic_water")
+	RunManager.add_consumable(water)
+	RunManager.current_hp = 40
+	RunManager.passion.current_value = 0
+	RunManager.use_consumable_on_map(water)
+	_check("relic-water heals 16 and drifts Passion 8 toward Hollow",
+		RunManager.current_hp == 56 and RunManager.passion.current_value == -8)
+
+	var writ := ConsumablePool.get_consumable(&"writ")
+	var loaf := ConsumablePool.get_consumable(&"loaf")
+	var pardon := ConsumablePool.get_consumable(&"indulgence")
+	RunManager.consumables.clear()
+	RunManager.add_consumable(writ)
+	RunManager.add_consumable(loaf)
+	RunManager.use_consumable_on_map(writ)
+	_check("a writ swings standing 8 toward the court",
+		RunManager.get_realm_standing(&"camelot") == -8)
+	RunManager.use_consumable_on_map(loaf)
+	_check("a loaf swings standing 8 toward the folk (back to even)",
+		RunManager.get_realm_standing(&"camelot") == 0)
+	RunManager.add_consumable(pardon)
+	RunManager.use_consumable_on_map(pardon)
+	_check("an indulgence swings standing 15 toward the court",
+		RunManager.get_realm_standing(&"camelot") == -15 and RunManager.consumables.is_empty())
+	_check("standing items are map-only",
+		not writ.usable_in_combat and not loaf.usable_in_combat and not pardon.usable_in_combat)
+
+	# --- Realm border: realm items leave the pack, generics stay.
+	RunManager.consumables.clear()
+	RunManager.add_consumable(ConsumablePool.get_consumable(&"relic_water"))
+	RunManager.add_consumable(ConsumablePool.get_consumable(&"traveller_salve"))
+	RunManager.set_current_realm(&"yggdrasil")
+	_check("crossing a border expires Camelot's relic-water and keeps the generic salve",
+		RunManager.consumables.size() == 1 and RunManager.consumables[0].id == &"traveller_salve")
+	RunManager.set_current_realm(&"camelot")
+	_check("re-entering the origin realm does not bring the expired item back",
+		RunManager.consumables.size() == 1)
+	RunManager.add_consumable(ConsumablePool.get_consumable(&"champions_favour"))
+	RunManager.set_current_realm(&"camelot")
+	_check("staying in the realm expires nothing", RunManager.consumables.size() == 2)
+
+	# --- Combat use ---
+	_reset_consumable_state()
+	var eng := _consumable_engine(30)
+	var csalve := ConsumablePool.get_consumable(&"traveller_salve")
+	RunManager.add_consumable(csalve)
+	_check("the salve heals 12 in combat, live, and is spent",
+		eng.use_consumable(csalve) and eng.player_stats.current_hp == 42
+		and RunManager.consumables.is_empty())
+	var healthy := ConsumablePool.get_consumable(&"traveller_salve")
+	RunManager.add_consumable(healthy)
+	eng.player_stats.current_hp = 50
+	_check("a combat heal at full health is refused",
+		not eng.can_use_consumable(healthy) and not eng.use_consumable(healthy)
+		and RunManager.consumables.has(healthy))
+	RunManager.consumables.clear()
+	var csupper := ConsumablePool.get_consumable(&"cold_supper")
+	RunManager.add_consumable(csupper)
+	eng.player_stats.current_hp = 10
+	_check("a map-only item cannot be used in combat", not eng.use_consumable(csupper))
+	RunManager.consumables.clear()
+
+	# Blade Oil: the first hit of the next attack card deals +8, once.
+	var coil := ConsumablePool.get_consumable(&"blade_oil")
+	RunManager.add_consumable(coil)
+	var strike := _neutral_attack("Test Strike", 1, 6)
+	var strike2 := _neutral_attack("Test Strike B", 1, 6)
+	eng.piles.hand.append(strike)
+	eng.piles.hand.append(strike2)
+	var dummy := eng.enemies[0].stats
+	var hp0 := dummy.current_hp
+	_check("blade oil is poured and spent",
+		eng.use_consumable(coil) and RunManager.consumables.is_empty())
+	eng.play_card(strike, dummy)
+	var first_hit := hp0 - dummy.current_hp
+	eng.play_card(strike2, dummy)
+	var second_hit := (hp0 - first_hit) - dummy.current_hp
+	_check("the next attack deals 6 + 8 = 14, then attacks return to 6 (one-shot)",
+		first_hit == 14 and second_hit == 6)
+	var oil2 := ConsumablePool.get_consumable(&"blade_oil")
+	var oil3 := ConsumablePool.get_consumable(&"blade_oil")
+	RunManager.add_consumable(oil2)
+	RunManager.add_consumable(oil3)
+	eng.use_consumable(oil2)
+	_check("a second oil is refused while one is already waiting (no wasted click)",
+		not eng.can_use_consumable(oil3))
+	RunManager.consumables.clear()
+
+	# Unspent Courage: the same fight-long Strength the Shade's queued boon gave, but held until
+	# the player spends it. A fight with the item merely held starts at 0 Strength.
+	_reset_consumable_state()
+	var ceng := _consumable_engine()
+	var courage := ConsumablePool.get_consumable(&"unspent_courage")
+	RunManager.add_consumable(courage)
+	_check("unspent courage gives +2 Strength for the fight when the player spends it",
+		ceng.use_consumable(courage)
+		and ceng.player_stats.get_status_stacks(StatusEffects.STRENGTH) == 2)
+	_check("it is not auto-applied: a fight with the item merely held starts at 0 Strength",
+		_held_courage_fight_starts_flat())
+
+	# A Bottled Blessing pushes toward the pole the player already leans to.
+	_reset_consumable_state()
+	var beng := _consumable_engine()
+	var blessing := ConsumablePool.get_consumable(&"bottled_blessing")
+	RunManager.add_consumable(blessing)
+	RunManager.passion.current_value = 10
+	beng.use_consumable(blessing)
+	_check("a blessing at +10 pushes toward Blazing (+12 to 22)",
+		RunManager.passion.current_value == 22)
+	var blessing2 := ConsumablePool.get_consumable(&"bottled_blessing")
+	RunManager.add_consumable(blessing2)
+	RunManager.passion.current_value = -10
+	beng.use_consumable(blessing2)
+	_check("a blessing at -10 pushes toward Hollow (-12 to -22)",
+		RunManager.passion.current_value == -22)
+	var blessing3 := ConsumablePool.get_consumable(&"bottled_blessing")
+	RunManager.add_consumable(blessing3)
+	RunManager.passion.current_value = 0
+	beng.use_consumable(blessing3)
+	_check("dead center leans Blazing", RunManager.passion.current_value == 12)
+	RunManager.passion.current_value = 0
+
+	# Relic-water in combat heals and drifts Passion; the favour turns the first blow only.
+	var weng := _consumable_engine(30)
+	var cwater := ConsumablePool.get_consumable(&"relic_water")
+	RunManager.add_consumable(cwater)
+	weng.use_consumable(cwater)
+	_check("relic-water in combat heals 16 and drifts Passion 8 toward Hollow",
+		weng.player_stats.current_hp == 46 and RunManager.passion.current_value == -8)
+	RunManager.passion.current_value = 0
+	var feng := _consumable_engine()
+	var favour := ConsumablePool.get_consumable(&"champions_favour")
+	RunManager.add_consumable(favour)
+	_check("the favour is armed and spent",
+		feng.use_consumable(favour) and RunManager.consumables.is_empty())
+	feng.execute_enemy_turn(feng.enemies[0])
+	_check("the first blow against the player does not land", feng.player_stats.current_hp == 50)
+	feng.execute_enemy_turn(feng.enemies[0])
+	_check("the second blow does (the favour is spent by the first)",
+		feng.player_stats.current_hp == 30)
+	var feng2 := _consumable_engine()
+	var favour2 := ConsumablePool.get_consumable(&"champions_favour")
+	RunManager.add_consumable(favour2)
+	feng2.use_consumable(favour2)
+	feng2.self_damage(feng2.player_stats, 5)
+	_check("the player's own HP costs do not spend the favour",
+		feng2.player_stats.current_hp == 45)
+	feng2.execute_enemy_turn(feng2.enemies[0])
+	_check("...and the favour still turns the next enemy blow", feng2.player_stats.current_hp == 45)
+
+	# Nothing armed carries into the next fight, and combat items wait for the player's turn.
+	var feng3 := _consumable_engine()
+	feng3.execute_enemy_turn(feng3.enemies[0])
+	_check("a new fight starts with no favour armed", feng3.player_stats.current_hp == 30)
+	feng3.phase = CombatEngine.Phase.ENEMY_TURN
+	var late_salve := ConsumablePool.get_consumable(&"traveller_salve")
+	RunManager.add_consumable(late_salve)
+	_check("combat consumables cannot be used off the player's turn",
+		not feng3.can_use_consumable(late_salve))
+	RunManager.consumables.clear()
+	for e in [eng, ceng, beng, weng, feng, feng2, feng3]:
+		e.free()
+
+	# --- The chalice: a quest item with a slot cost, spent at its payoff, dead once it is passed.
+	_reset_consumable_state()
+	var chalice := ConsumablePool.get_consumable(&"poisoned_chalice")
+	_check("the chalice is a quest item with no use button",
+		chalice.is_quest_item() and not chalice.usable_in_combat and not chalice.usable_on_map
+		and chalice.quest_id == &"raiders")
+	_check("an unarmed chalice is already spent", RunManager.is_consumable_spent(chalice))
+	var qmap: MapData = null
+	var payoff_id := -1
+	for seed_value in range(200, 260):
+		var qrng := RandomNumberGenerator.new()
+		qrng.seed = seed_value
+		qmap = MapGenerator.generate(qrng, &"camelot", 1, 1.0, false)
+		for id in qmap.nodes:
+			if qmap.nodes[id].quest_payoff_id == &"raiders":
+				payoff_id = id
+		if payoff_id != -1:
+			break
+	_check("a seeded Camelot map places the raider payoff the chalice rides", payoff_id != -1)
+	RunManager.current_map = qmap
+	RunManager.arm_quest(&"raiders")
+	_check("an armed chalice with the lair still ahead is live",
+		not RunManager.is_consumable_spent(chalice))
+	var boss_id := -1
+	for id in qmap.nodes:
+		if qmap.nodes[id].node_type == MapNode.NodeType.BOSS:
+			boss_id = id
+	var saved_pos := qmap.current_node_id
+	qmap.current_node_id = boss_id
+	_check("once the player has walked past the lair, the chalice is spent",
+		RunManager.is_consumable_spent(chalice))
+	qmap.current_node_id = saved_pos
+	qmap.nodes[payoff_id].visited = true
+	_check("a visited lair leaves the chalice spent", RunManager.is_consumable_spent(chalice))
+	qmap.nodes[payoff_id].visited = false
+	RunManager.complete_quest(&"raiders")
+	_check("a completed questline leaves the chalice spent", RunManager.is_consumable_spent(chalice))
+	_check("a spent quest item can still be dropped to free the slot",
+		RunManager.add_consumable(chalice) and RunManager.discard_consumable(chalice)
+		and RunManager.consumables.is_empty())
+
+	# Delivered at the lair: every raider opens the fight with the chalice's Poison.
+	var band := EnemyPool.get_raider_band_poisoned(chalice.value)
+	var normal_band := EnemyPool.get_raider_band()
+	var all_dosed := band.size() == 3
+	for member in band:
+		var dosed := false
+		for pair in member.starting_statuses:
+			if pair[0] == StatusEffects.POISON and pair[1] == chalice.value:
+				dosed = true
+		if not dosed:
+			all_dosed = false
+	_check("the poisoned band is the same three fighters, each carrying the chalice's Poison",
+		all_dosed and band.size() == normal_band.size())
+	var peng := CombatEngine.new()
+	add_child(peng)
+	peng.start_combat([], 50, 50, band)
+	var started_poisoned := true
+	for member in peng.enemies:
+		if member.stats.get_status_stacks(StatusEffects.POISON) != chalice.value:
+			started_poisoned = false
+	_check("they open the fight Poisoned", started_poisoned)
+	peng.free()
+	var es: Control = load("res://scenes/event/event_scene.gd").new()
+	var lair: EventData = es._build_raider_ambush_event()
+	var plea: EventData = es._build_raider_plea_event()
+	var cup: EventData.EventChoice = null
+	for ch in lair.choices:
+		if ch.requires_consumable == &"poisoned_chalice":
+			cup = ch
+	_check("the lair offers a chalice-gated option that spends it and launches the poisoned fight",
+		cup != null and cup.spends_consumable == &"poisoned_chalice"
+		and cup.starts_combat == &"raider_band_poisoned")
+	_check("the plea hands over the chalice when the hunt is accepted",
+		plea.choices[0].grants_consumable == &"poisoned_chalice"
+		and plea.choices[0].arms_quest == &"raiders")
+
+	# --- Every consumable has a grant site: an event choice, or the shop.
+	var granted: Array[StringName] = []
+	var events: Array[EventData] = EventPool._build_pool()
+	events.append(es._build_reliquary_struck_event())
+	events.append(plea)
+	events.append(lair)
+	for ev in events:
+		for ch in ev.choices:
+			if ch.grants_consumable != &"":
+				granted.append(ch.grants_consumable)
+	var orphans := PackedStringArray()
+	for id in ConsumablePool.all_ids():
+		var sold := id in camelot_stock
+		if id not in granted and not sold:
+			orphans.append(String(id))
+	_check("every consumable is granted by an event or sold in a shop (orphans: %s)" % ", ".join(orphans),
+		orphans.is_empty())
+	var unknown_grant := false
+	for id in granted:
+		if ConsumablePool.get_consumable(id) == null:
+			unknown_grant = true
+	_check("no event grants a consumable id the pool does not know", not unknown_grant)
+	es.free()
+
+	# --- The shop's provisions follow the same rules.
+	var shop: Control = load("res://scenes/shop/shop_scene.gd").new()
+	shop._generate_shop()
+	var priced: bool = shop.shop_consumables.size() == 2
+	for item in shop.shop_consumables:
+		priced = priced and shop.consumable_prices.get(item, 0) > 0
+	_check("a shop rolls two priced provisions", priced)
+	shop.free()
+
+	_reset_consumable_state()
+
+
+## Builds a fight with Unspent Courage merely HELD (not used) and reports whether the player starts
+## at 0 Strength: the migration's point is that the held item never spends itself.
+func _held_courage_fight_starts_flat() -> bool:
+	RunManager.consumables.clear()
+	RunManager.add_consumable(ConsumablePool.get_consumable(&"unspent_courage"))
+	var held_eng := _consumable_engine()
+	var flat: bool = held_eng.player_stats.get_status_stacks(StatusEffects.STRENGTH) == 0 \
+		and RunManager.consumables.size() == 1
+	held_eng.free()
+	RunManager.consumables.clear()
+	return flat
+
+
+## The pack's UI logic without rendering: the bar's reasons and uses, and the full-pack prompt.
+func _test_consumable_ui() -> void:
+	_reset_consumable_state()
+	var bar := ConsumableBar.new()
+	add_child(bar)
+	bar.setup(ConsumableBar.Mode.MAP)
+	var salve := ConsumablePool.get_consumable(&"traveller_salve")
+	var oil := ConsumablePool.get_consumable(&"blade_oil")
+	var supper := ConsumablePool.get_consumable(&"cold_supper")
+	var chalice := ConsumablePool.get_consumable(&"poisoned_chalice")
+	RunManager.current_hp = 80
+	_check("on the map, a salve at full health says why it waits",
+		bar._why_unusable(salve, false) == "Already at full health.")
+	RunManager.current_hp = 60
+	RunManager.add_consumable(salve)
+	_check("on the map, a salve at 60/80 is usable", bar._why_unusable(salve, false) == "")
+	RunManager.discard_consumable(salve)
+	_check("on the map, an oil says it is combat only",
+		bar._why_unusable(oil, false) == "Combat only.")
+	_check("a quest item says it is carried to its payoff",
+		bar._why_unusable(chalice, false).begins_with("Carried"))
+	_check("a spent quest item says to drop it",
+		bar._why_unusable(chalice, true).find("Drop it") != -1)
+	var cbar := ConsumableBar.new()
+	add_child(cbar)
+	var eng := _consumable_engine(30)
+	cbar.setup(ConsumableBar.Mode.COMBAT, eng)
+	_check("in combat, a supper says it is map only", cbar._why_unusable(supper, false) == "Map only.")
+	RunManager.add_consumable(salve)
+	_check("in combat, a wounded player can use a salve", cbar._why_unusable(salve, false) == "")
+	var used: Array = []
+	cbar.item_used.connect(func(item): used.append(item))
+	cbar._on_use_pressed(salve)
+	_check("pressing a usable item in combat uses it, spends it and tells the host",
+		used.size() == 1 and eng.player_stats.current_hp == 42 and RunManager.consumables.is_empty())
+	RunManager.add_consumable(supper)
+	var map_used: Array = []
+	bar.item_used.connect(func(item): map_used.append(item))
+	RunManager.current_hp = 40
+	bar._on_use_pressed(supper)
+	_check("pressing a usable item on the map uses it",
+		map_used.size() == 1 and RunManager.current_hp == 60)
+	eng.free()
+	bar.free()
+	cbar.free()
+
+	# The full-pack prompt: drop a held one to take the new one, or leave the new one.
+	_reset_consumable_state()
+	var held_a := ConsumablePool.get_consumable(&"traveller_salve")
+	var held_b := ConsumablePool.get_consumable(&"cold_supper")
+	RunManager.add_consumable(held_a)
+	RunManager.add_consumable(held_b)
+	var newcomer := ConsumablePool.get_consumable(&"blade_oil")
+	var swap := ConsumableSwap.open(self, newcomer)
+	var results: Array = []
+	swap.resolved.connect(func(taken): results.append(taken))
+	swap._on_drop_held(held_a)
+	_check("dropping a held item takes the new one: the pack is the supper and the oil",
+		results == [true] and RunManager.consumables.size() == 2
+		and RunManager.consumables.has(held_b) and RunManager.consumables.has(newcomer)
+		and not RunManager.consumables.has(held_a))
+	var newcomer2 := ConsumablePool.get_consumable(&"bottled_blessing")
+	var swap2 := ConsumableSwap.open(self, newcomer2)
+	var results2: Array = []
+	swap2.resolved.connect(func(taken): results2.append(taken))
+	swap2._on_leave_new()
+	_check("leaving the new item behind changes nothing in the pack",
+		results2 == [false] and RunManager.consumables.size() == 2
+		and not RunManager.consumables.has(newcomer2))
+	_reset_consumable_state()
+
+

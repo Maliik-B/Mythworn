@@ -98,3 +98,17 @@ class EventChoice extends RefCounted:
 	## this is a dead card that clogs the deck for the rest of the run. Used by the Wandering
 	## Spirit's banish option.
 	var grants_curse: StringName = &""
+	## If non-empty, taking this choice hands the player this consumable (ConsumablePool id). When
+	## both pack slots are full the event scene raises the swap prompt first: leave one behind, or
+	## leave the new thing. Sourced from events first and shops second, never from combat drops.
+	## The Shade at the Cross's lent courage is the first (&"unspent_courage"), held rather than
+	## spent for the player.
+	var grants_consumable: StringName = &""
+	## Pack gate: if non-empty, this choice is only selectable while the player holds this
+	## consumable. Rendered like a favor-gated option, disabled with "(Need: <name>)" so the
+	## player sees the road they were not carrying the means for (the raider lair's chalice).
+	var requires_consumable: StringName = &""
+	## If non-empty, taking this choice spends this held consumable (a quest item delivered where
+	## it was meant to go). Spent before the grant, so a swap never has to ask.
+	var spends_consumable: StringName = &""
+

@@ -8,6 +8,9 @@ var info_label: Label
 var desc_label: RichTextLabel
 var choice_container: VBoxContainer
 var follow_up_container: VBoxContainer
+## Whether the consumable the last choice offered went into the pack. False when the player
+## met a full pack and left the new thing behind. Read by the effect summary.
+var _consumable_taken := true
 
 
 func _ready() -> void:
@@ -155,8 +158,12 @@ func _build_raider_plea_event() -> EventData:
 	accept.text = "Follow the drovers' road. Put an end to the Boar."
 	accept.result_text = ("You tell him you'll take the road past the ford. He doesn't thank you. "
 		+ "He's past thanking people for things that haven't happened yet. But he draws you a map in "
-		+ "the dirt with the point of a stick, and marks where the trees close in. \"They'll hear you "
-		+ "before you see them,\" he says. \"They always do.\"")
+		+ "the dirt with the point of a stick, and marks where the trees close in. Then he sends a boy "
+		+ "running to the house for a stoppered cup, the last of the village's wine gone cloudy, with "
+		+ "the green smell of monkshood steeped in it. \"They drink anything,\" he says. \"Leave it "
+		+ "where they'll find it.\" He looks at the trees again. \"They'll hear you before you see "
+		+ "them. They always do.\"")
+	accept.grants_consumable = &"poisoned_chalice"
 	accept.arms_quest = &"raiders"
 	accept.passion_change = 3
 	accept.standing_change = 8  # taking up the people's fight earns their regard
@@ -191,6 +198,16 @@ func _build_raider_ambush_event() -> EventData:
 	fight.text = "Draw, and make an end of it."
 	fight.starts_combat = &"raider_band"
 	e.choices.append(fight)
+
+	# The chalice delivered: the cup the village sent with you is set where they will find it,
+	# and every raider opens the fight with Poison. Disabled with "(Need: The Poisoned Chalice)"
+	# for a keeper who dropped it, or never took it, so the road not carried is visible.
+	var cup = EventData.EventChoice.new()
+	cup.text = "Set the village's cup where they will find it, then draw."
+	cup.requires_consumable = &"poisoned_chalice"
+	cup.spends_consumable = &"poisoned_chalice"
+	cup.starts_combat = &"raider_band_poisoned"
+	e.choices.append(cup)
 
 	return e
 
@@ -379,8 +396,12 @@ func _build_reliquary_struck_event() -> EventData:
 		+ "her, for as long as it lasts, and you don't fight the chapel for anything past that. "
 		+ "Her face stays. Worn at the edges, but yours. On the way out you put a hand flat on the "
 		+ "grey door. \"I'm sorry,\" you tell it, and you're not sure for what. For leaving it like "
-		+ "this, maybe. It doesn't answer. You take the road with one more face kept than you came "
-		+ "with, and a chapel at your back that you did not save.")
+		+ "this, maybe. It doesn't answer. The font by the lychgate has a little standing water in "
+		+ "it, and you fill a flask from it on the way past, because it is there and because "
+		+ "something ought to be taken out of a place that has taken that much. It is colder than "
+		+ "it should be. You take the road with one more face kept than you came with, and a "
+		+ "chapel at your back that you did not save.")
+	hold.grants_consumable = &"relic_water"
 	hold.passion_change = 5
 	e.choices.append(hold)
 
@@ -552,6 +573,13 @@ func _show_choices() -> void:
 			btn.disabled = true
 			btn.text += " (Need: Favor of the Court)"
 			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
+		# Pack gate: an option that wants an item the player is not carrying (the raider lair's
+		# chalice) shows what it would have taken, the way a favor gate shows its faction.
+		elif choice.requires_consumable != &"" and not RunManager.has_consumable(choice.requires_consumable):
+			var needed := ConsumablePool.get_consumable(choice.requires_consumable)
+			btn.disabled = true
+			btn.text += " (Need: %s)" % (needed.display_name if needed else "an item")
+			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		choice_container.add_child(btn)
 
 
@@ -605,6 +633,10 @@ func _on_choice_selected(index: int) -> void:
 		# clamped to leave 1 HP -- the fight is the real threat, not the reach.
 		if choice.hp_change < 0:
 			RunManager.current_hp = maxi(1, RunManager.current_hp + choice.hp_change)
+		# A quest item delivered at the fight (the chalice left for the raiders) is spent
+		# here for the same reason: the launch skips _apply_effects.
+		if choice.spends_consumable != &"":
+			RunManager.spend_consumable_by_id(choice.spends_consumable)
 		_start_event_combat(choice.starts_combat)
 		return
 
@@ -632,6 +664,12 @@ func _on_choice_selected(index: int) -> void:
 			RunManager.get_owned_relic_names())
 		if liaison_picks.size() > 0:
 			choice.granted_relic_id = liaison_picks[0].relic_name
+
+	# A consumable grant resolves BEFORE the result shows: with both pack slots full the player
+	# must leave something behind, and the summary below has to say what actually happened.
+	_consumable_taken = true
+	if choice.grants_consumable != &"":
+		_consumable_taken = await _grant_consumable(choice.grants_consumable)
 
 	_apply_effects(choice)
 	choice_container.visible = false
@@ -669,6 +707,21 @@ func _combat_boon_label(boon: StringName) -> String:
 			return "Next combat: a boon"
 
 
+## Hands the player a consumable, or raises the swap prompt when both slots are full. Returns
+## whether the new item ended up in the pack. A coroutine: with a full pack it waits for the
+## player's decision, so the caller can show an honest result afterward.
+func _grant_consumable(id: StringName) -> bool:
+	var item := ConsumablePool.get_consumable(id)
+	if item == null:
+		push_warning("Unknown consumable id on an event choice: %s" % id)
+		return false
+	if RunManager.add_consumable(item):
+		return true
+	var swap := ConsumableSwap.open(self, item)
+	var taken: bool = await swap.resolved
+	return taken
+
+
 ## Launches a scripted event fight. The Sword-in-the-Stone guardian is the Beast at the
 ## Stone (a champion who went to face Caedmon and came back hollowed).
 ## Combat victory routes back to the "beast unmade" beat via pending_event_combat +
@@ -688,6 +741,20 @@ func _start_event_combat(key: StringName) -> void:
 		&"raider_band":
 			RunManager.pending_enemies.clear()
 			for enemy in EnemyPool.get_raider_band():
+				RunManager.pending_enemies.append(enemy)
+			RunManager.pending_gold_reward = 0
+			RunManager.pending_relic_reward = false
+			RunManager.pending_relic_is_boss = false
+			RunManager.pending_event_combat = true
+			RunManager.pending_special_event = &"raider_victory"
+			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
+		&"raider_band_poisoned":
+			# The chalice was left where the band would find it: every raider opens the fight
+			# with the chalice's Poison (its value, read from the consumable's own data so the
+			# number lives in one place).
+			var chalice := ConsumablePool.get_consumable(&"poisoned_chalice")
+			RunManager.pending_enemies.clear()
+			for enemy in EnemyPool.get_raider_band_poisoned(chalice.value if chalice else 6):
 				RunManager.pending_enemies.append(enemy)
 			RunManager.pending_gold_reward = 0
 			RunManager.pending_relic_reward = false
@@ -780,6 +847,10 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.skips_next_node:
 		RunManager.pending_skip_node = true
 
+	# A quest item delivered by this choice leaves the pack.
+	if choice.spends_consumable != &"":
+		RunManager.spend_consumable_by_id(choice.spends_consumable)
+
 	# A refusal's curse (the higher tier of consequence): a permanent unplayable card wedged
 	# into the run deck -- the spurned party's parting gift, dead weight for the rest of the run.
 	if choice.grants_curse != &"":
@@ -827,6 +898,11 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 
 	if choice.grants_combat_boon != &"":
 		parts.append(_combat_boon_label(choice.grants_combat_boon))
+
+	if choice.grants_consumable != &"":
+		var offered := ConsumablePool.get_consumable(choice.grants_consumable)
+		if offered:
+			parts.append(("Acquired: %s" if _consumable_taken else "Left behind: %s") % offered.display_name)
 
 	if choice.skips_next_node:
 		parts.append("Skip your next node")

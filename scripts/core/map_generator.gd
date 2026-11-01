@@ -353,6 +353,26 @@ static func pick_treasure_payoff(map: MapData, from_id: int, rng: RandomNumberGe
 	return cands[0]
 
 
+## True while the payoff node of a questline is still ahead of the player: tagged on this map,
+## not yet visited, and forward-reachable from where the player stands. A quest item whose
+## payoff fails this is spent (the lair is behind you, or the route to it is gone). rng-free, so
+## the pack UI can ask on every redraw.
+static func quest_payoff_ahead(map: MapData, quest_id: StringName) -> bool:
+	if map == null or quest_id == &"":
+		return false
+	var payoff: MapNode = null
+	for id in map.nodes:
+		var n: MapNode = map.nodes[id]
+		if n.quest_payoff_id == quest_id:
+			payoff = n
+			break
+	if payoff == null or payoff.visited:
+		return false
+	if map.current_node_id == -1:
+		return true  # the player has not entered the map yet; every node is ahead
+	return _reachable_from(map, map.current_node_id).has(payoff.id)
+
+
 ## Nodes that signature placement must never overwrite: the boss, the Sword, the opening
 ## row, the guaranteed pre-boss rest, and anything already tagged for the questline.
 static func _is_reserved_node(map: MapData, n: MapNode) -> bool:

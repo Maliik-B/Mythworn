@@ -222,6 +222,16 @@ static func get_raider_band() -> Array[EnemyData]:
 	return result
 
 
+## The raider band, as it meets a keeper who left the village's poisoned cup for it: the same
+## three fighters, each opening the fight with `dose` Poison. The dose is the Poisoned Chalice's
+## own value (ConsumablePool), passed in so the number lives in one place.
+static func get_raider_band_poisoned(dose: int) -> Array[EnemyData]:
+	var band := get_raider_band()
+	for enemy in band:
+		enemy.starting_statuses.append([StatusEffects.POISON, dose])
+	return band
+
+
 ## The Campfire treasure guardian: a solo, elite-weight fight (the barrow-warden denning on
 ## the cache the campers dug up and fled). A chosen, optional detour with a strong reward, so
 ## it's meatier than a regular but a notch under the Shattered Choir mini-boss.
