@@ -843,6 +843,52 @@ static func _memory_name_i_gave_myself() -> CardData:
 	return c
 
 
+# ============================================================
+# COMPANION (TRICK) CARDS
+# A companion's pool: cards the pet GIVES the player, not cards in the deck. Each carries the
+# Trick keyword (CardData.trick), so it leaves play when it resolves and, unplayed, vanishes at
+# the end of the turn unless it is bankable. Each is priced on its own: cost is the balance lever,
+# the pet's arrival chance (PetData.arrival_chance) is the other. PROVISIONAL (part 3).
+# ============================================================
+
+## The Camelot hound's pool. Three tricks, one answer each to the bankability question: Fetch
+## and Flush vanish (a banked free draw or a banked sweep is exactly the stockpile that recreates
+## the energy problem as a burst), Hold is bankable (it costs a hand slot to keep, and Weak does
+## not stack past its duration, so five of them gain nothing).
+static func build_hound_cards() -> Array[CardData]:
+	var cards: Array[CardData] = [_trick_fetch(), _trick_hold(), _trick_flush()]
+	return cards
+
+
+## Free card flow: it brings back whatever it thinks you need. Costs nothing, vanishes if unused.
+static func _trick_fetch() -> CardData:
+	var c := _card("Fetch", 0, CardData.CardType.SKILL, CardData.TargetType.SELF,
+		CardData.CardRarity.COMMON, [_draw(1)])
+	c.trick = true
+	c.flavor_text = "It brings back whatever it thinks you need. It is usually right."
+	return c
+
+
+## It has a leg and does not mean to let go. Weak on one enemy; bankable, since holding it
+## spends a hand slot and the status gains nothing from being stockpiled.
+static func _trick_hold() -> CardData:
+	var c := _card("Hold", 1, CardData.CardType.SKILL, CardData.TargetType.SINGLE_ENEMY,
+		CardData.CardRarity.COMMON, [_status(StatusEffects.WEAK, 2)])
+	c.trick = true
+	c.retain = true
+	c.flavor_text = "It has hold of a leg and does not intend to let go."
+	return c
+
+
+## It goes in low through the brush and everything that was hiding stops hiding. A light sweep.
+static func _trick_flush() -> CardData:
+	var c := _card("Flush", 1, CardData.CardType.ATTACK, CardData.TargetType.ALL_ENEMIES,
+		CardData.CardRarity.COMMON, [_damage(5)])
+	c.trick = true
+	c.flavor_text = "It goes in low through the brush, and what was hiding stops hiding."
+	return c
+
+
 ## The Excalibur signature card. Constructed fresh each combat by CombatEngine
 ## when the player holds Excalibur in Sword mode. Never enters the player's
 ## persistent deck and never appears in reward pools or shops — its existence

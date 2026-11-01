@@ -51,6 +51,7 @@ var titles_btn: Button
 var excalibur_btn: Button  # Only visible when player holds Excalibur (Camelot quest reward)
 var thurible_btn: Button  # Only visible when player holds The Thurible (Reliquary censer relic)
 var consumable_bar: ConsumableBar  # The pack: two consumable slots, usable from the map
+var pet_label: Label  # The companion readout; only visible when one travels with the player
 var timer_label: Label
 var seed_label: Label
 var info_label: Label
@@ -865,6 +866,14 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	consumable_bar.item_used.connect(func(_item): _update_bottom_bar())
 	bar.add_child(consumable_bar)
 
+	# The companion, if one travels with the player. Hidden until an event grants one.
+	pet_label = Label.new()
+	pet_label.add_theme_font_size_override("font_size", 18)
+	pet_label.add_theme_color_override("font_color", Color(0.78, 0.72, 0.55))
+	pet_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	pet_label.visible = false
+	bar.add_child(pet_label)
+
 	# Excalibur mode toggle — only shown when the player holds Excalibur.
 	# Gold styling matches the Sword in the Stone node color so it reads as
 	# "this is the Camelot quest reward you're managing."
@@ -916,6 +925,14 @@ func _update_bottom_bar() -> void:
 	# The click-through popup shows the full earned list + which are equipped.
 	titles_btn.text = "Titles: %d/%d slots" % [
 		_count_equipped_titles(), RunManager.active_title_slots.size()]
+
+	var companion := RunManager.get_pet()
+	if companion:
+		pet_label.visible = true
+		pet_label.text = "Companion: %s" % companion.display_name
+		pet_label.tooltip_text = companion.description
+	else:
+		pet_label.visible = false
 
 	if RunManager.has_excalibur():
 		excalibur_btn.visible = true

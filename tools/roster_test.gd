@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_event_reworks()
 	_test_consumables()
 	_test_consumable_ui()
+	_test_pets()
 	_test_liaison_relics()
 	_test_refusals()
 	_test_title_split()
@@ -2651,6 +2652,7 @@ func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:
 ## starts from the same place and leaves nothing behind for the next one.
 func _reset_consumable_state() -> void:
 	RunManager.consumables.clear()
+	RunManager.pet_id = &""
 	RunManager.realm_standing.clear()
 	RunManager.active_quests = {}
 	RunManager.current_map = null
@@ -3103,3 +3105,137 @@ func _test_consumable_ui() -> void:
 	_reset_consumable_state()
 
 
+func _test_pets() -> void:
+	_reset_consumable_state()
+	var hound := PetPool.get_pet(&"hound")
+	_check("the hound is a Camelot companion with a card chance and a description",
+		hound != null and hound.realm_id == &"camelot" and hound.arrival_chance > 0.0
+		and hound.arrival_chance < 1.0 and hound.description != "")
+	_check("an unknown pet, and no pet, are null",
+		PetPool.get_pet(&"nope") == null and PetPool.get_pet(&"") == null)
+	var cards := PetPool.build_cards(&"hound")
+	var names := PackedStringArray()
+	var all_trick := true
+	for c in cards:
+		names.append(c.card_name)
+		if not c.trick:
+			all_trick = false
+	_check("the hound's pool is Fetch, Hold and Flush, all Tricks", cards.size() == 3 and all_trick
+		and "Fetch" in names and "Hold" in names and "Flush" in names)
+	var fetch: CardData = _card_by_name(cards, "Fetch")
+	var hold: CardData = _card_by_name(cards, "Hold")
+	var flush: CardData = _card_by_name(cards, "Flush")
+	_check("bankability is answered per card: Hold stays, Fetch and Flush vanish",
+		hold.retain and not fetch.retain and not flush.retain)
+	_check("each pet card is priced on its own (Fetch free, Hold and Flush one energy)",
+		fetch.energy_cost == 0 and hold.energy_cost == 1 and flush.energy_cost == 1)
+	_check("the Trick keyword carries reminder text on the card, and the bankable one says it stays",
+		fetch.get_generated_description().find("Trick.") != -1
+		and fetch.trick_reminder().find("leaves at end of turn") != -1
+		and hold.trick_reminder().find("Stays in hand") != -1)
+	_check("an ordinary card carries no Trick reminder",
+		_neutral_attack("Plain", 1, 6).trick_reminder() == "")
+	_check("a pet card copies its Trick flag when duplicated", fetch.duplicate_card().trick)
+	_check("different calls give separate card instances", PetPool.build_cards(&"hound")[0] != cards[0])
+	_check("the Tiltyard's warm option grants the hound", _tiltyard_grants_hound())
+
+	# --- Arrival: a chance each turn, from the pool, through the deck rng; no pet, no draw.
+	var eng := _consumable_engine()
+	eng.piles.hand.clear()
+	var rng_before: int = RngManager.deck_rng.state
+	eng._maybe_pet_arrival()
+	_check("with no companion nothing arrives and the deck rng is untouched",
+		eng.piles.hand.is_empty() and RngManager.deck_rng.state == rng_before)
+	RunManager.set_pet(&"hound")
+	var arrivals := 0
+	var from_pool := true
+	for _i in 600:
+		eng.piles.hand.clear()
+		eng._maybe_pet_arrival()
+		arrivals += eng.piles.hand.size()
+		for c in eng.piles.hand:
+			if not c.trick or c.card_name not in names:
+				from_pool = false
+	_check("over 600 turns the hound brings about 40%% (got %d of 600)" % arrivals,
+		arrivals >= 190 and arrivals <= 290)
+	_check("every arrival is a Trick card from the hound's own pool", from_pool)
+	RunManager.set_pet(&"nope")
+	_check("an unknown pet id is refused and the hound stays", RunManager.pet_id == &"hound")
+	eng.free()
+
+	# --- Arrival is seeded: two runs of the same seed see the same cards.
+	RngManager.setup_run(4242)
+	var run_a := _hound_arrivals(40)
+	RngManager.setup_run(4242)
+	var run_b := _hound_arrivals(40)
+	_check("the hound's arrivals replay identically from the same run seed",
+		run_a == run_b and run_a != "")
+
+	# --- Playing and vanishing.
+	var peng := _consumable_engine()
+	var pcards := PetPool.build_cards(&"hound")
+	var p_fetch: CardData = _card_by_name(pcards, "Fetch")
+	var p_hold: CardData = _card_by_name(pcards, "Hold")
+	var p_flush: CardData = _card_by_name(pcards, "Flush")
+	peng.piles.hand.clear()
+	peng.piles.draw_pile.append(_neutral_attack("Deep Card", 1, 6))
+	peng.piles.hand.append(p_fetch)
+	peng.piles.hand.append(p_hold)
+	peng.piles.hand.append(p_flush)
+	var enemy_stats := peng.enemies[0].stats
+	var e_hp := enemy_stats.current_hp
+	_check("a pet card obeys energy: Fetch is free", peng.can_play_card(p_fetch) and peng.energy == 3)
+	peng.play_card(p_fetch, peng.player_stats)
+	_check("Fetch draws a card and leaves play (no pile, not exhausted, not discarded)",
+		peng.piles.hand.size() == 3 and p_fetch not in peng.piles.hand
+		and p_fetch not in peng.piles.discard_pile and p_fetch not in peng.piles.exhaust_pile)
+	peng.play_card(p_flush, enemy_stats)
+	_check("Flush spends 1 energy and hits all enemies for 5 (and leaves play)",
+		peng.energy == 2 and e_hp - enemy_stats.current_hp == 5
+		and p_flush not in peng.piles.discard_pile)
+	# Hold is bankable: it survives the end of the turn; an unplayed Fetch would not.
+	var spare_fetch: CardData = _card_by_name(PetPool.build_cards(&"hound"), "Fetch")
+	peng.piles.hand.append(spare_fetch)
+	var plain := _neutral_attack("Plain Strike", 1, 6)
+	peng.piles.hand.append(plain)
+	peng.instant = true
+	peng.end_player_turn()
+	_check("at end of turn an unplayed Trick vanishes (not into the discard pile)",
+		spare_fetch not in peng.piles.hand and spare_fetch not in peng.piles.discard_pile
+		and spare_fetch not in peng.piles.exhaust_pile)
+	_check("a bankable Trick stays in hand across the turn", p_hold in peng.piles.hand)
+	# (The next turn's draw may already have reshuffled it into the draw pile or the hand; what
+	# matters is that an ordinary card is never lost the way a Trick is.)
+	_check("an ordinary unplayed card is not lost the way a Trick is",
+		plain in peng.piles.discard_pile or plain in peng.piles.hand or plain in peng.piles.draw_pile)
+	# Playing the held Hold weakens its target and it too leaves play.
+	peng.play_card(p_hold, enemy_stats)
+	_check("Hold puts 2 Weak on its target and leaves play",
+		enemy_stats.get_status_stacks(StatusEffects.WEAK) == 2 and p_hold not in peng.piles.hand
+		and p_hold not in peng.piles.discard_pile)
+	peng.free()
+	_reset_consumable_state()
+
+
+## True if the Tiltyard's quiet option (the warm mundane one) hands over the hound.
+func _tiltyard_grants_hound() -> bool:
+	for ev in EventPool._build_pool():
+		if ev.event_name == "The Tiltyard":
+			for ch in ev.choices:
+				if ch.grants_pet == &"hound":
+					return true
+	return false
+
+
+## The names of the cards the hound brings over `turns` consecutive player turns, as one string.
+func _hound_arrivals(turns: int) -> String:
+	RunManager.set_pet(&"hound")
+	var eng := _consumable_engine()
+	var seen := PackedStringArray()
+	for _i in turns:
+		eng.piles.hand.clear()
+		eng._maybe_pet_arrival()
+		for c in eng.piles.hand:
+			seen.append(c.card_name)
+	eng.free()
+	return ",".join(seen)

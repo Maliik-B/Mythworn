@@ -111,4 +111,7 @@ class EventChoice extends RefCounted:
 	## If non-empty, taking this choice spends this held consumable (a quest item delivered where
 	## it was meant to go). Spent before the grant, so a swap never has to ask.
 	var spends_consumable: StringName = &""
+	## If non-empty, taking this choice hands the player this companion (PetPool id): a source
+	## with its own card pool, one per run. See CombatEngine pet arrivals.
+	var grants_pet: StringName = &""
 

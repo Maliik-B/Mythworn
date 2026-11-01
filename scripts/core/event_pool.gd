@@ -525,9 +525,13 @@ static func _the_tiltyard() -> EventData:
 	c3.result_text = ("You sit against the south wall, where the stone has been holding the sun all "
 		+ "afternoon, and you do not train and you do not take anything. For a quarter of an hour the "
 		+ "only thing happening anywhere in the world is a blackbird working the seeded butts for "
-		+ "grubs. Then you get up and go on. It was enough. You will think about that quarter of an "
-		+ "hour again later, at a considerably worse time, and it will still be enough.")
-	c3.hp_change = 8
+		+ "grubs. Somewhere in it a hound comes out of the kennel by the gate, grey in the muzzle, "
+		+ "and lies down against your boot as though that were what the afternoon was for. Then you "
+		+ "get up and go on. It was enough. The hound goes with you and does not ask whose yard this "
+		+ "was. You will think about that quarter of an hour again later, at a considerably worse "
+		+ "time, and it will still be enough.")
+	c3.hp_change = 5  # was 8 before the hound: the dog is part of what the quiet gives back
+	c3.grants_pet = &"hound"
 
 	e.choices.append(c1)
 	e.choices.append(c2)

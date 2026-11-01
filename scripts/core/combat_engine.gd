@@ -314,9 +314,30 @@ func start_player_turn() -> void:
 	var drawn = piles.draw_cards(HAND_SIZE)
 	for card in drawn:
 		Events.card_drawn.emit(card)
+	_maybe_pet_arrival()
 
 	phase = Phase.PLAYER_TURN
 	Events.player_turn_started.emit()
+
+
+## The companion: on a chance each player turn, one card from the pet's pool arrives in hand
+## (PetData.arrival_chance). It is an ordinary card in every way that matters: it costs energy,
+## it competes with the hand, and it can be left unplayed. It enters no pile. Both rolls use the
+## deck rng, so a seeded run replays identically, and a run with no companion draws nothing from
+## it, leaving every seed that never met one exactly as it was.
+func _maybe_pet_arrival() -> void:
+	var pet := RunManager.get_pet()
+	if pet == null:
+		return
+	if RngManager.deck_rng.randf() >= pet.arrival_chance:
+		return
+	var pool := PetPool.build_cards(pet.id)
+	if pool.is_empty():
+		return
+	var card: CardData = pool[RngManager.deck_rng.randi_range(0, pool.size() - 1)]
+	piles.hand.append(card)
+	Events.card_drawn.emit(card)
+	Events.combat_note.emit("%s brings you %s." % [pet.display_name, card.card_name])
 
 
 ## The Thurible relic: swings the player's Passion toward the pole chosen on the map screen
@@ -432,6 +453,12 @@ func _process_powers() -> void:
 func end_player_turn() -> void:
 	phase = Phase.PLAYER_TURN_END
 	tick_end_of_turn(player_stats)
+
+	# A companion's card the player did not play vanishes: out of the game, not into the discard
+	# pile (it was never part of the deck). A bankable trick (retain) stays like any retained card.
+	for card in piles.hand.duplicate():
+		if card.trick and not card.retain:
+			piles.hand.erase(card)
 
 	for card in piles.hand:
 		if not card.retain:
@@ -580,6 +607,10 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 	if card.card_type == CardData.CardType.POWER:
 		# Powers vanish into their persistent effect — they don't return to any pile
 		# this combat (StS behavior). The GainPowerEffect has already applied them.
+		pass
+	elif card.trick:
+		# A companion's card leaves play when it resolves. It is not exhausted (that would put
+		# it where a recall can bring it back) and not discarded (it was never in the deck).
 		pass
 	elif card.exhaust:
 		piles.exhaust_pile.append(card)

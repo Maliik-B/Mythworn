@@ -10,6 +10,10 @@ var perks: Array[PerkData] = []
 ## Held consumables: the fourth power layer. A hard cap of CONSUMABLE_SLOTS, and no relic widens
 ## it, so "which two" means the same thing from the first node to the last. See ConsumableData.
 var consumables: Array[ConsumableData] = []
+## The companion travelling with the player (PetPool id), or &"" for none. A source with its own
+## card pool: on a chance each player turn one of its cards arrives in hand
+## (CombatEngine._maybe_pet_arrival). One companion per run for now.
+var pet_id: StringName = &""
 var gold: int = 0
 var current_act: int = 0
 var current_hp: int = 0
@@ -227,6 +231,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	equipment.clear()
 	perks.clear()
 	consumables.clear()
+	pet_id = &""
 	run_active = true
 	current_map = null
 	realm_config = RealmConfig.new()  # neutral until the realm-entry VN sets it
@@ -581,6 +586,22 @@ func apply_liaison_gift(liaison: StringName) -> void:
 	var r := RelicPool.get_relic_by_name(relic_name)
 	if r:
 		add_relic(r)
+
+
+# --- Companion ---
+
+## Takes a companion on (an event grants it). An unknown id is refused with a warning and leaves
+## the current companion alone; a second grant replaces the first.
+func set_pet(id: StringName) -> void:
+	if PetPool.get_pet(id) == null:
+		push_warning("set_pet: unknown pet id '%s'" % id)
+		return
+	pet_id = id
+
+
+## The companion's data, or null if none travels with the player.
+func get_pet() -> PetData:
+	return PetPool.get_pet(pet_id)
 
 
 # --- Consumables ---

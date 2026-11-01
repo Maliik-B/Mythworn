@@ -847,9 +847,11 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.skips_next_node:
 		RunManager.pending_skip_node = true
 
-	# A quest item delivered by this choice leaves the pack.
+	# A quest item delivered by this choice leaves the pack; a companion joins it.
 	if choice.spends_consumable != &"":
 		RunManager.spend_consumable_by_id(choice.spends_consumable)
+	if choice.grants_pet != &"":
+		RunManager.set_pet(choice.grants_pet)
 
 	# A refusal's curse (the higher tier of consequence): a permanent unplayable card wedged
 	# into the run deck -- the spurned party's parting gift, dead weight for the rest of the run.
@@ -903,6 +905,11 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 		var offered := ConsumablePool.get_consumable(choice.grants_consumable)
 		if offered:
 			parts.append(("Acquired: %s" if _consumable_taken else "Left behind: %s") % offered.display_name)
+
+	if choice.grants_pet != &"":
+		var companion := PetPool.get_pet(choice.grants_pet)
+		if companion:
+			parts.append("%s joins you" % companion.display_name)
 
 	if choice.skips_next_node:
 		parts.append("Skip your next node")

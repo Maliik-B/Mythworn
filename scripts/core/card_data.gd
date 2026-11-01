@@ -39,6 +39,10 @@ enum PersonalityType { PRIMARY, SECONDARY, NEUTRAL, NEGATIVE }
 ## flag marks them for that gated sourcing (and future visual treatment); it carries no
 ## combat effect of its own. See CardPool.get_memory_card.
 @export var is_memory: bool = false
+## Trick: a card a companion gives you (PetPool). It never enters the deck, it leaves play when
+## it resolves rather than going to a pile, and an unplayed one vanishes at the end of the turn
+## unless it is also `retain` (a bankable trick). The keyword carries reminder text on the card.
+@export var trick: bool = false
 @export var card_art: Texture2D
 
 # Upgrade tracking
@@ -64,6 +68,7 @@ func duplicate_card() -> CardData:
 	copy.unplayable = unplayable
 	copy.retain = retain
 	copy.is_memory = is_memory
+	copy.trick = trick
 	copy.card_art = card_art
 	copy.upgraded = upgraded
 
@@ -127,6 +132,16 @@ func get_active_effects() -> Array[CardEffect]:
 	return effects
 
 
+## The reminder line a Trick card carries, so the keyword is taught on every card that has it.
+## Empty for any other card. Bankable tricks say they stay; the rest say they leave.
+func trick_reminder() -> String:
+	if not trick:
+		return ""
+	if retain:
+		return "Trick. Stays in hand until played."
+	return "Trick. Unplayed, it leaves at end of turn."
+
+
 ## Generates a description string from the card's effects.
 func get_generated_description() -> String:
 	var parts: PackedStringArray = []
@@ -141,6 +156,8 @@ func get_generated_description() -> String:
 		text = description
 	if target_type == TargetType.ALL_ENEMIES:
 		text += " Hits all enemies."
+	if trick:
+		text += "\n" + trick_reminder()
 	return text
 
 
@@ -165,4 +182,6 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 		text = description
 	if target_type == TargetType.ALL_ENEMIES:
 		text += " Hits all enemies."
+	if trick:
+		text += "\n" + trick_reminder()
 	return text
