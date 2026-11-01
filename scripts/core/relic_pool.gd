@@ -266,15 +266,15 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.HEAL, 6))
 
-	pool.append(_relic("Iron Quill", "A quill cut from iron, so the hand behind it does not tire. Start each combat with 1 Strength.",
+	pool.append(_relic("Iron Quill", "A quill cut from iron. The hand behind it does not tire. Start each combat with 1 Strength.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_STRENGTH, 1))
 
-	pool.append(_relic("Steadfast Binding", "Cords pulled tight through the boards, so the leaves hold under any blow. Start each combat with 10 Block.",
+	pool.append(_relic("Steadfast Binding", "Cords pulled tight through the boards. The leaves hold under any blow. Start each combat with 10 Block.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 10))
 
-	pool.append(_relic("Scattered Pages", "Leaves shaken loose from their gathering, so nothing stays where it was put. At the start of combat, apply 1 Vulnerable to ALL enemies.",
+	pool.append(_relic("Scattered Pages", "Leaves shaken loose from their gathering. Nothing stays where it was put. At the start of combat, apply 1 Vulnerable to ALL enemies.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.APPLY_VULNERABLE_ALL, 1))
 
@@ -295,7 +295,7 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_PICKUP,
 		RelicData.RelicEffect.GAIN_MAX_HP, 14))
 
-	pool.append(_relic("Prologue Scroll", "The scroll a herald reads before anything begins, so everyone already knows the order of events. Draw 2 additional cards at the start of combat.",
+	pool.append(_relic("Prologue Scroll", "The scroll a herald reads out before the lists open. Nobody is surprised by what follows. Draw 2 additional cards at the start of combat.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.DRAW_CARDS, 2))
 

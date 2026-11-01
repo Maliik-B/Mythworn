@@ -67,9 +67,9 @@ static func _man_off_the_field() -> EventData:
 	var c1 = EventData.EventChoice.new()
 	c1.text = "Splint it, and ask him what he ran from. (Lose 5 HP)"
 	c1.result_text = ("You set the leg with his own scabbard for a splint and get his arm over your "
-		+ "shoulder, and he pays you in talk the whole mile, and in the ring, and at the last stile "
-		+ "in a flat tin of salve out of his coat that a field surgeon pressed on him and he never "
-		+ "got round to opening. He was in the "
+		+ "shoulder, and he pays you in talk the whole mile as well as in the ring. At the last stile "
+		+ "he digs a horn box of salve out of his coat, something a barber-surgeon pressed on him "
+		+ "that he never got round to opening. He was in the "
 		+ "line when their own champion broke. Not broke and ran. Broke and kept fighting, badly, "
 		+ "wrong, the way a hand works a puppet it has never watched a man use. \"His guard went "
 		+ "first,\" he says. \"Then his face went. He was still winning.\" He does not know he is "
@@ -617,9 +617,9 @@ static func _peasants_plea() -> EventData:
 	cc.result_text = ("You find the collector on the road at first light and tell him, in the "
 		+ "crown's name, that this village is forgiven its share this season. He doesn't like it. "
 		+ "But he knows whose voice you carry, and it is not one he can afford to argue with, so he "
-		+ "turns his cart around. He leaves you the writ he was meant to serve, the seal still on it, "
-		+ "because somebody will want to know who sent him home. The village will never learn how "
-		+ "close it came. You will.")
+		+ "turns his cart around. He hands you the writ he was meant to serve, the seal unbroken. If "
+		+ "anyone asks why this village paid nothing this season, he would rather the answer was in "
+		+ "your hand than his. The village will never learn how close it came. You will.")
 	cc.grants_consumable = &"writ"
 	cc.requires_favor = &"court"
 	cc.passion_change = 3

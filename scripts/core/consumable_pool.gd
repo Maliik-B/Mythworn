@@ -79,11 +79,12 @@ static func get_shop_stock(rng: RandomNumberGenerator, realm_id: StringName, cou
 # ============================================================
 
 ## The baseline: a heal that works anywhere. Smaller than the supper, but flexible. The Man
-## Off the Field pays with what he has, and this is what he has.
+## Off the Field pays with what he has, and this is what he has. Shops sell it too, so its flavor
+## names no one who gave it.
 static func _traveller_salve() -> ConsumableData:
 	var c := _make(&"traveller_salve", "Traveller's Salve",
 		"Heal 12 HP.",
-		"A tin of grease and herbs, given by someone who had little else.",
+		"Goose grease and comfrey in a horn box. It smells of the barn, and it works.",
 		ConsumableData.Kind.RESTORATIVE, ConsumableData.Effect.HEAL, 12)
 	c.usable_in_combat = true
 	c.usable_on_map = true
@@ -92,11 +93,12 @@ static func _traveller_salve() -> ConsumableData:
 
 
 ## The restricted-but-bigger half of a clean trade against the salve: you eat at a fire, not
-## mid-swing. Gives the layer a second axis, when rather than only what. Map only.
+## mid-swing. Gives the layer a second axis, when rather than only what. Map only. Shops sell
+## it too, so the dead man's cloth stays in the Campfire's prose, not on the item.
 static func _cold_supper() -> ConsumableData:
 	var c := _make(&"cold_supper", "Cold Supper",
-		"Heal 20 HP. Map only: you eat at a fire, not mid-swing.",
-		"Bread and cold meat in a dead man's cloth. It is still food.",
+		"Heal 20 HP. Map only.",
+		"Bread and cold bacon tied in a cloth. It wants a fire and a quiet hour.",
 		ConsumableData.Kind.RESTORATIVE, ConsumableData.Effect.HEAL, 20)
 	c.usable_on_map = true
 	c.price = 45
@@ -183,7 +185,7 @@ static func _champions_favour() -> ConsumableData:
 static func _indulgence() -> ConsumableData:
 	var c := _make(&"indulgence", "An Indulgence",
 		"Swing standing 15 toward the court.",
-		"A pardon off a pardoner's tray. It forgives whatever you did against the crown.",
+		"A pardon off a pardoner's tray, under a bishop's seal. The bishop dines at court.",
 		ConsumableData.Kind.STANDING, ConsumableData.Effect.STANDING_SHIFT, -15)
 	c.usable_on_map = true
 	c.box = ConsumableData.Box.REALM
@@ -199,7 +201,7 @@ static func _indulgence() -> ConsumableData:
 static func _writ() -> ConsumableData:
 	var c := _make(&"writ", "A Writ",
 		"Swing standing 8 toward the court.",
-		"A sealed leaf with the crown's name on it. Carried far enough, it opens a door.",
+		"A sealed leaf with the crown's name on it. The collector was glad to be rid of it.",
 		ConsumableData.Kind.STANDING, ConsumableData.Effect.STANDING_SHIFT, -8)
 	c.usable_on_map = true
 	c.box = ConsumableData.Box.REALM

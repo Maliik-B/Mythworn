@@ -159,7 +159,7 @@ func _build_raider_plea_event() -> EventData:
 	accept.result_text = ("You tell him you'll take the road past the ford. He doesn't thank you. "
 		+ "He's past thanking people for things that haven't happened yet. But he draws you a map in "
 		+ "the dirt with the point of a stick, and marks where the trees close in. Then he sends a boy "
-		+ "running to the house for a stoppered cup, the last of the village's wine gone cloudy, with "
+		+ "running to the house for a covered cup, the last of the village's wine gone cloudy, with "
 		+ "the green smell of monkshood steeped in it. \"They drink anything,\" he says. \"Leave it "
 		+ "where they'll find it.\" He looks at the trees again. \"They'll hear you before you see "
 		+ "them. They always do.\"")
@@ -396,7 +396,7 @@ func _build_reliquary_struck_event() -> EventData:
 		+ "her, for as long as it lasts, and you don't fight the chapel for anything past that. "
 		+ "Her face stays. Worn at the edges, but yours. On the way out you put a hand flat on the "
 		+ "grey door. \"I'm sorry,\" you tell it, and you're not sure for what. For leaving it like "
-		+ "this, maybe. It doesn't answer. The font by the lychgate has a little standing water in "
+		+ "this, maybe. It doesn't answer. The stoup in the porch has a little holy water standing in "
 		+ "it, and you fill a flask from it on the way past, because it is there and because "
 		+ "something ought to be taken out of a place that has taken that much. It is colder than "
 		+ "it should be. You take the road with one more face kept than you came with, and a "
