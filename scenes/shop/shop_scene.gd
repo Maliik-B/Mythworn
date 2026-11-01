@@ -187,7 +187,7 @@ void fragment() {
 
 	# Info label
 	info_label = Label.new()
-	info_label.text = "Click a card or relic to purchase"
+	info_label.text = "Click a card, relic or provision to purchase"
 	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	info_label.add_theme_font_size_override("font_size", 16)
 	info_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
@@ -908,7 +908,7 @@ func _on_remove_pressed() -> void:
 	if deck_visible:
 		deck_section.visible = false
 		deck_visible = false
-		info_label.text = "Click a card or relic to purchase"
+		info_label.text = "Click a card, relic or provision to purchase"
 		return
 
 	var cost := _effective_remove_cost()
@@ -996,7 +996,7 @@ func _show_deck_for_removal() -> void:
 func _on_cancel_remove() -> void:
 	deck_section.visible = false
 	deck_visible = false
-	info_label.text = "Click a card or relic to purchase"
+	info_label.text = "Click a card, relic or provision to purchase"
 
 
 func _on_remove_card(index: int) -> void:
