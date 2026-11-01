@@ -754,7 +754,7 @@ func _start_event_combat(key: StringName) -> void:
 			# number lives in one place).
 			var chalice := ConsumablePool.get_consumable(&"poisoned_chalice")
 			RunManager.pending_enemies.clear()
-			for enemy in EnemyPool.get_raider_band_poisoned(chalice.value if chalice else 6):
+			for enemy in EnemyPool.get_raider_band_poisoned(chalice.value if chalice else 4):
 				RunManager.pending_enemies.append(enemy)
 			RunManager.pending_gold_reward = 0
 			RunManager.pending_relic_reward = false

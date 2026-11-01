@@ -227,9 +227,9 @@ static func _loaf() -> ConsumableData:
 ## behind the player it has no further use and the pack says so.
 static func _poisoned_chalice() -> ConsumableData:
 	var c := _make(&"poisoned_chalice", "The Poisoned Chalice",
-		"Carried to the lair past the ford. Leave it there and every raider opens the fight with 6 Poison.",
+		"Carried to the lair past the ford. Leave it there and every raider opens the fight with 4 Poison.",
 		"The village's last wine, steeped with monkshood. It is not for drinking.",
-		ConsumableData.Kind.QUEST, ConsumableData.Effect.NONE, 6)
+		ConsumableData.Kind.QUEST, ConsumableData.Effect.NONE, 4)
 	c.box = ConsumableData.Box.REALM
 	c.realm_id = &"camelot"
 	c.expires_at_border = true
