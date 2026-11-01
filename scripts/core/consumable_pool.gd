@@ -161,7 +161,8 @@ static func _relic_water() -> ConsumableData:
 
 
 ## The token a lady gives a knight to carry into the lists. A favour is worn into a fight
-## rather than used during one, so it is meant to be spent on the first turn.
+## rather than used during one, so it is meant to be spent on the first turn. It is given, not
+## bought: event-only (the Tourney), never sold.
 static func _champions_favour() -> ConsumableData:
 	var c := _make(&"champions_favour", "A Champion's Favour",
 		"The first blow against you this fight does not land.",
@@ -171,13 +172,12 @@ static func _champions_favour() -> ConsumableData:
 	c.box = ConsumableData.Box.REALM
 	c.realm_id = &"camelot"
 	c.expires_at_border = true
-	c.price = 55
 	return c
 
 
-## A pardon bought off a pardoner's tray: the only way a consumable reaches the court/folk
-## axis in a big way. It swings standing toward the court by more than a writ does, and it is
-## sold, not found. An indulgence from Camelot's church means nothing in another realm, so it
+## A pardon bought off a pardoner's tray: the only standing item a shop sells. It swings
+## standing toward the court by more than a writ does, and it is sold where the writ and the
+## loaf are found. An indulgence from Camelot's church means nothing in another realm, so it
 ## expires at the border.
 static func _indulgence() -> ConsumableData:
 	var c := _make(&"indulgence", "An Indulgence",
@@ -193,7 +193,8 @@ static func _indulgence() -> ConsumableData:
 
 
 ## The Peasant's Plea gates its options on court and folk favour. A writ lets the player carry
-## the court's answer instead of spending it on the spot.
+## the court's answer instead of spending it on the spot. Found there, never sold: a sold writ
+## would be the indulgence again at a smaller size, in the same shop.
 static func _writ() -> ConsumableData:
 	var c := _make(&"writ", "A Writ",
 		"Swing standing 8 toward the court.",
@@ -203,11 +204,12 @@ static func _writ() -> ConsumableData:
 	c.box = ConsumableData.Box.REALM
 	c.realm_id = &"camelot"
 	c.expires_at_border = true
-	c.price = 35
 	return c
 
 
-## The folk's half of the pair. A village's own bread, passed hand to hand.
+## The folk's half of the pair. A village's own bread, passed hand to hand. Found at the Plea,
+## never sold: bought for coin, it took a folk-pledged keeper over the people's champion bar
+## (RunManager.PEOPLES_CHAMPION_THRESHOLD) without a single act for the folk.
 static func _loaf() -> ConsumableData:
 	var c := _make(&"loaf", "A Loaf",
 		"Swing standing 8 toward the folk.",
@@ -217,7 +219,6 @@ static func _loaf() -> ConsumableData:
 	c.box = ConsumableData.Box.REALM
 	c.realm_id = &"camelot"
 	c.expires_at_border = true
-	c.price = 35
 	return c
 
 

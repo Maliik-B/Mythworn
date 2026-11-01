@@ -2698,6 +2698,9 @@ func _test_consumables() -> void:
 		and &"relic_water" not in other_stock and &"indulgence" not in other_stock)
 	_check("shops never sell the quest item or the event-only courage",
 		&"poisoned_chalice" not in camelot_stock and &"unspent_courage" not in camelot_stock)
+	_check("gifts are never wares: no shop sells the favour, the writ or the loaf",
+		&"champions_favour" not in camelot_stock and &"writ" not in camelot_stock
+		and &"loaf" not in camelot_stock)
 	var stock_a := ConsumablePool.get_shop_stock(_seeded(77), &"camelot", 2)
 	var stock_b := ConsumablePool.get_shop_stock(_seeded(77), &"camelot", 2)
 	_check("shop stock is two distinct items and follows the seed",
