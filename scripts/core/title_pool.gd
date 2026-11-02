@@ -66,8 +66,8 @@ static func _build_king_of_camelot() -> TitleData:
 	t.original_description = "The crown is yours. Shops in Camelot bow to their ruler. (-30% prices)"
 	t.original_value = 30
 
-	t.degraded_name = "Distant Royal Noble"
-	t.degraded_description = "Your bearing gives the air of nobility. Merchants warm to you. (-12% shop prices)"
+	t.degraded_name = "A King Abroad"
+	t.degraded_description = "Your crown is another realm's, and merchants here still warm to it. (-12% shop prices)"
 	t.degraded_value = 12
 
 	t.returning_name = "Former King"

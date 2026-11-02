@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_title_split()
 	_test_the_unfading()
 	_test_outlander_home()
+	_test_king_abroad()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1825,6 +1826,17 @@ func _test_outlander_home() -> void:
 	RunManager.active_title_slots = saved_slots
 	if not had_outlander:
 		RunManager.earned_title_ids.erase(&"outlander_of_camelot")
+
+
+## King of Camelot away from Camelot (title wave 2, sheet Q5): the degraded tier is A King
+## Abroad, still a crown at a smaller discount, and pairs with the returning tier's Former King.
+func _test_king_abroad() -> void:
+	var king := TitlePool.get_title(&"king_of_camelot")
+	_check("King of Camelot degrades to A King Abroad (-12%), returning as Former King (-20%)",
+		king != null
+		and king.get_name_for_tier(TitleData.Tier.DEGRADED) == "A King Abroad"
+		and king.get_value_for_tier(TitleData.Tier.DEGRADED) == 12
+		and king.get_name_for_tier(TitleData.Tier.RETURNING) == "Former King")
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth
