@@ -17,7 +17,20 @@ extends Node
 const TRIALS := 300
 const MAX_TURNS := 60
 const COMMIT_TARGET := 50    # when "committing", hold Passion at/above Blazing (+50)
-const FAILSAFE_QUIT_SECONDS := 180.0  # hard self-destruct if a run errors + idles (see _ready)
+const FAILSAFE_QUIT_SECONDS := 1500.0  # hard self-destruct if a run errors + idles (see _ready)
+const TRAJ_TURNS := 8        # the Passion trajectory is sampled after each of the first 8 turns
+## The realm-config dimension. The shipped (hollow) Camelot is its only value until the Straining
+## Court's design card lands; every report is tagged with it so a second value slots in beside.
+const CONFIG := "shipped"
+
+## Trial seeds are _seed_base + 0..N-1. The default base 0 keeps every number comparable with the
+## snapshots; --daily derives it from the UTC date (YYYYMMDD x 1000) so a day's run is the same
+## for anyone running it that day, and it is Build 1's seed. --seed=N sets the base by hand,
+## --trials=N the count, --only=pets,relics,... the sections.
+var _seed_base := 0
+var _trials := TRIALS
+var _only: PackedStringArray = []
+var _daily_seed := 0
 
 var _character: CharacterData
 var _cbt := HarnessCombat.new()  # shared planning-player combat policy
@@ -38,17 +51,26 @@ func _ready() -> void:
 			push_error("combat_harness failsafe timeout — forcing quit")
 			get_tree().quit(1))
 
+	_read_args()
 	print("\n===============================================================")
-	print(" Fable combat harness — REAL engine, %d trials/scenario" % TRIALS)
+	print(" Fable combat harness — REAL engine, %d trials/scenario" % _trials)
 	print(" player %d HP / %d energy   Passion axis -100..+100 (Blazing >= +50)" % [
 		80, CombatEngine.MAX_ENERGY])
+	print(" realm config: %s   trial seeds: %d..%d%s" % [CONFIG, _seed_base, _seed_base + _trials - 1,
+		"   (daily seed %d)" % _daily_seed if _daily_seed > 0 else ""])
 	print("===============================================================")
 	_character = _build_emo_hybrid()
 
-	for report in [_report_regulars, _report_elite, _report_guardian, _report_barrow_warden, _report_poles,
-			_report_prophet, _report_boss, _report_physical, _report_regen_check,
-			_report_swords_bearer]:
-		report.call()
+	for report in [["regulars", _report_regulars], ["elite", _report_elite],
+			["guardian", _report_guardian], ["barrow", _report_barrow_warden],
+			["poles", _report_poles], ["prophet", _report_prophet], ["boss", _report_boss],
+			["physical", _report_physical], ["regen", _report_regen_check],
+			["sword", _report_swords_bearer], ["pets", _report_pets],
+			["relics", _report_relics], ["titles", _report_titles],
+			["pack", _report_consumables]]:
+		if not _only.is_empty() and not _only.has(report[0]):
+			continue
+		report[1].call()
 		if _aborted:
 			print("\n== harness ABORTED at the memory ceiling; rows after the error are nan ==\n")
 			return
@@ -56,6 +78,20 @@ func _ready() -> void:
 	print("\n  %s" % _cbt.memory_summary())
 	print("\n== harness done ==\n")
 	get_tree().quit()
+
+
+## Reads the command-line arguments after `--`: --daily, --seed=N, --trials=N, --only=a,b.
+func _read_args() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a == "--daily":
+			_daily_seed = HarnessCombat.daily_seed()
+			_seed_base = _daily_seed * 1000
+		elif a.begins_with("--seed="):
+			_seed_base = int(a.substr(7))
+		elif a.begins_with("--trials="):
+			_trials = maxi(1, int(a.substr(9)))
+		elif a.begins_with("--only="):
+			_only = a.substr(7).split(",", false)
 
 
 # ============================================================
@@ -222,29 +258,123 @@ func _report_swords_bearer() -> void:
 
 
 # ============================================================
+# CONTRIBUTIONS (part 4): one thing added, the same seeds, the difference
+# ============================================================
+
+## The three fights every contribution is read on: a regular on the fresh deck, an elite on the mid
+## deck, the boss on the realistic loadout. Each is run twice off the same seeds, without the thing
+## and with it, and the table is the difference.
+func _fights() -> Array:
+	return [
+		["Regular", _fresh_deck(), ["knight", "shade"], 0, false],
+		["Elite", _mid_deck(), ["champion"], 0, false],
+		["Boss", _boss_deck(), ["caedmon"], 50, true],
+	]
+
+
+## Runs each variant against each fight and prints win rate, turns and HP lost as differences
+## from the same fight without it. A variant is [label, opts, extra_relic, extra_title].
+func _contribution_table(heading: String, variants: Array) -> void:
+	print("\n%s   (config: %s; same seeds with and without; delta = with minus without)" % [
+		heading, CONFIG])
+	var fights := _fights()
+	var bases: Array = []
+	for f in fights:
+		bases.append(_run(f[1], f[2], f[3], true, COMMIT_TARGET, f[4]))
+	var head := "  %-30s" % "baseline (without)"
+	for i in fights.size():
+		head += " | %-7s win %5.1f%% turns %4.1f lost %4.1f p90 %3.0f" % [fights[i][0],
+			bases[i]["winrate"], bases[i]["turns_mean"], bases[i]["hp_lost_mean"], bases[i]["hp_lost_p90"]]
+	print(head)
+	for v in variants:
+		var row := "  %-30s" % v[0]
+		for i in fights.size():
+			var f: Array = fights[i]
+			var r := _run(f[1], f[2], f[3], true, COMMIT_TARGET, f[4], v[2], v[3], v[1])
+			if _aborted:
+				return
+			row += " | %-7s win %+6.1f  turns %+5.1f lost %+5.1f" % [f[0],
+				r["winrate"] - bases[i]["winrate"], r["turns_mean"] - bases[i]["turns_mean"],
+				r["hp_lost_mean"] - bases[i]["hp_lost_mean"]]
+		print(row)
+
+
+func _report_pets() -> void:
+	var variants: Array = []
+	for id in PetPool.all_ids():
+		variants.append([PetPool.get_pet(id).display_name, {"pet": id}, "", &""])
+	_contribution_table("COMPANIONS (a card every turn from its own deck)", variants)
+	print("  Passion trajectory is unchanged by design: no pet card pushes Passion.")
+
+
+## Every reward-pool relic, then the six forgotten relics in both states: the dormant form as
+## rolled, and the woken form as a run that reached a record site.
+func _report_relics() -> void:
+	var variants: Array = []
+	for r in RelicPool._build_pool():
+		if r.is_dormant():
+			continue
+		variants.append([r.relic_name, {}, r.relic_name, &""])
+	_contribution_table("RELICS (reward pool, the forgotten relics' dormant forms apart)", variants)
+	var forgotten: Array = []
+	for name in RelicPool.dormant_names():
+		var dormant := RelicPool.get_relic_by_name(name)
+		forgotten.append(["dormant: " + name, {}, name, &""])
+		forgotten.append(["woken:   " + String(dormant.wakes_into), {}, String(dormant.wakes_into), &""])
+	_contribution_table("FORGOTTEN RELICS (dormant as rolled, woken as a record site leaves them)",
+		forgotten)
+
+
+func _report_titles() -> void:
+	var variants: Array = []
+	for t in TitlePool.get_all_titles():
+		variants.append([String(t.title_id), {}, "", t.title_id])
+	_contribution_table("TITLES (equipped in slot one, Original tier in Camelot)", variants)
+
+
+func _report_consumables() -> void:
+	var variants: Array = []
+	for id in ConsumablePool.all_ids():
+		var c := ConsumablePool.get_consumable(id)
+		if c.usable_in_combat:
+			variants.append([c.display_name, {"pack": [id]}, "", &""])
+	variants.append(["Blade Oil + A Champion's Favour", {"pack": [&"blade_oil", &"champions_favour"]}, "", &""])
+	variants.append(["Salve + Relic-Water", {"pack": [&"traveller_salve", &"relic_water"]}, "", &""])
+	_contribution_table("THE PACK (used by the policy: restoratives when hurt, boons on the opening turns)", variants)
+
+
+# ============================================================
 # TRIAL RUNNER + AGGREGATION
 # ============================================================
 
 func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 		commit: bool, commit_target: int = COMMIT_TARGET, grant_excalibur := false,
-		extra_relic: String = "", extra_title: StringName = &"") -> Dictionary:
+		extra_relic: String = "", extra_title: StringName = &"", opts: Dictionary = {}) -> Dictionary:
 	var wins := 0
 	var hp_lost: Array[int] = []
 	var turns_sum := 0
 	var passion_sum := 0
 	var ttb_sum := 0
 	var ttb_count := 0
-	for s in TRIALS:
+	var traj_sum: Array[float] = []
+	var traj_n: Array[int] = []
+	for s in _trials:
 		if _aborted:
 			return _aborted_result()
-		var r := _simulate(deck, enemy_keys, s, start_passion, commit, commit_target,
-			grant_excalibur, extra_relic, extra_title)
+		var r := _simulate(deck, enemy_keys, _seed_base + s, start_passion, commit, commit_target,
+			grant_excalibur, extra_relic, extra_title, opts)
 		if not _cbt.within_memory_ceiling("%s trial %d" % [enemy_keys, s]):
 			_aborted = true
 			get_tree().quit(1)
 			return _aborted_result()
 		turns_sum += r["turns"]
 		passion_sum += r["passion"]
+		for ti in r["traj"].size():
+			if traj_sum.size() <= ti:
+				traj_sum.append(0.0)
+				traj_n.append(0)
+			traj_sum[ti] += r["traj"][ti]
+			traj_n[ti] += 1
 		if r["ttb"] >= 0:
 			ttb_sum += r["ttb"]
 			ttb_count += 1
@@ -261,14 +391,18 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 	var p90 := 80
 	if hp_lost.size() > 0:
 		p90 = hp_lost[mini(hp_lost.size() - 1, int(0.9 * hp_lost.size()))]
+	var traj: Array[float] = []
+	for ti in traj_sum.size():
+		traj.append(traj_sum[ti] / maxf(1.0, traj_n[ti]))
 	return {
-		"winrate": 100.0 * wins / TRIALS,
-		"turns_mean": float(turns_sum) / TRIALS,
+		"winrate": 100.0 * wins / _trials,
+		"turns_mean": float(turns_sum) / _trials,
 		"hp_lost_mean": mean_lost,
 		"hp_lost_p90": p90,
-		"passion_mean": float(passion_sum) / TRIALS,
+		"passion_mean": float(passion_sum) / _trials,
 		"ttb_mean": (float(ttb_sum) / ttb_count) if ttb_count > 0 else -1.0,
-		"ttb_frac": float(ttb_count) / TRIALS,
+		"ttb_frac": float(ttb_count) / _trials,
+		"traj": traj,  # mean Passion after player turn 1, 2, ... (trials still fighting)
 	}
 
 
@@ -277,7 +411,7 @@ func _run(deck: Array[CardData], enemy_keys: Array, start_passion: int,
 func _aborted_result() -> Dictionary:
 	return {
 		"winrate": NAN, "turns_mean": NAN, "hp_lost_mean": NAN, "hp_lost_p90": NAN,
-		"passion_mean": NAN, "ttb_mean": NAN, "ttb_frac": NAN,
+		"passion_mean": NAN, "ttb_mean": NAN, "ttb_frac": NAN, "traj": [],
 	}
 
 
@@ -286,7 +420,7 @@ func _aborted_result() -> Dictionary:
 func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		start_passion: int, commit: bool, commit_target: int = COMMIT_TARGET,
 		grant_excalibur := false, extra_relic: String = "",
-		extra_title: StringName = &"") -> Dictionary:
+		extra_title: StringName = &"", opts: Dictionary = {}) -> Dictionary:
 	# Minimal run-state reset (mirrors roster_test; avoids start_run's realm/title
 	# machinery which is irrelevant to a single combat). Titles ARE cleared, because a
 	# slot left set would carry a title into every later trial and quietly rewrite the
@@ -322,6 +456,18 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 	# Camelot realm title resolves to its Original tier and escalates.
 	if extra_title != &"":
 		RunManager.active_title_slots[0] = extra_title
+	# Part 4 options, a fresh pack and companion every trial so nothing carries over: more relics
+	# by name (a dormant or a woken form), a companion by id, the pack by id, a second title.
+	RunManager.pet_id = opts.get("pet", &"")
+	RunManager.consumables.clear()
+	for id in opts.get("pack", []):
+		RunManager.consumables.append(ConsumablePool.get_consumable(id))
+	for rn in opts.get("relics", []):
+		var orel := RelicPool.get_relic_by_name(rn)
+		if orel:
+			RunManager.add_relic(orel)
+	if opts.has("title2"):
+		RunManager.active_title_slots[1] = opts["title2"]
 
 	var eng := CombatEngine.new()
 	eng.instant = true
@@ -336,6 +482,7 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		else PassionState.Tier.HOLLOW)
 	var ttb := -1
 	var guard := 0
+	var traj: Array[int] = []
 	while eng.phase == CombatEngine.Phase.PLAYER_TURN and eng.turn_number < MAX_TURNS:
 		guard += 1
 		if guard > 400:
@@ -343,6 +490,8 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		_cbt.play_turn(eng, commit, commit_target)
 		if ttb < 0 and RunManager.get_passion_tier() == extreme_tier:
 			ttb = eng.turn_number
+		if traj.size() < TRAJ_TURNS:
+			traj.append(RunManager.passion.current_value)
 		if eng.phase != CombatEngine.Phase.PLAYER_TURN:
 			break
 		eng.end_player_turn()  # instant: resolves enemy turn + next player-turn setup
@@ -355,8 +504,11 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 		"hp": maxi(0, eng.player_stats.current_hp),
 		"passion": RunManager.passion.current_value,
 		"ttb": ttb,
+		"traj": traj,
 	}
 	eng.free()
+	RunManager.pet_id = &""
+	RunManager.consumables.clear()
 	return res
 
 

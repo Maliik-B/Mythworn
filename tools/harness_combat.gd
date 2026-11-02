@@ -35,6 +35,13 @@ const CEILING_STATIC_MB := 128
 var peak_objects := 0
 var peak_static_mb := 0.0
 
+
+## The day's seed: the UTC date as YYYYMMDD. The same number for everyone running that day, and the
+## one Build 1 plays with. The batch harnesses multiply it by 1000 to give every trial its own seed.
+static func daily_seed() -> int:
+	var d := Time.get_date_dict_from_system(true)
+	return int(d["year"]) * 10000 + int(d["month"]) * 100 + int(d["day"])
+
 # What the player has dealt this combat, for the race estimate's damage rate.
 var _combat_id := 0
 var _dealt := 0.0
