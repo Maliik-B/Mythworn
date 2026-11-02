@@ -56,6 +56,7 @@ func _ready() -> void:
 	_test_refusals()
 	_test_title_split()
 	_test_the_unfading()
+	_test_outlander_home()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1790,6 +1791,40 @@ func _test_the_unfading() -> void:
 				compassion_sites += 1
 	_check("the Reliquary's won beat grants The Unfading; The Compassionate is the Last Cart Out's alone",
 		reliquary_pays == &"the_unfading" and compassion_sites == 1)
+
+
+## Outlander had no award path at all (TITLE_DESIGN 5.9). Its home is the Sword in the Stone's
+## walk-away (title wave 2): leaving the sword grants it, facing the beast does not, and worn
+## it pays its 5 gold when a combat is won.
+func _test_outlander_home() -> void:
+	var es: Control = load("res://scenes/event/event_scene.gd").new()
+	var stone: EventData = es._build_sword_in_stone_event()
+	es.free()
+	var walk_grants := &""
+	var fight_grants := &""
+	for ch in stone.choices:
+		if ch.starts_combat == &"sword_guardian":
+			fight_grants = ch.awarded_title_id
+		else:
+			walk_grants = ch.awarded_title_id
+	_check("leaving the sword in its stone grants Outlander; facing the beast does not",
+		walk_grants == &"outlander_of_camelot" and fight_grants == &"")
+
+	var saved_slots := RunManager.active_title_slots.duplicate()
+	var had_outlander := RunManager.earned_title_ids.has(&"outlander_of_camelot")
+	var saved_active := RunManager.run_active
+	var gold0 := RunManager.gold
+	RunManager.award_title(&"outlander_of_camelot")
+	RunManager.equip_title(0, &"outlander_of_camelot")
+	RunManager.equip_title(1, &"")
+	RunManager.run_active = true
+	RunManager._on_combat_won()
+	_check("worn, Outlander pays 5 gold when a combat is won", RunManager.gold == gold0 + 5)
+	RunManager.gold = gold0
+	RunManager.run_active = saved_active
+	RunManager.active_title_slots = saved_slots
+	if not had_outlander:
+		RunManager.earned_title_ids.erase(&"outlander_of_camelot")
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth

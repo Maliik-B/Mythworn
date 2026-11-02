@@ -92,6 +92,9 @@ func _build_sword_in_stone_event() -> EventData:
 		+ "again, guarding a thing that will never answer to it. The choice not to reach is also a "
 		+ "kind of weight, and you find you can carry it.")
 	walk.passion_change = 3
+	# Leaving the sword is the one refusal that rules out the crown (it needs Excalibur), so
+	# this is where Outlander is earned: mid-act, with the fights left to pay it.
+	walk.awarded_title_id = &"outlander_of_camelot"
 	e.choices.append(walk)
 
 	return e

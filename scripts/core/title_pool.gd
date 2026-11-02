@@ -148,6 +148,12 @@ static func _build_swords_bearer() -> TitleData:
 
 # --- Personality Titles (no degradation) ---
 
+## Earned by walking away from the Sword in the Stone. The starter concept was clearing Camelot
+## without engaging the central quest, which would only be known at the end of the act, and a
+## title handed over after the last fight is a line of text. Leaving the sword is the moment
+## that concept becomes true: the crown needs Excalibur, so a keeper who walks past the stone
+## leaves no king behind, and the stone sits on every map, so every run can earn it. One refusal
+## in one choice pays a +2 (TITLE_DESIGN 1.4), and the pay is a sellsword's: gold for each fight.
 static func _build_outlander_of_camelot() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"outlander_of_camelot"
@@ -157,7 +163,8 @@ static func _build_outlander_of_camelot() -> TitleData:
 	t.accent_color = NEUTRAL_ACCENT
 
 	t.original_name = "Outlander"
-	t.original_description = "You walked through a kingdom that wasn't yours and left no king behind. Gain 5 gold after each combat."
+	t.original_description = ("You left the sword in its stone and took nothing from Camelot but "
+		+ "what the fighting paid. Gain 5 gold after each combat.")
 	t.original_value = 5
 
 	t.passive_effect = TitleData.EffectType.GOLD_ON_COMBAT_END
