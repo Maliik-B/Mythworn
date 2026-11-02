@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_consumables()
 	_test_consumable_ui()
 	_test_pets()
+	_test_master_of_game()
 	_test_relic_names()
 	_test_liaison_relics()
 	_test_refusals()
@@ -3513,6 +3514,74 @@ func _test_pets() -> void:
 		thrown in feng.piles.hand and thrown not in feng.piles.discard_pile and feng.energy == 2)
 	_check("the ferret's four hurt nothing themselves", quarry.current_hp == q_hp)
 	feng.free()
+	_reset_consumable_state()
+
+
+## Part 3b: the huntsman's node. The Master of Game is seated once on every Camelot act-1 map in
+## the mid-act, as a scripted event node on no reserved node; the event sells every animal the
+## keeper does not have at 75, a new one replaces the old, and leaving costs nothing.
+func _test_master_of_game() -> void:
+	_reset_consumable_state()
+	var placed := 0
+	var mid := true
+	var clean := true
+	for s in range(40):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 700 + s
+		var map := MapGenerator.generate(rng, &"camelot", 1, 1.0, false)
+		var found := 0
+		for id in map.nodes:
+			var n: MapNode = map.nodes[id]
+			if n.scripted_event_id != MapGenerator.MASTER_OF_GAME_ID:
+				continue
+			found += 1
+			if n.node_type != MapNode.NodeType.EVENT or n.quest_giver_id != &"" \
+					or n.quest_payoff_id != &"":
+				clean = false
+			if n.floor_num < MapGenerator.HUNTSMAN_MIN_FLOOR \
+					or n.floor_num > MapGenerator.HUNTSMAN_MAX_FLOOR:
+				mid = false
+		if found == 1:
+			placed += 1
+	_check("the Master of Game is seated exactly once on every seeded Camelot map (%d of 40)" % placed,
+		placed == 40)
+	_check("it sits mid-act, on an event node that is no quest node", mid and clean)
+
+	var es: Control = load("res://scenes/event/event_scene.gd").new()
+	var ev: EventData = es._build_master_of_game_event()
+	var animals := 0
+	var priced := true
+	var leave: EventData.EventChoice = null
+	for ch in ev.choices:
+		if ch.grants_pet != &"":
+			animals += 1
+			if ch.gold_change != -75 or PetPool.get_pet(ch.grants_pet) == null:
+				priced = false
+		else:
+			leave = ch
+	_check("with no companion he offers all three animals at 75 each, and a leave",
+		animals == 3 and priced and ev.choices.size() == 4 and leave != null
+		and leave.gold_change == 0 and leave.grants_pet == &"")
+	RunManager.set_pet(&"hound")
+	ev = es._build_master_of_game_event()
+	var offered: Array[StringName] = []
+	var hawk_choice: EventData.EventChoice = null
+	for ch in ev.choices:
+		if ch.grants_pet != &"":
+			offered.append(ch.grants_pet)
+		if ch.grants_pet == &"hawk":
+			hawk_choice = ch
+	_check("with the hound he offers only the hawk and the ferret, and says the hound stays fed",
+		offered == [&"hawk", &"ferret"] and hawk_choice != null
+		and hawk_choice.result_text.find("The Hound you came with") != -1
+		and hawk_choice.result_text.find("see it fed") != -1)
+	RunManager.gold = 100
+	es._apply_effects(hawk_choice)
+	_check("taking the hawk costs 75 and replaces the hound", RunManager.gold == 25
+		and RunManager.pet_id == &"hawk")
+	es._apply_effects(leave)
+	_check("leaving them with him changes nothing", RunManager.gold == 25 and RunManager.pet_id == &"hawk")
+	es.free()
 	_reset_consumable_state()
 
 

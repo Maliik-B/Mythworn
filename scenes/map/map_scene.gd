@@ -1640,6 +1640,11 @@ func _create_node_button(node: MapNode) -> Button:
 		btn.tooltip_text = "Weakened elite — the people sabotaged it. Easier fight, same rewards."
 	if _is_quest_payoff_armed(node):
 		btn.tooltip_text = _quest_payoff_tooltip(node.quest_payoff_id)
+	# The Master of Game is meant to be found: its own glyph on the event colour, and the tooltip
+	# says what is sold there, so a run that wants a companion can route to it.
+	if node.scripted_event_id == MapGenerator.MASTER_OF_GAME_ID:
+		btn.text = "♘"
+		btn.tooltip_text = "The Master of Game: a huntsman selling his lord's animals. A companion, 75 gold."
 
 	btn.pressed.connect(_on_node_clicked.bind(node))
 	btn.mouse_entered.connect(_on_node_hover.bind(node))
@@ -1823,10 +1828,12 @@ func _enter_node(node: MapNode) -> void:
 		MapNode.NodeType.SHOP:
 			SceneTransition.change_scene("res://scenes/shop/shop_scene.tscn")
 		MapNode.NodeType.EVENT:
-			# A quest-giver event node routes to its plea; ordinary event nodes pull from
-			# the random pool.
+			# A quest-giver event node routes to its plea, a scripted node (the Master of Game) to
+			# its own event; ordinary event nodes pull from the random pool.
 			if node.quest_giver_id != &"":
 				RunManager.pending_special_event = &"raider_plea"
+			elif node.scripted_event_id != &"":
+				RunManager.pending_special_event = node.scripted_event_id
 			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		MapNode.NodeType.SWORD_IN_STONE:
 			# Reuse the event scene with a flag — Excalibur is a one-shot event

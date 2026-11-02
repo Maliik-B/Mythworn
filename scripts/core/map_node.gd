@@ -23,6 +23,11 @@ var weakened: bool = false
 # runtime (event_scene._arm_campfire_treasure picks a node downstream of the fire).
 var quest_giver_id: StringName = &""
 var quest_payoff_id: StringName = &""
+# A scripted event node: an EVENT node that always shows one named hand-authored event
+# (event_scene._build_special_event) instead of a draw from the pool, and shows the player what it
+# is on the map, so a run can route to it. The Master of Game (the huntsman selling his lord's
+# animals) is seated once a map by MapGenerator._place_master_of_game. &"" = an ordinary node.
+var scripted_event_id: StringName = &""
 # Purely-cosmetic sub-cell offsets (in fractions of a cell) so the rendered graph
 # looks organically placed instead of a rigid lattice. Set by MapGenerator; the
 # grid column/floor still drive connectivity, balance, and layout — jitter never

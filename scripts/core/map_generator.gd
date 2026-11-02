@@ -161,7 +161,7 @@ static func _combat_nodes_for_upgrade(map: MapData) -> Array[int]:
 		var node: MapNode = map.nodes[id]
 		# Skip the questline's payoff node: it must keep its original look until the player
 		# arms it, and its own reveal flourish shouldn't fight the pledge flourish.
-		if node.quest_payoff_id != &"" or node.quest_giver_id != &"":
+		if node.quest_payoff_id != &"" or node.quest_giver_id != &"" or node.scripted_event_id != &"":
 			continue
 		if node.node_type == MapNode.NodeType.COMBAT \
 				and node.floor_num >= 2 and node.floor_num <= map.floor_count - 3:
@@ -228,6 +228,7 @@ static func _apply_realm_specifics(map: MapData, realm_id: StringName, act: int,
 	if realm_id == &"camelot" and act == 1:
 		_place_sword_in_stone(map)
 		_place_raider_questline(map, rng)
+		_place_master_of_game(map, rng)
 
 
 static func _place_sword_in_stone(map: MapData) -> void:
@@ -307,6 +308,36 @@ static func _pick_quest_payoff(map: MapData, giver: MapNode, rng: RandomNumberGe
 	return cands[0]
 
 
+# The Master of Game: the huntsman whose lord rode out and did not come back, selling the lord's
+# animals to someone who will feed them. Seated once on every map in the mid-act, far enough in
+# that a bought companion has fights left to pay for itself and early enough that it is not the
+# last thing before the boss, on an ordinary combat or event node that nothing else has claimed.
+# Unlike the raider giver it is meant to be seen: the map shows what it is, so a run that wants a
+# companion can route to it. One a map; a Tiltyard hound is the other way to one.
+const MASTER_OF_GAME_ID := &"master_of_game"
+const HUNTSMAN_MIN_FLOOR := 6
+const HUNTSMAN_MAX_FLOOR := 10
+
+
+static func _place_master_of_game(map: MapData, rng: RandomNumberGenerator) -> void:
+	var cands: Array[int] = []
+	for id in map.nodes:
+		var n: MapNode = map.nodes[id]
+		if n.floor_num < HUNTSMAN_MIN_FLOOR or n.floor_num > HUNTSMAN_MAX_FLOOR:
+			continue
+		if _is_reserved_node(map, n):
+			continue
+		if n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT:
+			continue
+		cands.append(id)
+	if cands.is_empty():
+		return
+	RngManager.shuffle(cands, rng)
+	var node: MapNode = map.nodes[cands[0]]
+	node.node_type = MapNode.NodeType.EVENT
+	node.scripted_event_id = MASTER_OF_GAME_ID
+
+
 # A treasure cache a random Campfire exposes mid-run. Unlike the raider payoff (seated at
 # gen with a known giver), the Campfire can fire anywhere, so its payoff is chosen at the
 # moment of investigation from the nodes still AHEAD of where the player is standing. This
@@ -380,7 +411,7 @@ static func _is_reserved_node(map: MapData, n: MapNode) -> bool:
 		return true
 	if n.floor_num == 0 or n.floor_num >= map.floor_count - 2:
 		return true
-	if n.quest_giver_id != &"" or n.quest_payoff_id != &"":
+	if n.quest_giver_id != &"" or n.quest_payoff_id != &"" or n.scripted_event_id != &"":
 		return true
 	return false
 

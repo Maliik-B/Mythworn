@@ -63,6 +63,8 @@ func _build_special_event(id: StringName) -> EventData:
 			return _build_reliquary_struck_event()
 		&"reliquary_won":
 			return _build_reliquary_won_event()
+		&"master_of_game":
+			return _build_master_of_game_event()
 		_:
 			push_warning("Unknown special event id: %s" % id)
 			return EventPool.get_random_event(RngManager.event_rng)
@@ -449,6 +451,76 @@ func _build_reliquary_won_event() -> EventData:
 	take.awarded_title_id = &"the_unfading"
 	e.choices.append(take)
 
+	return e
+
+
+## The Master of Game: the huntsman's node, seated once a map by MapGenerator. His lord rode out
+## with the rest and did not come back, and he sells the lord's animals to someone who will feed
+## them. Every animal the keeper does not already have is a priced option (75 gold, flat: the
+## choice is identity, not value; gold_change disables what you cannot afford), a new one replaces
+## the old, which stays with him and is fed, and leaving them with him costs nothing. One
+## companion a run; the Tiltyard's hound is the other way to one. Stage-free: a lord who rode out
+## in the spring is any stage of the fall.
+func _build_master_of_game_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Master of Game"
+	e.description = ("The lodge sits where the forest road leaves the fields, and the kennels behind "
+		+ "it are still full. A man is feeding them. He is the lord's master of game, by the coat and "
+		+ "the horn at his hip, and his lord went up the king's road in the spring with the rest and "
+		+ "has not come back down it. So he feeds the hounds and the mews and the warren out of what "
+		+ "the lord left, and that will not see the winter out, and he knows it.\n\nHe does not ask "
+		+ "who you are. He looks at your hands and your boots. \"They want working,\" he says, of the "
+		+ "animals, \"and I am one man, and he is not coming back.\" He will sell to anyone who will "
+		+ "feed them. Seventy-five, each, and he does not haggle, because the price was never the "
+		+ "point of it.")
+
+	var held := RunManager.get_pet()
+	var stays := ""
+	if held != null:
+		stays = (" %s you came with goes to him, and he takes it without a word, and that is "
+			+ "settled. He will see it fed.") % held.display_name
+
+	if held == null or held.id != &"hound":
+		var hound = EventData.EventChoice.new()
+		hound.text = "Take the hound. (75 gold)"
+		hound.result_text = ("He whistles one out of the kennel, a lean hound grey in the muzzle, "
+			+ "and it comes to your hand as though it has been waiting for exactly this. \"That one "
+			+ "knows the work,\" he says. He does not say goodbye to it. He goes back to the "
+			+ "feeding. At the gate the hound looks back once, and then does not again." + stays)
+		hound.gold_change = -75
+		hound.grants_pet = &"hound"
+		e.choices.append(hound)
+
+	if held == null or held.id != &"hawk":
+		var hawk = EventData.EventChoice.new()
+		hawk.text = "Take the hawk. (75 gold)"
+		hawk.result_text = ("He brings the peregrine out of the mews hooded and sets her on your "
+			+ "fist, and shows you the jesses, and unhoods her. She looks at you the way they look "
+			+ "at everything, as though you were a long way down. \"She'll wait on for a man who "
+			+ "stands still,\" he says. \"Stand still.\"" + stays)
+		hawk.gold_change = -75
+		hawk.grants_pet = &"hawk"
+		e.choices.append(hawk)
+
+	if held == null or held.id != &"ferret":
+		var ferret = EventData.EventChoice.new()
+		ferret.text = "Take the ferret. (75 gold)"
+		ferret.result_text = ("He reaches into a box by the door and comes out with a ferret, long "
+			+ "and pale and already trying to go down his sleeve, and puts it in your hands, where "
+			+ "it tries to go down yours. \"Keep it fed and it will keep you fed,\" he says, \"and "
+			+ "keep your fingers out of the way of it.\" It is a smaller thing than the others, and "
+			+ "he charges you the same, and does not explain." + stays)
+		ferret.gold_change = -75
+		ferret.grants_pet = &"ferret"
+		e.choices.append(ferret)
+
+	var leave = EventData.EventChoice.new()
+	leave.text = "Leave them with him. They are fed."
+	leave.result_text = ("You leave him to it. He does not argue, and he does not thank you for the "
+		+ "consideration, because it was not for him. Behind you the kennel sets up a noise, and "
+		+ "stops, and then the only sound is a man working through a stack of feeding in the order "
+		+ "he has always done it in.")
+	e.choices.append(leave)
 	return e
 
 
