@@ -36,6 +36,77 @@ var peak_objects := 0
 var peak_static_mb := 0.0
 
 
+## Verification mode (combat_harness --verify): before each card the copy predicts the state after
+## it, and before each enemy turn the state after that turn; both are compared with what the engine
+## then did. A mismatch is a place the model does not know the engine, counted by card and field.
+var verify_on := false
+var verify_cards := 0
+var verify_enemy_turns := 0
+var verify_mismatches: Dictionary = {}  # "card: field" -> [count, example]
+
+
+func _verify_note(label: String, field: String, predicted, real) -> void:
+	var key := "%s: %s" % [label, field]
+	if not verify_mismatches.has(key):
+		verify_mismatches[key] = [0, "predicted %s, engine %s" % [str(predicted), str(real)]]
+	verify_mismatches[key][0] += 1
+
+
+func _verify_line(label: String, pred: Dictionary, real: Dictionary, real_energy: int) -> void:
+	verify_cards += 1
+	for k in ["php", "pblock", "pstr", "pweak", "pvuln", "pdex", "passion", "oil", "blooded",
+			"momentum", "ward", "girdle", "clutch", "echo"]:
+		if pred[k] != real[k]:
+			_verify_note(label, k, pred[k], real[k])
+	if pred["energy"] != real_energy:
+		_verify_note(label, "energy", pred["energy"], real_energy)
+	if pred["powers"] != real["powers"]:
+		_verify_note(label, "powers", pred["powers"], real["powers"])
+	if pred["flags"] != real["flags"]:
+		_verify_note(label, "flags", pred["flags"], real["flags"])
+	for i in pred["foes"].size():
+		var p: Dictionary = pred["foes"][i]
+		var r: Dictionary = real["foes"][i]
+		for k in ["hp", "block", "dead", "vuln", "weak", "intangible", "enraged", "strength",
+				"poison", "chilled", "stun", "dex", "phase"]:
+			if p[k] != r[k]:
+				_verify_note(label, "enemy " + k, p[k], r[k])
+
+
+## The state the copy expects after the coming enemy turn, taken before end_player_turn.
+func verify_enemy_turn_before(eng: CombatEngine, commit: bool, commit_target: int) -> Dictionary:
+	var line := _line_copy(eng)
+	_sim_enemy_turn(eng, _context(eng, commit, commit_target), line)
+	return line
+
+
+## Compares that prediction with the engine after end_player_turn. The player's Block and a
+## turn-start mend belong to the next player turn, so only HP is compared, and only when no relic
+## mends at turn start. An enemy with an unseen move (a bar just broke) is skipped by the copy's own
+## flag: its move is an average, not a prediction.
+func verify_enemy_turn_after(eng: CombatEngine, pred: Dictionary) -> void:
+	if eng.phase == CombatEngine.Phase.BATTLE_WON or eng.phase == CombatEngine.Phase.BATTLE_LOST:
+		return
+	var skip_hp := false
+	for r in RunManager.relics:
+		if r.trigger == RelicData.RelicTrigger.ON_TURN_START and (r.effect == RelicData.RelicEffect.HEAL \
+				or r.effect2 == RelicData.RelicEffect.HEAL):
+			skip_hp = true
+	for f in pred["foes"]:
+		if f["unknown_intent"]:
+			return
+	verify_enemy_turns += 1
+	var real := _line_copy(eng)
+	if not skip_hp and pred["php"] != real["php"]:
+		_verify_note("enemy turn", "player HP", pred["php"], real["php"])
+	for i in pred["foes"].size():
+		var p: Dictionary = pred["foes"][i]
+		var r: Dictionary = real["foes"][i]
+		for k in ["hp", "dead", "vuln", "weak", "strength", "poison", "chilled", "stun"]:
+			if p[k] != r[k]:
+				_verify_note("enemy turn", "enemy " + k, p[k], r[k])
+
+
 ## The day's seed: the UTC date as YYYYMMDD. The same number for everyone running that day, and the
 ## one Build 1 plays with. The batch harnesses multiply it by 1000 to give every trial its own seed.
 static func daily_seed() -> int:
@@ -96,8 +167,15 @@ func play_turn(eng: CombatEngine, commit: bool, commit_target: int) -> void:
 		var play := choose_play(eng, commit, commit_target)
 		if play.is_empty():
 			break
+		var predicted := {}
+		if verify_on:
+			predicted = _line_copy(eng)
+			_sim_card(eng, _context(eng, commit, commit_target), play[0], predicted)
+		var card_name: String = play[0].card_name
 		if not eng.play_card(play[0], play[1]):
 			break
+		if verify_on:
+			_verify_line(card_name, predicted, _line_copy(eng), eng.energy)
 	_dealt += maxf(0.0, before - _pool_total(_line_copy(eng)))
 	_turns_seen += 1
 	# The plan belongs to this turn; holding its cards past it would keep them alive.

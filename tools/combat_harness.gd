@@ -31,6 +31,7 @@ var _seed_base := 0
 var _trials := TRIALS
 var _only: PackedStringArray = []
 var _daily_seed := 0
+var _verify := false  # --verify: check the planner's copy against the engine instead of reporting
 
 var _character: CharacterData
 var _cbt := HarnessCombat.new()  # shared planning-player combat policy
@@ -60,6 +61,9 @@ func _ready() -> void:
 		"   (daily seed %d)" % _daily_seed if _daily_seed > 0 else ""])
 	print("===============================================================")
 	_character = _build_emo_hybrid()
+	if _verify:
+		_run_verify()
+		return
 
 	for report in [["regulars", _report_regulars], ["elite", _report_elite],
 			["guardian", _report_guardian], ["barrow", _report_barrow_warden],
@@ -80,6 +84,52 @@ func _ready() -> void:
 	get_tree().quit()
 
 
+## --verify: plays the loadout x fight matrix with the planner's copy checked against the engine
+## before every card and every enemy turn. Prints the counts and every mismatch by card and field.
+## A clean run says the copy knows everything these loadouts do; a mismatch is a model gap.
+func _run_verify() -> void:
+	_cbt.verify_on = true
+	var loadouts: Array = [
+		["bare", {}, "", &""],
+		["hound", {"pet": &"hound"}, "", &""],
+		["hawk", {"pet": &"hawk"}, "", &""],
+		["ferret", {"pet": &"ferret"}, "", &""],
+		["Green Girdle + Compassionate", {"relics": ["The Green Girdle"]}, "", &"the_compassionate"],
+		["Scabbard + Merciful", {"relics": ["Excalibur's Scabbard"]}, "", &"the_merciful"],
+		["Unfading + Sword's Bearer", {"title2": &"the_unfading"}, "", &"swords_bearer"],
+		["Blooded Edge + Momentum + Oak Banner", {"relics": ["Blooded Edge", "Momentum", "The Oak Banner"]}, "", &""],
+		["oil + Favour + hawk", {"pack": [&"blade_oil", &"champions_favour"], "pet": &"hawk"}, "", &""],
+		["Blessing + Courage + ferret", {"pack": [&"bottled_blessing", &"unspent_courage"], "pet": &"ferret"}, "", &""],
+		["Salve + Relic-Water + hound", {"pack": [&"traveller_salve", &"relic_water"], "pet": &"hound"}, "", &""],
+	]
+	var fights: Array = [
+		["Knight + Shade", _fresh_deck(), ["knight", "shade"], 0, false],
+		["Champion", _mid_deck(), ["champion"], 0, false],
+		["Beast at the Stone", _mid_deck(), ["guardian"], 0, true],
+		["Caedmon realistic", _boss_deck(), ["caedmon"], 50, true],
+		["Wasting Knight + Shade", _mid_deck(), ["rotting", "shade"], 0, false],
+	]
+	var saved_trials := _trials
+	_trials = mini(_trials, 25)
+	for lo in loadouts:
+		for f in fights:
+			_run(f[1], f[2], f[3], true, COMMIT_TARGET, f[4], lo[2], lo[3], lo[1])
+			if _aborted:
+				return
+	_trials = saved_trials
+	print("\nVERIFY: the planner's copy against the engine (%d loadouts x %d fights x 25 trials)" % [
+		loadouts.size(), fights.size()])
+	print("  cards checked: %d   enemy turns checked: %d   distinct mismatches: %d" % [
+		_cbt.verify_cards, _cbt.verify_enemy_turns, _cbt.verify_mismatches.size()])
+	var keys: Array = _cbt.verify_mismatches.keys()
+	keys.sort()
+	for k in keys:
+		var m: Array = _cbt.verify_mismatches[k]
+		print("  %-44s x%-5d %s" % [k, m[0], m[1]])
+	print("\n  %s\n\n== verify done ==\n" % _cbt.memory_summary())
+	get_tree().quit(0 if _cbt.verify_mismatches.is_empty() else 1)
+
+
 ## Reads the command-line arguments after `--`: --daily, --seed=N, --trials=N, --only=a,b.
 func _read_args() -> void:
 	for a in OS.get_cmdline_user_args():
@@ -92,6 +142,8 @@ func _read_args() -> void:
 			_trials = maxi(1, int(a.substr(9)))
 		elif a.begins_with("--only="):
 			_only = a.substr(7).split(",", false)
+		elif a == "--verify":
+			_verify = true
 
 
 # ============================================================
@@ -494,7 +546,12 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 			traj.append(RunManager.passion.current_value)
 		if eng.phase != CombatEngine.Phase.PLAYER_TURN:
 			break
+		var predicted := {}
+		if _cbt.verify_on:
+			predicted = _cbt.verify_enemy_turn_before(eng, commit, commit_target)
 		eng.end_player_turn()  # instant: resolves enemy turn + next player-turn setup
+		if _cbt.verify_on:
+			_cbt.verify_enemy_turn_after(eng, predicted)
 		if ttb < 0 and RunManager.get_passion_tier() == extreme_tier:
 			ttb = eng.turn_number
 
