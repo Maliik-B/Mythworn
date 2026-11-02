@@ -89,6 +89,16 @@ var _favour_ward: bool = false
 ## it is a companion's Trick card). Armed at combat start from the equipped titles.
 var _unfading_pending: bool = false
 
+## Named flags a card raises on the combat for another card to read and spend (CombatFlagEffect,
+## DamageEffect.bonus_flag): the hawk is waiting on until its Stoop comes down. Cleared with the
+## fight.
+var combat_flags: Dictionary = {}
+
+## The companion's deck for this fight (PetPool.build_cards): shuffled on the deck rng when it is
+## first needed, one card handed over at every player turn, rebuilt and reshuffled when it runs
+## out. Empty when no companion travels with the player.
+var _pet_deck: Array[CardData] = []
+
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
 ## synchronously. The balance harness (tools/combat_harness) sets this so it can
 ## run thousands of trials against the REAL engine without waiting real seconds.
@@ -155,6 +165,9 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	# Consumable effects are per fight: nothing armed carries in from a previous combat.
 	_blade_oil_pending = 0
 	_favour_ward = false
+	# Flags and the companion's deck are per fight too.
+	combat_flags.clear()
+	_pet_deck.clear()
 	_arm_be_the_king(player_hp)
 	# Whiplash power listens on tier crossings for the fight; no-op unless the player
 	# actually holds Whiplash (checked in the handler). Disconnected at combat end.
@@ -322,30 +335,46 @@ func start_player_turn() -> void:
 	var drawn = piles.draw_cards(HAND_SIZE)
 	for card in drawn:
 		Events.card_drawn.emit(card)
-	_maybe_pet_arrival()
+	_pet_arrival()
 
 	phase = Phase.PLAYER_TURN
 	Events.player_turn_started.emit()
 
 
-## The companion: on a chance each player turn, one card from the pet's pool arrives in hand
-## (PetData.arrival_chance). It is an ordinary card in every way that matters: it costs energy,
-## it competes with the hand, and it can be left unplayed. It enters no pile. Both rolls use the
-## deck rng, so a seeded run replays identically, and a run with no companion draws nothing from
-## it, leaving every seed that never met one exactly as it was.
-func _maybe_pet_arrival() -> void:
+## The companion: on every player turn one card from the pet's deck arrives in hand, drawn like
+## the player's own, without replacement and reshuffled when the deck is spent, so each card shows
+## once a cycle and the player can count on it. It is an ordinary card in every way that matters:
+## it costs energy, it competes with the hand, and it can be left unplayed. It enters no pile. The
+## shuffle is on the deck rng, so a seeded run replays identically, and a run with no companion
+## touches the rng not at all, leaving every seed that never met one exactly as it was.
+func _pet_arrival() -> void:
 	var pet := RunManager.get_pet()
 	if pet == null:
 		return
-	if RngManager.deck_rng.randf() >= pet.arrival_chance:
-		return
-	var pool := PetPool.build_cards(pet.id)
-	if pool.is_empty():
-		return
-	var card: CardData = pool[RngManager.deck_rng.randi_range(0, pool.size() - 1)]
+	if _pet_deck.is_empty():
+		_pet_deck = PetPool.build_cards(pet.id)
+		if _pet_deck.is_empty():
+			return
+		RngManager.shuffle(_pet_deck, RngManager.deck_rng)
+	var card: CardData = _pet_deck.pop_back()
 	piles.hand.append(card)
 	Events.card_drawn.emit(card)
 	Events.combat_note.emit("%s brings you %s." % [pet.display_name, card.card_name])
+
+
+# -- Combat flags (a card raises one, another reads and spends it) --
+
+func raise_flag(flag: StringName) -> void:
+	if flag != &"":
+		combat_flags[flag] = true
+
+
+func has_flag(flag: StringName) -> bool:
+	return combat_flags.get(flag, false)
+
+
+func spend_flag(flag: StringName) -> void:
+	combat_flags.erase(flag)
 
 
 ## The Thurible relic: swings the player's Passion toward the pole chosen on the map screen
@@ -744,6 +773,16 @@ func apply_block(target: CombatantStats, amount: int) -> void:
 	Events.block_gained.emit(target, actual)
 
 
+## Takes every point of a combatant's Block away (the hawk's Bind). Sent down the block signal as
+## a negative gain, so the bar and the log read it as the guard going.
+func strip_block(target: CombatantStats) -> void:
+	if target.block <= 0:
+		return
+	var lost := target.block
+	target.reset_block()
+	Events.block_gained.emit(target, -lost)
+
+
 ## A flat HP loss a combatant inflicts on itself (a DamageEffect with apply_to_source: the
 ## Beast at the Stone's Breaking Blow). Skips every modifier and block, so the cost is the
 ## number on the move, and goes through _on_damage_dealt so the bar updates and a bar that
@@ -795,6 +834,20 @@ func recall_from_exhaust(count: int) -> void:
 		var idx = RngManager.deck_rng.randi_range(0, piles.exhaust_pile.size() - 1)
 		var card: CardData = piles.exhaust_pile[idx]
 		piles.exhaust_pile.remove_at(idx)
+		piles.hand.append(card)
+		Events.card_drawn.emit(card)
+
+
+## Returns up to `count` random cards from the discard pile back to the hand (the ferret's Dig).
+## The same shape as recall_from_exhaust, on the same rng.
+func recall_from_discard(count: int) -> void:
+	if piles.discard_pile.is_empty() or count <= 0:
+		return
+	var n: int = mini(count, piles.discard_pile.size())
+	for i in n:
+		var idx: int = RngManager.deck_rng.randi_range(0, piles.discard_pile.size() - 1)
+		var card: CardData = piles.discard_pile[idx]
+		piles.discard_pile.remove_at(idx)
 		piles.hand.append(card)
 		Events.card_drawn.emit(card)
 

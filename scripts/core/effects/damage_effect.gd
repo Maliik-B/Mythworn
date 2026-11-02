@@ -25,6 +25,18 @@ extends CardEffect
 ## block, no lash), so the number on the intent is the number he pays. Player cards never
 ## set this.
 @export var apply_to_source: bool = false
+## Ignores Block outright: the whole hit, after every modifier, lands on HP. Distinct from
+## `pierce`, which is a fixed number of points. The hawk's Stoop uses it: there is no guard
+## against a thing that comes straight down.
+@export var ignores_block: bool = false
+## A flag-read bonus: while the combat flag `bonus_flag` is up (raised by a CombatFlagEffect),
+## every hit deals `bonus_value` more, and the card spends the flag after its hits. The hawk's
+## Stoop lands double while the hawk is waiting on. The flag lives on the engine, so the dragged
+## preview never shows the raised number; `bonus_flag_text` is how it reads on the card ("the
+## hawk is waiting on").
+@export var bonus_value: int = 0
+@export var bonus_flag: StringName = &""
+@export var bonus_flag_text: String = ""
 
 
 ## The base hit before combat modifiers, folding in the Passion-distance bonus so both
@@ -33,6 +45,12 @@ func _effective_value() -> int:
 	if passion_bonus_divisor > 0:
 		return value + RunManager.passion_distance_from_center() / passion_bonus_divisor
 	return value
+
+
+## Whether the flag bonus applies right now: there is one, and the engine has the flag up.
+func _bonus_applies(battle_state) -> bool:
+	return bonus_value != 0 and bonus_flag != &"" and battle_state != null \
+		and battle_state.has_method("has_flag") and battle_state.has_flag(bonus_flag)
 
 
 func apply(source, target, battle_state) -> void:
@@ -50,8 +68,17 @@ func apply(source, target, battle_state) -> void:
 			and RunManager.get_passion_tier() == PassionState.Tier.BLAZING:
 		total_hits += source.get_power_stacks(Powers.OVERFLOW)
 	var dmg := _effective_value()
+	var bonus_on := _bonus_applies(battle_state)
+	if bonus_on:
+		dmg += bonus_value
+	# A hit that ignores Block pierces for more than it could ever deal, and the engine clamps
+	# the pierce to the modified hit, so every point lands on HP whatever Strength added.
+	var pierce_points := 9999 if ignores_block else pierce
 	for i in total_hits:
-		battle_state.deal_damage(target, dmg, source, pierce)
+		battle_state.deal_damage(target, dmg, source, pierce_points)
+	# The flag is spent by the card that cashed it, once, after all its hits.
+	if bonus_on:
+		battle_state.spend_flag(bonus_flag)
 	# On-kill energy refund — checked once after all hits so a multi-hit doesn't
 	# double-count. The heavy blow that fells a foe gives its tempo back.
 	if energy_on_kill > 0 and target and target.is_dead() \
@@ -63,8 +90,12 @@ func _riders() -> String:
 	var s := ""
 	if passion_bonus_divisor > 0:
 		s += " +1 damage per %d Passion from center." % passion_bonus_divisor
-	if pierce > 0:
+	if ignores_block:
+		s += " Ignores Block."
+	elif pierce > 0:
 		s += " Ignores %d block." % pierce
+	if bonus_value != 0 and bonus_flag != &"":
+		s += " %d instead while %s." % [value + bonus_value, bonus_flag_text]
 	if energy_on_kill > 0:
 		s += " On kill, gain %d energy." % energy_on_kill
 	return s

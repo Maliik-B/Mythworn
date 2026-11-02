@@ -2575,16 +2575,26 @@ func _show_enemy_speech(panel: Control, text: String) -> void:
 
 
 func _on_block_gained(target, amount: int) -> void:
+	# A negative amount is Block taken away (the hawk's Bind strips a guard): the same signal,
+	# read as a loss, so the bar and the number both show it going.
+	var number := ("+%d" if amount >= 0 else "%d") % amount
 	if target == combat_engine.player_stats:
-		_log("Gained [color=cyan]%d Block[/color]." % amount)
-		_spawn_damage_number("+%d" % amount, Color(0.3, 0.7, 1.0), null)
+		if amount >= 0:
+			_log("Gained [color=cyan]%d Block[/color]." % amount)
+		else:
+			_log("Lost [color=cyan]%d Block[/color]." % -amount)
+		_spawn_damage_number(number, Color(0.3, 0.7, 1.0), null)
 	else:
 		for enemy in combat_engine.enemies:
 			if enemy.stats == target:
-				_log("%s gains [color=cyan]%d Block[/color]." % [
-					enemy.enemy_data.enemy_name, amount])
+				if amount >= 0:
+					_log("%s gains [color=cyan]%d Block[/color]." % [
+						enemy.enemy_data.enemy_name, amount])
+				else:
+					_log("%s loses [color=cyan]%d Block[/color]." % [
+						enemy.enemy_data.enemy_name, -amount])
 				var panel = enemy_nodes.get(enemy)
-				_spawn_damage_number("+%d" % amount, Color(0.3, 0.7, 1.0), panel)
+				_spawn_damage_number(number, Color(0.3, 0.7, 1.0), panel)
 				break
 	_refresh_ui()
 

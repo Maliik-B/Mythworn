@@ -845,52 +845,133 @@ static func _memory_name_i_gave_myself() -> CardData:
 
 # ============================================================
 # COMPANION (TRICK) CARDS
-# A companion's pool: cards the pet GIVES the player, not cards in the deck. Each carries the
+# A companion's deck: cards the pet GIVES the player, not cards in the deck. Each carries the
 # Trick keyword (CardData.trick), so it leaves play when it resolves and, unplayed, vanishes at
-# the end of the turn unless it is bankable. Each is priced on its own: cost is the balance lever,
-# the pet's arrival chance (PetData.arrival_chance) is the other. PROVISIONAL (part 3).
+# the end of the turn unless it is bankable. One arrives every player turn, drawn from the pet's
+# deck without replacement (CombatEngine._pet_arrival), so the cost of each card is the balance
+# lever and the cycle is the rhythm. The budget:
+# the whole deck is worth about an uncommon relic over a fight, spent as a 0-cost card at Quick
+# Jab's rate (4), a 1-cost card at a common deck card's full rate, and at most one bankable card
+# per pet, which wants a moment and arrives once a cycle. Pet text is character-agnostic. The
+# cards push no Passion and grant no Block, Poise or Strength, so either pole can run any pet.
+# Every value PROVISIONAL (part 3b).
 # ============================================================
 
-## The Camelot hound's pool. Three tricks, one answer each to the bankability question: Fetch
-## and Flush vanish (a banked free draw or a banked sweep is exactly the stockpile that recreates
-## the energy problem as a burst), Hold is bankable. Its answer to "what stops a stockpile" is
-## not that Weak refuses to stack (it does stack, as duration: each Hold adds 2 turns of the same
-## 25% damage cut) but that the stockpile is slow and dear: a Hold arrives about once in eight turns,
-## each one costs an energy to play, and holding it spends a hand slot. If a long boss fight
-## proves that too cheap, the lever is Hold's cost or its stacks, and the sheet lists it as a
-## candidate for part 4's gamebreak search.
+## The hound's deck: the pack, and the grind. It harries from two sides, holds the quarry at bay,
+## worries it until it bleeds, and throws in fresh hounds when the first are spent. No finisher:
+## the pack makes a fight slow and safe, and the quarry's numbers go down while yours do not. Bay
+## is the bankable one: Weak stacks as duration, so a banked Bay adds two more turns of the same
+## cut, and the cycle hands over one every four turns, which is what stops a stockpile. Harry's
+## two bites each carry the deck's per-hit riders (Strength, the Sword's Bearer), which is the
+## pack working with the keeper in mechanics.
 static func build_hound_cards() -> Array[CardData]:
-	var cards: Array[CardData] = [_trick_fetch(), _trick_hold(), _trick_flush()]
+	var cards: Array[CardData] = [
+		_trick("Harry", 0, CardData.CardType.ATTACK, CardData.TargetType.SINGLE_ENEMY,
+			[_damage(2, 2)], false,
+			"It comes in from both sides at once, and neither bite is the one that counts."),
+		_trick("Bay", 1, CardData.CardType.SKILL, CardData.TargetType.SINGLE_ENEMY,
+			[_status(StatusEffects.WEAK, 2)], true,
+			"Held at bay, a thing stops looking for the road and starts looking at the teeth."),
+		_trick("Worry", 1, CardData.CardType.SKILL, CardData.TargetType.SINGLE_ENEMY,
+			[_status(StatusEffects.POISON, 4)], false,
+			"They do not need to bring it down. They only need to keep at it."),
+		_trick("Relay", 1, CardData.CardType.SKILL, CardData.TargetType.SELF,
+			[_draw(2)], false,
+			"The first hounds are spent. The fresh ones come through them without slowing."),
+	]
 	return cards
 
 
-## Free card flow: it brings back whatever it thinks you need. Costs nothing, vanishes if unused.
-static func _trick_fetch() -> CardData:
-	var c := _card("Fetch", 0, CardData.CardType.SKILL, CardData.TargetType.SELF,
-		CardData.CardRarity.COMMON, [_draw(1)])
+## The hawk's deck: the stoop. It waits on (a flag the combat keeps), comes straight down through
+## the guard for double while it is waiting on, binds to the quarry and takes its guard off, and
+## after a pass uses the speed to climb again. Wait On is the bankable one: a second raised while
+## one is up does nothing, so banking two is worthless, and only one Stoop a cycle can spend it.
+static func build_hawk_cards() -> Array[CardData]:
+	var cards: Array[CardData] = [
+		_trick("Wait On", 0, CardData.CardType.SKILL, CardData.TargetType.SELF,
+			[_flag(HAWK_WAITING_ON, "The hawk is waiting on.")], true,
+			"It rings up until it is a speck, and then not even that. It is still there."),
+		_trick("Stoop", 1, CardData.CardType.ATTACK, CardData.TargetType.SINGLE_ENEMY,
+			[_stoop(8, 8)], false,
+			"There is no guard against a thing that comes straight down."),
+		_trick("Bind", 1, CardData.CardType.ATTACK, CardData.TargetType.SINGLE_ENEMY,
+			[_strip_block(), _damage(4)], false,
+			"It takes the quarry in the air, and the two of them come down together."),
+		_trick("Throw Up", 1, CardData.CardType.ATTACK, CardData.TargetType.SINGLE_ENEMY,
+			[_damage(5), _flag(HAWK_WAITING_ON, "The hawk is waiting on.")], false,
+			"The miss costs it nothing. It uses the speed to climb."),
+	]
+	return cards
+
+
+## The ferret's deck: the warren, and speed. It hurts nothing itself. A scurry that brings a card,
+## a filched energy (it vanishes unplayed, so it is one free energy on one turn in four and never a
+## burst), a bolt that drives the quarry into the open for the keeper's own cards, and a dig that
+## brings a thrown-away card back up. Dig is the bankable one: it wants a discard pile worth
+## digging in, and the cycle hands over one every four turns.
+static func build_ferret_cards() -> Array[CardData]:
+	var cards: Array[CardData] = [
+		_trick("Scurry", 0, CardData.CardType.SKILL, CardData.TargetType.SELF,
+			[_draw(1)], false,
+			"It is down one hole and up another before you have finished looking."),
+		_trick("Filch", 0, CardData.CardType.SKILL, CardData.TargetType.SELF,
+			[_energy(1)], false,
+			"It comes back with something, and it is never anything you lent it."),
+		_trick("Bolt", 1, CardData.CardType.SKILL, CardData.TargetType.SINGLE_ENEMY,
+			[_status(StatusEffects.VULNERABLE, 2)], false,
+			"Nothing stays in a burrow with a ferret in it."),
+		_trick("Dig", 1, CardData.CardType.SKILL, CardData.TargetType.SELF,
+			[_dig(1)], true,
+			"Whatever you threw away, it was only ever underneath."),
+	]
+	return cards
+
+
+## The flag the hawk's Wait On and Throw Up raise and its Stoop spends (CombatEngine flags).
+const HAWK_WAITING_ON := &"waiting_on"
+
+
+## Trick card factory: a common-rarity card with the keyword, bankable or not, and its line.
+static func _trick(card_name: String, cost: int, type: CardData.CardType,
+		target: CardData.TargetType, card_effects: Array, bankable: bool,
+		flavor: String) -> CardData:
+	var c := _card(card_name, cost, type, target, CardData.CardRarity.COMMON, card_effects)
 	c.trick = true
-	c.flavor_text = "It brings back whatever it thinks you need. It is usually right."
+	c.retain = bankable
+	c.flavor_text = flavor
 	return c
 
 
-## It has a leg and does not mean to let go. Weak on one enemy; bankable, with the slow arrival
-## and the energy price standing in for a hard cap (see build_hound_cards).
-static func _trick_hold() -> CardData:
-	var c := _card("Hold", 1, CardData.CardType.SKILL, CardData.TargetType.SINGLE_ENEMY,
-		CardData.CardRarity.COMMON, [_status(StatusEffects.WEAK, 2)])
-	c.trick = true
-	c.retain = true
-	c.flavor_text = "It has hold of a leg and does not intend to let go."
-	return c
+## The hawk's stoop: ignores Block outright, and `bonus` more while the hawk is waiting on, which
+## the hit spends (DamageEffect.bonus_flag).
+static func _stoop(amount: int, bonus: int) -> DamageEffect:
+	var e := DamageEffect.new()
+	e.value = amount
+	e.ignores_block = true
+	e.bonus_value = bonus
+	e.bonus_flag = HAWK_WAITING_ON
+	e.bonus_flag_text = "the hawk is waiting on"
+	return e
 
 
-## It goes in low through the brush and everything that was hiding stops hiding. A light sweep.
-static func _trick_flush() -> CardData:
-	var c := _card("Flush", 1, CardData.CardType.ATTACK, CardData.TargetType.ALL_ENEMIES,
-		CardData.CardRarity.COMMON, [_damage(5)])
-	c.trick = true
-	c.flavor_text = "It goes in low through the brush, and what was hiding stops hiding."
-	return c
+## Returns `amount` random cards from the discard pile to the hand (DiscardToHandEffect).
+static func _dig(amount: int) -> DiscardToHandEffect:
+	var e := DiscardToHandEffect.new()
+	e.value = amount
+	return e
+
+
+## Raises a combat flag (CombatFlagEffect); `text` is how it reads on the card.
+static func _flag(flag: StringName, text: String) -> CombatFlagEffect:
+	var e := CombatFlagEffect.new()
+	e.flag = flag
+	e.text = text
+	return e
+
+
+## Removes all of the target's Block (StripBlockEffect).
+static func _strip_block() -> StripBlockEffect:
+	return StripBlockEffect.new()
 
 
 ## The Excalibur signature card. Constructed fresh each combat by CombatEngine
