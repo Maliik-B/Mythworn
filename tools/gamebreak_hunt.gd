@@ -26,6 +26,7 @@ const SIX_TURNS := 6
 const LOOP_CARDS := 25     # more cards in one turn than this is a loop
 const ENERGY_HOARD := 12   # more energy than this at the end of a turn is a hoard
 const MAX_COPIES := 3
+const SOURCED_MEMORY_CARD := "The House That Was"  # the only memory card an event grants today
 
 var _cbt := HarnessCombat.new()
 var _character: CharacterData
@@ -581,11 +582,15 @@ func _compact(names: Array) -> String:
 
 func _search_space() -> Dictionary:
 	var cards: Array = []
+	# Only cards a run can hold: the draftable pools, and the one memory card an event grants. The
+	# two memory cards with no source yet (the linter's known findings) stay out, and a memory card
+	# is a single copy.
 	for pool in [CardPool.build_emo_primary_pool(), CardPool.build_emo_secondary_pool(),
-			CardPool._build_generic_pool(), CardPool.build_memory_cards()]:
+			CardPool._build_generic_pool()]:
 		for c in pool:
 			if not cards.has(c.card_name):
 				cards.append(c.card_name)
+	cards.append(SOURCED_MEMORY_CARD)
 	var relics: Array = []
 	for r in RelicPool._build_pool() + RelicPool._build_quest_pool() + RelicPool._build_woken_pool():
 		if not relics.has(r.relic_name) and not r.is_dormant():
@@ -627,7 +632,7 @@ func _mutate(b: Dictionary, space: Dictionary) -> Dictionary:
 	match kind:
 		0, 1, 2:
 			var card: String = space["cards"][_rng.randi_range(0, space["cards"].size() - 1)]
-			if n["deck"].count(card) < MAX_COPIES:
+			if n["deck"].count(card) < (1 if card == SOURCED_MEMORY_CARD else MAX_COPIES):
 				n["deck"].append(card)
 		3, 4:
 			if n["deck"].size() > 10:
