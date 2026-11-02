@@ -21,7 +21,113 @@ static func get_relic_by_name(name: String) -> RelicData:
 	for relic in _build_neve_pool():
 		if relic.relic_name == name:
 			return relic
+	# The woken forms of the forgotten relics: never rolled, only reached by waking.
+	for relic in _build_woken_pool():
+		if relic.relic_name == name:
+			return relic
 	return null
+
+
+# ============================================================
+# FORGOTTEN RELICS
+# ============================================================
+# A relic that arrives with its name worn off and its power dormant, and gets both back at a
+# place that keeps records (the Scriptorium, the Tourney's herald, the Reliquary): the rot's
+# subtraction running backwards, once, on the player's side of the table. The dormant form rolls
+# in rewards and shops at its own rarity, fair on its own; the woken form is the one it had, one
+# rarity up, the same effect and one more, and lives here outside _build_pool so it is only ever
+# reached by waking (RunManager.wake_relic). The tell is one line of absence in the dormant text
+# and the overlay's dead gold. A relic only ever goes up, once, never by distance. Every value
+# PROVISIONAL (part 3b); the harness models both states in part 4. The dormant names are plain and
+# unearned; the hart, the oak and Sir Aldric are placeholder names, open to change.
+
+## The six woken forms. Each names the dormant form it came from.
+static func _build_woken_pool() -> Array[RelicData]:
+	var pool: Array[RelicData] = []
+	pool.append(_woken("The Hart's Shield", &"A Plain Shield",
+		"A hart lodged, argent, on a field of green, read back off the roll. Start each combat with 8 Block and 1 Poise.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_BLOCK, 8, RelicData.RelicEffect.GAIN_DEXTERITY, 1))
+	pool.append(_woken("The Oak Banner", &"An Unpicked Banner",
+		"An oak with its roots showing, gold on red, and they rally to it again. Start each combat with 1 Strength and draw 1 additional card.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_STRENGTH, 1, RelicData.RelicEffect.DRAW_CARDS, 1))
+	pool.append(_woken("The Brass of Sir Aldric", &"A Rubbed Brass",
+		"The inscription read back, and with it the rents of a dead man's lands. Gain 15 bonus Gold and heal 6 HP after each combat.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicEffect.GAIN_GOLD, 15, RelicData.RelicEffect.HEAL, 6))
+	# The girdle's ward and the scabbard's guard are read by CombatEngine by name (effect2 NONE,
+	# value2 the number), like Blooded Edge: once a combat a blow that would fell you leaves you at
+	# value2 HP; every enemy hit on you deals value2 less.
+	pool.append(_woken("The Green Girdle", &"A Faded Girdle",
+		"Green again, and the gold bright in it, and whoever wears it cannot be slain, or so the lady said. Heal 8 HP after each combat. Once each combat, a blow that would fell you leaves you at 1 HP.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicEffect.HEAL, 8, RelicData.RelicEffect.NONE, 1))
+	pool.append(_woken("Excalibur's Scabbard", &"A Bare Scabbard",
+		"The sheath that was worth ten of the sword: whoever wears it loses no blood. Heal 2 HP at the start of each turn, and every enemy hit on you deals 1 less.",
+		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_TURN_START,
+		RelicData.RelicEffect.HEAL, 2, RelicData.RelicEffect.NONE, 1))
+	pool.append(_woken("Harja", &"A Bone Comb",
+		"The word along the back is a name, or the word for a fighter, and nobody can say which. Draw 1 additional card and start each combat with 1 Poise.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.DRAW_CARDS, 1, RelicData.RelicEffect.GAIN_DEXTERITY, 1))
+	return pool
+
+
+## The names of every dormant form, in a stable order (tests, tooling).
+static func dormant_names() -> PackedStringArray:
+	var names := PackedStringArray()
+	for relic in _build_pool():
+		if relic.is_dormant():
+			names.append(relic.relic_name)
+	return names
+
+
+## The offer: while the keeper carries no forgotten relic, dormant or woken, one of a reward's
+## picks is a dormant one, so a run meets the mechanic by its first elite rather than by luck.
+## Replaces the last pick with a seeded dormant choice when none was rolled; nothing to do when
+## one was, when the keeper already carries one, or when none is left to offer.
+static func _ensure_a_dormant_pick(picked: Array[RelicData], filtered: Array[RelicData],
+		rng: RandomNumberGenerator) -> void:
+	for relic in picked:
+		if relic.is_dormant():
+			return
+	var dormant: Array[RelicData] = []
+	for relic in filtered:
+		if relic.is_dormant() and relic not in picked:
+			dormant.append(relic)
+	if dormant.is_empty():
+		return
+	var offer: RelicData = dormant[rng.randi_range(0, dormant.size() - 1)]
+	if picked.is_empty():
+		picked.append(offer)
+	else:
+		picked[picked.size() - 1] = offer
+
+
+## A dormant forgotten relic: an ordinary reward relic that also names the woken form it wakes
+## into, how prose calls it, and the sentence of its waking.
+static func _forgotten(relic_name: String, short_name: String, desc: String,
+		rarity: RelicData.RelicRarity, trigger: RelicData.RelicTrigger,
+		effect: RelicData.RelicEffect, val: int, wakes_into: StringName,
+		wake_line: String) -> RelicData:
+	var r := _relic(relic_name, desc, rarity, trigger, effect, val)
+	r.wakes_into = wakes_into
+	r.short_name = short_name
+	r.wake_line = wake_line
+	return r
+
+
+## A woken forgotten relic: the effect it always had and one more, naming the dormant form.
+static func _woken(relic_name: String, woken_from: StringName, desc: String,
+		rarity: RelicData.RelicRarity, trigger: RelicData.RelicTrigger,
+		effect: RelicData.RelicEffect, val: int, effect2: RelicData.RelicEffect,
+		val2: int) -> RelicData:
+	var r := _relic(relic_name, desc, rarity, trigger, effect, val)
+	r.woken_from = woken_from
+	r.effect2 = effect2
+	r.value2 = val2
+	return r
 
 
 ## Quest-only relics — granted by specific narrative events, NEVER appear in
@@ -185,12 +291,13 @@ static func get_reward_choices(rng: RandomNumberGenerator, count: int = 3,
 		exclude_names: PackedStringArray = []) -> Array[RelicData]:
 	var pool = _build_pool()
 
-	# Remove relics the player already owns
+	# Remove relics the player already owns, and the dormant form of a relic the player has
+	# already woken (the woken form is the same thing with its name back).
 	var filtered: Array[RelicData] = []
 	for relic in pool:
 		var dominated = false
 		for name in exclude_names:
-			if relic.relic_name == name:
+			if relic.relic_name == name or (relic.is_dormant() and String(relic.wakes_into) == name):
 				dominated = true
 				break
 		if not dominated:
@@ -215,6 +322,10 @@ static func get_reward_choices(rng: RandomNumberGenerator, count: int = 3,
 				break
 			if relic not in picked:
 				picked.append(relic)
+
+	# The offer (see _ensure_a_dormant_pick): a keeper carrying no forgotten relic is shown one.
+	if RunManager and not RunManager.carries_forgotten_relic():
+		_ensure_a_dormant_pick(picked, filtered, rng)
 
 	return picked
 
@@ -282,6 +393,25 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.APPLY_WEAK_ALL, 1))
 
+	# -- COMMON, FORGOTTEN (dormant; the woken forms are in _build_woken_pool) --
+	# Two knightly objects with the device worn off, and the one from elsewhere: a comb cut with
+	# a word no one here can read (LORE_SURFACE §5, the strange elite; nothing explains it).
+	pool.append(_forgotten("A Plain Shield", "the plain shield",
+		"A knight's shield with the paint gone down to the bare wood, the boss still bright. Something was painted here once. Start each combat with 8 Block.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_BLOCK, 8, &"The Hart's Shield",
+		"The paint comes back up through the grain of the wood, white first: a hart, lying down, on a field of green."))
+	pool.append(_forgotten("An Unpicked Banner", "the unpicked banner",
+		"A banner with its device unpicked thread by thread, and the holes still show the shape of what was there. Start each combat with 1 Strength.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.GAIN_STRENGTH, 1, &"The Oak Banner",
+		"The holes in the cloth fill with thread, gold on red: an oak with its roots showing."))
+	pool.append(_forgotten("A Bone Comb", "the bone comb",
+		"A comb of antler, five teeth gone, with a word cut along the back that no one here can read. Draw 1 additional card at the start of combat.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
+		RelicData.RelicEffect.DRAW_CARDS, 1, &"Harja",
+		"Red comes into the cuts along the back, then black, and the one long scratch comes apart into a word."))
+
 	# -- UNCOMMON --
 	pool.append(_relic("Ruled Margin", "The ruled lines that keep a scribe's hand straight, pricked down the margin. Start each combat with 1 Poise.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
@@ -314,6 +444,25 @@ static func _build_pool() -> Array[RelicData]:
 	pool.append(_relic("Leaden Vow", "A vow sealed in lead, heavy enough to settle whatever it is hung on. Lose 2 Passion at the start of each turn (settles you toward Hollow).",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_PASSION, -2))
+
+	# -- UNCOMMON, FORGOTTEN (dormant) --
+	# A memorial brass with its inscription rubbed away, and two of the romances' own named
+	# objects, the girdle and the scabbard, each with its colour or its tooling gone.
+	pool.append(_forgotten("A Rubbed Brass", "the rubbed brass",
+		"A small memorial brass off a tomb slab, the inscription rubbed to nothing by a century of hands. Something was written here once. Gain 10 bonus Gold after each combat.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicEffect.GAIN_GOLD, 10, &"The Brass of Sir Aldric",
+		"The letters stand up out of the brass one at a time, and the last of them is a name."))
+	pool.append(_forgotten("A Faded Girdle", "the faded girdle",
+		"A lace of silk to go about the waist, the green gone to grey and the gold thread still in it. Something was worked into it once. Heal 8 HP after each combat.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicEffect.HEAL, 8, &"The Green Girdle",
+		"The grey goes out of the silk the way cold goes out of a hand, and it is green."))
+	pool.append(_forgotten("A Bare Scabbard", "the bare scabbard",
+		"A scabbard tooled for a blade longer than yours, the leather worn smooth where a device was. Heal 2 HP at the start of each turn.",
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
+		RelicData.RelicEffect.HEAL, 2, &"Excalibur's Scabbard",
+		"The tooling comes back under your thumb, and you know the blade it was made for, whether or not you carry it."))
 
 	# -- RARE --
 	pool.append(_relic("Chained Folio", "A folio chained to its lectern so nothing could carry it off. Gain 5 Block at the start of each turn.",

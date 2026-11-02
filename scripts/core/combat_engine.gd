@@ -84,6 +84,18 @@ var _blade_oil_pending: int = 0
 ## land on the player after it is used does not, and the flag clears. Reset every combat.
 var _favour_ward: bool = false
 
+## The Green Girdle (a woken forgotten relic): once a combat, a blow that would fell the player
+## leaves them at _girdle_hp instead. Armed at combat start from the relic's value2 (0 unless
+## held), spent by the blow it turns. Resolved after the clutch heal in _on_damage_dealt, so the
+## title's save goes first and the girdle catches what it did not.
+var _girdle_ward: bool = false
+var _girdle_hp: int = 0
+
+## Excalibur's Scabbard (a woken forgotten relic): every enemy hit on the player deals this much
+## less, read from the relic's value2 (0 unless held). Only an enemy's blow is softened; a
+## self-inflicted cost is not a wound the sheath can keep in.
+var _scabbard_guard: int = 0
+
 ## The Unfading (title): true until the first card of the combat is played. That card goes back
 ## to the hand instead of the discard pile, unless it was spent (it exhausts, it is a Power, or
 ## it is a companion's Trick card). Armed at combat start from the equipped titles.
@@ -162,6 +174,12 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	# per-fight via RunManager.thurible_mode and applied at each player turn-start.
 	var thur := RunManager.get_relic("The Thurible")
 	_thurible_swing = thur.value if thur else 0
+	# The woken forgotten relics the engine reads by name (0 or unarmed unless held).
+	var girdle := RunManager.get_relic("The Green Girdle")
+	_girdle_hp = girdle.value2 if girdle else 0
+	_girdle_ward = _girdle_hp > 0
+	var scabbard := RunManager.get_relic("Excalibur's Scabbard")
+	_scabbard_guard = scabbard.value2 if scabbard else 0
 	# Consumable effects are per fight: nothing armed carries in from a previous combat.
 	_blade_oil_pending = 0
 	_favour_ward = false
@@ -319,7 +337,12 @@ func start_player_turn() -> void:
 	energy = MAX_ENERGY
 	_momentum = 0  # Momentum relic: the within-turn damage ramp resets each player turn.
 	_emit_damage_ramp()  # the sword may have stepped on this turn boundary, and Momentum reset
-	player_stats.reset_block()
+	# Block falls at the start of every turn but the first. Block a relic gives at combat start
+	# (Steadfast Binding, Packed Tight, The People's Line, Barrow-Warden's Mail, A Plain Shield)
+	# is given before this turn begins and has to stand through the first enemy turn, or the relic
+	# never did anything; the reset used to run on turn one as well, and those relics were dead.
+	if turn_number > 1:
+		player_stats.reset_block()
 	tick_start_of_turn(player_stats)
 
 	if player_stats.is_dead():
@@ -724,6 +747,12 @@ func deal_damage(target: CombatantStats, base_amount: int,
 
 	amount = maxi(0, amount)
 
+	# Excalibur's Scabbard: an enemy's blow on the player lands for a little less. After every
+	# modifier, so it is the last point off the hit, and never on a cost the player paid themselves.
+	if _scabbard_guard > 0 and target == player_stats and source != null \
+			and source != player_stats and amount > 0:
+		amount = maxi(0, amount - _scabbard_guard)
+
 	# Intangible clamps any single damage source to 1. Emo Hybrid's "Slip the Tide"
 	# uses this for a deliberately defensive turn skip.
 	if amount > 0 and target.has_status(StatusEffects.INTANGIBLE):
@@ -956,6 +985,13 @@ func _on_damage_dealt(target: CombatantStats, amount: int) -> void:
 			if mended > 0:
 				player_stats.current_hp += mended
 				Events.player_healed.emit(mended, player_stats.current_hp)
+		# The Green Girdle: a blow that would fell the player leaves them standing instead, once
+		# a combat. After the clutch heal, so it only catches what the title did not.
+		if _girdle_ward and target.is_dead():
+			_girdle_ward = false
+			target.current_hp = _girdle_hp
+			Events.player_healed.emit(_girdle_hp, target.current_hp)
+			Events.combat_note.emit("The girdle holds, and nicks you.")
 		if target.is_dead():
 			phase = Phase.BATTLE_LOST
 			Events.combat_lost.emit()
@@ -1005,36 +1041,48 @@ func process_combat_end_relics() -> void:
 	for relic in RunManager.relics:
 		if relic.trigger != RelicData.RelicTrigger.ON_COMBAT_END:
 			continue
-		match relic.effect:
-			RelicData.RelicEffect.HEAL:
-				RunManager.heal(relic.value)
-			RelicData.RelicEffect.GAIN_GOLD:
-				RunManager.add_gold(relic.value)
+		_apply_combat_end_slot(relic.effect, relic.value)
+		_apply_combat_end_slot(relic.effect2, relic.value2)
 
 
+func _apply_combat_end_slot(effect: RelicData.RelicEffect, value: int) -> void:
+	match effect:
+		RelicData.RelicEffect.HEAL:
+			RunManager.heal(value)
+		RelicData.RelicEffect.GAIN_GOLD:
+			RunManager.add_gold(value)
+
+
+## A relic's effect and, for a woken forgotten relic, the second one joined to it, in that order
+## (so a shield's Block lands before the Poise that would have enlarged it).
 func _apply_relic_effect(relic: RelicData) -> void:
-	match relic.effect:
+	_apply_relic_slot(relic.effect, relic.value)
+	_apply_relic_slot(relic.effect2, relic.value2)
+
+
+func _apply_relic_slot(effect: RelicData.RelicEffect, value: int) -> void:
+	match effect:
 		RelicData.RelicEffect.GAIN_BLOCK:
-			apply_block(player_stats, relic.value)
+			apply_block(player_stats, value)
 		RelicData.RelicEffect.GAIN_STRENGTH:
-			apply_status_effect(player_stats, StatusEffects.STRENGTH, relic.value)
+			apply_status_effect(player_stats, StatusEffects.STRENGTH, value)
 		RelicData.RelicEffect.GAIN_DEXTERITY:
-			apply_status_effect(player_stats, StatusEffects.DEXTERITY, relic.value)
+			apply_status_effect(player_stats, StatusEffects.DEXTERITY, value)
 		RelicData.RelicEffect.APPLY_VULNERABLE_ALL:
 			for enemy in enemies:
 				if not enemy.stats.is_dead():
-					apply_status_effect(enemy.stats, StatusEffects.VULNERABLE, relic.value)
+					apply_status_effect(enemy.stats, StatusEffects.VULNERABLE, value)
 		RelicData.RelicEffect.APPLY_WEAK_ALL:
 			for enemy in enemies:
 				if not enemy.stats.is_dead():
-					apply_status_effect(enemy.stats, StatusEffects.WEAK, relic.value)
+					apply_status_effect(enemy.stats, StatusEffects.WEAK, value)
 		RelicData.RelicEffect.DRAW_CARDS:
-			draw_cards(relic.value)
+			draw_cards(value)
 		RelicData.RelicEffect.GAIN_PASSION:
-			RunManager.change_passion(relic.value)
+			RunManager.change_passion(value)
 		RelicData.RelicEffect.HEAL:
 			player_stats.current_hp = mini(
-				player_stats.current_hp + relic.value, player_stats.max_hp)
+				player_stats.current_hp + value, player_stats.max_hp)
 
 
 # -- Passion Zone Damage Modifier --

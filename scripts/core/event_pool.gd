@@ -281,6 +281,19 @@ static func _scriptorium() -> EventData:
 	e.choices.append(cf)
 	e.choices.append(c2)
 	e.choices.append(c3)
+	# A keeper carrying a forgotten relic may ask the record for it: one option per dormant relic
+	# held, none shown otherwise, so the site does the telling. It costs nothing but the event's
+	# other options (ROADMAP Phase 1, "Forgotten relics").
+	for relic in RunManager.get_forgotten_relics():
+		var wake = EventData.EventChoice.new()
+		wake.text = "Put %s on the table under the lamp, and ask Bram what the record says of it." % relic.short_name
+		wake.result_text = ("Bram turns it to the light and does not hurry. He goes through the "
+			+ "satchel twice and the drawers once, and comes back with a page he does not let you "
+			+ "read. \"There,\" he says. \"That one was written down.\" " + relic.wake_line
+			+ " He watches you put it away. \"Keep it out of the fire,\" he says, which is the "
+			+ "nearest he comes to a blessing.")
+		wake.wakes_relic = StringName(relic.relic_name)
+		e.choices.append(wake)
 	return e
 
 
@@ -353,6 +366,19 @@ static func _the_tourney() -> EventData:
 	e.choices.append(c1)
 	e.choices.append(cc)
 	e.choices.append(c3)
+	# The herald's roll of arms reads a device back: one waking option per dormant forgotten relic
+	# the keeper carries, none otherwise. It costs nothing but the event's other options.
+	for relic in RunManager.get_forgotten_relics():
+		var wake = EventData.EventChoice.new()
+		wake.text = "Take %s to the herald's tent and ask him to read it." % relic.short_name
+		wake.result_text = ("The herald is an old man with a roll of arms longer than he is, and the "
+			+ "eyes for it still. He unrolls it along the trestle a hand's width at a time, and "
+			+ "stops, and puts a finger on the vellum. \"I know that,\" he says. \"I know whose "
+			+ "that was.\" " + relic.wake_line + " He says a name, and the noise of the field "
+			+ "takes most of it, and you keep the rest. Then he rolls the roll back up and goes "
+			+ "to call the next pass.")
+		wake.wakes_relic = StringName(relic.relic_name)
+		e.choices.append(wake)
 	return e
 
 

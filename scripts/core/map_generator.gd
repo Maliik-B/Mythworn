@@ -229,6 +229,7 @@ static func _apply_realm_specifics(map: MapData, realm_id: StringName, act: int,
 		_place_sword_in_stone(map)
 		_place_raider_questline(map, rng)
 		_place_master_of_game(map, rng)
+		_place_record_site(map, rng)
 
 
 static func _place_sword_in_stone(map: MapData) -> void:
@@ -336,6 +337,35 @@ static func _place_master_of_game(map: MapData, rng: RandomNumberGenerator) -> v
 	var node: MapNode = map.nodes[cands[0]]
 	node.node_type = MapNode.NodeType.EVENT
 	node.scripted_event_id = MASTER_OF_GAME_ID
+
+
+# A record site: one of the three pool events that can wake a forgotten relic (the Scriptorium,
+# the Tourney's herald, the Reliquary), seated once on every map late in the act, after the
+# elites and shops that hand out dormant relics and before the pre-boss rest, so a run that holds
+# one can count on a place to wake it and route there. Which of the three is drawn on the map
+# rng; the pool keeps drawing all three at random as well. Shown on the map like the huntsman.
+const RECORD_SITE_IDS: Array[StringName] = [&"scriptorium", &"tourney", &"reliquary"]
+const RECORD_SITE_MIN_FLOOR := 9
+const RECORD_SITE_MAX_FLOOR := 12
+
+
+static func _place_record_site(map: MapData, rng: RandomNumberGenerator) -> void:
+	var cands: Array[int] = []
+	for id in map.nodes:
+		var n: MapNode = map.nodes[id]
+		if n.floor_num < RECORD_SITE_MIN_FLOOR or n.floor_num > RECORD_SITE_MAX_FLOOR:
+			continue
+		if _is_reserved_node(map, n):
+			continue
+		if n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT:
+			continue
+		cands.append(id)
+	if cands.is_empty():
+		return
+	RngManager.shuffle(cands, rng)
+	var node: MapNode = map.nodes[cands[0]]
+	node.node_type = MapNode.NodeType.EVENT
+	node.scripted_event_id = RECORD_SITE_IDS[rng.randi_range(0, RECORD_SITE_IDS.size() - 1)]
 
 
 # A treasure cache a random Campfire exposes mid-run. Unlike the raider payoff (seated at

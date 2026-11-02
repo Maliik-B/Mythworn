@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_consumable_ui()
 	_test_pets()
 	_test_master_of_game()
+	_test_forgotten_relics()
 	_test_relic_names()
 	_test_liaison_relics()
 	_test_refusals()
@@ -3583,6 +3584,270 @@ func _test_master_of_game() -> void:
 	_check("leaving them with him changes nothing", RunManager.gold == 25 and RunManager.pet_id == &"hawk")
 	es.free()
 	_reset_consumable_state()
+
+
+## Part 3b: the forgotten relics. Six dormant forms roll in the reward pool, each naming a woken
+## form one rarity up that never rolls; the offer is guaranteed while the keeper carries none; a
+## record site builds one waking option per dormant relic carried and none otherwise; waking
+## replaces the relic in place; the engine applies a woken relic's second effect, the girdle's
+## ward and the scabbard's guard; and a record site is seated late in every act.
+func _test_forgotten_relics() -> void:
+	_reset_consumable_state()
+	RunManager.relics.clear()
+	var dormant := ["A Plain Shield", "An Unpicked Banner", "A Rubbed Brass",
+		"A Faded Girdle", "A Bare Scabbard", "A Bone Comb"]
+	var woken := ["The Hart's Shield", "The Oak Banner", "The Brass of Sir Aldric",
+		"The Green Girdle", "Excalibur's Scabbard", "Harja"]
+	var pool_names := PackedStringArray()
+	for r in RelicPool._build_pool():
+		pool_names.append(r.relic_name)
+	var pairs_ok := true
+	var dormant_roll := true
+	var woken_never := true
+	var up_one := true
+	var tells := true
+	var lines := true
+	var second := true
+	for i in 6:
+		var d := RelicPool.get_relic_by_name(dormant[i])
+		var w := RelicPool.get_relic_by_name(woken[i])
+		if d == null or w == null:
+			pairs_ok = false
+			continue
+		if String(d.wakes_into) != woken[i] or String(w.woken_from) != dormant[i] \
+				or not d.is_dormant() or d.is_woken() or not w.is_woken() or w.is_dormant():
+			pairs_ok = false
+		if dormant[i] not in pool_names:
+			dormant_roll = false
+		if woken[i] in pool_names:
+			woken_never = false
+		if int(w.rarity) != int(d.rarity) + 1 or w.trigger != d.trigger or w.effect != d.effect:
+			up_one = false
+		if d.description.find(" once.") == -1 and d.description.find("still show") == -1 \
+				and d.description.find("worn smooth") == -1 \
+				and d.description.find("no one here can read") == -1:
+			tells = false
+		if d.wake_line == "" or d.short_name == "" or d.wake_line.find("—") != -1:
+			lines = false
+		if w.effect2 == RelicData.RelicEffect.NONE and w.value2 <= 0:
+			second = false
+	_check("six dormant relics each name a woken form, and the woken form names it back", pairs_ok)
+	_check("every dormant form rolls in the reward pool and no woken form ever does",
+		dormant_roll and woken_never)
+	_check("each woken form keeps its trigger and effect, one rarity up, with a second effect or an engine number",
+		up_one and second)
+	_check("each dormant text carries one line of absence, and each has a short name and a wake line",
+		tells and lines)
+	_check("the dormant names are known in a stable order", RelicPool.dormant_names().size() == 6)
+
+	# --- Carrying and waking: in place, once, only the one named.
+	var shield := RelicPool.get_relic_by_name("A Plain Shield")
+	var comb := RelicPool.get_relic_by_name("A Bone Comb")
+	var quill := RelicPool.get_relic_by_name("Iron Quill")
+	_check("with no relics the keeper carries no forgotten relic",
+		not RunManager.carries_forgotten_relic() and RunManager.get_forgotten_relics().is_empty())
+	RunManager.add_relic(quill)
+	RunManager.add_relic(shield)
+	RunManager.add_relic(comb)
+	_check("the dormant relics carried are listed in pickup order, and an ordinary one is not",
+		RunManager.get_forgotten_relics().size() == 2 and RunManager.get_forgotten_relics()[0] == shield
+		and RunManager.carries_forgotten_relic())
+	var hart := RunManager.wake_relic_by_name("A Plain Shield")
+	_check("waking the shield puts The Hart's Shield in its slot and leaves the comb asleep",
+		hart != null and hart.relic_name == "The Hart's Shield" and RunManager.relics[1] == hart
+		and RunManager.relics[2] == comb and RunManager.get_forgotten_relics().size() == 1
+		and RunManager.has_relic("The Hart's Shield") and not RunManager.has_relic("A Plain Shield"))
+	_check("a woken relic cannot be woken again, and a name not carried wakes nothing",
+		RunManager.wake_relic_by_name("The Hart's Shield") == null
+		and RunManager.wake_relic_by_name("A Faded Girdle") == null)
+	_check("a keeper holding a woken relic still counts as carrying a forgotten one",
+		RunManager.carries_forgotten_relic())
+
+	# --- The offer: with none carried every pick holds a dormant relic; with one, the roll is
+	# ordinary; the dormant form of a woken relic is never offered again.
+	RunManager.relics.clear()
+	var offered_each_time := true
+	for s in 20:
+		var picks := RelicPool.get_reward_choices(_seeded(900 + s), 3, [])
+		var has_dormant := false
+		for r in picks:
+			if r.is_dormant():
+				has_dormant = true
+		if not has_dormant:
+			offered_each_time = false
+	_check("while the keeper carries no forgotten relic, every relic pick of three includes a dormant one",
+		offered_each_time)
+	RunManager.add_relic(hart)
+	var never_again := true
+	var ordinary_sometimes := false
+	for s in 20:
+		var picks := RelicPool.get_reward_choices(_seeded(900 + s), 3, RunManager.get_owned_relic_names())
+		var has_dormant := false
+		for r in picks:
+			if r.relic_name == "A Plain Shield":
+				never_again = false
+			if r.is_dormant():
+				has_dormant = true
+		if not has_dormant:
+			ordinary_sometimes = true
+	_check("with The Hart's Shield carried A Plain Shield never rolls, and the roll is ordinary again",
+		never_again and ordinary_sometimes)
+	_check("a seeded roll with the offer is the same roll twice",
+		_relic_names(RelicPool.get_reward_choices(_seeded(77), 3, []))
+		== _relic_names(RelicPool.get_reward_choices(_seeded(77), 3, [])))
+
+	# --- The engine: the second effect, the girdle's ward, the scabbard's guard.
+	var deck: Array[CardData] = []
+	for i in 10:
+		deck.append(_neutral_attack("Card %d" % i, 1, 6))
+	RunManager.relics.clear()
+	RunManager.add_relic(hart)
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat(deck, 50, 50, [_dummy_attacker()])
+	_check("The Hart's Shield opens a fight with 8 Block and 1 Poise, the Block landing first",
+		eng.player_stats.block == 8 and eng.player_stats.get_status_stacks(StatusEffects.DEXTERITY) == 1)
+	eng.free()
+	RunManager.relics.clear()
+	RunManager.add_relic(RelicPool.get_relic_by_name("The Oak Banner"))
+	RunManager.add_relic(RelicPool.get_relic_by_name("Harja"))
+	eng = CombatEngine.new()
+	add_child(eng)
+	eng.start_combat(deck, 50, 50, [_dummy_attacker()])
+	_check("The Oak Banner and Harja: 1 Strength, 1 Poise and two extra cards in the opening hand",
+		eng.player_stats.get_status_stacks(StatusEffects.STRENGTH) == 1
+		and eng.player_stats.get_status_stacks(StatusEffects.DEXTERITY) == 1
+		and eng.piles.hand.size() == 7)
+	eng.free()
+	RunManager.relics.clear()
+	RunManager.add_relic(RelicPool.get_relic_by_name("The Brass of Sir Aldric"))
+	RunManager.max_hp = 50
+	RunManager.current_hp = 40
+	RunManager.gold = 0
+	eng = CombatEngine.new()
+	add_child(eng)
+	eng.start_combat(deck, 40, 50, [_dummy_attacker()])
+	eng.process_combat_end_relics()
+	_check("The Brass of Sir Aldric pays 15 gold and mends 6 when a fight ends",
+		RunManager.gold == 15 and RunManager.current_hp == 46)
+	eng.free()
+	RunManager.relics.clear()
+	RunManager.add_relic(RelicPool.get_relic_by_name("The Green Girdle"))
+	eng = CombatEngine.new()
+	add_child(eng)
+	eng.start_combat(deck, 10, 50, [_dummy_attacker()])
+	var foe := eng.enemies[0].stats
+	eng.deal_damage(eng.player_stats, 30, foe)
+	_check("The Green Girdle turns a felling blow into 1 HP, once, and the fight goes on",
+		eng.player_stats.current_hp == 1 and eng.phase != CombatEngine.Phase.BATTLE_LOST)
+	eng.deal_damage(eng.player_stats, 30, foe)
+	_check("the second felling blow lands", eng.player_stats.current_hp == 0
+		and eng.phase == CombatEngine.Phase.BATTLE_LOST)
+	eng.free()
+	RunManager.relics.clear()
+	RunManager.add_relic(RelicPool.get_relic_by_name("Excalibur's Scabbard"))
+	eng = CombatEngine.new()
+	add_child(eng)
+	eng.start_combat(deck, 50, 50, [_dummy_attacker()])
+	foe = eng.enemies[0].stats
+	var hp0 := eng.player_stats.current_hp
+	eng.deal_damage(eng.player_stats, 20, foe)
+	_check("Excalibur's Scabbard takes 1 off an enemy's 20 (after its turn-start mend of 2)",
+		hp0 - eng.player_stats.current_hp == 19 and hp0 == 50)
+	eng.self_damage(eng.player_stats, 5)
+	_check("a cost the player pays themselves is not softened",
+		hp0 - eng.player_stats.current_hp == 24)
+	eng.free()
+	var bare := CombatEngine.new()
+	add_child(bare)
+	RunManager.relics.clear()
+	bare.start_combat(deck, 10, 50, [_dummy_attacker()])
+	bare.deal_damage(bare.player_stats, 30, bare.enemies[0].stats)
+	_check("without the girdle a felling blow fells", bare.phase == CombatEngine.Phase.BATTLE_LOST)
+	bare.free()
+
+	# --- The sites: one waking option per dormant relic carried, none otherwise, and the relic's
+	# own wake line in the outcome.
+	RunManager.relics.clear()
+	var es: Control = load("res://scenes/event/event_scene.gd").new()
+	var scrip_none: EventData = EventPool._scriptorium()
+	var tourn_none: EventData = EventPool._the_tourney()
+	var struck_none: EventData = es._build_reliquary_struck_event()
+	_check("with no dormant relic the three sites show no waking (4, 3 and 2 options)",
+		scrip_none.choices.size() == 4 and tourn_none.choices.size() == 3
+		and struck_none.choices.size() == 2 and _wakings(scrip_none) == 0)
+	RunManager.add_relic(RelicPool.get_relic_by_name("A Plain Shield"))
+	RunManager.add_relic(RelicPool.get_relic_by_name("A Bone Comb"))
+	var scrip: EventData = EventPool._scriptorium()
+	var tourn: EventData = EventPool._the_tourney()
+	var struck: EventData = es._build_reliquary_struck_event()
+	_check("with two dormant relics each site shows two wakings, one per relic",
+		_wakings(scrip) == 2 and _wakings(tourn) == 2 and _wakings(struck) == 2)
+	var shield_wake: EventData.EventChoice = null
+	for ch in scrip.choices:
+		if ch.wakes_relic == &"A Plain Shield":
+			shield_wake = ch
+	_check("the Scriptorium names the thing and tells its waking in the outcome",
+		shield_wake != null and shield_wake.text.find("the plain shield") != -1
+		and shield_wake.result_text.find("a hart, lying down") != -1
+		and shield_wake.gold_change == 0 and shield_wake.awarded_title_id == &"")
+	es._apply_effects(shield_wake)
+	_check("taking it wakes the shield in place and leaves the comb asleep",
+		RunManager.has_relic("The Hart's Shield") and RunManager.get_forgotten_relics().size() == 1)
+	_check("the sites resolve as scripted events by id",
+		es._build_special_event(&"scriptorium").event_name == "The Scriptorium"
+		and es._build_special_event(&"tourney").event_name == "The Tourney"
+		and es._build_special_event(&"reliquary").event_name == "The Reliquary")
+	es.free()
+
+	# --- The seated record site: once a map, late, one of the three, beside the huntsman.
+	var seated := 0
+	var late := true
+	var ids_ok := true
+	var apart := true
+	for s in range(40):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 1100 + s
+		var map := MapGenerator.generate(rng, &"camelot", 1, 1.0, false)
+		var found := 0
+		var huntsman := -1
+		var site := -1
+		for id in map.nodes:
+			var n: MapNode = map.nodes[id]
+			if n.scripted_event_id == MapGenerator.MASTER_OF_GAME_ID:
+				huntsman = id
+			if n.scripted_event_id in MapGenerator.RECORD_SITE_IDS:
+				found += 1
+				site = id
+				if n.node_type != MapNode.NodeType.EVENT:
+					ids_ok = false
+				if n.floor_num < MapGenerator.RECORD_SITE_MIN_FLOOR \
+						or n.floor_num > MapGenerator.RECORD_SITE_MAX_FLOOR:
+					late = false
+		if found == 1:
+			seated += 1
+		if site != -1 and site == huntsman:
+			apart = false
+	_check("a record site is seated exactly once on every seeded map (%d of 40), late, as an event, never on the huntsman"
+		% seated, seated == 40 and late and ids_ok and apart)
+	RunManager.relics.clear()
+	_reset_consumable_state()
+
+
+## The number of waking options an event offers.
+func _wakings(ev: EventData) -> int:
+	var n := 0
+	for ch in ev.choices:
+		if ch.wakes_relic != &"":
+			n += 1
+	return n
+
+
+func _relic_names(relics: Array[RelicData]) -> PackedStringArray:
+	var names := PackedStringArray()
+	for r in relics:
+		names.append(r.relic_name)
+	return names
 
 
 ## The names of a companion deck, in its built order.

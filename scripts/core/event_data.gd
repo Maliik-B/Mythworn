@@ -114,4 +114,13 @@ class EventChoice extends RefCounted:
 	## If non-empty, taking this choice hands the player this companion (PetPool id): a source
 	## with its own card pool, one per run. See CombatEngine pet arrivals.
 	var grants_pet: StringName = &""
+	## Relic gate: if non-empty, this choice is only selectable while the player carries the relic
+	## of this name. Rendered like a favor gate, disabled with "(Need: <name>)". The home of the
+	## parked requires_item idea: the relic is the key and the site is the lock.
+	var requires_relic: StringName = &""
+	## If non-empty, taking this choice wakes the carried dormant forgotten relic of this name
+	## (RunManager.wake_relic_by_name): the one it had takes its place. A record site builds one
+	## such option per dormant relic the keeper carries, and none when none is carried, so the site
+	## does the telling. It costs nothing but the event's other options.
+	var wakes_relic: StringName = &""
 

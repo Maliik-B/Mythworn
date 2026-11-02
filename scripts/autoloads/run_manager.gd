@@ -373,14 +373,59 @@ func get_owned_relic_names() -> PackedStringArray:
 
 
 func _apply_pickup_relic(relic: RelicData) -> void:
-	match relic.effect:
+	_apply_pickup_slot(relic.effect, relic.value)
+	_apply_pickup_slot(relic.effect2, relic.value2)
+
+
+func _apply_pickup_slot(effect: RelicData.RelicEffect, value: int) -> void:
+	match effect:
 		RelicData.RelicEffect.GAIN_MAX_HP:
-			max_hp += relic.value
-			current_hp += relic.value
+			max_hp += value
+			current_hp += value
 		RelicData.RelicEffect.HEAL:
-			heal(relic.value)
+			heal(value)
 		RelicData.RelicEffect.GAIN_GOLD:
-			add_gold(relic.value)
+			add_gold(value)
+
+
+# --- Forgotten relics ---
+
+## The dormant forgotten relics the player carries, in pickup order: the ones a record site can
+## wake. Empty for a keeper carrying none, which is how the sites know to show no waking.
+func get_forgotten_relics() -> Array[RelicData]:
+	var held: Array[RelicData] = []
+	for r in relics:
+		if r.is_dormant():
+			held.append(r)
+	return held
+
+
+## True once the player carries any forgotten relic, dormant or already woken. While false the
+## relic rolls make a point of offering one (RelicPool.get_reward_choices).
+func carries_forgotten_relic() -> bool:
+	for r in relics:
+		if r.is_dormant() or r.is_woken():
+			return true
+	return false
+
+
+## Wakes a carried dormant relic: the woken form takes its place in the same slot, with its name
+## back and its second effect joined to the first. A relic only ever goes up, once. Returns the
+## woken relic, or null if the name is not a carried dormant relic.
+func wake_relic_by_name(dormant_name: String) -> RelicData:
+	for i in relics.size():
+		var r: RelicData = relics[i]
+		if r.relic_name != dormant_name or not r.is_dormant():
+			continue
+		var woken := RelicPool.get_relic_by_name(String(r.wakes_into))
+		if woken == null:
+			return null
+		relics[i] = woken
+		if woken.trigger == RelicData.RelicTrigger.ON_PICKUP:
+			_apply_pickup_relic(woken)
+		Events.relic_acquired.emit(woken)
+		return woken
+	return null
 
 
 func equip(item: EquipmentData) -> void:

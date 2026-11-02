@@ -129,6 +129,11 @@ func _relic_card(relic: RelicData) -> PanelContainer:
 		RelicData.RelicRarity.BOSS: Color(0.9, 0.3, 0.3),
 	}
 	var color: Color = rarity_colors.get(relic.rarity, Color(0.6, 0.6, 0.6))
+	# A forgotten relic's tell: dead gold while it sleeps, burnished once it has its name back.
+	if relic.is_dormant():
+		color = Color(0.6, 0.52, 0.3)
+	elif relic.is_woken():
+		color = Color(1.0, 0.85, 0.4)
 
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(270, 92)

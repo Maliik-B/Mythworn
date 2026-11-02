@@ -1616,6 +1616,14 @@ func _create_map_display() -> void:
 		node_buttons[id] = btn
 
 
+## What the map says of each seated record site (MapGenerator.RECORD_SITE_IDS).
+const RECORD_SITE_TOOLTIPS := {
+	&"scriptorium": "The Scriptorium: an abbey's records, and Bram at the long table",
+	&"tourney": "The Tourney: the lists, and the herald's roll of arms",
+	&"reliquary": "The Reliquary: a wayside chapel that keeps memory",
+}
+
+
 func _create_node_button(node: MapNode) -> Button:
 	var btn = Button.new()
 	btn.custom_minimum_size = Vector2(NODE_SIZE, NODE_SIZE)
@@ -1645,6 +1653,11 @@ func _create_node_button(node: MapNode) -> Button:
 	if node.scripted_event_id == MapGenerator.MASTER_OF_GAME_ID:
 		btn.text = "♘"
 		btn.tooltip_text = "The Master of Game: a huntsman selling his lord's animals. A companion, 75 gold."
+	# The record site seated late in the act: a place that keeps records, where a forgotten relic
+	# can be given its name back. Named, so a keeper carrying one can route to it.
+	elif node.scripted_event_id in MapGenerator.RECORD_SITE_IDS:
+		btn.text = "✎"
+		btn.tooltip_text = RECORD_SITE_TOOLTIPS.get(node.scripted_event_id, "A place that keeps records")
 
 	btn.pressed.connect(_on_node_clicked.bind(node))
 	btn.mouse_entered.connect(_on_node_hover.bind(node))

@@ -65,6 +65,15 @@ func _build_special_event(id: StringName) -> EventData:
 			return _build_reliquary_won_event()
 		&"master_of_game":
 			return _build_master_of_game_event()
+		# The record site seated late in every act (MapGenerator._place_record_site): one of the
+		# three pool events that can wake a forgotten relic, shown on the map so a run can route
+		# to it. The pool keeps drawing them too.
+		&"scriptorium":
+			return EventPool._scriptorium()
+		&"tourney":
+			return EventPool._the_tourney()
+		&"reliquary":
+			return EventPool._reliquary()
 		_:
 			push_warning("Unknown special event id: %s" % id)
 			return EventPool.get_random_event(RngManager.event_rng)
@@ -418,6 +427,21 @@ func _build_reliquary_struck_event() -> EventData:
 	stay.starts_combat = &"chapel_beast"
 	e.choices.append(stay)
 
+	# A keeper carrying a forgotten relic can give the chapel the memory it wants for the one the
+	# thing has lost: one option per dormant relic held, none when none is carried. The cost is
+	# the hold and the fight, which is to say her. The chapel's trade, taken at its word.
+	for relic in RunManager.get_forgotten_relics():
+		var trade = EventData.EventChoice.new()
+		trade.text = "Let her go. Hold up %s instead, and let the chapel have its trade." % relic.short_name
+		trade.result_text = ("You stop reaching for her and hold the thing up instead, and the chapel "
+			+ "takes what it takes. She goes the way the oldest things go, without a sound, and "
+			+ "you will not be able to say afterward what the line between her eyes looked like. "
+			+ "In your hands the thing you carried comes back to itself. " + relic.wake_line
+			+ " You go out past the stoup without filling anything. The chapel is at your back "
+			+ "with its memory, and the thing in your hand has its own, and you are short one.")
+		trade.wakes_relic = StringName(relic.relic_name)
+		e.choices.append(trade)
+
 	return e
 
 
@@ -654,6 +678,11 @@ func _show_choices() -> void:
 			var needed := ConsumablePool.get_consumable(choice.requires_consumable)
 			btn.disabled = true
 			btn.text += " (Need: %s)" % (needed.display_name if needed else "an item")
+			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
+		# Relic gate: the relic is the key and the site is the lock, shown the same way.
+		elif choice.requires_relic != &"" and not RunManager.has_relic(String(choice.requires_relic)):
+			btn.disabled = true
+			btn.text += " (Need: %s)" % choice.requires_relic
 			btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		choice_container.add_child(btn)
 
@@ -928,6 +957,10 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 	if choice.grants_pet != &"":
 		RunManager.set_pet(choice.grants_pet)
 
+	# A forgotten relic woken at a record site: the one it had takes the dormant form's place.
+	if choice.wakes_relic != &"":
+		RunManager.wake_relic_by_name(String(choice.wakes_relic))
+
 	# A refusal's curse (the higher tier of consequence): a permanent unplayable card wedged
 	# into the run deck -- the spurned party's parting gift, dead weight for the rest of the run.
 	if choice.grants_curse != &"":
@@ -985,6 +1018,11 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 		var companion := PetPool.get_pet(choice.grants_pet)
 		if companion:
 			parts.append("%s joins you" % companion.display_name)
+
+	if choice.wakes_relic != &"":
+		var dormant := RelicPool.get_relic_by_name(String(choice.wakes_relic))
+		if dormant and dormant.is_dormant():
+			parts.append("Woken: %s" % dormant.wakes_into)
 
 	if choice.skips_next_node:
 		parts.append("Skip your next node")
