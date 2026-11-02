@@ -81,6 +81,7 @@ func play_turn(eng: CombatEngine, commit: bool, commit_target: int) -> void:
 		_dealt = 0.0
 		_turns_seen = 0
 		_move_info = {}
+	use_consumables(eng, commit, commit_target)
 	var before := _pool_total(_line_copy(eng))
 	var guard := 0
 	while eng.phase == CombatEngine.Phase.PLAYER_TURN and guard < 30:
@@ -95,6 +96,61 @@ func play_turn(eng: CombatEngine, commit: bool, commit_target: int) -> void:
 	# The plan belongs to this turn; holding its cards past it would keep them alive.
 	_plan_hand = []
 	_plan_rest = []
+
+
+## What a decent player does with the pack at the top of a turn, one rule per kind of item. Items
+## are used at the moment they are worth the most, not at the first chance:
+##   a restorative when it is mostly not wasted and the fight is turning, or when death is near;
+##   Blade Oil and Unspent Courage on the opening turns of a fight worth spending them on;
+##   a Blessing toward the pole the player is committing to, never against it;
+##   a Favour ahead of the largest single blow the enemies have telegraphed.
+## Items with no combat use (a map-only meal, a standing swing) are left to the run harness.
+func use_consumables(eng: CombatEngine, commit: bool, commit_target: int) -> void:
+	if RunManager.consumables.is_empty():
+		return
+	var ps := eng.player_stats
+	var hp_frac := float(ps.current_hp) / maxf(1.0, ps.max_hp)
+	var missing := ps.max_hp - ps.current_hp
+	var foe_hp := 0
+	for en in _living(eng):
+		foe_hp += en.stats.current_hp
+	for item in RunManager.consumables.duplicate():
+		if not eng.can_use_consumable(item):
+			continue
+		var use := false
+		match item.effect:
+			ConsumableData.Effect.HEAL:
+				use = (hp_frac <= 0.45 and missing >= int(0.75 * item.value)) or hp_frac <= 0.25
+			ConsumableData.Effect.HEAL_DRIFT_HOLLOW:
+				# The drift toward Hollow is a cost to a player committing to Blazing.
+				var against_pole := commit and commit_target > 0
+				use = (hp_frac <= 0.45 and missing >= int(0.75 * item.value) and not against_pole) \
+					or hp_frac <= 0.25
+			ConsumableData.Effect.NEXT_ATTACK_BONUS:
+				use = eng.turn_number <= 2 and foe_hp >= 30
+			ConsumableData.Effect.STRENGTH_THIS_FIGHT:
+				use = eng.turn_number <= 2 and foe_hp >= 45
+			ConsumableData.Effect.PASSION_TOWARD_POLE:
+				if commit and RunManager.passion != null:
+					var dir := 1 if RunManager.passion.current_value >= RunManager.passion_center() else -1
+					use = signi(commit_target) == dir and eng.turn_number <= 3 \
+						and (RunManager.passion.current_value - commit_target) * dir < 0
+			ConsumableData.Effect.WARD_NEXT_BLOW:
+				use = _biggest_telegraphed_blow(eng) >= 14
+		if use:
+			eng.use_consumable(item)
+
+
+## The largest single hit any living enemy has telegraphed for the coming turn, at its Strength.
+func _biggest_telegraphed_blow(eng: CombatEngine) -> int:
+	var biggest := 0
+	for en in _living(eng):
+		if en.current_intent == null or en.stats.has_status(StatusEffects.STUN):
+			continue
+		for e in en.current_intent.effects:
+			if e is DamageEffect and not e.apply_to_source:
+				biggest = maxi(biggest, e.value + en.stats.get_status_stacks(StatusEffects.STRENGTH))
+	return biggest
 
 
 ## The next card to play, or null to end the turn.
@@ -211,10 +267,16 @@ func _plan_search(eng: CombatEngine, ctx: Dictionary, cards: Array, from: int, l
 		if not c.x_cost and c.energy_cost > line["energy"]:
 			continue
 		var next := _copy_line(line)
-		_sim_card(eng, ctx, c, next)
+		var echoed := _sim_card(eng, ctx, c, next)
 		if next["php"] <= 0:
 			continue
-		_plan_search(eng, ctx, cards, i + 1, next, plan + [c], best)
+		if echoed:
+			# The Unfading's first card comes back to the hand: it is offered again, once.
+			var again := cards.duplicate()
+			again.insert(i + 1, c)
+			_plan_search(eng, ctx, again, i + 1, next, plan + [c], best)
+		else:
+			_plan_search(eng, ctx, cards, i + 1, next, plan + [c], best)
 	_weigh(eng, ctx, line, plan, best)
 
 
@@ -323,6 +385,14 @@ func _line_copy(eng: CombatEngine) -> Dictionary:
 		"powers": powers, "energy": eng.energy,
 		"passion": RunManager.passion.current_value if RunManager.passion else 0,
 		"momentum": eng._momentum, "blooded": eng._blooded_edge_pending, "draws": 0,
+		# What the engine carries beyond the first model: a Blade Oil poured and waiting, a Favour
+		# armed, the Girdle's and the Compassionate's one-time saves (the HP they leave you at, the
+		# mend; 0 once spent), the Unfading's echo not yet used, and the combat flags a card raised
+		# for another to spend (the hawk's Wait On).
+		"oil": eng._blade_oil_pending, "ward": eng._favour_ward,
+		"girdle": eng._girdle_hp if eng._girdle_ward else 0,
+		"clutch": eng._clutch_heal if not eng._clutch_used else 0,
+		"echo": eng._unfading_pending, "flags": eng.combat_flags.duplicate(),
 	}
 
 
@@ -335,6 +405,7 @@ func _copy_line(line: Dictionary) -> Dictionary:
 		foes.append(f.duplicate())
 	c["foes"] = foes
 	c["powers"] = line["powers"].duplicate()
+	c["flags"] = line["flags"].duplicate()
 	return c
 
 
@@ -342,8 +413,12 @@ func _copy_line(line: Dictionary) -> Dictionary:
 ## by effect: damage hit by hit through deal_damage's order (with lifebars, overkill, hits on a
 ## fallen enemy, Enraged lash, Momentum and Blooded Edge), block, statuses (and Water's control-
 ## heal), healing, Passion, energy, draws and powers. A single-target card strikes the focus
-## enemy; an area card every enemy still standing when each of its effects resolves.
-func _sim_card(eng: CombatEngine, ctx: Dictionary, card: CardData, line: Dictionary) -> void:
+## enemy; an area card every enemy still standing when each of its effects resolves. Returns true
+## when the card goes back to the hand (the Unfading's echo on the first card of the combat), which
+## the plan search then offers once more.
+func _sim_card(eng: CombatEngine, ctx: Dictionary, card: CardData, line: Dictionary) -> bool:
+	var echoed: bool = line["echo"]
+	line["echo"] = false
 	var x := 0
 	if card.x_cost:
 		x = line["energy"]
@@ -368,12 +443,19 @@ func _sim_card(eng: CombatEngine, ctx: Dictionary, card: CardData, line: Diction
 						targets.append(i)
 		for t in targets:
 			_sim_effect(eng, ctx, card, e, t, x, line)
+	return echoed and not card.exhaust and not card.trick \
+		and card.card_type != CardData.CardType.POWER
 
 
 func _sim_effect(eng: CombatEngine, ctx: Dictionary, card: CardData, e, t: int,
 		x: int, line: Dictionary) -> void:
 	var foes: Array = line["foes"]
 	if e is DamageEffect:
+		if e.apply_to_source:
+			# A cost the card's user pays (a player card that says "lose HP"): flat, past block.
+			if t < 0:
+				_player_loses(line, e.value)
+			return
 		if t < 0:
 			return
 		var hits: int = e.hits
@@ -384,8 +466,12 @@ func _sim_effect(eng: CombatEngine, ctx: Dictionary, card: CardData, e, t: int,
 			hits += line["powers"].get(&"overflow", 0)
 		var f: Dictionary = foes[t]
 		var zone := _zone_at(card.personality, tier)
+		var bonus_on: bool = e.bonus_value != 0 and e.bonus_flag != &"" \
+			and line["flags"].get(e.bonus_flag, false)
 		for h in hits:
-			_player_hit(ctx, e, zone, f, line)
+			_player_hit(ctx, e, zone, f, line, bonus_on)
+		if bonus_on:
+			line["flags"].erase(e.bonus_flag)  # spent once, after all the card's hits
 		if e.energy_on_kill > 0 and f["dead"]:
 			line["energy"] += e.energy_on_kill
 	elif e is BlockEffect:
@@ -408,6 +494,17 @@ func _sim_effect(eng: CombatEngine, ctx: Dictionary, card: CardData, e, t: int,
 		line["energy"] = maxi(0, line["energy"] + e.value)
 	elif e is DrawEffect:
 		line["draws"] += e.value
+	elif e is DiscardToHandEffect or e is ExhaustToHandEffect:
+		line["draws"] += e.value  # a random card back from a pile: a card drawn, for the estimate
+	elif e is CombatFlagEffect:
+		if e.flag != &"":
+			line["flags"][e.flag] = true
+	elif e is StripBlockEffect:
+		if t >= 0:
+			foes[t]["block"] = 0
+	elif e is PassionCenterEffect:
+		var eff := clampf(e.strength * ctx["volatility"], 0.0, 1.0)
+		_move_passion(ctx, line, int(round(line["passion"] * (1.0 - eff))) - line["passion"])
 	elif e is GainPowerEffect:
 		if e.power:
 			line["powers"][e.power.id] = line["powers"].get(e.power.id, 0) + e.stacks
@@ -416,10 +513,12 @@ func _sim_effect(eng: CombatEngine, ctx: Dictionary, card: CardData, e, t: int,
 ## One player hit on a copied enemy, in deal_damage's order. The zone is the card's at the tier
 ## when its damage effect resolves.
 func _player_hit(ctx: Dictionary, e: DamageEffect, zone: float, f: Dictionary,
-		line: Dictionary) -> void:
+		line: Dictionary, bonus_on: bool = false) -> void:
 	var amount: int = e.value
 	if e.passion_bonus_divisor > 0:
 		amount += absi(line["passion"] - ctx["center"]) / e.passion_bonus_divisor
+	if bonus_on:
+		amount += e.bonus_value
 	amount += line["pstr"]
 	if line["pweak"] > 0:
 		amount = int(amount * 0.75)
@@ -427,13 +526,16 @@ func _player_hit(ctx: Dictionary, e: DamageEffect, zone: float, f: Dictionary,
 	if line["blooded"] > 0:
 		amount += line["blooded"]
 		line["blooded"] = 0
+	if line["oil"] > 0:
+		amount += line["oil"]
+		line["oil"] = 0
 	amount = int(amount * zone)
 	if f["vuln"] > 0:
 		amount = int(amount * 1.5)
 	amount = maxi(0, amount)
 	if amount > 0 and f["intangible"] > 0:
 		amount = 1
-	var direct := mini(e.pierce, amount)
+	var direct := mini(9999 if e.ignores_block else e.pierce, amount)
 	var absorbed: int = mini(f["block"], amount - direct)
 	f["block"] -= absorbed
 	var through: int = amount - absorbed
@@ -442,13 +544,13 @@ func _player_hit(ctx: Dictionary, e: DamageEffect, zone: float, f: Dictionary,
 		_bar_down(ctx, line, f)
 	line["momentum"] += ctx["momentum_per_hit"]
 	if through > 0 and f["enraged"] > 0:
-		line["php"] = maxi(0, line["php"] - f["enraged"])
+		_player_loses(line, f["enraged"])
 
 
 ## An enemy brought to 0: a boss with another lifebar starts it full, with no block, its
 ## statuses cleared, its entry Strength and Enraged, and lashes the player on entering; it
 ## rolls a new move the player has not seen. Anything else falls.
-func _bar_down(_ctx: Dictionary, line: Dictionary, f: Dictionary) -> void:
+func _bar_down(ctx: Dictionary, line: Dictionary, f: Dictionary) -> void:
 	var data: EnemyData = f["data"]
 	if data.phase_hps.size() > f["phase"] + 1:
 		f["phase"] += 1
@@ -464,12 +566,31 @@ func _bar_down(_ctx: Dictionary, line: Dictionary, f: Dictionary) -> void:
 		if data.phase_enter_enraged.size() > p:
 			f["enraged"] = data.phase_enter_enraged[p]
 		if data.phase_enter_damage.size() > p:
-			line["php"] = maxi(0, line["php"] - data.phase_enter_damage[p])
+			_player_loses(line, data.phase_enter_damage[p])
 		f["intent"] = null
 		f["next"] = null
 		f["unknown_intent"] = true
 	else:
 		f["dead"] = true
+		# The Merciful: a body down mends the player while the fight goes on.
+		if ctx["mercy"] > 0 and line["php"] > 0:
+			line["php"] = mini(line["pmax"], line["php"] + ctx["mercy"])
+
+
+## HP the player loses to anything that is not an enemy's blow through Block (a lash, a phase
+## entry, Poison, a cost they paid), then the two saves in the engine's order: the Compassionate's
+## mend the first time they drop below half, then the Girdle's stand at 1 HP if that left them
+## felled. Enemy blows reach here after the scabbard, the ward and Block have had their say.
+func _player_loses(line: Dictionary, amount: int) -> void:
+	if amount <= 0:
+		return
+	line["php"] = maxi(0, line["php"] - amount)
+	if line["clutch"] > 0 and line["php"] < line["pmax"] / 2:
+		line["php"] = mini(line["pmax"], line["php"] + line["clutch"])
+		line["clutch"] = 0
+	if line["php"] <= 0 and line["girdle"] > 0:
+		line["php"] = line["girdle"]
+		line["girdle"] = 0
 
 
 ## A status landing on a copied combatant (index -1 is the player), stacked as the engine
@@ -543,7 +664,7 @@ func _sim_enemy_turn(_eng: CombatEngine, ctx: Dictionary, line: Dictionary) -> v
 		if f["stun"] > 0:
 			f["stun"] -= 1
 		elif f["unknown_intent"] or f["intent"] == null:
-			_enemy_strikes(line, f, _moves_of(f, f["phase"], 0, _hp_frac(f))[0], 0)
+			_enemy_strikes(ctx, line, f, _moves_of(f, f["phase"], 0, _hp_frac(f))[0], 0)
 		else:
 			for e in f["intent"].effects:
 				_enemy_effect(ctx, line, f, e)
@@ -568,7 +689,7 @@ func _sim_enemy_turn(_eng: CombatEngine, ctx: Dictionary, line: Dictionary) -> v
 			f[k] = maxi(0, f[k] - 1)
 	if line["php"] > 0 and line["ppoison"] > 0:
 		var tick: int = 1 if line["pint"] > 0 else line["ppoison"]
-		line["php"] = maxi(0, line["php"] - tick)
+		_player_loses(line, tick)
 		line["ppoison"] -= 1
 
 
@@ -583,7 +704,7 @@ func _enemy_effect(ctx: Dictionary, line: Dictionary, f: Dictionary, e) -> void:
 			return
 		var base: int = e.value
 		for h in e.hits:
-			_enemy_strikes(line, f, base, e.pierce)
+			_enemy_strikes(ctx, line, f, base, e.pierce)
 			if line["php"] <= 0:
 				return
 	elif e is BlockEffect:
@@ -607,21 +728,26 @@ func _enemy_effect(ctx: Dictionary, line: Dictionary, f: Dictionary, e) -> void:
 			f["hp"] = mini(f["max"], f["hp"] + maxi(0, e.value))
 
 
-## One enemy hit on the player, in deal_damage's order: Strength, Weak, the player's Vulnerable
-## and Intangible, then block (less any pierce) before HP.
-func _enemy_strikes(line: Dictionary, f: Dictionary, base: float, pierce: int) -> void:
+## One enemy hit on the player, in deal_damage's order: Strength, Weak, the player's Vulnerable,
+## the Scabbard's point off, Intangible, a Favour armed, then block (less any pierce) before HP.
+func _enemy_strikes(ctx: Dictionary, line: Dictionary, f: Dictionary, base: float, pierce: int) -> void:
 	var amount: int = int(base) + f["strength"]
 	if f["weak"] > 0:
 		amount = int(amount * 0.75)
 	if line["pvuln"] > 0:
 		amount = int(amount * 1.5)
 	amount = maxi(0, amount)
+	if ctx["scabbard"] > 0 and amount > 0:
+		amount = maxi(0, amount - ctx["scabbard"])
 	if amount > 0 and line["pint"] > 0:
 		amount = 1
+	if line["ward"] and amount > 0:
+		line["ward"] = false
+		amount = 0
 	var direct := mini(pierce, amount)
 	var absorbed: int = mini(line["pblock"], amount - direct)
 	line["pblock"] -= absorbed
-	line["php"] = maxi(0, line["php"] - (amount - absorbed))
+	_player_loses(line, amount - absorbed)
 
 
 # ============================================================
@@ -921,6 +1047,8 @@ func _context(eng: CombatEngine, commit: bool, commit_target: int) -> Dictionary
 	ctx["pmax_passion"] = RunManager.passion.max_value if RunManager.passion else 100
 	ctx["center"] = RunManager.passion_center()
 	ctx["sword"] = eng.sword_bonus()
+	ctx["scabbard"] = eng._scabbard_guard
+	ctx["mercy"] = eng._mercy_heal
 	ctx["momentum_per_hit"] = eng._momentum_per_hit
 	ctx["pole_dir"] = pole_dir
 	ctx["pole_target"] = commit_target
@@ -931,6 +1059,11 @@ func _context(eng: CombatEngine, commit: bool, commit_target: int) -> Dictionary
 var _rates_combat := 0
 var _rates_turn := -1
 var _rates := {}
+## The companion's expected damage a turn for the race estimate, read once per combat.
+var _pet_rate_combat := 0
+var _pet_dmg := 0.0
+## How much of the companion's attack arrivals a decent player turns into damage.
+const PET_PLAY_SHARE := 0.6
 
 
 func _turn_rates(eng: CombatEngine) -> Dictionary:
@@ -950,7 +1083,8 @@ func _turn_rates(eng: CombatEngine) -> Dictionary:
 	var multi_hit := 0.0
 	var count := 0
 	for c in deck:
-		if c.unplayable:
+		# A companion's card is not the deck's: it is priced separately below, as an arrival a turn.
+		if c.unplayable or c.trick:
 			continue
 		count += 1
 		total_cost += CombatEngine.MAX_ENERGY if c.x_cost else maxf(0.5, c.energy_cost)
@@ -975,15 +1109,30 @@ func _turn_rates(eng: CombatEngine) -> Dictionary:
 	for r in RunManager.relics:
 		if r.trigger != RelicData.RelicTrigger.ON_TURN_START:
 			continue
-		match r.effect:
-			RelicData.RelicEffect.GAIN_BLOCK: block_turn += r.value
-			RelicData.RelicEffect.HEAL: heal_turn += r.value
-			RelicData.RelicEffect.GAIN_STRENGTH: str_turn += r.value
+		# A woken relic carries a second effect on the same trigger; the scabbard's guard is read
+		# by name (effect2 NONE) and enters through the enemy strikes instead.
+		for slot in [[r.effect, r.value], [r.effect2, r.value2]]:
+			match slot[0]:
+				RelicData.RelicEffect.GAIN_BLOCK: block_turn += slot[1]
+				RelicData.RelicEffect.HEAL: heal_turn += slot[1]
+				RelicData.RelicEffect.GAIN_STRENGTH: str_turn += slot[1]
+	# The companion hands over one card a turn. Its damage is priced at the average of its deck's
+	# attacks, with a share of the arrivals played (the rest compete with the hand for energy).
+	if _pet_rate_combat != eng.get_instance_id():
+		_pet_rate_combat = eng.get_instance_id()
+		_pet_dmg = 0.0
+		var pet := RunManager.get_pet()
+		if pet != null:
+			var pet_deck := PetPool.build_cards(pet.id)
+			var pd := 0.0
+			for c in pet_deck:
+				pd += _neutral_damage(eng, c)[0]
+			_pet_dmg = PET_PLAY_SHARE * pd / maxf(1.0, pet_deck.size())
 	var powers0 := {}
 	for p in ps.powers:
 		powers0[p.id] = ps.powers[p]
 	_rates = {
-		"D": (d0 + _dealt) / (1.0 + _turns_seen) if eng.get_instance_id() == _combat_id else d0,
+		"D": (d0 + _pet_dmg + _dealt) / (1.0 + _turns_seen) if eng.get_instance_id() == _combat_id else d0 + _pet_dmg,
 		"dpe": dpe,
 		"hits_turn": energy * hits / total_cost if total_cost > 0.0 else 0.0,
 		"multi_turn": energy * multi_cards / total_cost if total_cost > 0.0 else 0.0,

@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_rewards_follow_the_run_seed()
 	_test_harness_copy_matches_engine()
 	_test_harness_copy_card_rules()
+	_test_harness_copy_new_rules()
 	_test_harness_policy_decides()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
@@ -2610,6 +2611,100 @@ func _test_harness_copy_card_rules() -> void:
 	_check("a bar breaking mid-card: the third 4 breaks the 10-HP bar (2 past it lost), the fourth lands on the fresh 50; entry lash 18, and the breaking hit and the fourth each lash 1",
 		line["foes"][0]["phase"] == 1 and line["foes"][0]["hp"] == 46 and line["php"] == 80 - 18 - 1 - 1)
 	beng.free()
+	RunManager.passion.current_value = saved_passion
+	RunManager.relics.assign(saved_relics)
+	RunManager.active_title_slots.assign(saved_titles)
+
+
+## Part 4: what the engine gained since the planner was written, each locked to the engine. The
+## companion's Stoop (ignores Block, a flag bonus spent once), Bind (strips Block), Wait On (raises
+## the flag), the oil, the ward, the girdle, the clutch mend, the scabbard, the Merciful's mend and
+## the Unfading's echo. Enemy-turn rules are compared against a real end_player_turn.
+func _test_harness_copy_new_rules() -> void:
+	var policy := HarnessCombat.new()
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_titles := RunManager.active_title_slots.duplicate()
+	var saved_passion: int = RunManager.passion.current_value
+	RunManager.relics.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	RunManager.passion.current_value = 0
+	var hawk := PetPool.build_cards(&"hawk")
+	var stoop := _card_by_name(hawk, "Stoop")
+	var bind := _card_by_name(hawk, "Bind")
+	var wait_on := _card_by_name(hawk, "Wait On")
+
+	var eng := _policy_fight([], 80, [_one_move_enemy("Target", 100, 0)])
+	eng.enemies[0].stats.block = 10
+	_check("Stoop ignores Block: 8 lands whole on a target holding 10 Block",
+		_copy_strike(policy, eng, stoop)[0] == 8)
+	var line := policy._line_copy(eng)
+	var ctx := policy._context(eng, false, 0)
+	policy._sim_card(eng, ctx, wait_on, line)
+	_check("Wait On raises the flag on the copy and not on the engine",
+		line["flags"].get(&"waiting_on", false) == true and eng.combat_flags.is_empty())
+	var flag: StringName = line["flags"].keys()[0] if line["flags"].size() > 0 else &""
+	policy._sim_card(eng, ctx, stoop, line)
+	_check("with the flag up Stoop deals 16 and spends it (copy: %d lost, flag %s)" % [
+			100 - line["foes"][0]["hp"], str(line["flags"].has(flag))],
+		100 - line["foes"][0]["hp"] == 16 and not line["flags"].has(flag))
+	line = policy._line_copy(eng)
+	policy._sim_card(eng, ctx, bind, line)
+	_check("Bind strips the 10 Block and deals 4: the copy's block is 0, HP 96",
+		line["foes"][0]["block"] == 0 and line["foes"][0]["hp"] == 96)
+	eng.enemies[0].stats.block = 0
+	eng._blade_oil_pending = 8
+	var triple := _neutral_attack("Triple", 1, 4)
+	triple.effects[0].hits = 3
+	_check("Blade Oil lands once, on the first hit: 4+8 then 4, 4 = 20", _copy_strike(policy, eng, triple)[0] == 20)
+	eng._blade_oil_pending = 0
+	var echo_line := policy._line_copy(eng)
+	eng._unfading_pending = true
+	echo_line = policy._line_copy(eng)
+	var first_back := policy._sim_card(eng, ctx, triple, echo_line)
+	var second_back := policy._sim_card(eng, ctx, triple, echo_line)
+	_check("the Unfading's echo: the first card goes back, the second does not", first_back and not second_back)
+	var exhausts := _neutral_attack("Burn", 1, 4)
+	exhausts.exhaust = true
+	echo_line = policy._line_copy(eng)
+	echo_line["echo"] = true
+	_check("an exhausting card is spent and does not come back", not policy._sim_card(eng, ctx, exhausts, echo_line))
+	eng._unfading_pending = false
+	eng.free()
+
+	# Enemy-turn rules against the real engine: a 3 x 11 mover into a player on 40 HP.
+	for case in [
+		["the Scabbard takes 1 off every blow", "scabbard", 1],
+		["a Favour turns the first blow", "ward", 1],
+		["the Girdle leaves a felled player on 1 HP", "girdle", 6],
+		["the Compassionate mends the first drop below half", "clutch", 8],
+	]:
+		var foe := _one_move_enemy("Striker", 100, 11, 1 if case[1] == "girdle" else 3)
+		var fe := _policy_fight([], 40, [foe])
+		match case[1]:
+			"scabbard": fe._scabbard_guard = case[2]
+			"ward": fe._favour_ward = true
+			"girdle":
+				fe.player_stats.current_hp = 9
+				fe._girdle_hp = 1
+				fe._girdle_ward = true
+			"clutch":
+				fe._clutch_heal = case[2]
+				fe._clutch_used = false
+		var l := policy._line_copy(fe)
+		policy._sim_enemy_turn(fe, policy._context(fe, false, 0), l)
+		fe.end_player_turn()
+		_check("copy vs engine: %s (copy HP %d, engine %d)" % [case[0], l["php"],
+			fe.player_stats.current_hp], l["php"] == fe.player_stats.current_hp)
+		fe.free()
+
+	# The Merciful: a kill mends, in the copy as in the engine.
+	var mend_eng := _policy_fight([], 60, [_one_move_enemy("Frail", 3, 0)])
+	mend_eng.player_stats.current_hp = 50
+	mend_eng._mercy_heal = 5
+	var ml := policy._line_copy(mend_eng)
+	policy._sim_card(mend_eng, policy._context(mend_eng, false, 0), _neutral_attack("Jab", 1, 9), ml)
+	_check("a kill mends 5 on the copy: 50 -> 55", ml["php"] == 55)
+	mend_eng.free()
 	RunManager.passion.current_value = saved_passion
 	RunManager.relics.assign(saved_relics)
 	RunManager.active_title_slots.assign(saved_titles)
