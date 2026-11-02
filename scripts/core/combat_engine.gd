@@ -84,6 +84,11 @@ var _blade_oil_pending: int = 0
 ## land on the player after it is used does not, and the flag clears. Reset every combat.
 var _favour_ward: bool = false
 
+## The Unfading (title): true until the first card of the combat is played. That card goes back
+## to the hand instead of the discard pile, unless it was spent (it exhausts, it is a Power, or
+## it is a companion's Trick card). Armed at combat start from the equipped titles.
+var _unfading_pending: bool = false
+
 ## When true, the enemy-turn coroutine skips its pacing timers and resolves
 ## synchronously. The balance harness (tools/combat_harness) sets this so it can
 ## run thousands of trials against the REAL engine without waiting real seconds.
@@ -136,6 +141,9 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	# The Sword's Bearer: arm the per-hit bonus and whether this tier escalates (0 if unworn).
 	_sword_base = RunManager.get_title_passive_total(TitleData.EffectType.DAMAGE_BONUS_FLAT)
 	_sword_escalates = RunManager.title_damage_bonus_escalates()
+	# The Unfading: arm the first-card echo from the equipped title (false if unworn).
+	_unfading_pending = RunManager.get_title_passive_total(
+		TitleData.EffectType.FIRST_CARD_RETURNS) > 0
 	# Momentum: prime the per-hit ramp from the relic (0 if unheld); the accrued bonus starts empty.
 	var mom := RunManager.get_relic("Momentum")
 	_momentum_per_hit = mom.value if mom else 0
@@ -585,6 +593,11 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 		energy -= card.energy_cost
 	piles.hand.erase(card)
 
+	# The Unfading's echo belongs to the first card played this combat, whatever it is, so it is
+	# used up here even when this card turns out to be spent and does not come back.
+	var echoes := _unfading_pending
+	_unfading_pending = false
+
 	# Track current card for zone penalty in deal_damage
 	_current_card = card
 
@@ -615,6 +628,11 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 	elif card.exhaust:
 		piles.exhaust_pile.append(card)
 		Events.card_exhausted.emit(card)
+	elif echoes:
+		# Back to the hand, and only the card: the energy it cost stays spent.
+		piles.hand.append(card)
+		Events.card_drawn.emit(card)
+		Events.combat_note.emit("%s comes back to your hand." % card.card_name)
 	else:
 		piles.discard_pile.append(card)
 		Events.card_discarded.emit(card)

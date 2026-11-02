@@ -418,9 +418,9 @@ func _build_reliquary_struck_event() -> EventData:
 
 ## The Reliquary, stage 3: the beast is unmade and the memory held. Reached only by winning the
 ## chapel-beast fight (pending_special_event after victory). The payoff: a heal, a Passion lift,
-## The Thurible relic (the censer toggle, replacing the old Vigil Candle), and The Compassionate
-## title (distinct from The Merciful -- a lasting capacity for having held on rather than another
-## post-combat mend).
+## The Thurible relic (the censer toggle, replacing the old Vigil Candle), and The Unfading title
+## (the first card you play each combat returns to your hand: a thing you spend that refuses to
+## be spent, for having refused to let a memory go). The Compassionate is the Last Cart Out's.
 func _build_reliquary_won_event() -> EventData:
 	var e = EventData.new()
 	e.event_name = "The Reliquary"
@@ -443,7 +443,7 @@ func _build_reliquary_won_event() -> EventData:
 	take.hp_change = maxi(1, int(round(RunManager.max_hp * 0.25)))
 	take.passion_change = 5
 	take.granted_relic_id = &"The Thurible"
-	take.awarded_title_id = &"the_compassionate"
+	take.awarded_title_id = &"the_unfading"
 	e.choices.append(take)
 
 	return e

@@ -55,6 +55,7 @@ func _ready() -> void:
 	_test_liaison_relics()
 	_test_refusals()
 	_test_title_split()
+	_test_the_unfading()
 	_test_vn_data()
 	_test_profile_intro()
 	_test_boss_reward()
@@ -1672,6 +1673,123 @@ func _test_title_split() -> void:
 				cart_grant = ch
 	_check("The Last Cart Out's lift pays The Compassionate (re-homed off the Reliquary)",
 		cart_grant != null and cart_grant.standing_change > 0)
+
+
+## The Unfading (TITLE_DESIGN 5.7, title wave 2), through the real engine: the first card played
+## each combat comes back to the hand with its energy still spent; only the first card echoes,
+## and each combat arms it anew; a spent first card (it exhausts, it is a Power, it is a Trick
+## card) does not come back and uses the echo up; unworn, nothing echoes. And the Reliquary's
+## won beat grants it, which leaves The Compassionate to the Last Cart Out alone.
+func _test_the_unfading() -> void:
+	var unf := TitlePool.get_title(&"the_unfading")
+	_check("The Unfading is a personality title on its own effect, and its text says Exhaust wins",
+		unf != null and unf.category == TitleData.Category.PERSONALITY
+		and unf.passive_effect == TitleData.EffectType.FIRST_CARD_RETURNS
+		and unf.original_description.contains("exhausts"))
+	var saved_slots := RunManager.active_title_slots.duplicate()
+	var had_unfading := RunManager.earned_title_ids.has(&"the_unfading")
+	# No relic bonus on the hits and no companion card arriving in the hand.
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_pet := RunManager.pet_id
+	RunManager.relics.clear()
+	RunManager.pet_id = &""
+	RunManager.award_title(&"the_unfading")
+	RunManager.equip_title(0, &"the_unfading")
+
+	# The return, and only the first card's.
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [_dummy_attacker()])
+	var first := _neutral_attack("Echo Strike", 1, 6)
+	var second := _neutral_attack("Plain Strike", 1, 6)
+	eng.piles.hand.append(first)
+	eng.piles.hand.append(second)
+	eng.energy = 3
+	var dummy := eng.enemies[0].stats
+	var hp0 := dummy.current_hp
+	eng.play_card(first, dummy)
+	_check("the first card played comes back to the hand, its 6 dealt and its energy spent (3 -> 2)",
+		first in eng.piles.hand and first not in eng.piles.discard_pile
+		and dummy.current_hp == hp0 - 6 and eng.energy == 2)
+	eng.play_card(second, dummy)
+	eng.play_card(first, dummy)
+	_check("only the first card echoes: the second, and the echoed card played again, are discarded",
+		second in eng.piles.discard_pile and first in eng.piles.discard_pile
+		and eng.piles.hand.is_empty() and eng.energy == 0)
+	# A new combat arms it again.
+	eng.start_combat([], 50, 50, [_dummy_attacker()])
+	var next_fight := _neutral_attack("Next Fight", 1, 6)
+	eng.piles.hand.append(next_fight)
+	eng.energy = 3
+	eng.play_card(next_fight, eng.enemies[0].stats)
+	_check("each combat arms the echo anew", next_fight in eng.piles.hand)
+	eng.free()
+
+	# Spent things stay spent, and a spent first card still uses the echo up.
+	var spent_cases: Array[CardData] = []
+	var exhausting := _neutral_attack("Spent Strike", 1, 6)
+	exhausting.exhaust = true
+	spent_cases.append(exhausting)
+	var power := CardData.new()
+	power.card_name = "Test Power"
+	power.energy_cost = 1
+	power.card_type = CardData.CardType.POWER
+	power.target_type = CardData.TargetType.SELF
+	spent_cases.append(power)
+	var trick := _neutral_attack("Test Trick", 0, 3)
+	trick.trick = true
+	spent_cases.append(trick)
+	var spent_ok := true
+	for spent in spent_cases:
+		var seng := CombatEngine.new()
+		add_child(seng)
+		seng.start_combat([], 50, 50, [_dummy_attacker()])
+		var after := _neutral_attack("After Strike", 1, 6)
+		seng.piles.hand.append(spent)
+		seng.piles.hand.append(after)
+		seng.energy = 3
+		var tgt := seng.enemies[0].stats
+		seng.play_card(spent, tgt if spent.target_type == CardData.TargetType.SINGLE_ENEMY else seng.player_stats)
+		seng.play_card(after, tgt)
+		if spent in seng.piles.hand or after in seng.piles.hand or after not in seng.piles.discard_pile:
+			spent_ok = false
+		seng.free()
+	_check("a first card that exhausts, a Power or a Trick card is spent, and the echo goes with it",
+		spent_ok and exhausting.exhaust and power.card_type == CardData.CardType.POWER)
+
+	# Unworn, the first card is discarded like any other.
+	RunManager.equip_title(0, &"")
+	var ueng := CombatEngine.new()
+	add_child(ueng)
+	ueng.start_combat([], 50, 50, [_dummy_attacker()])
+	var plain := _neutral_attack("Unworn Strike", 1, 6)
+	ueng.piles.hand.append(plain)
+	ueng.energy = 3
+	ueng.play_card(plain, ueng.enemies[0].stats)
+	_check("unworn, the first card goes to the discard pile",
+		plain in ueng.piles.discard_pile and plain not in ueng.piles.hand)
+	ueng.free()
+	RunManager.active_title_slots = saved_slots
+	RunManager.relics = saved_relics
+	RunManager.pet_id = saved_pet
+	if not had_unfading:
+		RunManager.earned_title_ids.erase(&"the_unfading")
+
+	# The grant: the Reliquary's won beat pays The Unfading; The Compassionate has one site left.
+	var es: Control = load("res://scenes/event/event_scene.gd").new()
+	var won: EventData = es._build_reliquary_won_event()
+	es.free()
+	var reliquary_pays := &""
+	for ch in won.choices:
+		if ch.awarded_title_id != &"":
+			reliquary_pays = ch.awarded_title_id
+	var compassion_sites := 0
+	for ev in EventPool._build_pool():
+		for ch in ev.choices:
+			if ch.awarded_title_id == &"the_compassionate":
+				compassion_sites += 1
+	_check("the Reliquary's won beat grants The Unfading; The Compassionate is the Last Cart Out's alone",
+		reliquary_pays == &"the_unfading" and compassion_sites == 1)
 
 
 ## Event scheduling (Step 2 tech): a scripted beat can be pinned to the player's Nth

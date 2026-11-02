@@ -21,6 +21,7 @@ static func get_all_titles() -> Array[TitleData]:
 	titles.append(_build_the_gracious())
 	titles.append(_build_the_calculating())
 	titles.append(_build_the_compassionate())
+	titles.append(_build_the_unfading())
 	titles.append(_build_peoples_champion())
 	return titles
 
@@ -235,10 +236,9 @@ static func _build_the_calculating() -> TitleData:
 
 
 ## Earned at the Last Cart Out, for getting under the miller's axle and lifting until the square
-## is empty. Re-homed there from The Reliquary, which still grants it as a stand-in until the
-## Route B title (TITLE_DESIGN 5.7) is built under a name that is not the reserved one, and it lands
-## on one of the three sites that used to grant The Merciful, so the kindness lane gets less
-## repetitive in the same move. Deliberately distinct from mercy's per-death mend: compassion
+## is empty, and only there: The Reliquary pays The Unfading now. It landed on one of the three
+## sites that used to grant The Merciful, so the kindness lane got less repetitive in the same
+## move. Deliberately distinct from mercy's per-death mend: compassion
 ## here is a CLUTCH heal, catching you the first time a fight drives you below half HP, which is
 ## what carrying other people through a bad day leaves you with. Personality; never degrades.
 static func _build_the_compassionate() -> TitleData:
@@ -254,6 +254,36 @@ static func _build_the_compassionate() -> TitleData:
 	t.original_value = 8
 
 	t.passive_effect = TitleData.EffectType.CLUTCH_HEAL
+	t.passive_scales_with_tier = false
+	return t
+
+
+## The Reliquary's grant, for holding on to a memory while the chapel tried to take it, through
+## the fight the holding costs. The event's subject is a thing that refuses to fade, and the
+## mechanical form of that is a card you spend that refuses to be spent: the first card you play
+## each combat comes back to your hand. The card comes back and the energy does not, so the gain
+## is one paid extra play a fight, which is why it is a +4 and not a +6 (TITLE_DESIGN 5.7a).
+##
+## Spent things stay spent. A card that exhausts does not come back, which keeps the memory cards
+## one-shot, and neither does a Power (it is used up into its lasting effect, and one played twice
+## would be a doubled engine) or a companion's Trick card. The echo belongs to the FIRST card
+## played, whatever it is, so leading with a spent card wastes it: the opening play is the
+## decision, and that is the title's latent half. Personality; never degrades.
+static func _build_the_unfading() -> TitleData:
+	var t := TitleData.new()
+	t.title_id = &"the_unfading"
+	t.category = TitleData.Category.PERSONALITY
+	t.origin_realm_id = &""
+	t.visual_style = RealmData.VisualStyle.NEUTRAL
+	t.accent_color = NEUTRAL_ACCENT
+
+	t.original_name = "The Unfading"
+	t.original_description = ("You held on to what the chapel meant to take. The first card you "
+		+ "play each combat returns to your hand. A card that exhausts, or a Power, is spent and "
+		+ "does not come back.")
+	t.original_value = 1
+
+	t.passive_effect = TitleData.EffectType.FIRST_CARD_RETURNS
 	t.passive_scales_with_tier = false
 	return t
 
