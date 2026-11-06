@@ -69,9 +69,9 @@ func _register_realms() -> void:
 		Color(0.85, 0.32, 0.32, 1.0),  # Act 3: blood red
 	]
 	yggdrasil.aurora_upper_by_act = [
-		Color(0.55, 0.40, 0.85, 1.0),  # Act 1: peaceful violet
-		Color(0.42, 0.32, 0.78, 1.0),  # Act 2: storm violet
-		Color(0.62, 0.18, 0.45, 1.0),  # Act 3: corrupt magenta
+		Color(0.45, 0.72, 0.80, 1.0),  # Act 1: pale ice
+		Color(0.34, 0.52, 0.72, 1.0),  # Act 2: storm blue
+		Color(0.72, 0.30, 0.22, 1.0),  # Act 3: ember
 	]
 	_realms[yggdrasil.realm_id] = yggdrasil
 

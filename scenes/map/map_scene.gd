@@ -373,13 +373,13 @@ func _add_sky_body(kind: int, _accent: Color) -> void:
 	match kind:
 		RealmData.SkyBody.AURORA:
 			# Wavy color bands across the upper sky — two bands of customizable
-			# color so we can shift them per act (peaceful green/violet for
+			# color so we can shift them per act (peaceful green/ice for
 			# Act 1, deeper for Act 2, blood-red for Act 3).
 			shader.code = """
 shader_type canvas_item;
 uniform float time_scale = 0.10;
 uniform vec4 band_color_lower : source_color = vec4(0.30, 0.85, 0.55, 1.0);
-uniform vec4 band_color_upper : source_color = vec4(0.55, 0.40, 0.85, 1.0);
+uniform vec4 band_color_upper : source_color = vec4(0.45, 0.72, 0.80, 1.0);
 uniform float intensity = 0.55;
 void fragment() {
 	vec2 uv = UV;

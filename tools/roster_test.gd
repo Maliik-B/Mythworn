@@ -775,6 +775,14 @@ func _test_realm_routes() -> void:
 	RunManager.current_realm_id = saved_realm
 	RunManager.realm_config = saved_config
 
+	# Purple is forbidden on a frame, so no realm's aurora may sit in the purple hues at any act.
+	var purple_bands := 0
+	for realm in RealmRegistry.get_all_realms():
+		for band: Color in realm.aurora_lower_by_act + realm.aurora_upper_by_act:
+			if band.s > 0.2 and band.h > 0.69 and band.h < 0.92:
+				purple_bands += 1
+	_check("no aurora band is purple, at any act", purple_bands == 0)
+
 	# Loud on every run until the picks land, and a failure the moment a realm claims it is ready.
 	for realm in RealmRegistry.get_all_realms():
 		var ready_to_ship: bool = EnemyPool.has_encounters(realm.realm_id, RealmRoutes.BASE) \
