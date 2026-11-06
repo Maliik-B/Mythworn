@@ -13,11 +13,11 @@ const PAGE := &"page"
 ## The switch. A capture can set it before the combat scene loads.
 static var active: StringName = PAGE
 
-## What Passion may colour on the page. False is the lore ruling: the page itself keeps its hue and
-## value, and only the ground band and the keeper's own things (gauge, desk, hand) take the band.
-## True is the earlier tint over the whole stage, kept so the two can be compared and the ruling
-## overruled. It has no effect in the dark, where there is no page.
-static var passion_tints_whole_page := false
+## How far Passion reaches on the page. It is the keeper's and not the world's, so by default the
+## page and the ground stay as they are and only the keeper's own things (gauge, desk, hand) answer.
+## The two wider reaches are kept so they can be compared. No effect in the dark, which has no page.
+enum PassionReach { KEEPER, GROUND_TOO, WHOLE_PAGE }
+static var passion_reach := PassionReach.KEEPER
 
 static var _no_purple: ShaderMaterial = null
 static var _icon_grey: ShaderMaterial = null
@@ -31,7 +31,7 @@ const NUMERAL_FONT_PATH := CardFace.NUMERAL_FONT_PATH
 # How strongly Passion tints the whole stage, by look, where it does.
 const MOOD_GAIN := {DARK: 1.0, PAGE: 0.55}
 
-# What a Passion band does to the ground and the keeper's things on the page; Steady leaves them be.
+# What a Passion band does on the page, Steady leaving it all be. "ground" only if the reach allows.
 # Blazing warms. Hollow goes to the deep blue and never to grey, which is why these are the colours
 # to arrive at and not a blue laid over them: tan under a thin blue is grey. The hand warms and does
 # not cool: a blue leaf turns the edges of its red initials and coins purple, so at the cold end the
@@ -242,9 +242,14 @@ static func is_page() -> bool:
 	return active == PAGE
 
 
-## True when Passion colours the ground and the keeper's things, and not the whole stage.
+## True when Passion colours the keeper's things, and not the whole stage.
 static func passion_on_keeper() -> bool:
-	return is_page() and not passion_tints_whole_page
+	return is_page() and passion_reach != PassionReach.WHOLE_PAGE
+
+
+## The ground under a Passion band.
+static func ground_tint(tier: int) -> Color:
+	return keeper_tint(tier)["ground"] if passion_reach == PassionReach.GROUND_TOO else c("ground")
 
 
 ## The ground, desk and hand a Passion band asks for on the page.

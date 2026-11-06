@@ -76,8 +76,8 @@ func _ready() -> void:
 ## The stage takes on the Passion band you stand in: warm above Steady, cold below it, more so at a
 ## pole, with embers or frost where the look has any. The page has none, since a speck on it reads
 ## as a stain. It stays behind the bodies, so a body keeps its own colour on it. A change flares past
-## its mark, then settles. On the page only the ground band takes it (see StageSkin); the leaf itself
-## keeps its hue and value, and the skyline washed on it.
+## its mark, then settles. On the page none of this happens by default: Passion is the keeper's and
+## not the world's, so the leaf, the skyline and the ground stay as they are (see StageSkin).
 func set_mood(tier: int, instant := false) -> void:
 	if StageSkin.passion_on_keeper():
 		_set_ground_mood(tier, instant)
@@ -106,7 +106,9 @@ func set_mood(tier: int, instant := false) -> void:
 
 
 func _set_ground_mood(tier: int, instant: bool) -> void:
-	var target: Color = StageSkin.keeper_tint(tier)["ground"]
+	var target: Color = StageSkin.ground_tint(tier)
+	if target == _ground.color:
+		return
 	if _ground_tween:
 		_ground_tween.kill()
 	if instant:
