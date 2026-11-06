@@ -39,7 +39,7 @@ var continue_btn: Button
 var _main_container: MarginContainer
 var _hover_popup: PanelContainer
 var _status_pin: PanelContainer  # click-pinned status/effect description (see _show_status_pin)
-var _is_animating_card := false
+var _last_play_ms := -100000  # when a card last played, for the double-click guard
 
 # Enemy sprite animation. Each enemy maps to a "sprite set" (one LuizMelo sheet folder),
 # and each set lists its strips as [file, frame_count, fps]. Every strip is a horizontal
@@ -54,6 +54,8 @@ const PORTRAIT_BOX := 130.0
 const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
 const TARGET_LIGHT_FADE := 0.08
 const DRAG_CARD_CLEARANCE := 8.0
+const DOUBLE_CLICK_GUARD_MS := 250
+const CARD_FLIGHT := 0.14
 ## The hand row's fixed height. It holds this on the enemy turn too, when the hand is empty, so
 ## the player bar and the enemies keep their places from round to round.
 const HAND_ROW_H := 310.0
@@ -318,8 +320,6 @@ func _input(event: InputEvent) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if combat_engine == null or combat_engine.phase != CombatEngine.Phase.PLAYER_TURN:
-		return
-	if _is_animating_card:
 		return
 
 	# Keyboard: Space/Enter to end turn
@@ -1434,8 +1434,10 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 		_light_card_targets(card)
 	)
 	panel.mouse_exited.connect(func():
-		var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		t.tween_property(panel, "scale", Vector2.ONE, 0.12)
+		# A card that has left the hand is in flight or being dragged, and owns its own scale.
+		if panel.get_parent() == hand_container:
+			var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+			t.tween_property(panel, "scale", Vector2.ONE, 0.12)
 		if not _dragging_card:
 			_set_lit_enemies([])
 	)
@@ -1476,9 +1478,14 @@ func _on_card_input(event: InputEvent, card: CardData) -> void:
 			and event.button_index == MOUSE_BUTTON_LEFT):
 		return
 
-	if combat_engine.phase != CombatEngine.Phase.PLAYER_TURN or _is_animating_card:
+	if combat_engine.phase != CombatEngine.Phase.PLAYER_TURN:
 		return
 	if _dragging_card:
+		return
+	# The hand closes up the moment a card plays, so the second press of a double-click lands on
+	# whatever slid under the cursor. Only that press is dropped: a click that has moved plays at
+	# once, however fast it follows.
+	if event.double_click and Time.get_ticks_msec() - _last_play_ms < DOUBLE_CLICK_GUARD_MS:
 		return
 
 	if not combat_engine.can_play_card(card):
@@ -1504,15 +1511,17 @@ func _on_card_input(event: InputEvent, card: CardData) -> void:
 				_log("Drag onto an enemy, or right-click to cancel...")
 
 
+## The effect lands on the click and the card's flight is only a flourish behind it, so nothing
+## waits on it: no input is held and End Turn cannot strand a card mid-air.
 func _play_selected_card(target: CombatantStats) -> void:
-	if not selected_card or _is_animating_card:
+	if not selected_card:
 		return
 	var card = selected_card
 	selected_card = null
 	_set_lit_enemies([])
+	_last_play_ms = Time.get_ticks_msec()
 	var panel: PanelContainer = card_nodes.get(card)
 	if panel:
-		_is_animating_card = true
 		# Find target position
 		var target_pos := Vector2(960, 300)
 		if target:
@@ -1532,21 +1541,19 @@ func _play_selected_card(target: CombatantStats) -> void:
 		add_child(panel)
 		panel.global_position = start_pos
 		panel.z_index = 30
+		# Still a card under the cursor as far as clicks go, and this one has been played.
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_nodes.erase(card)
 
 		var t = create_tween().set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 		t.set_parallel(true)
-		t.tween_property(panel, "global_position", target_pos - panel.size / 2.0, 0.25)
-		t.tween_property(panel, "scale", Vector2(0.5, 0.5), 0.25)
-		t.tween_property(panel, "modulate:a", 0.0, 0.15).set_delay(0.15)
-		t.chain().tween_callback(func():
-			panel.queue_free()
-			_is_animating_card = false
-			combat_engine.play_card(card, target)
-			_refresh_ui()
-		)
-	else:
-		combat_engine.play_card(card, target)
-		_refresh_ui()
+		t.tween_property(panel, "global_position", target_pos - panel.size / 2.0, CARD_FLIGHT)
+		t.tween_property(panel, "scale", Vector2(0.5, 0.5), CARD_FLIGHT)
+		t.tween_property(panel, "modulate:a", 0.0, CARD_FLIGHT * 0.6).set_delay(CARD_FLIGHT * 0.4)
+		t.chain().tween_callback(panel.queue_free)
+
+	combat_engine.play_card(card, target)
+	_refresh_ui()
 
 
 func _update_card_highlights() -> void:
@@ -1679,7 +1686,7 @@ func _update_drag_target_highlight(pos: Vector2) -> void:
 ## A card that needs no aiming already knows what it will hit, so hovering it says so: an
 ## all-enemy card lights them all, and a single-target card with one enemy left lights that one.
 func _light_card_targets(card: CardData) -> void:
-	if combat_engine == null or _dragging_card or _is_animating_card \
+	if combat_engine == null or _dragging_card \
 			or combat_engine.phase != CombatEngine.Phase.PLAYER_TURN \
 			or not combat_engine.can_play_card(card):
 		return
