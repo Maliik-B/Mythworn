@@ -61,6 +61,7 @@ func _ready() -> void:
 	_test_title_split()
 	_test_the_unfading()
 	_test_outlander_home()
+	await _test_set_pieces()
 	_test_king_abroad()
 	_test_vn_data()
 	_test_profile_intro()
@@ -1799,6 +1800,63 @@ func _test_the_unfading() -> void:
 		reliquary_pays == &"the_unfading" and compassion_sites == 1)
 
 
+## The staged moments are presentation over the event's own words. Each answer at the stone names its
+## stage, each stage's line is still a whole sentence of the prose it quotes (so a rewrite of the event
+## fails here instead of leaving the stage quoting something the game no longer says), each stage
+## runs to its end without a player, and a held toast waits and then shows.
+func _test_set_pieces() -> void:
+	var es: Control = load("res://scenes/event/event_scene.gd").new()
+	var stone: EventData = es._build_sword_in_stone_event()
+	var won: EventData = es._build_sword_guardian_won_event()
+	es.free()
+	var walk: EventData.EventChoice = null
+	for ch in stone.choices:
+		if ch.set_piece == &"excalibur_leave":
+			walk = ch
+	var take: EventData.EventChoice = won.choices[0]
+	_check("taking Excalibur and leaving it each name a stage; facing the beast does not",
+		take.set_piece == &"excalibur_take" and walk != null
+		and _stone_fight_is_unstaged(stone))
+	var taken_line := ExcaliburPiece.take_line(take)
+	var left_line := ExcaliburPiece.leave_line(walk)
+	_check("the stage's lines are whole sentences of the event's own prose",
+		taken_line.ends_with("impossibly light.") and take.result_text.contains(taken_line)
+		and left_line.begins_with("The choice not to reach") and left_line.ends_with(".")
+		and walk.result_text.contains(left_line))
+	_check("the words the refusal stamps and the take names still resolve",
+		TitlePool.get_title(walk.awarded_title_id) != null
+		and RelicPool.get_relic_by_name(String(take.granted_relic_id)) != null)
+	var host := Node.new()
+	add_child(host)
+	var ran := 0
+	var take_piece := ExcaliburPiece.play_take(host, take, true)
+	take_piece.hurry()
+	await take_piece.finished
+	ran += 1
+	var leave_piece := ExcaliburPiece.play_leave(host, stone.event_name, walk)
+	leave_piece.hurry()
+	await leave_piece.finished
+	ran += 1
+	_check("the take and the refusal both run to their end", ran == 2)
+	host.queue_free()
+
+	var waiting_before: int = TitleEarnedPopup._queue.size()
+	var live_before = TitleEarnedPopup._live_card
+	TitleEarnedPopup.hold()
+	Events.title_earned.emit(&"outlander_of_camelot")
+	_check("a held toast waits in the queue and shows nothing",
+		TitleEarnedPopup._queue.size() == waiting_before + 1 and TitleEarnedPopup._live_card == live_before)
+	TitleEarnedPopup.release()
+	_check("letting it go leaves nothing held", not TitleEarnedPopup._held)
+
+
+func _stone_fight_is_unstaged(stone: EventData) -> bool:
+	for ch in stone.choices:
+		if ch.starts_combat != &"" and ch.set_piece != &"":
+			return false
+	return true
+
+
 ## Outlander had no award path at all (TITLE_DESIGN 5.9). Its home is the Sword in the Stone's
 ## walk-away (title wave 2): leaving the sword grants it, facing the beast does not, and worn
 ## it pays its 5 gold when a combat is won.
@@ -2306,7 +2364,7 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/game_over/game_over_scene.gd",
 			"res://scenes/title/title_screen.gd",
 			"res://scenes/splash/splash_scene.gd",
-			"res://scripts/ui/set_piece.gd"]:
+			"res://scripts/ui/set_piece.gd", "res://scripts/ui/excalibur_piece.gd"]:
 		var scr = load(path)
 		var compiled: bool = scr != null and scr is GDScript and scr.reload() == OK
 		_check("compiles: %s" % path, compiled)

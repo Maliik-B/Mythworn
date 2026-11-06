@@ -11,6 +11,8 @@ var follow_up_container: VBoxContainer
 ## Whether the consumable the last choice offered went into the pack. False when the player
 ## met a full pack and left the new thing behind. Read by the effect summary.
 var _consumable_taken := true
+## The capture rig sets this: a staged hold plays itself instead of waiting for a player.
+var set_piece_camera_holds := false
 
 
 func _ready() -> void:
@@ -106,6 +108,7 @@ func _build_sword_in_stone_event() -> EventData:
 	# Leaving the sword is the one refusal that rules out the crown (it needs Excalibur), so
 	# this is where Outlander is earned: mid-act, with the fights left to pay it.
 	walk.awarded_title_id = &"outlander_of_camelot"
+	walk.set_piece = &"excalibur_leave"
 	e.choices.append(walk)
 
 	return e
@@ -139,6 +142,7 @@ func _build_sword_guardian_won_event() -> EventData:
 		+ "can feel it will answer to how you hold it: as an edge, or as an eye.")
 	take.granted_relic_id = &"Excalibur"
 	take.awarded_title_id = &"swords_bearer"
+	take.set_piece = &"excalibur_take"
 	take.passion_change = 3
 	e.choices.append(take)
 
@@ -775,6 +779,10 @@ func _on_choice_selected(index: int) -> void:
 	if choice.grants_consumable != &"":
 		_consumable_taken = await _grant_consumable(choice.grants_consumable)
 
+	# A staged moment covers the scene while everything below lands under it, so when the stage
+	# lifts the result is already standing there. Its toast waits for the map.
+	_open_set_piece(choice)
+
 	_apply_effects(choice)
 	choice_container.visible = false
 
@@ -799,6 +807,22 @@ func _on_choice_selected(index: int) -> void:
 		_show_next_beat(choice.next_event_id)
 	else:
 		_show_done()
+
+
+## Opens the stage this choice calls for, if any. Fire and forget: the stage shields the scene from
+## input and frees itself.
+func _open_set_piece(choice: EventData.EventChoice) -> void:
+	match choice.set_piece:
+		&"excalibur_take":
+			TitleEarnedPopup.hold()
+			ExcaliburPiece.play_take(self, choice, set_piece_camera_holds)
+		&"excalibur_leave":
+			TitleEarnedPopup.hold()
+			ExcaliburPiece.play_leave(self, event.event_name, choice)
+
+
+func _exit_tree() -> void:
+	TitleEarnedPopup.release()
 
 
 ## Player-facing label for a queued next-combat boon (RunManager.pending_combat_boon). Mirror

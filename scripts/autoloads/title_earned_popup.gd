@@ -21,6 +21,9 @@ var _current_dismiss_timer: SceneTreeTimer = null
 ## a reference that may be freed before it fires. The timer reads this and
 ## no-ops if it's already null.
 var _live_card: PanelContainer = null
+## While true, earned titles queue without showing. A staged moment holds the toast so nothing
+## cheers over it; the scene that held it lets it go on the way out (see `release`).
+var _held: bool = false
 
 
 func _ready() -> void:
@@ -35,6 +38,20 @@ func _ready() -> void:
 
 func _on_title_earned(title_id: StringName) -> void:
 	_queue.append(title_id)
+	if not _showing and not _held:
+		_show_next()
+
+
+## Queue titles instead of showing them until `release`.
+func hold() -> void:
+	_held = true
+
+
+## Shows anything held back. Safe to call when nothing is held.
+func release() -> void:
+	if not _held:
+		return
+	_held = false
 	if not _showing:
 		_show_next()
 

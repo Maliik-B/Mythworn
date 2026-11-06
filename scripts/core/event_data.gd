@@ -123,4 +123,8 @@ class EventChoice extends RefCounted:
 	## such option per dormant relic the keeper carries, and none when none is carried, so the site
 	## does the telling. It costs nothing but the event's other options.
 	var wakes_relic: StringName = &""
+	## If non-empty, this choice plays a staged moment over the event scene before its result reads:
+	## &"excalibur_take" or &"excalibur_leave". Presentation only: every effect and word on the choice
+	## is unchanged.
+	var set_piece: StringName = &""
 
