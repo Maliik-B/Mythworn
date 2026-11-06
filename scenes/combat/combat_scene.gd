@@ -50,6 +50,9 @@ var _is_animating_card := false
 # frames tighter and will want less zoom. Real per-enemy art is the B5 track -- these are
 # shared CC0 stand-ins until it lands.
 const PORTRAIT_BOX := 130.0
+const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
+const TARGET_LIGHT_FADE := 0.08
+const DRAG_CARD_CLEARANCE := 8.0
 ## The hand row's fixed height. It holds this on the enemy turn too, when the hand is empty, so
 ## the player bar and the enemies keep their places from round to round.
 const HAND_ROW_H := 310.0
@@ -142,9 +145,10 @@ var _damage_flash: ColorRect
 var _dragging_card: CardData = null
 var _drag_panel: PanelContainer = null
 var _drag_offset := Vector2.ZERO
-var _drag_line: Line2D = null       # aim line from the card's origin to the cursor
 var _drag_hint: Label = null        # "right-click to cancel" affordance during a drag
-var _drag_origin := Vector2.ZERO    # where the dragged card started (line anchor)
+var _enemy_lights: Dictionary = {}  # EnemyCombatState -> the targeting light on it (see _set_lit_enemies)
+var _target_glow_tex: GradientTexture2D = null
+var _target_glow_mat: CanvasItemMaterial = null
 
 
 func _ready() -> void:
@@ -185,8 +189,12 @@ func _build_enemy_portrait(set_key: String, enemy) -> Control:
 
 	var box := Control.new()
 	box.custom_minimum_size = Vector2(PORTRAIT_BOX, PORTRAIT_BOX)
-	box.clip_contents = true
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# The clip is a layer of its own, so the targeting glow behind it can spill past the box.
+	var clip := Control.new()
+	clip.set_anchors_preset(Control.PRESET_FULL_RECT)
+	clip.clip_contents = true
+	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var portrait := TextureRect.new()
 	portrait.texture = atlas
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -195,7 +203,9 @@ func _build_enemy_portrait(set_key: String, enemy) -> Control:
 	var inner := PORTRAIT_BOX * zoom
 	portrait.size = Vector2(inner, inner)
 	portrait.position = Vector2((PORTRAIT_BOX - inner) / 2.0, (PORTRAIT_BOX - inner) / 2.0)
-	box.add_child(portrait)
+	clip.add_child(portrait)
+	box.add_child(_make_target_light(enemy, portrait))
+	box.add_child(clip)
 
 	var anim := {
 		"set": set_key, "fw": fw, "fh": fh, "atlas": atlas, "rect": portrait,
@@ -292,12 +302,8 @@ func _input(event: InputEvent) -> void:
 	if not (_dragging_card and _drag_panel):
 		return
 	if event is InputEventMouseMotion:
-		_drag_panel.global_position = event.global_position - _drag_offset
+		_drag_panel.global_position = _drag_card_pos(event.global_position)
 		_update_drag_target_highlight(event.global_position)
-		if _drag_line:
-			_drag_line.set_point_position(1, event.global_position)
-			var over := _enemy_at(event.global_position) != null
-			_drag_line.default_color = Color(1.0, 0.4, 0.3, 0.9) if over else Color(0.9, 0.85, 0.5, 0.6)
 		if _drag_hint:
 			_drag_hint.global_position = event.global_position + Vector2(20, 16)
 		get_viewport().set_input_as_handled()
@@ -1424,10 +1430,13 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 		if panel.modulate != Color(0.5, 0.5, 0.5):
 			var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 			t.tween_property(panel, "scale", Vector2(1.08, 1.08), 0.12)
+		_light_card_targets(card)
 	)
 	panel.mouse_exited.connect(func():
 		var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 		t.tween_property(panel, "scale", Vector2.ONE, 0.12)
+		if not _dragging_card:
+			_set_lit_enemies([])
 	)
 
 	return panel
@@ -1499,6 +1508,7 @@ func _play_selected_card(target: CombatantStats) -> void:
 		return
 	var card = selected_card
 	selected_card = null
+	_set_lit_enemies([])
 	var panel: PanelContainer = card_nodes.get(card)
 	if panel:
 		_is_animating_card = true
@@ -1569,17 +1579,6 @@ func _start_drag(card: CardData, event: InputEvent) -> void:
 	panel.modulate = Color(1.3, 1.3, 1.0, 0.9)
 	_drag_panel = panel
 
-	# Aim line from the card's origin up to the cursor, so it's unambiguous what the
-	# player is pulling toward. It brightens to a "confirm" red over a valid enemy.
-	_drag_origin = start_pos + panel.size / 2.0
-	_drag_line = Line2D.new()
-	_drag_line.width = 4.0
-	_drag_line.default_color = Color(0.9, 0.85, 0.5, 0.6)
-	_drag_line.z_index = 34
-	_drag_line.add_point(_drag_origin)
-	_drag_line.add_point(_drag_origin)
-	add_child(_drag_line)
-
 	# Right-click cancel affordance, following the cursor.
 	_drag_hint = Label.new()
 	_drag_hint.text = "⊘ right-click to cancel"
@@ -1597,26 +1596,7 @@ func _complete_drag(drop_pos: Vector2) -> void:
 		return
 	_clear_drag_visuals()
 	var card = _dragging_card
-	var target_enemy: EnemyCombatState = null
-	for enemy in combat_engine.enemies:
-		if enemy.stats.is_dead():
-			continue
-		var epanel: PanelContainer = enemy_nodes.get(enemy)
-		if epanel and Rect2(epanel.global_position, epanel.size).has_point(drop_pos):
-			target_enemy = enemy
-			break
-	if not target_enemy and drop_pos.y < 500:
-		var closest_dist := INF
-		for enemy in combat_engine.enemies:
-			if enemy.stats.is_dead():
-				continue
-			var epanel: PanelContainer = enemy_nodes.get(enemy)
-			if epanel:
-				var center = epanel.global_position + epanel.size / 2.0
-				var dist = center.distance_to(drop_pos)
-				if dist < closest_dist:
-					closest_dist = dist
-					target_enemy = enemy
+	var target_enemy := _drag_target_at(drop_pos)
 	if target_enemy:
 		_drag_panel.queue_free()
 		card_nodes.erase(card)
@@ -1638,23 +1618,38 @@ func _cancel_drag() -> void:
 
 
 func _clear_drag_visuals() -> void:
-	if _drag_line:
-		_drag_line.queue_free()
-		_drag_line = null
+	_set_lit_enemies([])
 	if _drag_hint:
 		_drag_hint.queue_free()
 		_drag_hint = null
 
 
-## The living enemy whose panel is under the given screen position, or null.
-func _enemy_at(pos: Vector2) -> EnemyCombatState:
-	for enemy in combat_engine.enemies:
-		if enemy.stats.is_dead():
-			continue
+## The dragged card follows the cursor but stops short of the enemies, so it never covers the
+## one it is about to hit: with no aim line, the light on the enemy is the whole read.
+func _drag_card_pos(cursor: Vector2) -> Vector2:
+	var pos := cursor - _drag_offset
+	pos.y = maxf(pos.y, _enemies_bottom() + DRAG_CARD_CLEARANCE)
+	return pos
+
+
+## The enemy a drop at this position hits: the one under it, otherwise the closest living one
+## anywhere above the player bar. On or below the bar there is no target, and the drop cancels.
+## The highlight and the drop both read this, so what is lit is what gets hit.
+func _drag_target_at(pos: Vector2) -> EnemyCombatState:
+	var closest: EnemyCombatState = null
+	var closest_dist := INF
+	for enemy in _living_enemies():
 		var epanel: PanelContainer = enemy_nodes.get(enemy)
-		if epanel and Rect2(epanel.global_position, epanel.size).has_point(pos):
+		if not epanel:
+			continue
+		var rect := epanel.get_global_rect()
+		if rect.has_point(pos):
 			return enemy
-	return null
+		var dist := rect.get_center().distance_to(pos)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest = enemy
+	return closest if pos.y < _player_bar.global_position.y else null
 
 
 func _living_enemies() -> Array:
@@ -1665,24 +1660,80 @@ func _living_enemies() -> Array:
 	return out
 
 
-## During a drag, tint the enemy currently under the cursor so the player can see
-## exactly who they are about to hit. Reset on the next hand/enemy rebuild.
-## Also live-updates the dragged card's damage bracket against that enemy, so
-## target-side modifiers (Vulnerable ×1.5, composing with Weak) show the real
-## number the moment the card is over them, and revert when it's pulled away.
+## During a drag, light the enemy this drop would hit so the player can see exactly
+## who they are about to hit. Also live-updates the dragged card's damage bracket against
+## that enemy, so target-side modifiers (Vulnerable ×1.5, composing with Weak) show the
+## real number the moment the card would land on them, and revert when it's pulled away.
 func _update_drag_target_highlight(pos: Vector2) -> void:
-	var hovered_enemy := _enemy_at(pos)
-	for enemy in combat_engine.enemies:
-		var epanel: PanelContainer = enemy_nodes.get(enemy)
-		if not epanel:
-			continue
-		epanel.modulate = Color(1.4, 1.2, 0.6) if enemy == hovered_enemy else Color.WHITE
+	var target := _drag_target_at(pos)
+	_set_lit_enemies([target] if target else [])
 
 	if _drag_panel and _dragging_card and combat_engine.player_stats:
 		var desc_lbl: Label = _drag_panel.find_child("CardDesc", true, false)
 		if desc_lbl:
-			var target_stats = hovered_enemy.stats if hovered_enemy else null
+			var target_stats = target.stats if target else null
 			desc_lbl.text = _dragging_card.get_modified_description(combat_engine.player_stats, target_stats)
+
+
+## A card that needs no aiming already knows what it will hit, so hovering it says so: an
+## all-enemy card lights them all, and a single-target card with one enemy left lights that one.
+func _light_card_targets(card: CardData) -> void:
+	if combat_engine == null or _dragging_card or _is_animating_card \
+			or combat_engine.phase != CombatEngine.Phase.PLAYER_TURN \
+			or not combat_engine.can_play_card(card):
+		return
+	var living := _living_enemies()
+	if card.target_type == CardData.TargetType.ALL_ENEMIES \
+			or (card.target_type == CardData.TargetType.SINGLE_ENEMY and living.size() == 1):
+		_set_lit_enemies(living)
+
+
+## The targeting light: the sprite brightens a little and a soft warm glow comes up on the
+## ground under it. Nothing touches the panel, and neither piece takes part in layout.
+func _set_lit_enemies(targets: Array) -> void:
+	for enemy in _enemy_lights:
+		var light: Dictionary = _enemy_lights[enemy]
+		var lit: bool = enemy in targets
+		if lit == light["lit"] or not is_instance_valid(light["glow"]):
+			continue
+		light["lit"] = lit
+		if light["tween"]:
+			light["tween"].kill()
+		var t := create_tween().set_parallel(true)
+		t.tween_property(light["glow"], "modulate:a", 1.0 if lit else 0.0, TARGET_LIGHT_FADE)
+		if is_instance_valid(light["body"]):
+			t.tween_property(light["body"], "modulate", TARGET_LIT_BODY if lit else Color.WHITE, TARGET_LIGHT_FADE)
+		light["tween"] = t
+
+
+## Registers the targeting light for an enemy and returns its glow, ready to go behind the body.
+## The glow is anchored to whatever holds it, so it scales with the sprite box.
+func _make_target_light(enemy: EnemyCombatState, body: CanvasItem) -> TextureRect:
+	if _target_glow_tex == null:
+		var grad := Gradient.new()
+		grad.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+		grad.colors = PackedColorArray([
+			Color(1.0, 0.72, 0.36, 0.8), Color(1.0, 0.62, 0.26, 0.3), Color(1.0, 0.55, 0.2, 0.0)])
+		_target_glow_tex = GradientTexture2D.new()
+		_target_glow_tex.gradient = grad
+		_target_glow_tex.fill = GradientTexture2D.FILL_RADIAL
+		_target_glow_tex.fill_from = Vector2(0.5, 0.5)
+		_target_glow_tex.fill_to = Vector2(1.0, 0.5)
+		_target_glow_mat = CanvasItemMaterial.new()
+		_target_glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var glow := TextureRect.new()
+	glow.texture = _target_glow_tex
+	glow.material = _target_glow_mat
+	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	glow.stretch_mode = TextureRect.STRETCH_SCALE
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glow.anchor_left = -0.15
+	glow.anchor_right = 1.15
+	glow.anchor_top = 0.68
+	glow.anchor_bottom = 1.12
+	glow.modulate.a = 0.0
+	_enemy_lights[enemy] = {"glow": glow, "body": body, "lit": false, "tween": null}
+	return glow
 
 
 # ============================================================
@@ -1732,6 +1783,7 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 		port_icon.text = "?"
 		port_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		port_icon.add_theme_font_size_override("font_size", 36)
+		portrait.add_child(_make_target_light(enemy, port_icon))
 		portrait.add_child(port_icon)
 		vbox.add_child(portrait)
 
@@ -2183,7 +2235,9 @@ func _refresh_ui() -> void:
 	discard_label.text = "Discard: %d" % combat_engine.piles.discard_pile.size()
 	exhaust_label.text = "Exhaust: %d" % combat_engine.piles.exhaust_pile.size()
 
-	# Hand
+	# Hand. The rebuild frees the hovered card without its mouse_exited, so its light goes here.
+	if not _dragging_card:
+		_set_lit_enemies([])
 	for child in hand_container.get_children():
 		child.queue_free()
 	card_nodes.clear()
@@ -2393,6 +2447,7 @@ func _log_relic_activations(trigger: RelicData.RelicTrigger) -> void:
 
 func _on_combat_started() -> void:
 	_enemy_anims.clear()
+	_enemy_lights.clear()
 	for enemy in combat_engine.enemies:
 		var panel = _create_enemy_panel(enemy)
 		enemy_container.add_child(panel)
@@ -2753,13 +2808,16 @@ func _show_turn_banner(text: String, color: Color) -> void:
 
 ## The middle of the gap between the lowest living enemy panel and the top of the player bar.
 func _turn_banner_gap_center() -> float:
-	var bar_top := _player_bar.global_position.y
-	var enemies_bottom := enemy_container.global_position.y
+	return (_enemies_bottom() + _player_bar.global_position.y) / 2.0
+
+
+func _enemies_bottom() -> float:
+	var bottom := enemy_container.global_position.y
 	for enemy in enemy_nodes:
 		var epanel: Control = enemy_nodes[enemy]
 		if is_instance_valid(epanel) and epanel.is_visible_in_tree():
-			enemies_bottom = maxf(enemies_bottom, epanel.global_position.y + epanel.size.y)
-	return (enemies_bottom + bar_top) / 2.0
+			bottom = maxf(bottom, epanel.global_position.y + epanel.size.y)
+	return bottom
 
 
 func _screen_shake(intensity: float = 8.0, duration: float = 0.2) -> void:
