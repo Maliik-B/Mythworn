@@ -18,20 +18,9 @@ const MAP_MARGIN_Y := 60
 const MAP_MARGIN_TOP := 165
 const NODE_SIZE := 50
 
-# Realm-entry flourish: on the first map open, ONLY the nodes the "A Realm Divided" pledge
-# changed animate (Court upgrades combats->elites, Folk weakens elites). Each enlarges ->
-# swaps to its new look -> de-enlarges (RevealAnim). Everything else loads as normal.
-const REVEAL_ENLARGE := 1.4
-const REVEAL_ENLARGE_T := 0.28
-const REVEAL_SWAP_T := 0.24
-const REVEAL_DEENLARGE_T := 0.20
-# The flourish gently pans the camera up through the changed nodes (so the player's eye
-# follows each change as it animates), then glides back to the start.
-const PLEDGE_HOLD := 0.35
-const PLEDGE_BACK := 0.9
-const PLEDGE_PAN_PER_NODE := 0.4
-const PLEDGE_PAN_MIN := 1.4
-const PLEDGE_PAN_MAX := 2.8
+# A sentence a line at this size is what fits a quest's toast in the phone crop.
+const QUEST_TOAST_SIZE := 44
+const QUEST_TOAST_OUTLINE := 12
 
 # UI references
 var scroll_container: ScrollContainer
@@ -60,7 +49,8 @@ var _timer_accum := 0.0
 var _pulse_time := 0.0
 var _available_nodes: Array = []
 var _map_x_offset := 0.0  # horizontal centering shift for the node graph
-var _pledge_anim_active := false  # true while the changed-node camera flourish plays
+var _pledge_anim_active := false  # true while a flourish plays: the rewrite or a quest mark
+var _flourish: MapFlourish = null
 
 func _ready() -> void:
 	if not RunManager.run_active:
@@ -656,10 +646,21 @@ func _process(delta: float) -> void:
 				btn.modulate = Color(pulse + 0.15, pulse + 0.15, pulse + 0.15)
 
 
+func _input(event: InputEvent) -> void:
+	# A click hurries a flourish to its end state. The press is used up here, so it cannot also
+	# land on a node. Clicks inside the grace are dropped, as they always were during a flourish.
+	if _flourish == null or not (event is InputEventMouseButton and event.pressed):
+		return
+	if event.button_index == MOUSE_BUTTON_LEFT:
+		get_viewport().set_input_as_handled()
+		if _flourish.can_hurry():
+			_flourish.finish_now()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Dev-only: press R to replay the pledge-change flourish on the current map (feel-tuning
 	# without relaunching). Debug builds only; never fires in a shipped build.
-	if not OS.is_debug_build():
+	if not OS.is_debug_build() or _flourish != null:
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
 		if RunManager.current_map and not RunManager.current_map.pledge_changes.is_empty():
@@ -783,9 +784,15 @@ void fragment() {
 	# slack. Fills the previously-empty right side and puts the boss on screen centre.
 	var viewport_w: float = ProjectSettings.get_setting("display/window/size/viewport_width", 1920)
 	_map_x_offset = maxf(0.0, (viewport_w - graph_w) / 2.0)
+	# The canvas hangs from a plain holder, not from the scroll: a container re-fits its child on
+	# every sort and resets its scale, so only this way can a flourish push in on the canvas.
+	var canvas_size := Vector2(maxf(graph_w, viewport_w), canvas_h)
+	var canvas_holder := Control.new()
+	canvas_holder.custom_minimum_size = canvas_size
+	scroll_container.add_child(canvas_holder)
 	map_canvas = Control.new()
-	map_canvas.custom_minimum_size = Vector2(maxf(graph_w, viewport_w), canvas_h)
-	scroll_container.add_child(map_canvas)
+	map_canvas.size = canvas_size
+	canvas_holder.add_child(map_canvas)
 
 	# Floating header overlay — sits above the scroll area at the top of the
 	# screen with a vertical fade-out gradient. Text is solid at the top, the
@@ -1869,12 +1876,14 @@ func _scroll_to_player() -> void:
 
 
 # ============================================================
-# PLEDGE CHANGES (realm-entry flourish — only the nodes the pledge changed)
+# PLEDGE CHANGES (the road rewrites itself: only the nodes the pledge changed)
 # ============================================================
 
-## Set each changed node to its PRE-change look and hide it (scale/alpha) synchronously, so
-## there's no first-frame flash of the final state, then start the animation after layout.
+## Set each changed node to its PRE-change look synchronously, so there's no first-frame flash of the
+## final state, then start the flourish after layout. Each stays visible and bright until the ink
+## reaches it, since the change only reads if you saw what was there. Replays on an open map.
 func _prime_pledge_changes() -> void:
+	_end_flourish()
 	var map = RunManager.current_map
 	for id in map.pledge_changes:
 		var btn: Button = node_buttons.get(id)
@@ -1882,66 +1891,68 @@ func _prime_pledge_changes() -> void:
 			continue
 		if map.pledge_changes[id] == &"elite_added":
 			_paint_node(btn, MapNode.TYPE_LOOKS[MapNode.NodeType.COMBAT])  # was a combat node
-		else:  # &"weakened" — was a normal (un-weakened) elite
+		else:  # &"weakened" -- was a normal (un-weakened) elite
 			_paint_node(btn, MapNode.TYPE_LOOKS[MapNode.NodeType.ELITE])
-		btn.pivot_offset = btn.size / 2.0
-		btn.scale = Vector2(0.5, 0.5)
-		btn.modulate.a = 0.0
+		btn.modulate = Color.WHITE
+	_pledge_anim_active = true
 	_play_pledge_changes.call_deferred()
 
 
-## Gently pan the camera up through the changed nodes (bottom -> top) so the player's eye
-## follows each change as it animates (enlarge -> swap -> de-enlarge), then glide back to the
-## start. Each node's anim fires as the camera reaches it.
+## Ink spreads from where you stand and each changed node flips as the front reaches it.
 func _play_pledge_changes() -> void:
+	await get_tree().process_frame  # the scroll has to have settled for the camera to frame from it
 	var map = RunManager.current_map
 	if map == null or map.pledge_changes.is_empty():
+		_finish_pledge_changes()
 		return
-	var ids: Array = map.pledge_changes.keys()
-	ids.sort_custom(func(a, b): return map.nodes[a].floor_num < map.nodes[b].floor_num)
-	_pledge_anim_active = true
-
-	var start_scroll := _scroll_value_for_floor(0)  # the player's rest position
-	var top_floor: int = map.nodes[ids[ids.size() - 1]].floor_num
-	var top_scroll := _scroll_value_for_floor(top_floor)
-	var span := start_scroll - top_scroll  # panning up = scroll decreases
-	var pan_up := clampf(PLEDGE_PAN_PER_NODE * float(ids.size()), PLEDGE_PAN_MIN, PLEDGE_PAN_MAX)
-
-	# Camera: start -> up to the top-most changed node -> hold -> back to the start. The pan-up
-	# is LINEAR so elapsed time maps directly to scroll position -- that's what lets each node's
-	# animation stay in sync with where the camera actually is (an eased pan would drift).
-	var tw := create_tween()
-	if span > 4.0:
-		tw.tween_property(scroll_container, "scroll_vertical", int(top_scroll), pan_up) \
-			.set_trans(Tween.TRANS_LINEAR)
-	else:
-		tw.tween_interval(pan_up)  # everything already on screen; just time the anims
-	tw.tween_interval(PLEDGE_HOLD)
-	tw.tween_property(scroll_container, "scroll_vertical", int(start_scroll), PLEDGE_BACK) \
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_callback(_finish_pledge_changes)
-
-	# Start each node's anim so its SWAP (the actual change, at the flip midpoint) lands exactly
-	# as the camera centers the node. The swap fires enlarge_t + swap_t/2 into the anim.
-	var swap_lead := REVEAL_ENLARGE_T + REVEAL_SWAP_T * 0.5
-	for id in ids:
+	var flips: Array = []
+	var middle := Vector2.ZERO
+	for id in map.pledge_changes:
 		var btn: Button = node_buttons.get(id)
 		var node: MapNode = map.get_node(id)
 		if btn == null or node == null:
 			continue
-		var frac := 0.0
-		if span > 4.0:
-			frac = clampf((start_scroll - _scroll_value_for_floor(node.floor_num)) / span, 0.0, 1.0)
-		var delay := maxf(0.0, frac * pan_up - swap_lead)
-		RevealAnim.play_node(self, btn, delay, {
-			"enlarge": REVEAL_ENLARGE,
-			"enlarge_t": REVEAL_ENLARGE_T,
-			"swap_t": REVEAL_SWAP_T,
-			"deenlarge_t": REVEAL_DEENLARGE_T,
-		}, _pledge_swap_cb(btn, node))
+		var at := _get_node_center(node)
+		middle += at
+		flips.append({"btn": btn, "at": at, "swap": _pledge_swap_cb(btn, node)})
+	if flips.is_empty():
+		_finish_pledge_changes()
+		return
+	_start_flourish().play_rewrite(_ink_origin(middle / flips.size()), flips)
+
+
+## Where the ink starts: your node, or before you have one, the opening node nearest the action.
+func _ink_origin(toward: Vector2) -> Vector2:
+	var map = RunManager.current_map
+	if map.current_node_id >= 0:
+		return _get_node_center(map.get_node(map.current_node_id))
+	var best: Vector2 = toward
+	var best_dist := INF
+	for id in map.starting_node_ids:
+		var at := _get_node_center(map.get_node(id))
+		var dist := at.distance_squared_to(toward)
+		if dist < best_dist:
+			best_dist = dist
+			best = at
+	return best
+
+
+func _start_flourish() -> MapFlourish:
+	_flourish = MapFlourish.new()
+	add_child(_flourish)
+	_flourish.setup(map_canvas)
+	_flourish.finished.connect(_finish_pledge_changes)
+	return _flourish
+
+
+## Ends whichever flourish is playing, at its end state. A no-op with none playing.
+func _end_flourish() -> void:
+	if _flourish != null:
+		_flourish.finish_now()
 
 
 func _finish_pledge_changes() -> void:
+	_flourish = null
 	_pledge_anim_active = false
 	_update_node_states()  # restore availability dimming on the changed nodes
 	_scroll_to_player()    # settle exactly at the start
@@ -1950,15 +1961,6 @@ func _finish_pledge_changes() -> void:
 ## Flip-midpoint callback: swap the node into its real, post-change look.
 func _pledge_swap_cb(btn: Button, node: MapNode) -> Callable:
 	return func() -> void: _paint_node(btn, node.look())
-
-
-## Scroll offset that centers the given floor's row in the viewport (floor 0 = the start row
-## at the bottom). Matches _scroll_to_player's formula so the pan starts/ends at the rest
-## position without a jump. Clamped non-negative.
-func _scroll_value_for_floor(floor_num: int) -> float:
-	var map = RunManager.current_map
-	var target_y: float = MAP_MARGIN_Y + (map.floor_count - 1 - floor_num) * NODE_SPACING_Y
-	return maxf(0.0, target_y - scroll_container.size.y / 2.0 + NODE_SIZE / 2.0)
 
 
 # ============================================================
@@ -1982,18 +1984,10 @@ func _quest_payoff_node(quest_id: StringName) -> MapNode:
 	return null
 
 
-## The player's current floor (0 if they haven't entered the map yet). Used to anchor the
-## reveal pan's start/end at where the player is sitting.
-func _player_floor() -> int:
-	var map = RunManager.current_map
-	if map.current_node_id >= 0:
-		return map.get_node(map.current_node_id).floor_num
-	return 0
-
-
-## Set the payoff node to its PRE-arm look and hide it synchronously (no first-frame flash of
-## the glyph), latch the one-shot flag, then start the reveal after layout.
+## Set the payoff node to its PRE-arm look synchronously (no first-frame flash of the glyph), latch
+## the one-shot flag, then start the flourish after layout. Replays on an open map.
 func _prime_quest_reveal(quest_id: StringName) -> void:
+	_end_flourish()
 	var node := _quest_payoff_node(quest_id)
 	if node == null:
 		RunManager.mark_quest_revealed(quest_id)  # nothing to reveal; don't retry
@@ -2003,47 +1997,30 @@ func _prime_quest_reveal(quest_id: StringName) -> void:
 		return
 	RunManager.mark_quest_revealed(quest_id)
 	_paint_node(btn, node.look(false))  # its ordinary pre-arm look
-	btn.pivot_offset = btn.size / 2.0
-	btn.scale = Vector2(0.5, 0.5)
-	btn.modulate.a = 0.0
+	_pledge_anim_active = true
 	_play_quest_reveal.call_deferred(node)
 
 
-## Pan the camera to the payoff node, play the reveal (its swap lands as the camera centers
-## it, like the pledge flourish), raise a one-line objective toast, then glide back.
+## A gold line draws itself down the road from your node to the payoff, the glyph stamps at the end
+## of it, and the objective comes up as it lands.
 func _play_quest_reveal(node: MapNode) -> void:
+	await get_tree().process_frame  # the scroll has to have settled for the camera to frame from it
 	var btn: Button = node_buttons.get(node.id)
 	if btn == null:
+		_finish_pledge_changes()
 		return
-	_pledge_anim_active = true
-
-	var start_scroll := _scroll_value_for_floor(_player_floor())
-	var target_scroll := _scroll_value_for_floor(node.floor_num)
-	var span := absf(start_scroll - target_scroll)
-	var pan := PLEDGE_PAN_MIN
-
-	var tw := create_tween()
-	if span > 4.0:
-		tw.tween_property(scroll_container, "scroll_vertical", int(target_scroll), pan) \
-			.set_trans(Tween.TRANS_LINEAR)
-	else:
-		tw.tween_interval(pan)
-	tw.tween_interval(PLEDGE_HOLD)
-	tw.tween_property(scroll_container, "scroll_vertical", int(start_scroll), PLEDGE_BACK) \
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_callback(_finish_pledge_changes)
-
-	# Time the swap (the actual glyph change) to land as the camera settles on the node.
-	var swap_lead := REVEAL_ENLARGE_T + REVEAL_SWAP_T * 0.5
-	var delay := maxf(0.0, pan - swap_lead)
-	RevealAnim.play_node(self, btn, delay, {
-		"enlarge": REVEAL_ENLARGE,
-		"enlarge_t": REVEAL_ENLARGE_T,
-		"swap_t": REVEAL_SWAP_T,
-		"deenlarge_t": REVEAL_DEENLARGE_T,
-	}, _quest_swap_cb(btn, node))
-
-	_show_map_toast(_quest_reveal_toast(node.quest_payoff_id))
+	var map = RunManager.current_map
+	var road_ids: Array[int] = map.road_between(map.current_node_id, node.id)
+	var road := PackedVector2Array()
+	var lit: Array = []
+	for id in road_ids:
+		road.append(_get_node_center(map.get_node(id)))
+		if id != node.id and node_buttons.has(id):
+			lit.append(node_buttons[id])
+	if road.size() < 2:  # no road reaches it: a straight stroke still says where it is
+		road = PackedVector2Array([_ink_origin(_get_node_center(node)), _get_node_center(node)])
+	_start_flourish().play_mark(road, lit, btn, _quest_swap_cb(btn, node),
+		_show_quest_toast.bind(_quest_reveal_toast(node.quest_payoff_id)))
 
 
 ## Flip-midpoint callback: swap the payoff node into its armed quest-glyph look.
@@ -2096,7 +2073,7 @@ const TOAST_BOTTOM_OFFSET := -132.0  # up off the bottom edge
 ## The status line is deliberately not used for this surface: info_label is overwritten by
 ## the next hover or node-state refresh, which is why "You took the shortcut, skipping
 ## ahead." does not survive long enough to be read. Transient flavor wants the toast.
-func _show_map_toast(text: String, anchor := ToastAnchor.TOP, dismissible := false) -> void:
+func _show_map_toast(text: String, anchor := ToastAnchor.TOP, dismissible := false) -> Label:
 	var holder := CenterContainer.new()
 	holder.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	if anchor == ToastAnchor.BOTTOM:
@@ -2135,6 +2112,17 @@ func _show_map_toast(text: String, anchor := ToastAnchor.TOP, dismissible := fal
 				tw.kill()
 			holder.queue_free()
 		)
+	return toast
+
+
+## A quest's objective, large enough to read on a phone. The words are the toast's own: only the line
+## break is new, a sentence to a line.
+func _show_quest_toast(text: String) -> void:
+	var toast := _show_map_toast(text.replace(". ", ".\n"))
+	toast.add_theme_font_override("font", load(CardFace.RULES_FONT_PATH))
+	toast.add_theme_font_size_override("font_size", QUEST_TOAST_SIZE)
+	toast.add_theme_constant_override("outline_size", QUEST_TOAST_OUTLINE)
+	toast.get_parent().z_index = MapFlourish.ABOVE_Z
 
 
 # ============================================================

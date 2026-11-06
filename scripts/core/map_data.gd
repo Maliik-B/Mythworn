@@ -26,6 +26,35 @@ func get_available_next_ids() -> Array[int]:
 	return []
 
 
+## The node ids along one forward road from `from_id` to `to_id`, both included, or empty if none
+## reaches it. -1 starts from the opening row, as a player who has not entered the map would.
+func road_between(from_id: int, to_id: int) -> Array[int]:
+	var frontier: Array[int] = []
+	if from_id == -1:
+		frontier.assign(starting_node_ids)
+	else:
+		frontier.append(from_id)
+	var came_from := {}
+	for id in frontier:
+		came_from[id] = -1
+	while not frontier.is_empty():
+		var id: int = frontier.pop_front()
+		if id == to_id:
+			var road: Array[int] = []
+			while id != -1:
+				road.push_front(id)
+				id = came_from[id]
+			return road
+		var node := get_node(id)
+		if node == null:
+			continue
+		for next_id in node.next_nodes:
+			if not came_from.has(next_id):
+				came_from[next_id] = id
+				frontier.append(next_id)
+	return []
+
+
 func move_to(node_id: int) -> void:
 	current_node_id = node_id
 	var node = get_node(node_id)

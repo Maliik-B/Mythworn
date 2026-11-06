@@ -75,6 +75,7 @@ func _ready() -> void:
 	_test_harness_copy_card_rules()
 	_test_harness_copy_new_rules()
 	_test_harness_policy_decides()
+	await _test_map_flourish()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -3791,6 +3792,98 @@ func _test_map_node_looks() -> void:
 	_check("a weakened elite has its own drained look", elite.look() == MapNode.WEAKENED_ELITE_LOOK)
 	for id in MapGenerator.RECORD_SITE_IDS:
 		_check("record site %s has a look" % id, MapNode.SCRIPTED_LOOKS.has(id))
+
+
+## The map's flourishes are presentation: however one ends, the map is left at rest, showing what the
+## run says is true. A click carried over from the last screen cannot skip one, and the click that
+## does hurry one is used up, so it cannot also land on a node.
+func _test_map_flourish() -> void:
+	print("-- Map flourish --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 424242)
+	RunManager.realm_config.elite_frequency_mult = 1.4
+	RunManager.current_map = null
+	var scene = load("res://scenes/map/map_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	var map: MapData = RunManager.current_map
+	var at_rest: int = scene.map_canvas.get_child_count()
+	_check("a pledge changes nodes to show", not map.pledge_changes.is_empty())
+	for id in map.pledge_changes:
+		_check("a changed node keeps its old look until the ink reaches it",
+			scene.node_buttons[id].get_meta("look") == MapNode.TYPE_LOOKS[MapNode.NodeType.COMBAT])
+	_check("a flourish holds the map from its first frame", scene._pledge_anim_active)
+	for i in 3:
+		await get_tree().process_frame
+	_check("the rewrite plays on a pledged map", scene._flourish != null)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	scene._input(click)
+	_check("a click in the grace does not skip the flourish", scene._flourish != null)
+	scene._flourish._age = MapFlourish.HURRY_AFTER
+	scene._input(click)
+	_check("a click after the grace hurries it", scene._flourish == null)
+	_check("the hurrying click is used up", get_viewport().is_input_handled())
+	await get_tree().process_frame
+	_check_map_at_rest(scene, at_rest, "hurried rewrite")
+
+	var giver := -1
+	var payoff := -1
+	for id in map.nodes:
+		if map.nodes[id].quest_giver_id == &"raiders":
+			giver = id
+		if map.nodes[id].quest_payoff_id == &"raiders":
+			payoff = id
+	var road := map.road_between(giver, payoff)
+	var walkable := road.size() >= 2 and road[0] == giver and road[road.size() - 1] == payoff
+	for i in road.size() - 1:
+		walkable = walkable and map.nodes[road[i]].next_nodes.has(road[i + 1])
+	_check("the road to a quest is one the player can walk", walkable)
+	_check("no road runs back down the map", map.road_between(payoff, giver).is_empty())
+	var from_start := map.road_between(-1, payoff)
+	_check("before entering the map, a road starts on the opening row",
+		from_start.size() >= 2 and map.starting_node_ids.has(from_start[0]))
+
+	scene.queue_free()
+	await get_tree().process_frame
+	map.move_to(giver)
+	RunManager.arm_quest(&"raiders")
+	scene = load("res://scenes/map/map_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	_check("an armed payoff keeps its ordinary look until the glyph lands",
+		scene.node_buttons[payoff].get_meta("look") == map.nodes[payoff].look(false))
+	for i in 3:
+		await get_tree().process_frame
+	_check("the mark plays on returning armed", scene._flourish != null)
+	_check("the mark plays once", RunManager.first_unrevealed_quest() == &"")
+	scene._flourish.finish_now()
+	await get_tree().process_frame
+	_check_map_at_rest(scene, at_rest, "hurried mark")
+	_check("a hurried mark still shows its glyph", scene.node_buttons[payoff].get_meta("look") == MapNode.QUEST_MARK_LOOK)
+	var shown := ""
+	for child in scene.get_children():
+		if child is CenterContainer and child.get_child(0) is Label:
+			shown = child.get_child(0).text
+	_check("a hurried mark still brings up the objective, in the toast's own words",
+		shown.replace("\n", " ") == scene._quest_reveal_toast(&"raiders"))
+	scene.queue_free()
+	await get_tree().process_frame
+	RunManager.current_map = null
+
+
+func _check_map_at_rest(scene: Node, canvas_children: int, tag: String) -> void:
+	_check("%s: the canvas is back at rest" % tag,
+		scene.map_canvas.scale == Vector2.ONE and scene.map_canvas.position == Vector2.ZERO)
+	_check("%s: the map takes clicks again" % tag, not scene._pledge_anim_active)
+	_check("%s: nothing of the flourish is left on the canvas" % tag,
+		scene.map_canvas.get_child_count() == canvas_children)
+	var settled := true
+	var map: MapData = RunManager.current_map
+	for id in scene.node_buttons:
+		var btn: Button = scene.node_buttons[id]
+		var node: MapNode = map.nodes[id]
+		settled = settled and btn.scale == Vector2.ONE and btn.z_index == 0 \
+			and btn.get_meta("look") == node.look(scene._is_quest_payoff_armed(node))
+	_check("%s: every node is its own size, on its layer, showing its real look" % tag, settled)
 
 
 ## The card face moves sentences between zones and must never lose or change one: for every shipped
