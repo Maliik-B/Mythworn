@@ -280,7 +280,7 @@ static func _card_in_pole(card: CardData, pole: int) -> bool:
 static func _shell() -> PanelContainer:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.07, 0.12, 0.98)
+	style.bg_color = Color(0.08, 0.075, 0.07, 0.98)
 	style.set_corner_radius_all(10)
 	style.set_border_width_all(2)
 	style.border_color = Color(0.85, 0.55, 0.3)

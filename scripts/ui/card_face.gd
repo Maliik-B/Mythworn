@@ -117,8 +117,8 @@ static func _card_style(card: CardData) -> StyleBoxFlat:
 		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
 	# Unplayable curses read as sickly and dead: they only clog a hand slot.
 	if card.unplayable:
-		style.bg_color = Color(0.16, 0.1, 0.18)
-		style.border_color = Color(0.5, 0.32, 0.55)
+		style.bg_color = Color(0.14, 0.13, 0.12)
+		style.border_color = Color(0.46, 0.42, 0.36)
 	return style
 
 
@@ -268,6 +268,7 @@ static func _make_emblem(card: CardData, card_style: StyleBoxFlat) -> Control:
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		icon.position = Vector2(8, (SLAB_H - 36.0) / 2.0)
 		icon.size = Vector2(36, 36)
+		icon.material = StageSkin.no_purple()
 		return icon
 	var glyph := Label.new()
 	match card.card_type:
@@ -280,6 +281,7 @@ static func _make_emblem(card: CardData, card_style: StyleBoxFlat) -> Control:
 	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	glyph.add_theme_font_size_override("font_size", 24)
 	glyph.add_theme_color_override("font_color", card_style.border_color.lightened(0.3))
+	glyph.material = StageSkin.no_purple()
 	return glyph
 
 

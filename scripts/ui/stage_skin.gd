@@ -12,6 +12,8 @@ const PAGE := &"page"
 ## The switch. A capture can set it before the combat scene loads.
 static var active: StringName = DARK
 
+static var _no_purple: ShaderMaterial = null
+
 # The faces the stage's words are set in, so a swap is here and nowhere else. They follow the card
 # face's picks.
 const NAME_FONT_PATH := CardFace.TITLE_FONT_PATH
@@ -109,6 +111,15 @@ const LOOKS := {
 
 static func c(key: String) -> Color:
 	return LOOKS[active][key]
+
+
+## For a glyph or icon that may come out of a system emoji font: ⚔ is shaded purple there, and this
+## is what takes it out. Shared, since it holds no state of its own.
+static func no_purple() -> ShaderMaterial:
+	if _no_purple == null:
+		_no_purple = ShaderMaterial.new()
+		_no_purple.shader = load("res://assets/ui/stage_body.gdshader")
+	return _no_purple
 
 
 static func is_page() -> bool:

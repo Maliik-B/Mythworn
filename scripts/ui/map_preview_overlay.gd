@@ -63,7 +63,7 @@ func _build() -> void:
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.08, 0.07, 0.12, 0.98)
+	panel_style.bg_color = Color(0.08, 0.075, 0.07, 0.98)
 	panel_style.set_corner_radius_all(10)
 	panel_style.set_border_width_all(2)
 	panel_style.border_color = Color(0.5, 0.45, 0.32)
@@ -160,7 +160,7 @@ func _render_map(canvas: Control) -> void:
 			var travelled := node.visited and next_node.visited
 			line.width = 3.0 if travelled else 2.0
 			line.default_color = Color(0.8, 0.7, 0.4, 0.8) if travelled \
-				else Color(0.35, 0.3, 0.5, 0.6)
+				else Color(0.36, 0.34, 0.3, 0.6)
 			canvas.add_child(line)
 
 	# Node dots.

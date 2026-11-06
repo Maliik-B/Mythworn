@@ -199,6 +199,27 @@ func _sheet_body(set_key: String) -> Rect2i:
 	return body
 
 
+## A sheet's darkest and lightest values, near enough, so the page look can spread a dark sheet and a
+## pale one over the same ramp. From its first idle frame, and asked for only when that look is on.
+func _sheet_values(set_key: String) -> Vector2:
+	var sset: Dictionary = SPRITE_SETS[set_key]
+	var fw: int = int(sset.get("fw", sset.get("cell", 150)))
+	var fh: int = int(sset.get("fh", sset.get("cell", 150)))
+	var frame: Image = load(sset["dir"] + sset["anims"]["idle"][0]).get_image().get_region(Rect2i(0, 0, fw, fh))
+	var seen := {}
+	var values: Array[float] = []
+	for y in fh:
+		for x in fw:
+			var pixel := frame.get_pixel(x, y)
+			if pixel.a > 0.1 and not seen.has(pixel):
+				seen[pixel] = true
+				values.append(0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b)
+	values.sort()
+	if values.is_empty():
+		return Vector2(0.05, 0.6)
+	return Vector2(values[int((values.size() - 1) * 0.04)], values[int((values.size() - 1) * 0.98)])
+
+
 ## This fight's scale for a body: the boss who stands alone is large, everyone else regular. A
 ## sheet too tall for the stage at that scale steps down until it fits under the top bar.
 func _body_scale(set_key: String) -> int:
@@ -238,6 +259,11 @@ func _build_enemy_body(set_key: String, enemy) -> Control:
 	portrait.position = -Vector2(body.position) * scale_px
 	var mat := ShaderMaterial.new()
 	mat.shader = STAGE_BODY_SHADER
+	if StageSkin.is_page():
+		var values := _sheet_values(set_key)
+		mat.set_shader_parameter("page", true)
+		mat.set_shader_parameter("value_lo", values.x)
+		mat.set_shader_parameter("value_hi", values.y)
 	portrait.material = mat
 	stand.add_child(_make_body_shadow())
 	stand.add_child(_make_target_light(enemy, portrait))
@@ -457,6 +483,8 @@ void fragment() {
 """
 	mat.shader = shader
 	vignette.material = mat
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vignette.visible = not StageSkin.is_page()
 	add_child(vignette)
 
 	# Damage flash overlay (hidden by default)
@@ -531,7 +559,7 @@ func _build_top_bar() -> HBoxContainer:
 
 	# Map peek — glance at your route / what's ahead without leaving combat. Sits at
 	# the far left (map-in-the-corner), set apart from the pile counts on the right.
-	var map_btn = _make_pile_button(Color(0.82, 0.72, 0.42))
+	var map_btn = _make_pile_button(StageSkin.c("pile_map"))
 	map_btn.text = "Map ▸"
 	map_btn.tooltip_text = "Peek the map: your route so far and what lies ahead"
 	map_btn.pressed.connect(_on_view_map)
@@ -541,7 +569,7 @@ func _build_top_bar() -> HBoxContainer:
 	map_spacer.custom_minimum_size.x = 34
 	bar.add_child(map_spacer)
 
-	draw_label = _make_pile_button(Color(0.5, 0.7, 0.9))
+	draw_label = _make_pile_button(StageSkin.c("pile_draw"))
 	draw_label.pressed.connect(_on_pile_clicked.bind("draw"))
 	bar.add_child(draw_label)
 
@@ -554,13 +582,14 @@ func _build_top_bar() -> HBoxContainer:
 	consumable_bar = ConsumableBar.new()
 	consumable_bar.setup(ConsumableBar.Mode.COMBAT)
 	consumable_bar.item_used.connect(_on_consumable_used)
+	consumable_bar.modulate = StageSkin.c("pack_tint")
 	bar.add_child(consumable_bar)
 
 	var pack_spacer = Control.new()
 	pack_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(pack_spacer)
 
-	exhaust_label = _make_pile_button(Color(0.6, 0.5, 0.6))
+	exhaust_label = _make_pile_button(StageSkin.c("pile_exhaust"))
 	exhaust_label.pressed.connect(_on_pile_clicked.bind("exhaust"))
 	bar.add_child(exhaust_label)
 
@@ -568,7 +597,7 @@ func _build_top_bar() -> HBoxContainer:
 	spacer2.custom_minimum_size.x = 30
 	bar.add_child(spacer2)
 
-	discard_label = _make_pile_button(Color(0.7, 0.5, 0.5))
+	discard_label = _make_pile_button(StageSkin.c("pile_discard"))
 	discard_label.pressed.connect(_on_pile_clicked.bind("discard"))
 	bar.add_child(discard_label)
 
@@ -576,7 +605,7 @@ func _build_top_bar() -> HBoxContainer:
 	spacer3.custom_minimum_size.x = 30
 	bar.add_child(spacer3)
 
-	var log_btn = _make_pile_button(Color(0.6, 0.5, 0.6))
+	var log_btn = _make_pile_button(StageSkin.c("pile_exhaust"))
 	log_btn.text = "Log"
 	log_btn.tooltip_text = "What has happened this fight"
 	log_btn.pressed.connect(func(): log_text.visible = not log_text.visible)
@@ -598,7 +627,7 @@ func _make_pile_button(color: Color) -> Button:
 func _build_player_bar() -> PanelContainer:
 	var panel = PanelContainer.new()
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.12, 0.1, 0.18, 0.8)
+	style.bg_color = Color(0.105, 0.098, 0.09, 0.95)
 	style.set_corner_radius_all(6)
 	style.content_margin_left = 20
 	style.content_margin_right = 20
@@ -818,11 +847,11 @@ func _make_hp_bar(width: int, height: int) -> Control:
 	trail.max_value = 100
 	trail.value = 100
 	var trail_bg = StyleBoxFlat.new()
-	trail_bg.bg_color = Color(0.2, 0.08, 0.06)
+	trail_bg.bg_color = StageSkin.c("bar_back")
 	trail_bg.set_corner_radius_all(3)
 	trail.add_theme_stylebox_override("background", trail_bg)
 	var trail_fill = StyleBoxFlat.new()
-	trail_fill.bg_color = Color(0.7, 0.15, 0.08, 0.6)
+	trail_fill.bg_color = StageSkin.c("bar_trail")
 	trail_fill.set_corner_radius_all(3)
 	trail.add_theme_stylebox_override("fill", trail_fill)
 	container.add_child(trail)
@@ -838,7 +867,7 @@ func _make_hp_bar(width: int, height: int) -> Control:
 	bg_style.set_corner_radius_all(3)
 	bar.add_theme_stylebox_override("background", bg_style)
 	var fill_style = StyleBoxFlat.new()
-	fill_style.bg_color = Color(0.8, 0.2, 0.15)
+	fill_style.bg_color = StageSkin.c("bar_high")
 	fill_style.set_corner_radius_all(3)
 	bar.add_theme_stylebox_override("fill", fill_style)
 	container.add_child(bar)
@@ -880,10 +909,10 @@ func _on_pile_clicked(pile_name: String) -> void:
 func _show_pile_popup(title: String, cards: Array) -> void:
 	pile_popup = PanelContainer.new()
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.08, 0.16, 0.95)
+	style.bg_color = Color(0.09, 0.085, 0.078, 0.97)
 	style.set_corner_radius_all(10)
 	style.set_border_width_all(2)
-	style.border_color = Color(0.45, 0.38, 0.6)
+	style.border_color = Color(0.5, 0.46, 0.38)
 	style.content_margin_left = 20
 	style.content_margin_right = 20
 	style.content_margin_top = 16
@@ -1221,7 +1250,7 @@ func _get_personality_color(pers: CardData.PersonalityType) -> Color:
 	if pers == CardData.PersonalityType.SECONDARY:
 		return Color(0.4, 0.6, 0.9) # Cool blue for physical
 	if pers == CardData.PersonalityType.NEGATIVE:
-		return Color(0.6, 0.35, 0.7) # Sickly purple for curses
+		return Color(0.55, 0.5, 0.42) # Dead ash for curses
 	return Color(0.6, 0.6, 0.6)
 
 
@@ -1259,6 +1288,7 @@ func _make_resonance_sigil(card: CardData) -> Control:
 	lbl.text = glyph
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.material = StageSkin.no_purple()
 
 	if zm > 1.0:
 		# FAVORED — an empowered glyph, styled the SAME at the lean and extreme tiers: the halo
@@ -1651,15 +1681,15 @@ func _make_target_light(enemy: EnemyCombatState, body: CanvasItem) -> TextureRec
 	if _target_glow_tex == null:
 		var grad := Gradient.new()
 		grad.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
-		grad.colors = PackedColorArray([
-			Color(1.0, 0.72, 0.36, 0.8), Color(1.0, 0.62, 0.26, 0.3), Color(1.0, 0.55, 0.2, 0.0)])
+		var mid := StageSkin.c("glow_mid")
+		grad.colors = PackedColorArray([StageSkin.c("glow_core"), mid, Color(mid.r, mid.g, mid.b, 0.0)])
 		_target_glow_tex = GradientTexture2D.new()
 		_target_glow_tex.gradient = grad
 		_target_glow_tex.fill = GradientTexture2D.FILL_RADIAL
 		_target_glow_tex.fill_from = Vector2(0.5, 0.5)
 		_target_glow_tex.fill_to = Vector2(1.0, 0.5)
 		_target_glow_mat = CanvasItemMaterial.new()
-		_target_glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		_target_glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_MIX if StageSkin.is_page() else CanvasItemMaterial.BLEND_MODE_ADD
 	var glow := TextureRect.new()
 	glow.texture = _target_glow_tex
 	glow.material = _target_glow_mat
@@ -1798,6 +1828,7 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	intent_lbl.name = "Intent"
 	intent_lbl.add_theme_font_size_override("font_size", 20)
 	intent_lbl.add_theme_color_override("font_color", StageSkin.c("intent_attack"))
+	intent_lbl.material = StageSkin.no_purple()
 	intent_row.add_child(intent_lbl)
 
 	# Sight mode peek — only rendered when player has Excalibur in Sight mode.
@@ -1957,11 +1988,11 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 		var ep = float(enemy.stats.current_hp) / enemy.stats.max_hp
 		var ef: StyleBoxFlat = hp_bar.get_theme_stylebox("fill")
 		if ep > 0.5:
-			ef.bg_color = Color(0.8, 0.2, 0.15)
+			ef.bg_color = StageSkin.c("bar_high")
 		elif ep > 0.25:
-			ef.bg_color = Color(0.9, 0.5, 0.1)
+			ef.bg_color = StageSkin.c("bar_mid")
 		else:
-			ef.bg_color = Color(0.5, 0.1, 0.1)
+			ef.bg_color = StageSkin.c("bar_low")
 
 	if enemy.stats.block > 0:
 		block_lbl.text = "Block: %d" % enemy.stats.block
@@ -1974,12 +2005,12 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 
 	if enemy.current_intent:
 		var icon := ""
-		var intent_color := Color(0.95, 0.85, 0.5)
+		var intent_color := StageSkin.c("ink")
 		var value_str := ""
 		match enemy.current_intent.intent_type:
 			EnemyMove.IntentType.ATTACK, EnemyMove.IntentType.ATTACK_DEBUFF:
 				icon = "⚔"
-				intent_color = Color(1.0, 0.4, 0.3)
+				intent_color = StageSkin.c("intent_attack")
 				for effect in enemy.current_intent.effects:
 					if effect is DamageEffect and not effect.apply_to_source:
 						var modified = effect.value
@@ -2002,7 +2033,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 						break
 			EnemyMove.IntentType.DEFEND:
 				icon = "◆"
-				intent_color = Color(0.3, 0.7, 1.0)
+				intent_color = StageSkin.c("intent_defend")
 				for effect in enemy.current_intent.effects:
 					if effect is BlockEffect:
 						var modified = effect.value + enemy.stats.get_status_stacks(StatusEffects.DEXTERITY)
@@ -2013,14 +2044,14 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 						break
 			EnemyMove.IntentType.DEBUFF:
 				icon = "☠"
-				intent_color = Color(0.8, 0.3, 0.8)
+				intent_color = StageSkin.c("intent_debuff")
 				for effect in enemy.current_intent.effects:
 					if effect is StatusApplyEffect:
 						value_str = " %s" % effect.status_effect.effect_name
 						break
 			EnemyMove.IntentType.BUFF:
 				icon = "★"
-				intent_color = Color(0.3, 0.9, 0.4)
+				intent_color = StageSkin.c("intent_buff")
 				for effect in enemy.current_intent.effects:
 					if effect is StatusApplyEffect:
 						value_str = " %s" % effect.status_effect.effect_name
@@ -2061,10 +2092,10 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 					break
 		# Passion pressure is its own threat category — an attack on your identity, not
 		# your HP or your stats. Override the generic (usually DEBUFF) readout with a
-		# distinct spark glyph + violet color so it reads as a different kind of threat.
+		# distinct spark glyph + the Passion readout's own colour, so the eye goes to that stat.
 		if _intent_affects_passion(enemy.current_intent):
 			icon = "✧"
-			intent_color = Color(0.66, 0.52, 0.96)
+			intent_color = StageSkin.c("intent_passion")
 			value_str = _passion_intent_readout(enemy.current_intent)
 		# Name stays a muted constant color (flavor); the emphasized value carries the
 		# intent color so the threat category reads from the big number, not the name.
@@ -2312,7 +2343,7 @@ func _show_status_pin(anchor: Control, effect: StatusEffectData, stacks: int) ->
 	style.set_corner_radius_all(8)
 	style.set_border_width_all(2)
 	style.border_color = accent
-	style.bg_color = Color(0.09, 0.08, 0.14, 0.98)
+	style.bg_color = Color(0.09, 0.085, 0.078, 0.98)
 	style.content_margin_left = 12
 	style.content_margin_right = 12
 	style.content_margin_top = 9
@@ -2398,14 +2429,14 @@ func _on_card_exhausted(card: CardData) -> void:
 func _on_player_turn_started() -> void:
 	_log("[color=cyan]--- Your Turn %d ---[/color]" % combat_engine.turn_number)
 	_log_relic_activations(RelicData.RelicTrigger.ON_TURN_START)
-	_show_turn_banner("Your Turn", Color(0.3, 0.8, 0.9))
+	_show_turn_banner("Your Turn", StageSkin.c("banner_you"))
 	_refresh_ui()
 	_animate_card_draw()
 
 
 func _on_enemy_turn_started() -> void:
 	_log("[color=orange]--- Enemy Turn ---[/color]")
-	_show_turn_banner("Enemy Turn", Color(0.9, 0.4, 0.3))
+	_show_turn_banner("Enemy Turn", StageSkin.c("banner_enemy"))
 	# Per-enemy "X uses Y" is announced as each one acts, in _on_enemy_action_started.
 	_refresh_ui()
 
@@ -2507,7 +2538,7 @@ func _on_enemy_damaged(enemy, amount: int, new_hp: int) -> void:
 		enemy.enemy_data.enemy_name, amount, new_hp])
 	RunManager.run_stats["damage_dealt"] = RunManager.run_stats.get("damage_dealt", 0) + amount
 	var panel = enemy_nodes.get(enemy)
-	_spawn_damage_number("-%d" % amount, Color(1.0, 0.3, 0.2), panel)
+	_spawn_damage_number("-%d" % amount, StageSkin.c("number_hurt"), panel)
 	# Flinch on a real hit; a killing blow skips straight to the death throe below.
 	if amount > 0 and new_hp > 0:
 		_enemy_play(enemy, "hit")
@@ -2522,7 +2553,7 @@ func _on_enemy_healed(enemy, amount: int, new_hp: int) -> void:
 	_log("[color=lightgreen]%s recovers %d HP. (HP: %d)[/color]" % [
 		enemy.enemy_data.enemy_name, amount, new_hp])
 	var panel = enemy_nodes.get(enemy)
-	_spawn_damage_number("+%d" % amount, Color(0.4, 1.0, 0.4), panel)
+	_spawn_damage_number("+%d" % amount, StageSkin.c("number_heal"), panel)
 	_refresh_ui()
 
 
@@ -2538,7 +2569,7 @@ func _on_enemy_died(enemy) -> void:
 	if final_line != "":
 		var panel: Control = enemy_nodes.get(enemy)
 		if panel:
-			_log("[color=violet]%s: \"%s\"[/color]" % [enemy.enemy_data.enemy_name, final_line])
+			_log("[color=wheat]%s: \"%s\"[/color]" % [enemy.enemy_data.enemy_name, final_line])
 			_show_enemy_speech(panel, final_line)
 	_animate_enemy_death(enemy)
 	_refresh_ui()
@@ -2548,12 +2579,12 @@ func _on_enemy_died(enemy) -> void:
 ## swapped. Flash the model, float a speech bubble with the transition line, and
 ## refresh so the new HP bar + intent read immediately.
 func _on_enemy_phase_changed(enemy, _phase_index: int, line: String) -> void:
-	_log("[color=violet]%s changes![/color]" % enemy.enemy_data.enemy_name)
+	_log("[color=wheat]%s changes![/color]" % enemy.enemy_data.enemy_name)
 	var panel: Control = enemy_nodes.get(enemy)
 	if panel:
 		panel.pivot_offset = panel.size / 2.0
 		var t = create_tween()
-		t.tween_property(panel, "modulate", Color(1.4, 0.7, 1.4, 1.0), 0.15)
+		t.tween_property(panel, "modulate", Color(1.5, 1.5, 1.5, 1.0), 0.15)
 		t.tween_property(panel, "modulate", Color(1, 1, 1, 1.0), 0.4)
 		_screen_shake(8.0, 0.3)
 		if line != "":
@@ -2568,10 +2599,10 @@ func _show_enemy_speech(panel: Control, text: String) -> void:
 	bubble.z_index = 60
 	bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.08, 0.14, 0.96)
+	style.bg_color = Color(0.09, 0.085, 0.078, 0.96)
 	style.set_corner_radius_all(10)
 	style.set_border_width_all(2)
-	style.border_color = Color(0.75, 0.55, 0.95)
+	style.border_color = Color(0.7, 0.66, 0.56)
 	style.content_margin_left = 14
 	style.content_margin_right = 14
 	style.content_margin_top = 10
@@ -2583,7 +2614,7 @@ func _show_enemy_speech(panel: Control, text: String) -> void:
 	lbl.custom_minimum_size.x = 320
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.add_theme_font_size_override("font_size", 17)
-	lbl.add_theme_color_override("font_color", Color(0.93, 0.88, 0.98))
+	lbl.add_theme_color_override("font_color", Color(0.95, 0.93, 0.88))
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bubble.add_child(lbl)
 	add_child(bubble)
@@ -2613,7 +2644,7 @@ func _on_block_gained(target, amount: int) -> void:
 			_log("Gained [color=cyan]%d Block[/color]." % amount)
 		else:
 			_log("Lost [color=cyan]%d Block[/color]." % -amount)
-		_spawn_damage_number(number, Color(0.3, 0.7, 1.0), null)
+		_spawn_damage_number(number, StageSkin.c("number_block"), null)
 	else:
 		for enemy in combat_engine.enemies:
 			if enemy.stats == target:
@@ -2624,7 +2655,7 @@ func _on_block_gained(target, amount: int) -> void:
 					_log("%s loses [color=cyan]%d Block[/color]." % [
 						enemy.enemy_data.enemy_name, -amount])
 				var panel = enemy_nodes.get(enemy)
-				_spawn_damage_number(number, Color(0.3, 0.7, 1.0), panel)
+				_spawn_damage_number(number, StageSkin.c("number_block"), panel)
 				break
 	_refresh_ui()
 
@@ -2675,7 +2706,7 @@ func _is_extreme_favored(personality: CardData.PersonalityType, passion_value: i
 
 func _on_status_applied(target, effect: StatusEffectData, stacks: int) -> void:
 	var name = _get_combatant_name(target)
-	var color = "green" if effect.is_buff else "magenta"
+	var color = "green" if effect.is_buff else "salmon"
 	_log("[color=%s]%s: +%d %s[/color]" % [color, name, stacks, effect.effect_name])
 	_refresh_ui()
 
@@ -2709,7 +2740,7 @@ func _show_turn_banner(text: String, color: Color) -> void:
 	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	banner.add_theme_font_size_override("font_size", 34)
 	banner.add_theme_color_override("font_color", color)
-	banner.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	banner.add_theme_color_override("font_outline_color", StageSkin.c("banner_outline"))
 	banner.add_theme_constant_override("outline_size", 6)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.z_index = 20
