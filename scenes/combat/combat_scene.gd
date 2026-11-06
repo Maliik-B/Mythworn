@@ -44,13 +44,21 @@ var _last_play_ms := -100000  # when a card last played, for the double-click gu
 # Enemy sprite animation. Each enemy maps to a "sprite set" (one LuizMelo sheet folder),
 # and each set lists its strips as [file, frame_count, fps]. Every strip is a horizontal
 # row of square cells (cell size = the PNG's height); the animator (see _process /
-# _anim_tick) steps the AtlasTexture region across the row. `zoom` scales the whole cell
-# inside a fixed, clipped portrait box so the character reads large enough: the monster
-# placeholder sheets carry a lot of motion padding, where the real per-enemy human art
-# frames tighter and will want less zoom. Real per-enemy art is the B5 track -- these are
-# shared CC0 stand-ins until it lands. Attack strips run fast so the swing lands on the engine's
-# wind-up beat (CombatEngine.start_enemy_turn): change one with the other.
-const PORTRAIT_BOX := 130.0
+# _anim_tick) steps the AtlasTexture region across the row. Real per-enemy art is the B5 track --
+# these are shared CC0 stand-ins until it lands. Attack strips run fast so the swing lands on the
+# engine's wind-up beat (CombatEngine.start_enemy_turn): change one with the other.
+#
+# Bodies are drawn at one whole-number scale per fight, feet on one ground: a regular at 4, a boss
+# who stands alone at 6, and small things stay small. Where a body sits in its cell is measured
+# from the sheet (see _sheet_body), so a new sheet needs nothing but its entry here.
+const BODY_SCALE_REGULAR := 4
+const BODY_SCALE_BOSS := 6
+const STAGE_FEET_Y := 556.0  # bodies stand here, a little in front of CombatStage.GROUND_LINE_Y
+const STAGE_TOP_Y := 68.0  # the top of the enemy area, under the top bar
+const BODY_MAX_H := STAGE_FEET_Y - STAGE_TOP_Y
+const STATUS_COLUMN_W := 124.0  # beside the feet, on each side, so statuses never move a body
+const ENEMY_MIN_W := 320.0
+const LOG_RECT := Rect2(1370, 68, 520, 624)
 const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
 const TARGET_LIGHT_FADE := 0.08
 const DRAG_CARD_CLEARANCE := 8.0
@@ -60,45 +68,46 @@ const END_TURN_W := 140.0
 const MAIN_W := 1860.0  # the 1920 frame less the main margins
 const HAND_SEP := 10
 const BOTTOM_ROW_SEP := 20
-const ENEMY_TOP_GAP := 42.0
 const CHIP_SEP := 6
 const CHIP_ROW_MAX_W := 400.0
+
+const STAGE_BODY_SHADER := preload("res://assets/ui/stage_body.gdshader")
 
 const SPRITE_SETS := {
 	"goblin": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/",
-		"cell": 150, "zoom": 2.2,
+		"cell": 150,
 		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"skeleton": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/",
-		"cell": 150, "zoom": 1.8,
+		"cell": 150,
 		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"flyingeye": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/",
-		"cell": 150, "zoom": 2.0,
+		"cell": 150,
 		"anims": {"idle": ["Flight.png", 8, 10], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"mushroom": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Mushroom/",
-		"cell": 150, "zoom": 2.2,
+		"cell": 150,
 		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"worm": {
 		"dir": "res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/",
-		"cell": 90, "zoom": 1.4,
+		"cell": 90,
 		"anims": {"idle": ["Idle.png", 9, 10], "attack": ["Attack.png", 16, 24], "hit": ["Get Hit.png", 3, 12], "death": ["Death.png", 8, 10]},
 	},
 	"wizard2": {
 		"dir": "res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/",
-		"cell": 250, "zoom": 1.8,
+		"cell": 250,
 		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 18], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
 	},
 	# Real Camelot per-enemy art (LuizMelo, CC0), corruption-recolored. Non-square frames.
 	"medieval_warrior": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms/",
-		"fw": 184, "fh": 137, "zoom": 1.5,
+		"fw": 184, "fh": 137,
 		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
 	},
 }
@@ -149,6 +158,8 @@ var _drag_panel: PanelContainer = null
 var _drag_offset := Vector2.ZERO
 var _drag_hint: Label = null        # "right-click to cancel" affordance during a drag
 var _enemy_lights: Dictionary = {}  # EnemyCombatState -> the targeting light on it (see _set_lit_enemies)
+var _sheet_bodies: Dictionary = {}  # sprite set key -> where its body sits in the cell (see _sheet_body)
+var _shadow_tex: GradientTexture2D = null
 var _target_glow_tex: GradientTexture2D = null
 var _target_glow_mat: CanvasItemMaterial = null
 
@@ -172,15 +183,42 @@ func _process(delta: float) -> void:
 		_anim_tick(_enemy_anims[enemy], delta)
 
 
-## Builds the animated portrait for an enemy and registers its animator in _enemy_anims.
-## The cell is drawn oversized inside a fixed, clipped box so the character fills the frame
-## and its motion padding spills out of view rather than shrinking the sprite.
-func _build_enemy_portrait(set_key: String, enemy) -> Control:
+## Where the body sits in a sheet: the columns of its first idle frame and the rows of the whole
+## idle strip, so an idle that bobs still stands on one spot. Measured once per sheet.
+func _sheet_body(set_key: String) -> Rect2i:
+	if _sheet_bodies.has(set_key):
+		return _sheet_bodies[set_key]
+	var sset: Dictionary = SPRITE_SETS[set_key]
+	var fw: int = int(sset.get("fw", sset.get("cell", 150)))
+	var fh: int = int(sset.get("fh", sset.get("cell", 150)))
+	var strip: Image = load(sset["dir"] + sset["anims"]["idle"][0]).get_image()
+	var rows := strip.get_used_rect()
+	var columns := strip.get_region(Rect2i(0, 0, fw, fh)).get_used_rect()
+	var body := Rect2i(columns.position.x, rows.position.y, columns.size.x, rows.size.y)
+	_sheet_bodies[set_key] = body
+	return body
+
+
+## This fight's scale for a body: the boss who stands alone is large, everyone else regular. A
+## sheet too tall for the stage at that scale steps down until it fits under the top bar.
+func _body_scale(set_key: String) -> int:
+	var wanted := BODY_SCALE_REGULAR
+	if combat_engine.enemies.size() == 1 and (RunManager.pending_relic_is_boss \
+			or combat_engine.enemies[0].enemy_data.phase_hps.size() > 1):
+		wanted = BODY_SCALE_BOSS
+	return mini(wanted, floori(BODY_MAX_H / _sheet_body(set_key).size.y))
+
+
+## Builds the animated body for an enemy and registers its animator in _enemy_anims. Returns the
+## stand: a box exactly the body's size, on the ground, that everything aimed at the enemy (numbers,
+## lights, the lunge, a thrown card) reads. The cell hangs off it uncropped, so a swing can leave it.
+func _build_enemy_body(set_key: String, enemy) -> Control:
 	var sset: Dictionary = SPRITE_SETS[set_key]
 	# Frame cell: square sets give just "cell"; packs with non-square frames give fw/fh.
 	var fw: int = int(sset.get("fw", sset.get("cell", 150)))
 	var fh: int = int(sset.get("fh", sset.get("cell", 150)))
-	var zoom: float = sset["zoom"]
+	var scale_px := _body_scale(set_key)
+	var body := _sheet_body(set_key)
 	# Preload every strip once so state swaps are instant.
 	var textures := {}
 	for state in sset["anims"]:
@@ -189,25 +227,21 @@ func _build_enemy_portrait(set_key: String, enemy) -> Control:
 	atlas.atlas = textures["idle"]
 	atlas.region = Rect2(0, 0, fw, fh)
 
-	var box := Control.new()
-	box.custom_minimum_size = Vector2(PORTRAIT_BOX, PORTRAIT_BOX)
-	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	# The clip is a layer of its own, so the targeting glow behind it can spill past the box.
-	var clip := Control.new()
-	clip.set_anchors_preset(Control.PRESET_FULL_RECT)
-	clip.clip_contents = true
-	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var stand := _make_stand(Vector2(body.size) * scale_px)
 	var portrait := TextureRect.new()
 	portrait.texture = atlas
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.stretch_mode = TextureRect.STRETCH_SCALE
 	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	var inner := PORTRAIT_BOX * zoom
-	portrait.size = Vector2(inner, inner)
-	portrait.position = Vector2((PORTRAIT_BOX - inner) / 2.0, (PORTRAIT_BOX - inner) / 2.0)
-	clip.add_child(portrait)
-	box.add_child(_make_target_light(enemy, portrait))
-	box.add_child(clip)
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait.size = Vector2(fw, fh) * scale_px
+	portrait.position = -Vector2(body.position) * scale_px
+	var mat := ShaderMaterial.new()
+	mat.shader = STAGE_BODY_SHADER
+	portrait.material = mat
+	stand.add_child(_make_body_shadow())
+	stand.add_child(_make_target_light(enemy, portrait))
+	stand.add_child(portrait)
 
 	var anim := {
 		"set": set_key, "fw": fw, "fh": fh, "atlas": atlas, "rect": portrait,
@@ -216,7 +250,49 @@ func _build_enemy_portrait(set_key: String, enemy) -> Control:
 	}
 	_enemy_anims[enemy] = anim
 	_anim_set_state(anim, "idle")
-	return box
+	return stand
+
+
+## A box of the body's size, standing on the ground at the middle of the enemy's column.
+func _make_stand(body_size: Vector2) -> Control:
+	var stand := Control.new()
+	stand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stand.anchor_left = 0.5
+	stand.anchor_right = 0.5
+	stand.anchor_top = 1.0
+	stand.anchor_bottom = 1.0
+	stand.offset_left = -body_size.x / 2.0
+	stand.offset_right = body_size.x / 2.0
+	stand.offset_top = -body_size.y
+	stand.offset_bottom = 0.0
+	stand.pivot_offset = Vector2(body_size.x / 2.0, body_size.y)
+	return stand
+
+
+## The shadow on the ground under a body. Anchored to the stand, so it fits any size of body.
+func _make_body_shadow() -> TextureRect:
+	if _shadow_tex == null:
+		var grad := Gradient.new()
+		grad.offsets = PackedFloat32Array([0.0, 0.7, 1.0])
+		grad.colors = PackedColorArray([Color.WHITE, Color.WHITE, Color(1, 1, 1, 0)])
+		_shadow_tex = GradientTexture2D.new()
+		_shadow_tex.gradient = grad
+		_shadow_tex.fill = GradientTexture2D.FILL_RADIAL
+		_shadow_tex.fill_from = Vector2(0.5, 0.5)
+		_shadow_tex.fill_to = Vector2(1.0, 0.5)
+	var shadow := TextureRect.new()
+	shadow.texture = _shadow_tex
+	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shadow.stretch_mode = TextureRect.STRETCH_SCALE
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shadow.modulate = StageSkin.c("shadow")
+	shadow.anchor_left = -0.12
+	shadow.anchor_right = 1.12
+	shadow.anchor_bottom = 1.0
+	shadow.anchor_top = 1.0
+	shadow.offset_top = -9.0
+	shadow.offset_bottom = 9.0
+	return shadow
 
 
 ## Switches an animator to a state (idle/attack/hit/death). Only idle loops; the others
@@ -358,11 +434,12 @@ func _make_click_event() -> InputEventMouseButton:
 # ============================================================
 
 func _build_ui() -> void:
-	# Background
+	# The desk under everything, and the stage on it.
 	var bg = ColorRect.new()
-	bg.color = Color(0.1, 0.07, 0.18)
+	bg.color = StageSkin.c("desk")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+	add_child(CombatStage.new())
 
 	# Vignette
 	var vignette = ColorRect.new()
@@ -417,7 +494,6 @@ void fragment() {
 	enemy_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	enemy_container.add_theme_constant_override("separation", 40)
 	enemy_container.set_anchors_preset(Control.PRESET_FULL_RECT)
-	enemy_container.offset_top = ENEMY_TOP_GAP
 	enemy_area.add_child(enemy_container)
 
 	# Player info bar
@@ -427,21 +503,24 @@ void fragment() {
 	# Hand + End Turn
 	vbox.add_child(_build_bottom_area())
 
-	# Combat log
+	# Combat log: closed until asked for, over the stage so opening it moves nothing.
 	log_text = RichTextLabel.new()
 	log_text.bbcode_enabled = true
-	log_text.custom_minimum_size.y = 140
 	log_text.scroll_following = true
 	log_text.scroll_active = true
+	log_text.position = LOG_RECT.position
+	log_text.size = LOG_RECT.size
+	log_text.z_index = 50
+	log_text.visible = false
 	var log_style = StyleBoxFlat.new()
-	log_style.bg_color = Color(0.08, 0.07, 0.14, 0.95)
+	log_style.bg_color = Color(0.07, 0.065, 0.06, 0.96)
 	log_style.set_corner_radius_all(6)
 	log_style.content_margin_left = 12
 	log_style.content_margin_right = 12
 	log_style.content_margin_top = 8
 	log_style.content_margin_bottom = 8
 	log_text.add_theme_stylebox_override("normal", log_style)
-	vbox.add_child(log_text)
+	add_child(log_text)
 
 	# Add damage flash on top of everything
 	add_child(_damage_flash)
@@ -492,6 +571,16 @@ func _build_top_bar() -> HBoxContainer:
 	discard_label = _make_pile_button(Color(0.7, 0.5, 0.5))
 	discard_label.pressed.connect(_on_pile_clicked.bind("discard"))
 	bar.add_child(discard_label)
+
+	var spacer3 = Control.new()
+	spacer3.custom_minimum_size.x = 30
+	bar.add_child(spacer3)
+
+	var log_btn = _make_pile_button(Color(0.6, 0.5, 0.6))
+	log_btn.text = "Log"
+	log_btn.tooltip_text = "What has happened this fight"
+	log_btn.pressed.connect(func(): log_text.visible = not log_text.visible)
+	bar.add_child(log_btn)
 
 	return bar
 
@@ -1374,7 +1463,7 @@ func _play_selected_card(target: CombatantStats) -> void:
 				if enemy.stats == target:
 					var epanel = enemy_nodes.get(enemy)
 					if epanel:
-						target_pos = epanel.global_position + epanel.size / 2.0
+						target_pos = _body_rect(epanel).get_center()
 					break
 		else:
 			# AoE — fly to center of enemy area
@@ -1592,77 +1681,70 @@ func _make_target_light(enemy: EnemyCombatState, body: CanvasItem) -> TextureRec
 
 func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(220, 220)
-	# Size to content instead of stretching to fill the tall enemy area, so the
-	# card border ends near its content and leaves a clean gap above the player
-	# readout — that gap is where the turn banner sits (see _show_turn_banner).
-	# Hung from the top, so a panel that grows (a status row, a longer intent) keeps its
-	# sprite where it was and only reaches further into the gap.
+	# No chrome: the body stands on the ground, and its name, bar and intent sit on the ground under
+	# it. Hung from the top with a fixed body height, so feet line up across a fight and nothing that
+	# changes below them can move a body. The gap left under the panel is where the turn banner sits
+	# (see _show_turn_banner).
 	panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.2, 0.15, 0.25)
-	style.set_corner_radius_all(8)
-	style.set_border_width_all(2)
-	style.border_color = Color(0.5, 0.4, 0.5)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	var vbox = VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 6)
+	vbox.add_theme_constant_override("separation", 4)
 	panel.add_child(vbox)
 
-	# Enemy portrait area -- animated spritesheet (idle loops; attack/hit/death play on
-	# combat events, then fall back to idle). See SPRITE_SETS / _build_enemy_portrait.
+	# The body's place: a column that stands the body on the ground, with the statuses beside its feet.
+	var place := Control.new()
+	place.name = "Place"
+	place.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(place)
+
+	# Animated spritesheet (idle loops; attack/hit/death play on combat events, then fall back to
+	# idle). See SPRITE_SETS / _build_enemy_body.
 	var set_key: String = ENEMY_SPRITE_SET.get(enemy.enemy_data.enemy_name, "")
+	var stand: Control
 	if set_key != "" and SPRITE_SETS.has(set_key):
-		vbox.add_child(_build_enemy_portrait(set_key, enemy))
+		stand = _build_enemy_body(set_key, enemy)
 	else:
 		# Fallback for unknown enemies
-		var portrait = PanelContainer.new()
-		portrait.custom_minimum_size = Vector2(0, 70)
-		var port_style = StyleBoxFlat.new()
-		port_style.set_corner_radius_all(6)
-		port_style.bg_color = Color(0.22, 0.17, 0.28)
-		portrait.add_theme_stylebox_override("panel", port_style)
+		stand = _make_stand(Vector2(130, 130))
 		var port_icon = Label.new()
 		port_icon.text = "?"
 		port_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		port_icon.add_theme_font_size_override("font_size", 36)
-		portrait.add_child(_make_target_light(enemy, port_icon))
-		portrait.add_child(port_icon)
-		vbox.add_child(portrait)
+		port_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		port_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+		port_icon.add_theme_font_size_override("font_size", 72)
+		stand.add_child(_make_body_shadow())
+		stand.add_child(_make_target_light(enemy, port_icon))
+		stand.add_child(port_icon)
+	place.add_child(stand)
+	panel.set_meta("stand", stand)
+	var body_w: float = stand.offset_right - stand.offset_left
+	place.custom_minimum_size = Vector2(maxf(ENEMY_MIN_W, body_w + 2.0 * STATUS_COLUMN_W), BODY_MAX_H)
+
+	# Statuses as the same hover-describable chips as the player's, stacked up from the feet.
+	var status_chips = VBoxContainer.new()
+	status_chips.name = "Statuses"
+	status_chips.alignment = BoxContainer.ALIGNMENT_END
+	status_chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_chips.add_theme_constant_override("separation", 4)
+	status_chips.anchor_left = 0.5
+	status_chips.anchor_right = 0.5
+	status_chips.anchor_top = 1.0
+	status_chips.anchor_bottom = 1.0
+	status_chips.offset_left = body_w / 2.0 + 10.0
+	status_chips.offset_right = status_chips.offset_left + STATUS_COLUMN_W
+	status_chips.offset_top = -BODY_MAX_H
+	place.add_child(status_chips)
 
 	var name_lbl = Label.new()
 	name_lbl.text = enemy.enemy_data.enemy_name
-	name_lbl.add_theme_font_size_override("font_size", 24)
+	name_lbl.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
+	name_lbl.add_theme_font_size_override("font_size", 26)
+	name_lbl.add_theme_color_override("font_color", StageSkin.c("ink"))
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(name_lbl)
 
-	# --- HP section (own panel) ---
-	var hp_panel = PanelContainer.new()
-	hp_panel.name = "HPPanel"
-	var hp_style = StyleBoxFlat.new()
-	hp_style.bg_color = Color(0.14, 0.06, 0.06, 0.8)
-	hp_style.set_corner_radius_all(5)
-	hp_style.set_border_width_all(1)
-	hp_style.border_color = Color(0.4, 0.15, 0.15)
-	hp_style.content_margin_left = 8
-	hp_style.content_margin_right = 8
-	hp_style.content_margin_top = 4
-	hp_style.content_margin_bottom = 4
-	hp_panel.add_theme_stylebox_override("panel", hp_style)
-	vbox.add_child(hp_panel)
-
-	var hp_vbox = VBoxContainer.new()
-	hp_vbox.add_theme_constant_override("separation", 8)
-	hp_panel.add_child(hp_vbox)
-
-	var hp_bar_container = _make_hp_bar(180, 20)
+	var hp_bar_container = _make_hp_bar(240, 22)
 	hp_bar_container.name = "HPBarContainer"
 	var enemy_hp_bar: ProgressBar = hp_bar_container.get_child(1)
 	enemy_hp_bar.name = "HPBar"
@@ -1674,9 +1756,9 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	# HP text overlaid inside the bar
 	var hp_lbl = Label.new()
 	hp_lbl.name = "HP"
-	hp_lbl.add_theme_font_size_override("font_size", 14)
-	hp_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
-	hp_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	hp_lbl.add_theme_font_size_override("font_size", 15)
+	hp_lbl.add_theme_color_override("font_color", StageSkin.c("bar_text"))
+	hp_lbl.add_theme_color_override("font_shadow_color", StageSkin.c("bar_text_shadow"))
 	hp_lbl.add_theme_constant_override("shadow_offset_x", 1)
 	hp_lbl.add_theme_constant_override("shadow_offset_y", 1)
 	hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1684,78 +1766,49 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	hp_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hp_bar_container.add_child(hp_lbl)
-	hp_vbox.add_child(hp_bar_container)
-
+	# Block sits off the bar's left end, outside its width, so the bar holds the column's centre.
 	var block_lbl = Label.new()
 	block_lbl.name = "Block"
-	block_lbl.add_theme_font_size_override("font_size", 16)
-	block_lbl.add_theme_color_override("font_color", Color(0.3, 0.6, 0.9))
-	block_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hp_vbox.add_child(block_lbl)
+	block_lbl.add_theme_font_size_override("font_size", 18)
+	block_lbl.add_theme_color_override("font_color", StageSkin.c("block"))
+	block_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	block_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	block_lbl.anchor_top = 0.0
+	block_lbl.anchor_bottom = 1.0
+	block_lbl.offset_left = -112.0
+	block_lbl.offset_right = -8.0
+	hp_bar_container.add_child(block_lbl)
+	vbox.add_child(hp_bar_container)
 
-	# Enemy statuses as the same hover-describable chips as the player's, centered
-	# and wrapping under the HP bar.
-	var status_chips = HFlowContainer.new()
-	status_chips.name = "Statuses"
-	status_chips.alignment = FlowContainer.ALIGNMENT_CENTER
-	status_chips.add_theme_constant_override("h_separation", 5)
-	status_chips.add_theme_constant_override("v_separation", 4)
-	hp_vbox.add_child(status_chips)
+	# The intent, one line: the move's name in ink, then the threat in its category's colour, so the
+	# number never reads as part of the name.
+	var intent_row = HBoxContainer.new()
+	intent_row.name = "IntentRow"
+	intent_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	intent_row.add_theme_constant_override("separation", 10)
+	vbox.add_child(intent_row)
 
-	# Spacer between HP and intent
-	var hp_intent_spacer = Control.new()
-	hp_intent_spacer.custom_minimum_size.y = 12
-	vbox.add_child(hp_intent_spacer)
-
-	# --- Intent section (own panel) ---
-	var intent_panel = PanelContainer.new()
-	intent_panel.name = "IntentPanel"
-	var intent_style = StyleBoxFlat.new()
-	intent_style.bg_color = Color(0.1, 0.08, 0.16, 0.8)
-	intent_style.set_corner_radius_all(5)
-	intent_style.set_border_width_all(1)
-	intent_style.border_color = Color(0.35, 0.28, 0.5)
-	intent_style.content_margin_left = 8
-	intent_style.content_margin_right = 8
-	intent_style.content_margin_top = 5
-	intent_style.content_margin_bottom = 5
-	intent_panel.add_theme_stylebox_override("panel", intent_style)
-	vbox.add_child(intent_panel)
-
-	# PanelContainer only renders one child, so the current/next intent labels
-	# live inside a VBox to stack vertically.
-	var intent_vbox = VBoxContainer.new()
-	intent_vbox.name = "IntentVBox"
-	intent_vbox.add_theme_constant_override("separation", 2)
-	intent_panel.add_child(intent_vbox)
-
-	# Two-part readout: the move name identifies the move on top; the icon+value below
-	# is the intent-colored threat readout. The name is kept at least as large as the
-	# readout (it's what the player reads first) and the value leans on color + the icon
-	# rather than size for its emphasis, so the number never reads as part of the name.
 	var intent_name_lbl = Label.new()
 	intent_name_lbl.name = "IntentName"
 	intent_name_lbl.add_theme_font_size_override("font_size", 20)
-	intent_name_lbl.add_theme_color_override("font_color", Color(0.9, 0.86, 0.72))
-	intent_name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intent_vbox.add_child(intent_name_lbl)
+	intent_name_lbl.add_theme_color_override("font_color", StageSkin.c("ink_soft"))
+	intent_row.add_child(intent_name_lbl)
 
 	var intent_lbl = Label.new()
 	intent_lbl.name = "Intent"
-	intent_lbl.add_theme_font_size_override("font_size", 18)
-	intent_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.5))
-	intent_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intent_vbox.add_child(intent_lbl)
+	intent_lbl.add_theme_font_size_override("font_size", 20)
+	intent_lbl.add_theme_color_override("font_color", StageSkin.c("intent_attack"))
+	intent_row.add_child(intent_lbl)
 
 	# Sight mode peek — only rendered when player has Excalibur in Sight mode.
 	# Sits below the current intent in a dimmer color: "Then: <move>".
 	var next_intent_lbl = Label.new()
 	next_intent_lbl.name = "NextIntent"
-	next_intent_lbl.add_theme_font_size_override("font_size", 12)
-	next_intent_lbl.add_theme_color_override("font_color", Color(0.65, 0.55, 0.8))
+	next_intent_lbl.add_theme_font_size_override("font_size", 14)
+	next_intent_lbl.add_theme_color_override("font_color", StageSkin.c("ink_soft"))
 	next_intent_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	next_intent_lbl.visible = false
-	intent_vbox.add_child(next_intent_lbl)
+	vbox.add_child(next_intent_lbl)
 
 	# Click to target
 	panel.gui_input.connect(_on_enemy_input.bind(enemy))
@@ -1888,17 +1941,13 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 		return
 
 	var vbox = panel.get_child(0)
-	var hp_panel: PanelContainer = vbox.get_node("HPPanel")
-	var hp_vbox = hp_panel.get_child(0)
-	var block_lbl: Label = hp_vbox.get_node("Block")
-	var status_chips: HFlowContainer = hp_vbox.get_node("Statuses")
-	var intent_panel: PanelContainer = vbox.get_node("IntentPanel")
-	var intent_vbox: VBoxContainer = intent_panel.get_node("IntentVBox")
-	var intent_name_lbl: Label = intent_vbox.get_node("IntentName")
-	var intent_lbl: Label = intent_vbox.get_node("Intent")
-	var next_intent_lbl: Label = intent_vbox.get_node("NextIntent")
+	var hp_container = vbox.get_node("HPBarContainer")
+	var block_lbl: Label = hp_container.get_node("Block")
+	var status_chips: VBoxContainer = vbox.get_node("Place/Statuses")
+	var intent_name_lbl: Label = vbox.get_node("IntentRow/IntentName")
+	var intent_lbl: Label = vbox.get_node("IntentRow/Intent")
+	var next_intent_lbl: Label = vbox.get_node("NextIntent")
 
-	var hp_container = hp_vbox.get_node_or_null("HPBarContainer")
 	if hp_container:
 		var hp_lbl: Label = hp_container.get_node("HP")
 		hp_lbl.text = "%d / %d" % [enemy.stats.current_hp, enemy.stats.max_hp]
@@ -2196,6 +2245,7 @@ func _make_power_chip(power: PowerData, stacks: int) -> PanelContainer:
 ## fades) and a subtle hover-highlight so it reads as inspectable.
 func _make_status_chip(effect: StatusEffectData, stacks: int) -> PanelContainer:
 	var chip = PanelContainer.new()
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var accent := Color(0.4, 0.75, 0.45) if effect.is_buff else Color(0.82, 0.4, 0.4)
 	var style = StyleBoxFlat.new()
 	style.set_corner_radius_all(6)
@@ -2368,13 +2418,12 @@ func _on_enemy_action_started(enemy, move) -> void:
 	_log("%s uses [color=white]%s[/color]!" % [enemy.enemy_data.enemy_name, move.move_name])
 	var epanel: Control = enemy_nodes.get(enemy)
 	if epanel:
-		# Wind-up lunge: a quick scale punch (works inside the enemy container, which
-		# manages position/size but not scale).
-		epanel.pivot_offset = epanel.size / 2.0
+		# Wind-up lunge: a quick scale punch from the feet. The name and bar under the body hold still.
+		var stand: Control = epanel.get_meta("stand", epanel)
 		var t = create_tween()
-		t.tween_property(epanel, "scale", Vector2(1.12, 1.12), 0.16) \
+		t.tween_property(stand, "scale", Vector2(1.08, 1.08), 0.16) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		t.tween_property(epanel, "scale", Vector2(1.0, 1.0), 0.20).set_trans(Tween.TRANS_QUAD)
+		t.tween_property(stand, "scale", Vector2(1.0, 1.0), 0.20).set_trans(Tween.TRANS_QUAD)
 		_float_move_callout(epanel, move.move_name)
 	# Play the attack strip for offensive intents; defends/buffs stay on idle.
 	if move.intent_type == EnemyMove.IntentType.ATTACK \
@@ -2397,18 +2446,28 @@ func _on_enemy_stunned(enemy) -> void:
 		_float_move_callout(epanel, "Frozen!")
 
 
-## Floats the move name up above the enemy and fades it — the visible "X uses Y" beat.
+## The body an enemy panel holds, in screen space; the panel itself if it has none.
+func _body_rect(epanel: Control) -> Rect2:
+	var stand: Control = epanel.get_meta("stand", epanel)
+	return stand.get_global_rect()
+
+
+## Floats the move name up beside the enemy's head and fades it — the visible "X uses Y" beat.
 func _float_move_callout(epanel: Control, text: String) -> void:
 	var lbl = Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 22)
-	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
-	lbl.add_theme_constant_override("outline_size", 5)
-	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	lbl.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
+	lbl.add_theme_font_size_override("font_size", 32)
+	lbl.add_theme_color_override("font_color", StageSkin.c("callout"))
+	lbl.add_theme_constant_override("outline_size", 6)
+	lbl.add_theme_color_override("font_outline_color", StageSkin.c("callout_outline"))
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.custom_minimum_size.x = 480.0
 	lbl.z_index = 45
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(lbl)
-	var start := epanel.global_position + Vector2(epanel.size.x / 2.0 - text.length() * 5.5, -6)
+	var body := _body_rect(epanel)
+	var start := Vector2(body.get_center().x - 240.0, maxf(body.position.y - 44.0, STAGE_TOP_Y + 42.0))
 	lbl.global_position = start
 	var t = create_tween()
 	t.set_parallel(true)
@@ -2534,8 +2593,9 @@ func _show_enemy_speech(panel: Control, text: String) -> void:
 		if is_instance_valid(bubble):
 			bubble.queue_free()
 		return
-	var target := panel.global_position + Vector2(panel.size.x / 2.0 - bubble.size.x / 2.0, -bubble.size.y - 12)
-	bubble.global_position = Vector2(clampf(target.x, 10, 1920 - bubble.size.x - 10), maxf(10, target.y))
+	var body := _body_rect(panel)
+	var target := Vector2(body.get_center().x - bubble.size.x / 2.0, body.position.y - bubble.size.y - 12)
+	bubble.global_position = Vector2(clampf(target.x, 10, 1920 - bubble.size.x - 10), maxf(STAGE_TOP_Y, target.y))
 	bubble.modulate.a = 0.0
 	var t := create_tween()
 	t.tween_property(bubble, "modulate:a", 1.0, 0.25)
@@ -2705,18 +2765,23 @@ func _screen_shake(intensity: float = 8.0, duration: float = 0.2) -> void:
 func _spawn_damage_number(text: String, color: Color, target_panel: Control) -> void:
 	var lbl = Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 28)
+	lbl.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
+	lbl.add_theme_font_size_override("font_size", 56)
 	lbl.add_theme_color_override("font_color", color)
-	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0))
-	lbl.add_theme_constant_override("outline_size", 4)
+	lbl.add_theme_color_override("font_outline_color", StageSkin.c("number_outline"))
+	lbl.add_theme_constant_override("outline_size", 8)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.custom_minimum_size.x = 200.0
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.z_index = 10
 
 	if target_panel:
-		var pos = target_panel.global_position + Vector2(target_panel.size.x / 2.0 - 30, 10)
-		lbl.global_position = pos
+		# Over the chest, a little to the side, so it never covers the face.
+		var body := _body_rect(target_panel)
+		lbl.position = Vector2(body.get_center().x - 100.0 + body.size.x * 0.3, body.position.y + body.size.y * 0.25)
 	else:
-		lbl.position = Vector2(960, 400)
+		# The player has no body on the stage: their numbers rise off the player bar.
+		lbl.position = Vector2(hp_label.global_position.x - 260.0, _player_bar.global_position.y - 64.0)
 
 	add_child(lbl)
 
@@ -3082,7 +3147,7 @@ func _animate_enemy_death(enemy: EnemyCombatState) -> void:
 	if not panel:
 		return
 	# Burst particles from the enemy position
-	var center = panel.global_position + panel.size / 2.0
+	var center := _body_rect(panel).get_center()
 	for i in 15:
 		var p = ColorRect.new()
 		p.custom_minimum_size = Vector2(5, 5)
@@ -3098,16 +3163,25 @@ func _animate_enemy_death(enemy: EnemyCombatState) -> void:
 		t.tween_property(p, "position", target_pos, randf_range(0.4, 0.8)).set_ease(Tween.EASE_OUT)
 		t.tween_property(p, "modulate:a", 0.0, 0.6).set_delay(0.2)
 		t.chain().tween_callback(p.queue_free)
-	# Fade and shrink the panel, then remove it cleanly. Detach it from enemy_nodes
-	# up front so any refresh in the same frame can't re-touch the corpse, and free it
-	# once the animation ends so it never lingers to skew multi-enemy layout.
-	panel.pivot_offset = panel.size / 2.0
+	# Fade and sink the panel, then remove it. Detach it from enemy_nodes up front so any refresh in
+	# the same frame can't re-touch the corpse. An empty column of its width takes its place, so the
+	# bodies still standing don't slide across the stage.
+	panel.pivot_offset = Vector2(panel.size.x / 2.0, BODY_MAX_H)
 	enemy_nodes.erase(enemy)
 	var t = create_tween()
 	t.set_parallel(true)
 	t.tween_property(panel, "modulate:a", 0.0, 0.5)
 	t.tween_property(panel, "scale", Vector2(0.3, 0.3), 0.5).set_ease(Tween.EASE_IN)
-	t.chain().tween_callback(panel.queue_free)
+	t.chain().tween_callback(_leave_empty_column.bind(panel))
+
+
+func _leave_empty_column(panel: Control) -> void:
+	var gap := Control.new()
+	gap.custom_minimum_size.x = panel.size.x
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	enemy_container.add_child(gap)
+	enemy_container.move_child(gap, panel.get_index())
+	panel.queue_free()
 
 
 # ============================================================
