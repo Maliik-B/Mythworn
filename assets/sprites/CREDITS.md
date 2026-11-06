@@ -59,7 +59,7 @@ All under the SIL Open Font License 1.1; the licence text sits beside each font 
 ## Backgrounds
 
 ### Parallax Backgrounds: Snowy Mountains, by Admurin
-- **Used in**: the cold frame of the staged crossing (`realms/cold_edge/`). The file there is a stand-in, cut from the pack's page cover and modified: the bands above and below its title lettering, joined along a new ridge line. The pack's own layers replace it when they are in hand.
+- **Used in**: the cold frame of the staged crossing (`realms/cold_edge/`). The pack's five layers, as downloaded, in their own palette and otherwise unchanged; `snowy_sky`, `snowy_mountains`, `snowy_pines_far`, `snowy_pines_near` and `snowy_ground` are the pack's `5`, `4`, `3`, `2` and `1`. The stage lifts the layers to stand clear of the hand's row.
 - **License**: "You can use this asset in any game project, personal or commercial"; "Modify to suit your needs"; "DO NOT resell or redistribute AS A GAME ASSET, it has to be part of a project"; no NFTs; not to be used to train AI. Credit not required, and given with thanks. The page states "No generative AI was used".
 - **Not in this repository**: the licence bars redistributing the pack's art as loose files, so it ships only inside built games.
 - **Source**: https://admurin.itch.io/parallax-backgrounds-snowy-mountains

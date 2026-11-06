@@ -3969,8 +3969,8 @@ func _test_crossing_stage() -> void:
 	for prop in crossing._props:
 		named = named or prop is Label
 	_check("nothing else on the stage carries a word", not named)
-	for path in CrossingStage.COLD_LAYERS:
-		_check("the far side's layer exists: %s" % path, ResourceLoader.exists(path))
+	for layer in CrossingStage.COLD_LAYERS:
+		_check("the far side's layer exists: %s" % layer[0], ResourceLoader.exists(CrossingStage.COLD_DIR + layer[0]))
 
 	crossing.close()
 	await get_tree().process_frame
@@ -3980,6 +3980,22 @@ func _test_crossing_stage() -> void:
 		all_back = all_back and scene.node_buttons[id].modulate.a > 0.0
 	_check("every node it hid is back", all_back)
 	_check("the map's data is still as it was", _map_fingerprint(map) == data_before)
+
+	# Each look of the light, and the road the ink-fading one has to give back.
+	for light in CrossingStage.Light.values():
+		var look := CrossingStage.play(scene, -1, light)
+		await get_tree().process_frame
+		look.step_through()
+		look.close()
+		await get_tree().process_frame
+		_check_map_at_rest(scene, at_rest, "closed crossing, light %d" % light)
+		var inked := false
+		var all_visible := true
+		for child in scene.map_canvas.get_children():
+			inked = inked or (child is Line2D and child.gradient != null)
+		for id in scene.node_buttons:
+			all_visible = all_visible and scene.node_buttons[id].modulate.a > 0.0
+		_check("light %d gives the roads and nodes back" % light, not inked and all_visible)
 	scene.queue_free()
 	await get_tree().process_frame
 	RunManager.current_map = null
