@@ -65,6 +65,7 @@ const STAGE_LINE_SIZE := 46
 const STAGE_LINE_CHARS_PER_SEC := 30.0
 const STAGE_LINE_HOLD := 1.7
 const BREAK_DRAIN_TIME := 1.6
+const COIN_STAGGER := 0.04
 const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
 const TARGET_LIGHT_FADE := 0.08
 const DRAG_CARD_CLEARANCE := 8.0
@@ -176,6 +177,7 @@ var _sheet_bodies: Dictionary = {}  # sprite set key -> where its body sits in t
 var _shadow_tex: GradientTexture2D = null
 var _stage: CombatStage = null
 var _stage_line: Label = null
+var _passion_gauge: PassionGauge = null
 var _target_glow_tex: GradientTexture2D = null
 var _target_glow_mat: CanvasItemMaterial = null
 
@@ -566,6 +568,9 @@ void fragment() {
 	log_style.content_margin_bottom = 8
 	log_text.add_theme_stylebox_override("normal", log_style)
 	add_child(log_text)
+
+	_passion_gauge = PassionGauge.new()
+	add_child(_passion_gauge)
 
 	# Add damage flash on top of everything
 	add_child(_damage_flash)
@@ -1286,7 +1291,7 @@ func _personality_sigil(pers: CardData.PersonalityType) -> String:
 ## true pole card it reflects the live zone: FAVORED = an empowered glyph (brighter + a breathing
 ## pulse), and at the DEEP end (+25% extreme) the glyph sits on a glowing HALO coin — the coin is
 ## the at-a-glance tell that separates a fresh +12% lean from a deep +25% extreme, and it FADES in/
-## out when you cross the extreme threshold (see _fade_coin_transitions). DISFAVORED = greyed +
+## out when you cross the extreme threshold (see _relight_coins). DISFAVORED = greyed +
 ## faded (uniform across −12% / −25%). A NEUTRAL-personality card that merely wears a school symbol
 ## never rides the zone, so it stays flat + muted (no coin). Returns null for a school-less card.
 func _make_resonance_sigil(card: CardData) -> Control:
@@ -2417,6 +2422,9 @@ func _on_combat_started() -> void:
 		enemy_container.add_child(panel)
 		enemy_nodes[enemy] = panel
 	_log_relic_activations(RelicData.RelicTrigger.ON_COMBAT_START)
+	if RunManager.passion:
+		_passion_gauge.show_now()
+		_stage.set_mood(RunManager.get_passion_tier(), true)
 	_refresh_ui()
 	_animate_card_draw()
 
@@ -2752,25 +2760,30 @@ func _on_passion_changed(old_value: int, new_value: int) -> void:
 	else:
 		_log("[color=orange]Passion %d (%d)[/color]" % [diff, new_value])
 	_refresh_ui()
-	_fade_coin_transitions(old_value, new_value)
+	_passion_gauge.move_to(new_value)
+	var old_tier: int = RunManager.get_passion_tier_for_value(old_value)
+	var new_tier: int = RunManager.get_passion_tier_for_value(new_value)
+	if old_tier != new_tier:
+		_stage.set_mood(new_tier)
+		# Deferred: the rest of this card's effects rebuild the hand again, and would free the coins.
+		_relight_coins.call_deferred(old_value, new_value)
 
 
-## Cross a Passion threshold → the halo coin doesn't pop, it ebbs. The hand was just rebuilt with
-## each coin at its NEW-Passion alpha; for any in-hand pole card whose EXTREME-favored state flipped
-## between the old and new Passion, rewind its coin to the OLD alpha and tween back — so the coin
-## fades IN as you sink into the deep zone and OUT as you leave it.
-func _fade_coin_transitions(old_value: int, new_value: int) -> void:
-	for card in _hand_coins:
-		var disc: Panel = _hand_coins[card]
-		if not is_instance_valid(disc):
+## Crossing a band, the coins relight across the hand one after another, left to right. Each rises
+## from what it showed before and settles on what the new band gives it: lit at a pole, out elsewhere.
+func _relight_coins(old_value: int, new_value: int) -> void:
+	var i := 0
+	for card in combat_engine.piles.hand:
+		var disc = _hand_coins.get(card)
+		if disc == null or not is_instance_valid(disc):
 			continue
-		var was := _is_extreme_favored(card.personality, old_value)
-		var now := _is_extreme_favored(card.personality, new_value)
-		if was == now:
-			continue
-		disc.modulate.a = 1.0 if was else 0.0
-		var tw := disc.create_tween()
-		tw.tween_property(disc, "modulate:a", 1.0 if now else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+		disc.modulate.a = 1.0 if _is_extreme_favored(card.personality, old_value) else 0.0
+		var settle := 1.0 if _is_extreme_favored(card.personality, new_value) else 0.0
+		var tw: Tween = disc.create_tween()
+		tw.tween_interval(i * COIN_STAGGER)
+		tw.tween_property(disc, "modulate:a", 1.0, 0.1).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(disc, "modulate:a", settle, 0.3).set_trans(Tween.TRANS_SINE)
+		i += 1
 
 
 ## Would this card's pole sit at its EXTREME favored tier (Blazing for Water / Hollow for Physical)
