@@ -21,6 +21,9 @@ modification and commercial use; credited here regardless.
   `man_at_arms_whole/` is the same strips recolored by hand into living colour, also not AI; it
   stands in for Sir Caedmon until his own sheet lands.
 
+`baked/` holds the same sheets again, run through `tools/bake_sheet.py` for the page look: one value
+ramp, one outline, one window, lapis on one object. An algorithmic recolor of CC0 art, not AI.
+
 ## Bosses
 
 ### Evil Wizard 2 — LuizMelo

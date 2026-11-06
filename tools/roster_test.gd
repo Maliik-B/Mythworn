@@ -71,6 +71,7 @@ func _ready() -> void:
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
 	_test_whole_and_hollow()
+	_test_every_sheet_is_baked()
 	_test_rewards_follow_the_run_seed()
 	_test_harness_copy_matches_engine()
 	_test_harness_copy_card_rules()
@@ -2531,6 +2532,21 @@ func _test_inner_fire_copies_itself() -> void:
 ## 6.9 GB. Fights a few real instant combats the way the harness does and checks the object
 ## count comes back to where it started. The first fight is a warm-up, since a first combat can
 ## build things once (caches, registries) that are meant to stay.
+## The page shows only baked sheets, so a sheet added without its bake fails here and not on the frame.
+func _test_every_sheet_is_baked() -> void:
+	var scene_script: GDScript = load("res://scenes/combat/combat_scene.gd")
+	var missing: Array[String] = []
+	for key in scene_script.SPRITE_SETS:
+		var sset: Dictionary = scene_script.SPRITE_SETS[key]
+		if not sset.has("baked"):
+			missing.append(key)
+			continue
+		for state in sset["anims"]:
+			if not ResourceLoader.exists(sset["baked"] + sset["anims"][state][0]):
+				missing.append("%s/%s" % [key, state])
+	_check("every sprite set has its bake for the page %s" % str(missing), missing.is_empty())
+
+
 ## The side-by-side fight is one man twice: same numbers, same sheet, only the colour differs.
 func _test_whole_and_hollow() -> void:
 	var pair := EnemyPool.whole_and_hollow()

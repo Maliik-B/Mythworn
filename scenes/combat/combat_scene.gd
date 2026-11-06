@@ -56,6 +56,7 @@ const BODY_SCALE_BOSS := 6
 const STAGE_FEET_Y := 556.0  # bodies stand here, a little in front of CombatStage.GROUND_LINE_Y
 const STAGE_TOP_Y := 68.0  # the top of the enemy area, under the top bar
 const BODY_MAX_H := STAGE_FEET_Y - STAGE_TOP_Y
+const BODY_FIT_H := STAGE_FEET_Y - 56.0  # a body may rise to the top bar's lower edge
 const STATUS_COLUMN_W := 124.0  # beside the feet, on each side, so statuses never move a body
 const ENEMY_MIN_W := 320.0
 const LOG_RECT := Rect2(1370, 68, 520, 624)
@@ -83,51 +84,55 @@ const STAGE_BODY_SHADER := preload("res://assets/ui/stage_body.gdshader")
 const SPRITE_SETS := {
 	"goblin": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/",
+		"baked": "res://assets/sprites/baked/goblin/",
 		"cell": 150,
 		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"skeleton": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/",
+		"baked": "res://assets/sprites/baked/skeleton/", "lapis": true,
 		"cell": 150,
 		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"flyingeye": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/",
+		"baked": "res://assets/sprites/baked/flyingeye/",
 		"cell": 150,
 		"anims": {"idle": ["Flight.png", 8, 10], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"mushroom": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Mushroom/",
+		"baked": "res://assets/sprites/baked/mushroom/",
 		"cell": 150,
 		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"worm": {
 		"dir": "res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/",
+		"baked": "res://assets/sprites/baked/worm/",
 		"cell": 90,
 		"anims": {"idle": ["Idle.png", 9, 10], "attack": ["Attack.png", 16, 24], "hit": ["Get Hit.png", 3, 12], "death": ["Death.png", 8, 10]},
 	},
 	"wizard2": {
 		"dir": "res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/",
+		"baked": "res://assets/sprites/baked/wizard2/",
 		"cell": 250,
 		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 18], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
 	},
-	# Sir Caedmon's one slot. A bought sheet replaces this entry and nothing else: its folder, its
-	# cell, its strips. Give it an optional "break" strip and that plays as his bar breaks, in place
-	# of "hit". A stand-in until then: the Man-at-Arms in living colour, whose lapis is what drains.
-	"caedmon": {
-		"dir": "res://assets/sprites/enemies/camelot/man_at_arms_whole/",
-		"fw": 184, "fh": 137,
-		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
-	},
+	# Sir Caedmon's one slot, one line, as tools/bake_sheet.py prints it: a bought sheet replaces this
+	# line and nothing else. A "break" strip, given with --strip, plays as his bar breaks in place of
+	# "hit". A stand-in until then: the Man-at-Arms in living colour, whose lapis is what drains.
+	"caedmon": {"dir": "res://assets/sprites/baked/caedmon/", "baked": "res://assets/sprites/baked/caedmon/", "lapis": true, "fw": 184, "fh": 137, "anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]}},
 	# The Man-at-Arms in living colour: the source the shader drains for the hollow one beside him.
 	"man_at_arms_whole": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms_whole/",
+		"baked": "res://assets/sprites/baked/man_at_arms_whole/", "lapis": true,
 		"fw": 184, "fh": 137,
 		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
 	},
 	# Real Camelot per-enemy art (LuizMelo, CC0), corruption-recolored. Non-square frames.
 	"medieval_warrior": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms/",
+		"baked": "res://assets/sprites/baked/medieval_warrior/",
 		"fw": 184, "fh": 137,
 		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
 	},
@@ -184,6 +189,7 @@ var _shadow_tex: GradientTexture2D = null
 var _stage: CombatStage = null
 var _stage_line: Label = null
 var _passion_gauge: PassionGauge = null
+var _lapis_taken := false  # a body in this fight already carries the frame's lapis
 var _target_glow_tex: GradientTexture2D = null
 var _target_glow_mat: CanvasItemMaterial = null
 
@@ -215,7 +221,7 @@ func _sheet_body(set_key: String) -> Rect2i:
 	var sset: Dictionary = SPRITE_SETS[set_key]
 	var fw: int = int(sset.get("fw", sset.get("cell", 150)))
 	var fh: int = int(sset.get("fh", sset.get("cell", 150)))
-	var strip: Image = load(sset["dir"] + sset["anims"]["idle"][0]).get_image()
+	var strip: Image = load(_sheet_dir(sset) + sset["anims"]["idle"][0]).get_image()
 	var rows := strip.get_used_rect()
 	var columns := strip.get_region(Rect2i(0, 0, fw, fh)).get_used_rect()
 	var body := Rect2i(columns.position.x, rows.position.y, columns.size.x, rows.size.y)
@@ -223,25 +229,9 @@ func _sheet_body(set_key: String) -> Rect2i:
 	return body
 
 
-## A sheet's darkest and lightest values, near enough, so the page look can spread a dark sheet and a
-## pale one over the same ramp. From its first idle frame, and asked for only when that look is on.
-func _sheet_values(set_key: String) -> Vector2:
-	var sset: Dictionary = SPRITE_SETS[set_key]
-	var fw: int = int(sset.get("fw", sset.get("cell", 150)))
-	var fh: int = int(sset.get("fh", sset.get("cell", 150)))
-	var frame: Image = load(sset["dir"] + sset["anims"]["idle"][0]).get_image().get_region(Rect2i(0, 0, fw, fh))
-	var seen := {}
-	var values: Array[float] = []
-	for y in fh:
-		for x in fw:
-			var pixel := frame.get_pixel(x, y)
-			if pixel.a > 0.1 and not seen.has(pixel):
-				seen[pixel] = true
-				values.append(0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b)
-	values.sort()
-	if values.is_empty():
-		return Vector2(0.05, 0.6)
-	return Vector2(values[int((values.size() - 1) * 0.04)], values[int((values.size() - 1) * 0.98)])
+## Where a sprite set's strips are in the look that is on: the page wants its bake.
+func _sheet_dir(sset: Dictionary) -> String:
+	return sset["baked"] if StageSkin.is_page() and sset.has("baked") else sset["dir"]
 
 
 ## This fight's scale for a body: the boss who stands alone is large, everyone else regular. A
@@ -251,7 +241,7 @@ func _body_scale(set_key: String) -> int:
 	if combat_engine.enemies.size() == 1 and (RunManager.pending_relic_is_boss \
 			or combat_engine.enemies[0].enemy_data.phase_hps.size() > 1):
 		wanted = BODY_SCALE_BOSS
-	return mini(wanted, floori(BODY_MAX_H / _sheet_body(set_key).size.y))
+	return mini(wanted, floori(BODY_FIT_H / _sheet_body(set_key).size.y))
 
 
 ## Builds the animated body for an enemy and registers its animator in _enemy_anims. Returns the
@@ -267,7 +257,7 @@ func _build_enemy_body(set_key: String, enemy) -> Control:
 	# Preload every strip once so state swaps are instant.
 	var textures := {}
 	for state in sset["anims"]:
-		textures[state] = load(sset["dir"] + sset["anims"][state][0])
+		textures[state] = load(_sheet_dir(sset) + sset["anims"][state][0])
 	var atlas := AtlasTexture.new()
 	atlas.atlas = textures["idle"]
 	atlas.region = Rect2(0, 0, fw, fh)
@@ -283,12 +273,13 @@ func _build_enemy_body(set_key: String, enemy) -> Control:
 	portrait.position = -Vector2(body.position) * scale_px
 	var mat := ShaderMaterial.new()
 	mat.shader = STAGE_BODY_SHADER
-	mat.set_shader_parameter("drain", enemy.enemy_data.drained)
-	if StageSkin.is_page():
-		var values := _sheet_values(set_key)
-		mat.set_shader_parameter("page", true)
-		mat.set_shader_parameter("value_lo", values.x)
-		mat.set_shader_parameter("value_hi", values.y)
+	mat.set_shader_parameter("baked", _sheet_dir(sset) == sset.get("baked", ""))
+	# One lapis object to a frame: the first body in the fight to carry it keeps it.
+	var drained: float = enemy.enemy_data.drained
+	if sset.get("lapis", false) and StageSkin.is_page() and drained <= 0.0:
+		drained = 1.0 if _lapis_taken else 0.0
+		_lapis_taken = true
+	mat.set_shader_parameter("drain", drained)
 	portrait.material = mat
 	stand.add_child(_make_body_shadow())
 	stand.add_child(_make_target_light(enemy, portrait))
@@ -2424,6 +2415,7 @@ func _log_relic_activations(trigger: RelicData.RelicTrigger) -> void:
 # ============================================================
 
 func _on_combat_started() -> void:
+	_lapis_taken = false
 	_enemy_anims.clear()
 	_enemy_lights.clear()
 	for enemy in combat_engine.enemies:
