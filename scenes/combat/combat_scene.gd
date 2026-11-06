@@ -56,10 +56,9 @@ const TARGET_LIGHT_FADE := 0.08
 const DRAG_CARD_CLEARANCE := 8.0
 const DOUBLE_CLICK_GUARD_MS := 250
 const CARD_FLIGHT := 0.14
-## The hand row's fixed height. It holds this on the enemy turn too, when the hand is empty, so
-## the player bar and the enemies keep their places from round to round.
-const HAND_ROW_H := 310.0
 const END_TURN_W := 140.0
+const MAIN_W := 1860.0  # the 1920 frame less the main margins
+const HAND_SEP := 10
 const BOTTOM_ROW_SEP := 20
 const ENEMY_TOP_GAP := 42.0
 const CHIP_SEP := 6
@@ -665,7 +664,9 @@ func _build_bottom_area() -> HBoxContainer:
 	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	hand_container.add_theme_constant_override("separation", 10)
 	hand_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hand_container.custom_minimum_size.y = HAND_ROW_H
+	# A fixed height, held on the enemy turn too when the hand is empty, so the player bar and the
+	# enemies keep their places from round to round.
+	hand_container.custom_minimum_size.y = CardFace.SIZE.y
 	bottom.add_child(hand_container)
 
 	end_turn_btn = Button.new()
@@ -1250,192 +1251,36 @@ func _sigil_v_nudge(pole: CardData.PersonalityType) -> int:
 # ============================================================
 
 func _create_card_panel(card: CardData) -> PanelContainer:
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(160, 220)
+	var sigil = _make_resonance_sigil(card)
+	if sigil and sigil.has_meta("halo_disc"):
+		_hand_coins[card] = sigil.get_meta("halo_disc")
+	var source: CombatantStats = combat_engine.player_stats if combat_engine else null
+	var panel := CardFace.build(card, source, sigil)
 	panel.size_flags_vertical = Control.SIZE_SHRINK_END
 
-	var style = StyleBoxFlat.new()
-	style.set_corner_radius_all(8)
-	style.set_border_width_all(3)
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	style.content_margin_top = 10
-	style.content_margin_bottom = 10
-
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			style.bg_color = Color(0.3, 0.12, 0.1)
-			style.border_color = Color(0.9, 0.25, 0.2)
-		CardData.CardType.SKILL:
-			style.bg_color = Color(0.1, 0.14, 0.3)
-			style.border_color = Color(0.25, 0.45, 0.9)
-		CardData.CardType.POWER:
-			style.bg_color = Color(0.28, 0.24, 0.08)
-			style.border_color = Color(0.9, 0.75, 0.15)
-
-	# Upgraded card green border tint
-	if card.upgraded:
-		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
-
-	# Unplayable curses read as sickly and dead: you can't play them, they just
-	# clog a hand slot for the fight.
-	if card.unplayable:
-		style.bg_color = Color(0.16, 0.1, 0.18)
-		style.border_color = Color(0.5, 0.32, 0.55)
-		panel.modulate = Color(0.85, 0.85, 0.85)
-
-	panel.add_theme_stylebox_override("panel", style)
-
-	var vbox = VBoxContainer.new()
-	panel.add_child(vbox)
-
-	# Energy cost in circle ornament
-	var cost_container = PanelContainer.new()
-	cost_container.custom_minimum_size = Vector2(36, 36)
-	var cost_style = StyleBoxFlat.new()
-	cost_style.set_corner_radius_all(18)
-	cost_style.bg_color = Color(0.18, 0.14, 0.06)
-	cost_style.set_border_width_all(2)
-	cost_style.border_color = Color(0.95, 0.8, 0.2)
-	cost_style.content_margin_left = 4
-	cost_style.content_margin_right = 4
-	cost_style.content_margin_top = 2
-	cost_style.content_margin_bottom = 2
-	cost_container.add_theme_stylebox_override("panel", cost_style)
-	var cost_lbl = Label.new()
-	cost_lbl.text = card.cost_label()
-	cost_lbl.add_theme_font_size_override("font_size", 22)
-	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
-	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cost_container.add_child(cost_lbl)
-
-	# Top row: energy cost pinned left, resonance sigil pinned right (a corner badge).
-	var top_row = HBoxContainer.new()
-	top_row.add_child(cost_container)
-	var top_spacer = Control.new()
-	top_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(top_spacer)
-	var sigil = _make_resonance_sigil(card)
-	if sigil:
-		sigil.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-		top_row.add_child(sigil)
-		if sigil.has_meta("halo_disc"):
-			_hand_coins[card] = sigil.get_meta("halo_disc")
-	vbox.add_child(top_row)
-
-	# Card name
-	var name_lbl = Label.new()
-	name_lbl.text = card.card_name
-	name_lbl.add_theme_font_size_override("font_size", 17)
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_lbl)
-
-	# Type + Rarity
-	var type_names = ["Attack", "Skill", "Power"]
-	var rarity_names = ["Starter", "Common", "Uncommon", "Rare"]
-	var rarity_colors = [
-		Color(0.5, 0.5, 0.5), Color(0.55, 0.55, 0.55),
-		Color(0.3, 0.7, 0.9), Color(0.95, 0.8, 0.2),
-	]
-	var type_lbl = Label.new()
-	type_lbl.text = "%s - %s" % [type_names[card.card_type], rarity_names[card.rarity]]
-	type_lbl.add_theme_font_size_override("font_size", 12)
-	type_lbl.add_theme_color_override("font_color", rarity_colors[card.rarity])
-	type_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(type_lbl)
-
-	# Personality tag (Magic / Physical)
-	if card.personality != CardData.PersonalityType.NEUTRAL:
-		var pers_lbl = Label.new()
-		pers_lbl.text = _get_personality_label(card.personality)
-		pers_lbl.add_theme_font_size_override("font_size", 11)
-		pers_lbl.add_theme_color_override("font_color", _get_personality_color(card.personality))
-		pers_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(pers_lbl)
-
-	# Card art area
-	var art_frame = PanelContainer.new()
-	art_frame.custom_minimum_size = Vector2(0, 40)
-	var art_style = StyleBoxFlat.new()
-	art_style.set_corner_radius_all(4)
-	art_style.content_margin_top = 4
-	art_style.content_margin_bottom = 4
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			art_style.bg_color = Color(0.4, 0.1, 0.08)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.7, 0.18, 0.1, 0.5)
-		CardData.CardType.SKILL:
-			art_style.bg_color = Color(0.08, 0.15, 0.35)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.15, 0.28, 0.65, 0.5)
-		CardData.CardType.POWER:
-			art_style.bg_color = Color(0.35, 0.28, 0.06)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.65, 0.5, 0.1, 0.5)
-	art_frame.add_theme_stylebox_override("panel", art_style)
-	var icon_file = CardVisuals.icon_path(card.card_name)
-	if icon_file != "":
-		var art_icon = TextureRect.new()
-		art_icon.texture = load(icon_file)
-		art_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		art_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		art_icon.custom_minimum_size = Vector2(36, 36)
-		art_frame.add_child(art_icon)
-	else:
-		var art_lbl = Label.new()
-		match card.card_type:
-			CardData.CardType.ATTACK: art_lbl.text = "⚔"
-			CardData.CardType.SKILL: art_lbl.text = "◆"
-			CardData.CardType.POWER: art_lbl.text = "★"
-		art_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		art_lbl.add_theme_font_size_override("font_size", 24)
-		art_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.3))
-		art_frame.add_child(art_lbl)
-	vbox.add_child(art_frame)
-
-	# Spacer
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(spacer)
-
-	# Description (show modified values if in combat)
-	var desc_lbl = Label.new()
-	desc_lbl.name = "CardDesc"
-	if combat_engine and combat_engine.player_stats:
-		desc_lbl.text = card.get_modified_description(combat_engine.player_stats)
-	else:
-		desc_lbl.text = card.get_generated_description()
-	desc_lbl.add_theme_font_size_override("font_size", 14)
-	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(desc_lbl)
-
-	# Optional flavor text — italicized, smaller, dimmer
-	_add_flavor_label(vbox, card)
-
 	# Make all children pass clicks through to the panel
-	_ignore_mouse_recursive(vbox)
+	_ignore_mouse_recursive(panel.get_child(0))
 
 	# Click handler
 	panel.gui_input.connect(_on_card_input.bind(card))
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	panel.pivot_offset = Vector2(80, 110)
 
 	# Hover animation only. The old detail popup was removed: the hand card is already
 	# fully legible, and the popup floated up over the enemies' intents. A card at rest
 	# still shows everything; the enlarge-on-hover is enough of an affordance.
 	panel.mouse_entered.connect(func():
+		# Comes forward, since the hand overlaps once it is too wide for the row.
+		panel.z_index = 5
 		if panel.modulate != Color(0.5, 0.5, 0.5):
 			var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 			t.tween_property(panel, "scale", Vector2(1.08, 1.08), 0.12)
 		_light_card_targets(card)
 	)
 	panel.mouse_exited.connect(func():
-		# A card that has left the hand is in flight or being dragged, and owns its own scale.
-		if panel.get_parent() == hand_container:
+		# A card in flight or being dragged owns its own scale and z.
+		if panel.mouse_filter != Control.MOUSE_FILTER_IGNORE and panel != _drag_panel:
+			panel.z_index = 0
 			var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 			t.tween_property(panel, "scale", Vector2.ONE, 0.12)
 		if not _dragging_card:
@@ -1677,10 +1522,7 @@ func _update_drag_target_highlight(pos: Vector2) -> void:
 	_set_lit_enemies([target] if target else [])
 
 	if _drag_panel and _dragging_card and combat_engine.player_stats:
-		var desc_lbl: Label = _drag_panel.find_child("CardDesc", true, false)
-		if desc_lbl:
-			var target_stats = target.stats if target else null
-			desc_lbl.text = _dragging_card.get_modified_description(combat_engine.player_stats, target_stats)
+		CardFace.show_target(_drag_panel, _dragging_card, combat_engine.player_stats, target.stats if target else null)
 
 
 ## A card that needs no aiming already knows what it will hit, so hovering it says so: an
@@ -2246,11 +2088,15 @@ func _refresh_ui() -> void:
 	# Hand. The rebuild frees the hovered card without its mouse_exited, so its light goes here.
 	if not _dragging_card:
 		_set_lit_enemies([])
+	# Out of the container now, not at the end of the frame: its minimum width counts every child,
+	# and a full hand counted twice would push the whole layout off the screen for that frame.
 	for child in hand_container.get_children():
+		hand_container.remove_child(child)
 		child.queue_free()
 	card_nodes.clear()
 	_hand_coins.clear()
 
+	_fit_hand()
 	for card in combat_engine.piles.hand:
 		var panel = _create_card_panel(card)
 		hand_container.add_child(panel)
@@ -2268,6 +2114,17 @@ func _refresh_ui() -> void:
 
 	# What the pack can do changes with HP and phase, so it redraws with everything else.
 	consumable_bar.refresh()
+
+
+## The hand keeps a gap while it fits the row, and past that overlaps by exactly what its size
+## needs, so it never pushes End Turn or runs under the spacer.
+func _fit_hand() -> void:
+	var count: int = combat_engine.piles.hand.size()
+	var separation := HAND_SEP
+	if count > 1:
+		var row_w := MAIN_W - 2.0 * (_hand_spacer.custom_minimum_size.x + BOTTOM_ROW_SEP)
+		separation = mini(HAND_SEP, floori((row_w - CardFace.SIZE.x * count) / (count - 1)))
+	hand_container.add_theme_constant_override("separation", separation)
 
 
 # ============================================================
@@ -2943,6 +2800,7 @@ func _show_continue_button(text: String, callback: Callable) -> void:
 	# Add next to the end turn button, and widen the spacer by as much so the hand stays centred.
 	end_turn_btn.get_parent().add_child(continue_btn)
 	_hand_spacer.custom_minimum_size.x += continue_btn.custom_minimum_size.x + BOTTOM_ROW_SEP
+	_fit_hand()
 
 
 func _on_continue_pressed() -> void:

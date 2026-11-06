@@ -117,6 +117,19 @@ func get_description() -> String:
 ## onto an enemy — so the bracket shows the real number, composing with Strength/Weak.
 func get_modified_description(source: CombatantStats, target: CombatantStats = null,
 		zone_mult: float = 1.0) -> String:
+	var modified := modified_value(source, target, zone_mult)
+	if modified != value:
+		var riders := _riders()
+		if x_scaled:
+			return "Deal %d [%d] damage X times (X = energy spent).%s" % [value, modified, riders]
+		if hits > 1:
+			return "Deal %d [%d] damage %d times (%d total).%s" % [value, modified, hits, modified * hits, riders]
+		return "Deal %d [%d] damage.%s" % [value, modified, riders]
+	return get_description()
+
+
+## The number one hit will land for: the rules' bracket and the card's big numeral both read this.
+func modified_value(source: CombatantStats, target: CombatantStats = null, zone_mult: float = 1.0) -> int:
 	# Start from the effective base so the Passion-distance bonus is already in the bracket.
 	var modified = _effective_value()
 	if source:
@@ -131,12 +144,4 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 		modified = int(modified * zone_mult)
 	if target and target.has_status(StatusEffects.VULNERABLE):
 		modified = int(modified * 1.5)
-	modified = maxi(0, modified)
-	if modified != value:
-		var riders := _riders()
-		if x_scaled:
-			return "Deal %d [%d] damage X times (X = energy spent).%s" % [value, modified, riders]
-		if hits > 1:
-			return "Deal %d [%d] damage %d times (%d total).%s" % [value, modified, hits, modified * hits, riders]
-		return "Deal %d [%d] damage.%s" % [value, modified, riders]
-	return get_description()
+	return maxi(0, modified)

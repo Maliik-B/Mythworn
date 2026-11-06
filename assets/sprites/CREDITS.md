@@ -37,3 +37,10 @@ modification and commercial use; credited here regardless.
 - **Contents**: the five icons the cards and the altar use: a shield, a blue gem, a gauntlet, a red scroll and a chestplate
 - **License**: Free for commercial and non-commercial use
 - **Source**: https://in-the-void.itch.io/free-rpg-icons
+
+## Fonts
+
+Both under the SIL Open Font License 1.1; the licence text sits beside each font in `assets/fonts/`.
+
+- **Marcellus SC** (card names and numerals), Copyright (c) 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI). https://fonts.google.com/specimen/Marcellus+SC
+- **EB Garamond** (card rules), Copyright 2017 The EB Garamond Project Authors. https://github.com/octaviopardo/EBGaramond12

@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_pets()
 	_test_master_of_game()
 	_test_map_node_looks()
+	_test_card_face_words()
 	_test_forgotten_relics()
 	_test_relic_names()
 	_test_liaison_relics()
@@ -3713,6 +3714,48 @@ func _test_map_node_looks() -> void:
 	_check("a weakened elite has its own drained look", elite.look() == MapNode.WEAKENED_ELITE_LOOK)
 	for id in MapGenerator.RECORD_SITE_IDS:
 		_check("record site %s has a look" % id, MapNode.SCRIPTED_LOOKS.has(id))
+
+
+## The card face moves sentences between zones and must never lose or change one: for every shipped
+## card, its zones hold exactly the words of its description, printed and in combat.
+func _test_card_face_words() -> void:
+	print("-- Card face words --")
+	var sets: Array = [CharacterPool.emo_starting_deck(), CardPool._build_generic_pool(),
+		CardPool.build_emo_primary_pool(), CardPool.build_emo_secondary_pool(),
+		CardPool.build_memory_cards(), [CardPool.get_curse_card(&"clinging_grief")],
+		[CardPool.build_excalibur_card()], CardPool.build_hound_cards(), CardPool.build_hawk_cards(),
+		CardPool.build_ferret_cards()]
+	var stats := CombatantStats.new(80, 80)
+	stats.apply_status(StatusEffects.STRENGTH, 2)
+	var total := 0
+	var printed_ok := 0
+	var modified_ok := 0
+	for pile in sets:
+		for card in pile:
+			total += 1
+			if _same_words(card.get_face_text(), card.get_generated_description()):
+				printed_ok += 1
+			else:
+				print("   printed differs: %s" % card.card_name)
+			if _same_words(card.get_face_text(stats), card.get_modified_description(stats)):
+				modified_ok += 1
+			else:
+				print("   in combat differs: %s" % card.card_name)
+	_check("all %d cards' zones hold their printed words" % total, printed_ok == total and total > 50)
+	_check("all %d cards' zones hold their words in combat" % total, modified_ok == total and total > 50)
+	# The slab's numeral is the bracket: the same function answers both.
+	var hit := DamageEffect.new()
+	hit.value = 5
+	_check("the numeral is the bracket's number", hit.modified_value(stats) == 7 \
+		and hit.get_modified_description(stats).begins_with("Deal 5 [7] damage"))
+
+
+func _same_words(face: Dictionary, whole: String) -> bool:
+	var a: PackedStringArray = (face["rules"] + " " + face["passion"] + " " + face["trick"]).split(" ", false)
+	var b: PackedStringArray = whole.replace("\n", " ").split(" ", false)
+	a.sort()
+	b.sort()
+	return a == b
 
 
 func _test_forgotten_relics() -> void:

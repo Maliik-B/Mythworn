@@ -161,6 +161,35 @@ func get_generated_description() -> String:
 	return text
 
 
+## The card's words sorted into the zones of a fixed face (CardFace): `rules`, the Passion sentences
+## the foot carries, the Passion total they add up to, and a Trick's reminder. Together they are the
+## same words as the description, in full; with no `source` they carry the printed numbers.
+func get_face_text(source: CombatantStats = null, target: CombatantStats = null) -> Dictionary:
+	var zm := CombatEngine.zone_multiplier(personality) if source else 1.0
+	var rules: PackedStringArray = []
+	var passion: PackedStringArray = []
+	var passion_total := 0
+	for effect in get_active_effects():
+		var desc: String = effect.get_modified_description(source, target, zm) if source else effect.get_description()
+		if desc == "":
+			continue
+		if effect is PassionEffect:
+			passion.append(desc)
+			passion_total += effect.value
+		else:
+			rules.append(desc)
+	if rules.is_empty() and passion.is_empty() and description != "":
+		rules.append(description)
+	if target_type == TargetType.ALL_ENEMIES:
+		rules.append("Hits all enemies.")
+	return {
+		"rules": " ".join(rules),
+		"passion": " ".join(passion),
+		"passion_total": passion_total,
+		"trick": trick_reminder(),
+	}
+
+
 ## Generates description with combat modifiers applied. When `target` is supplied
 ## (e.g. an enemy the card is being dragged onto), target-side modifiers like
 ## Vulnerable are folded into the damage brackets too.

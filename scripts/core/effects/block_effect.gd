@@ -15,7 +15,11 @@ func get_description() -> String:
 ## zone-modified (the Passion zone only scales attack damage), so `_zone_mult` is ignored.
 func get_modified_description(source: CombatantStats, _target: CombatantStats = null,
 		_zone_mult: float = 1.0) -> String:
-	var modified = value + source.get_status_stacks(StatusEffects.DEXTERITY)
+	var modified := modified_value(source)
 	if modified != value:
 		return "Gain %d [%d] Block." % [value, modified]
 	return get_description()
+
+
+func modified_value(source: CombatantStats) -> int:
+	return value + source.get_status_stacks(StatusEffects.DEXTERITY)
