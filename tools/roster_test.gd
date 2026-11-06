@@ -2305,7 +2305,8 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/reward/relic_reward_scene.gd",
 			"res://scenes/game_over/game_over_scene.gd",
 			"res://scenes/title/title_screen.gd",
-			"res://scenes/splash/splash_scene.gd"]:
+			"res://scenes/splash/splash_scene.gd",
+			"res://scripts/ui/set_piece.gd"]:
 		var scr = load(path)
 		var compiled: bool = scr != null and scr is GDScript and scr.reload() == OK
 		_check("compiles: %s" % path, compiled)
