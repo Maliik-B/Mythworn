@@ -50,3 +50,11 @@ Both under the SIL Open Font License 1.1; the licence text sits beside each font
 
 - **Marcellus SC** (card names and numerals), Copyright (c) 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI). https://fonts.google.com/specimen/Marcellus+SC
 - **EB Garamond** (card rules), Copyright 2017 The EB Garamond Project Authors. https://github.com/octaviopardo/EBGaramond12
+
+## Backgrounds
+
+### Parallax Backgrounds: Snowy Mountains, by Admurin
+- **Used in**: the cold frame of the staged crossing (`realms/cold_edge/`). The file there is a stand-in, cut from the pack's page cover and modified: the bands above and below its title lettering, joined along a new ridge line. The pack's own layers replace it when they are in hand.
+- **License**: "You can use this asset in any game project, personal or commercial"; "Modify to suit your needs"; "DO NOT resell or redistribute AS A GAME ASSET, it has to be part of a project"; no NFTs; not to be used to train AI. Credit not required, and given with thanks. The page states "No generative AI was used".
+- **Not in this repository**: the licence bars redistributing the pack's art as loose files, so it ships only inside built games.
+- **Source**: https://admurin.itch.io/parallax-backgrounds-snowy-mountains

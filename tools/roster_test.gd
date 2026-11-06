@@ -76,6 +76,7 @@ func _ready() -> void:
 	_test_harness_copy_new_rules()
 	_test_harness_policy_decides()
 	await _test_map_flourish()
+	await _test_crossing_stage()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -3892,6 +3893,81 @@ func _check_map_at_rest(scene: Node, canvas_children: int, tag: String) -> void:
 		settled = settled and btn.scale == Vector2.ONE and btn.z_index == 0 \
 			and btn.get_meta("look") == node.look(scene._is_quest_payoff_armed(node))
 	_check("%s: every node is its own size, on its layer, showing its real look" % tag, settled)
+
+
+## The crossing is staged for the clip: it names nothing, changes no map data, and gives the map back
+## as it found it. A word or a legend entry on it would be a name it has not been given.
+func _test_crossing_stage() -> void:
+	print("-- Crossing stage --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 424242)
+	RunManager.current_map = null
+	var scene = load("res://scenes/map/map_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	for i in 3:
+		await get_tree().process_frame
+	var map: MapData = RunManager.current_map
+	var at_rest: int = scene.map_canvas.get_child_count()
+	var data_before := _map_fingerprint(map)
+	var legend_before := _legend_words(scene)
+
+	var crossing := CrossingStage.play(scene)
+	var picked: MapNode = crossing._pick_node(map)
+	_check("it stands on an ordinary node on floors 8 to 10",
+		picked != null and picked.floor_num >= 8 and picked.floor_num <= 10 and picked.quest_payoff_id == &""
+		and picked.quest_giver_id == &"" and picked.scripted_event_id == &"")
+	_check("it holds the map while it plays", scene._pledge_anim_active)
+	_check("the far side waits for the cut", not crossing._far.visible)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("it adds nothing to the legend", _legend_words(scene) == legend_before)
+	_check("it changes no map data", _map_fingerprint(map) == data_before)
+
+	crossing.step_through()
+	_check("the cut brings the far side up whole, in one call", crossing._far.visible)
+	var hand: Array = crossing._far.words.get_children()
+	var all_cards := hand.size() == CrossingStage.HAND_SIZE
+	for card in hand:
+		all_cards = all_cards and card is PanelContainer
+	_check("the only words on the far side are the hand's", all_cards)
+	var named := false
+	for layer in [crossing._far.world, crossing._far.fore]:
+		for child in layer.get_children():
+			named = named or child is Label
+	for prop in crossing._props:
+		named = named or prop is Label
+	_check("nothing else on the stage carries a word", not named)
+	for path in CrossingStage.COLD_LAYERS:
+		_check("the far side's layer exists: %s" % path, ResourceLoader.exists(path))
+
+	crossing.close()
+	await get_tree().process_frame
+	_check_map_at_rest(scene, at_rest, "closed crossing")
+	var all_back := true
+	for id in scene.node_buttons:
+		all_back = all_back and scene.node_buttons[id].modulate.a > 0.0
+	_check("every node it hid is back", all_back)
+	_check("the map's data is still as it was", _map_fingerprint(map) == data_before)
+	scene.queue_free()
+	await get_tree().process_frame
+	RunManager.current_map = null
+
+
+func _map_fingerprint(map: MapData) -> String:
+	var parts: PackedStringArray = []
+	for id in map.nodes:
+		var n: MapNode = map.nodes[id]
+		parts.append("%d:%d:%s:%s:%s:%s:%s" % [id, n.node_type, n.weakened, n.quest_giver_id, n.quest_payoff_id,
+			n.scripted_event_id, n.next_nodes])
+	parts.append("at %d, %d changes" % [map.current_node_id, map.pledge_changes.size()])
+	return "|".join(parts)
+
+
+func _legend_words(scene: Node) -> PackedStringArray:
+	var words: PackedStringArray = []
+	for label in scene._legend_row.get_children():
+		if not label.is_queued_for_deletion():
+			words.append(label.text)
+	return words
 
 
 ## The card face moves sentences between zones and must never lose or change one: for every shipped
