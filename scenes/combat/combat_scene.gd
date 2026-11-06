@@ -5,7 +5,9 @@ extends Control
 # -- UI references (built in _build_ui) --
 var combat_engine: CombatEngine
 var hand_container: HBoxContainer
+var _hand_spacer: Control  # left of the hand, keeps it centred on the screen against End Turn
 var enemy_container: HBoxContainer
+var _player_bar: PanelContainer
 var hp_label: Label
 var energy_label: Label
 var block_label: Label
@@ -48,6 +50,14 @@ var _is_animating_card := false
 # frames tighter and will want less zoom. Real per-enemy art is the B5 track -- these are
 # shared CC0 stand-ins until it lands.
 const PORTRAIT_BOX := 130.0
+## The hand row's fixed height. It holds this on the enemy turn too, when the hand is empty, so
+## the player bar and the enemies keep their places from round to round.
+const HAND_ROW_H := 310.0
+const END_TURN_W := 140.0
+const BOTTOM_ROW_SEP := 20
+const ENEMY_TOP_GAP := 42.0
+const CHIP_SEP := 6
+const CHIP_ROW_MAX_W := 400.0
 
 const SPRITE_SETS := {
 	"goblin": {
@@ -390,15 +400,23 @@ void fragment() {
 	# Top bar: pile counts
 	vbox.add_child(_build_top_bar())
 
-	# Enemy area
+	# Enemy area. The row sits in a plain Control so that a tall panel (a boss's status rows)
+	# can never push the player bar and the hand down: this area takes whatever is left.
+	var enemy_area := Control.new()
+	enemy_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	enemy_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(enemy_area)
+
 	enemy_container = HBoxContainer.new()
 	enemy_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	enemy_container.add_theme_constant_override("separation", 40)
-	enemy_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(enemy_container)
+	enemy_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	enemy_container.offset_top = ENEMY_TOP_GAP
+	enemy_area.add_child(enemy_container)
 
 	# Player info bar
-	vbox.add_child(_build_player_bar())
+	_player_bar = _build_player_bar()
+	vbox.add_child(_player_bar)
 
 	# Hand + End Turn
 	vbox.add_child(_build_bottom_area())
@@ -500,16 +518,22 @@ func _build_player_bar() -> PanelContainer:
 
 	# Character POWERS slot — anchored at the left (character) end, ahead of the
 	# resource stats, and visually distinct (gold) from the status chips. Persistent
-	# powers read as "who I am this fight." Hidden until a POWER is active.
+	# powers read as "who I am this fight." Hidden until a POWER is active. The two chip
+	# sides share the spare width equally, so the stats hold the bar's centre and a chip
+	# landing never moves them.
+	var powers_side := _make_chip_side(BoxContainer.ALIGNMENT_END)
+	bar.add_child(powers_side)
+
 	player_powers_prefix = _make_stat_label(Color(0.9, 0.78, 0.4))
 	player_powers_prefix.text = "Powers:"
 	player_powers_prefix.visible = false
-	bar.add_child(player_powers_prefix)
+	powers_side.add_child(player_powers_prefix)
 
 	player_powers_chips = HFlowContainer.new()
-	player_powers_chips.add_theme_constant_override("h_separation", 6)
+	player_powers_chips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	player_powers_chips.add_theme_constant_override("h_separation", CHIP_SEP)
 	player_powers_chips.add_theme_constant_override("v_separation", 4)
-	bar.add_child(player_powers_chips)
+	powers_side.add_child(player_powers_chips)
 
 	hp_label = _make_stat_label(Color(0.9, 0.3, 0.3))
 	bar.add_child(hp_label)
@@ -529,17 +553,43 @@ func _build_player_bar() -> PanelContainer:
 
 	# Status effects live on this readout as individual, hover-describable chips.
 	# A small "Effects:" caption names the area (both hidden when nothing's active).
+	var status_side := _make_chip_side(BoxContainer.ALIGNMENT_BEGIN)
+	bar.add_child(status_side)
+
 	player_status_prefix = _make_stat_label(Color(0.7, 0.7, 0.55))
 	player_status_prefix.text = "Effects:"
 	player_status_prefix.visible = false
-	bar.add_child(player_status_prefix)
+	status_side.add_child(player_status_prefix)
 
 	player_status_chips = HFlowContainer.new()
-	player_status_chips.add_theme_constant_override("h_separation", 6)
+	player_status_chips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	player_status_chips.add_theme_constant_override("h_separation", CHIP_SEP)
 	player_status_chips.add_theme_constant_override("v_separation", 4)
-	bar.add_child(player_status_chips)
+	status_side.add_child(player_status_chips)
 
 	return panel
+
+
+func _make_chip_side(alignment: BoxContainer.AlignmentMode) -> HBoxContainer:
+	var side := HBoxContainer.new()
+	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side.alignment = alignment
+	side.add_theme_constant_override("separation", CHIP_SEP)
+	return side
+
+
+## A flow container inside a box only gets its widest child's width, so chips would stack in a
+## column and grow the bar. This gives it room for its chips on one row, up to the cap; past that
+## they wrap. Returns how many chips it holds.
+func _fit_chip_row(flow: HFlowContainer) -> int:
+	var width := 0.0
+	var count := 0
+	for chip in flow.get_children():
+		if chip is Control and not chip.is_queued_for_deletion():
+			width += chip.get_combined_minimum_size().x + CHIP_SEP
+			count += 1
+	flow.custom_minimum_size.x = minf(width, CHIP_ROW_MAX_W)
+	return count
 
 
 ## Hovering the Passion readout pops a quick OVERVIEW above the bar: the five tiers
@@ -596,17 +646,25 @@ func _on_view_map() -> void:
 
 func _build_bottom_area() -> HBoxContainer:
 	var bottom = HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 20)
+	bottom.add_theme_constant_override("separation", BOTTOM_ROW_SEP)
+
+	# Matches End Turn plus the separation, so the hand's centre is the screen's centre.
+	_hand_spacer = Control.new()
+	_hand_spacer.custom_minimum_size.x = END_TURN_W
+	_hand_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom.add_child(_hand_spacer)
 
 	hand_container = HBoxContainer.new()
 	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	hand_container.add_theme_constant_override("separation", 10)
 	hand_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hand_container.custom_minimum_size.y = HAND_ROW_H
 	bottom.add_child(hand_container)
 
 	end_turn_btn = Button.new()
 	end_turn_btn.text = "End Turn"
-	end_turn_btn.custom_minimum_size = Vector2(140, 60)
+	end_turn_btn.custom_minimum_size = Vector2(END_TURN_W, 60)
+	end_turn_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	end_turn_btn.add_theme_font_size_override("font_size", 20)
 	end_turn_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
@@ -1187,6 +1245,7 @@ func _sigil_v_nudge(pole: CardData.PersonalityType) -> int:
 func _create_card_panel(card: CardData) -> PanelContainer:
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(160, 220)
+	panel.size_flags_vertical = Control.SIZE_SHRINK_END
 
 	var style = StyleBoxFlat.new()
 	style.set_corner_radius_all(8)
@@ -1636,7 +1695,9 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	# Size to content instead of stretching to fill the tall enemy area, so the
 	# card border ends near its content and leaves a clean gap above the player
 	# readout — that gap is where the turn banner sits (see _show_turn_banner).
-	panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Hung from the top, so a panel that grows (a status row, a longer intent) keeps its
+	# sprite where it was and only reaches further into the gap.
+	panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.2, 0.15, 0.25)
@@ -2112,37 +2173,26 @@ func _refresh_ui() -> void:
 		passion_label.text = "Passion: --"
 
 	_populate_status_chips(player_status_chips, combat_engine.player_stats)
-	player_status_prefix.visible = player_status_chips.get_child_count() > 0
+	player_status_prefix.visible = _fit_chip_row(player_status_chips) > 0
 
 	_populate_power_chips(player_powers_chips, combat_engine.player_stats)
-	player_powers_prefix.visible = player_powers_chips.get_child_count() > 0
+	player_powers_prefix.visible = _fit_chip_row(player_powers_chips) > 0
 
 	# Piles
 	draw_label.text = "Draw: %d" % combat_engine.piles.draw_pile.size()
 	discard_label.text = "Discard: %d" % combat_engine.piles.discard_pile.size()
 	exhaust_label.text = "Exhaust: %d" % combat_engine.piles.exhaust_pile.size()
 
-	# Hand — fan cards in an arc
+	# Hand
 	for child in hand_container.get_children():
 		child.queue_free()
 	card_nodes.clear()
 	_hand_coins.clear()
 
-	var hand = combat_engine.piles.hand
-	var card_count = hand.size()
-	for i in card_count:
-		var card = hand[i]
+	for card in combat_engine.piles.hand:
 		var panel = _create_card_panel(card)
 		hand_container.add_child(panel)
 		card_nodes[card] = panel
-		# Fan rotation: spread cards in an arc
-		if card_count > 1:
-			var max_angle := 3.0 * minf(card_count, 7)  # degrees total spread
-			var angle = lerp(-max_angle, max_angle, float(i) / (card_count - 1))
-			panel.rotation_degrees = angle
-			# Vertical arc offset (middle cards higher)
-			var t_norm = float(i) / (card_count - 1) - 0.5  # -0.5 to 0.5
-			panel.position.y = abs(t_norm) * 20.0  # edges lower
 
 	# Enemies
 	for enemy in combat_engine.enemies:
@@ -2666,6 +2716,13 @@ func _get_combatant_name(stats) -> String:
 
 
 func _show_turn_banner(text: String, color: Color) -> void:
+	if not is_inside_tree():
+		return
+	# Containers lay out after the frame they change in, and turn one starts inside _ready, so
+	# the gap can only be read once layout has run.
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
 	var banner = Label.new()
 	banner.text = text
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2677,13 +2734,14 @@ func _show_turn_banner(text: String, color: Color) -> void:
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.z_index = 20
 	# Full width so the text is truly screen-centered, placed in the gap between the
-	# (now shorter) enemy cards and the player readout — computed, not hardcoded.
+	# enemy panels and the player readout: computed, not hardcoded.
 	banner.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	var gap_y := enemy_container.global_position.y + enemy_container.size.y - 50
+	var banner_h := 48.0
+	var gap_y := _turn_banner_gap_center() - banner_h / 2.0
 	banner.offset_left = 0
 	banner.offset_right = 0
 	banner.offset_top = gap_y
-	banner.offset_bottom = gap_y + 46
+	banner.offset_bottom = gap_y + banner_h
 	banner.modulate.a = 0.0
 	add_child(banner)
 	var t = create_tween()
@@ -2691,6 +2749,17 @@ func _show_turn_banner(text: String, color: Color) -> void:
 	t.tween_interval(0.6)
 	t.tween_property(banner, "modulate:a", 0.0, 0.3)
 	t.tween_callback(banner.queue_free)
+
+
+## The middle of the gap between the lowest living enemy panel and the top of the player bar.
+func _turn_banner_gap_center() -> float:
+	var bar_top := _player_bar.global_position.y
+	var enemies_bottom := enemy_container.global_position.y
+	for enemy in enemy_nodes:
+		var epanel: Control = enemy_nodes[enemy]
+		if is_instance_valid(epanel) and epanel.is_visible_in_tree():
+			enemies_bottom = maxf(enemies_bottom, epanel.global_position.y + epanel.size.y)
+	return (enemies_bottom + bar_top) / 2.0
 
 
 func _screen_shake(intensity: float = 8.0, duration: float = 0.2) -> void:
@@ -2803,9 +2872,11 @@ func _show_continue_button(text: String, callback: Callable) -> void:
 	continue_btn.text = text
 	continue_btn.custom_minimum_size = Vector2(200, 60)
 	continue_btn.add_theme_font_size_override("font_size", 22)
+	continue_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	continue_btn.pressed.connect(callback)
-	# Add next to the end turn button
+	# Add next to the end turn button, and widen the spacer by as much so the hand stays centred.
 	end_turn_btn.get_parent().add_child(continue_btn)
+	_hand_spacer.custom_minimum_size.x += continue_btn.custom_minimum_size.x + BOTTOM_ROW_SEP
 
 
 func _on_continue_pressed() -> void:
