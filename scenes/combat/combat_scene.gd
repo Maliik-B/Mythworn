@@ -454,7 +454,7 @@ func _build_top_bar() -> HBoxContainer:
 	# the far left (map-in-the-corner), set apart from the pile counts on the right.
 	var map_btn = _make_pile_button(Color(0.82, 0.72, 0.42))
 	map_btn.text = "Map ▸"
-	map_btn.tooltip_text = "Peek the map — your route so far and what lies ahead"
+	map_btn.tooltip_text = "Peek the map: your route so far and what lies ahead"
 	map_btn.pressed.connect(_on_view_map)
 	bar.add_child(map_btn)
 
@@ -1177,7 +1177,7 @@ func _make_resonance_sigil(card: CardData) -> Control:
 		lbl.add_theme_color_override("font_color", col.lightened(0.34))
 		lbl.add_theme_constant_override("outline_size", 5)
 		lbl.add_theme_color_override("font_outline_color", Color(col.r, col.g, col.b, 0.85))
-		lbl.tooltip_text = "%s — Resonant: +%d%% damage at your current Passion." \
+		lbl.tooltip_text = "%s. Resonant: +%d%% damage at your current Passion." \
 			% [pole_name, roundi((zm - 1.0) * 100.0)]
 		var pulse := lbl.create_tween().set_loops()
 		pulse.tween_property(lbl, "modulate", Color(1.18, 1.18, 1.18, 1.0), 0.65) \
@@ -1189,7 +1189,7 @@ func _make_resonance_sigil(card: CardData) -> Control:
 		lbl.add_theme_font_size_override("font_size", 22)
 		lbl.add_theme_color_override("font_color", col.lerp(Color(0.45, 0.45, 0.45), 0.6))
 		lbl.modulate.a = 0.55
-		lbl.tooltip_text = "%s — Dissonant: -%d%% damage at your current Passion." \
+		lbl.tooltip_text = "%s. Dissonant: -%d%% damage at your current Passion." \
 			% [pole_name, roundi((1.0 - zm) * 100.0)]
 	else:
 		# Flat: the identity colour, muted. A NEUTRAL card wearing a school symbol (never rides
@@ -1198,7 +1198,7 @@ func _make_resonance_sigil(card: CardData) -> Control:
 		lbl.add_theme_color_override("font_color", col)
 		lbl.modulate.a = 0.8
 		if card.personality == CardData.PersonalityType.NEUTRAL:
-			lbl.tooltip_text = "%s-aligned — a neutral card, so no zone bonus or penalty." % pole_name
+			lbl.tooltip_text = "%s-aligned: a neutral card, so no zone bonus or penalty." % pole_name
 		else:
 			lbl.tooltip_text = "%s card. Commit to its Passion pole for +25%% damage." % pole_name
 

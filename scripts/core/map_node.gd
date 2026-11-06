@@ -36,40 +36,51 @@ var x_jitter: float = 0.0
 var y_jitter: float = 0.0
 
 
-static func type_label(t: NodeType) -> String:
-	match t:
-		NodeType.COMBAT: return "⚔"
-		NodeType.ELITE: return "☠"
-		NodeType.REST: return "♨"
-		NodeType.SHOP: return "$"
-		NodeType.EVENT: return "!"
-		NodeType.MYSTERY: return "?"
-		NodeType.BOSS: return "★"
-		NodeType.SWORD_IN_STONE: return "✦"
-	return "?"
+# What the map shows for a node: its glyph, colour and name, in one place. The node painter, the map
+# peek and the legend all go through look(), so a kind added here is painted and joins the legend by
+# itself; the content linter fails a kind with no name. `order` is its place in the legend. A
+# `landmark` stays bright while locked. `loud` is a bigger ring: [fill darkened, ring lightened,
+# hover fill darkened, hover ring lightened].
+const EVENT_COLOR := Color(0.8, 0.55, 0.9)
+const TYPE_LOOKS := {
+	NodeType.COMBAT: {"glyph": "⚔", "name": "Combat", "color": Color(0.9, 0.25, 0.2), "order": 10},
+	NodeType.ELITE: {"glyph": "☠", "name": "Elite", "color": Color(0.95, 0.65, 0.1), "order": 20},
+	NodeType.REST: {"glyph": "♨", "name": "Rest", "color": Color(0.3, 0.8, 0.4), "order": 30},
+	NodeType.SHOP: {"glyph": "$", "name": "Shop", "color": Color(0.3, 0.7, 0.9), "order": 40},
+	NodeType.EVENT: {"glyph": "!", "name": "Event", "color": EVENT_COLOR, "order": 50},
+	NodeType.MYSTERY: {"glyph": "?", "name": "Mystery", "color": Color(0.55, 0.55, 0.55), "order": 60},
+	# The signature quest node, in heraldic gold.
+	NodeType.SWORD_IN_STONE: {"glyph": "✦", "name": "The Sword in the Stone", "color": Color(1.0, 0.85, 0.35),
+		"order": 70, "font": 30, "landmark": true, "loud": [0.35, 0.25, 0.15, 0.4]},
+	# The act's threat: bold, vivid, resilient to the map's darkening.
+	NodeType.BOSS: {"glyph": "★", "name": "Boss", "color": Color(0.95, 0.15, 0.15),
+		"order": 100, "font": 32, "landmark": true, "loud": [0.15, 0.35, 0.0, 0.5]},
+}
+# Drained: the elite is still there, with the fight gone out of it.
+const WEAKENED_ELITE_LOOK := {"glyph": "☠", "name": "Weakened Elite", "color": Color(0.5, 0.56, 0.62), "order": 25}
+# Seated scripted events, meant to be found and routed to, so each shows what it is.
+const SCRIPTED_LOOKS := {
+	&"master_of_game": {"glyph": "♘", "name": "The Master of Game", "color": EVENT_COLOR, "order": 80},
+	&"scriptorium": {"glyph": "✎", "name": "The Scriptorium", "color": EVENT_COLOR, "order": 85},
+	&"tourney": {"glyph": "✎", "name": "The Tourney", "color": EVENT_COLOR, "order": 85},
+	&"reliquary": {"glyph": "✎", "name": "The Reliquary", "color": EVENT_COLOR, "order": 85},
+}
+# An armed questline payoff, in hunt gold. It overrides the ordinary look of the node it sits on,
+# and only once armed: before that the node must read as whatever it was.
+const QUEST_MARK_LOOK := {"glyph": "◎", "name": "Quest", "color": Color(1.0, 0.8, 0.3),
+	"order": 90, "font": 28, "landmark": true, "loud": [0.4, 0.2, 0.2, 0.4]}
+
+
+## What this node shows. `quest_armed` is the caller's, since arming lives in RunManager.
+func look(quest_armed: bool = false) -> Dictionary:
+	if quest_armed and quest_payoff_id != &"":
+		return QUEST_MARK_LOOK
+	if SCRIPTED_LOOKS.has(scripted_event_id):
+		return SCRIPTED_LOOKS[scripted_event_id]
+	if node_type == NodeType.ELITE and weakened:
+		return WEAKENED_ELITE_LOOK
+	return TYPE_LOOKS[node_type]
 
 
 static func type_name(t: NodeType) -> String:
-	match t:
-		NodeType.COMBAT: return "Combat"
-		NodeType.ELITE: return "Elite"
-		NodeType.REST: return "Rest"
-		NodeType.SHOP: return "Shop"
-		NodeType.EVENT: return "Event"
-		NodeType.MYSTERY: return "Mystery"
-		NodeType.BOSS: return "Boss"
-		NodeType.SWORD_IN_STONE: return "The Sword in the Stone"
-	return "???"
-
-
-static func type_color(t: NodeType) -> Color:
-	match t:
-		NodeType.COMBAT: return Color(0.9, 0.25, 0.2)
-		NodeType.ELITE: return Color(0.95, 0.65, 0.1)
-		NodeType.REST: return Color(0.3, 0.8, 0.4)
-		NodeType.SHOP: return Color(0.3, 0.7, 0.9)
-		NodeType.EVENT: return Color(0.8, 0.55, 0.9)
-		NodeType.MYSTERY: return Color(0.55, 0.55, 0.55)
-		NodeType.BOSS: return Color(0.95, 0.15, 0.15)
-		NodeType.SWORD_IN_STONE: return Color(1.0, 0.85, 0.35)  # heraldic gold
-	return Color.WHITE
+	return TYPE_LOOKS[t]["name"]

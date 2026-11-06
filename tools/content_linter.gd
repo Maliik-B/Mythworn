@@ -269,6 +269,7 @@ func _gather() -> Dictionary:
 
 	# --- maps ---
 	w["maps"] = _map_survey()
+	w["node_looks"] = _node_looks(w["maps"])
 
 	# --- authored text (em dashes) ---
 	w["strings"] = _authored_strings(events, relics, cons, pets)
@@ -444,6 +445,31 @@ func _map_survey() -> Dictionary:
 	return survey
 
 
+## What the map shows for every node kind: each type, and each scripted event a map can seat. A
+## scripted id with no look of its own reads as nameless here, though the map would paint it as a
+## plain event, because that is the failure this catches.
+func _node_looks(survey: Dictionary) -> Array:
+	var out: Array = []
+	for t in MapNode.NodeType.values():
+		out.append(_look_record("type %s" % MapNode.NodeType.keys()[t], MapNode.TYPE_LOOKS.get(t, {})))
+	var scripted: Array = [String(MapGenerator.MASTER_OF_GAME_ID)]
+	for id in MapGenerator.RECORD_SITE_IDS:
+		scripted.append(String(id))
+	for id in survey["seated_ids"]:
+		if not scripted.has(id):
+			scripted.append(id)
+	for id in scripted:
+		out.append(_look_record("scripted %s" % id, MapNode.SCRIPTED_LOOKS.get(StringName(id), {})))
+	out.append(_look_record("weakened elite", MapNode.WEAKENED_ELITE_LOOK))
+	out.append(_look_record("quest mark", MapNode.QUEST_MARK_LOOK))
+	return out
+
+
+func _look_record(key: String, look: Dictionary) -> Dictionary:
+	return {"key": key, "name": String(look.get("name", "")), "glyph": String(look.get("glyph", "")),
+		"has_order": look.has("order"), "has_color": look.has("color")}
+
+
 func _authored_strings(events: Array, relics: Array, cons: Dictionary, pets: Dictionary) -> Array:
 	var out: Array = []  # [where, text]
 	for e in events:
@@ -494,6 +520,7 @@ func _run_rules(w: Dictionary) -> Dictionary:
 	out["every special event is reachable"] = _rule_special_reachable(w)
 	out["special event references name a real event"] = _rule_special_refs_resolve(w)
 	out["seated map nodes name a real event and stay in place"] = _rule_map_seating(w)
+	out["every map node kind has a name, glyph and colour for the legend"] = _rule_node_looks(w)
 	out["consumables resolve and have a grant site"] = _rule_consumables(w)
 	out["quest ids have a payoff"] = _rule_quests(w)
 	out["pets resolve, have a deck of tricks and a grant site"] = _rule_pets(w)
@@ -716,6 +743,23 @@ func _rule_map_seating(w: Dictionary) -> Array:
 	return out
 
 
+func _rule_node_looks(w: Dictionary) -> Array:
+	var out: Array = []
+	var seen := {}
+	for r in w["node_looks"]:
+		if r["name"].strip_edges() == "":
+			out.append("%s has no name" % r["key"])
+		elif seen.has(r["name"]):
+			out.append("%s shares the name '%s' with %s, and the legend would merge them" % [r["key"], r["name"], seen[r["name"]]])
+		else:
+			seen[r["name"]] = r["key"]
+		if r["glyph"].strip_edges() == "":
+			out.append("%s has no glyph" % r["key"])
+		if not r["has_color"] or not r["has_order"]:
+			out.append("%s has no colour or legend order" % r["key"])
+	return out
+
+
 func _rule_consumables(w: Dictionary) -> Array:
 	var out: Array = []
 	var cons: Dictionary = w["consumables"]
@@ -876,6 +920,8 @@ func _self_test(w: Dictionary) -> void:
 			x["special_refs"].append(["pending_special_event", "typo_beat", "res://x.gd"])],
 		["seated map nodes name a real event and stay in place", func(x):
 			x["maps"]["bad"].append("seeded")],
+		["every map node kind has a name, glyph and colour for the legend", func(x):
+			x["node_looks"].append({"key": "seed", "name": "", "glyph": "?", "has_order": true, "has_color": true})],
 		["consumables resolve and have a grant site", func(x):
 			x["consumables"]["orphan_tonic"] = {"price": 0, "quest_id": "", "id_matches": true, "text": []}
 			x["consumable_arms"].append("orphan_tonic")],

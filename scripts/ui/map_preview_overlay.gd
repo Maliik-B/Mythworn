@@ -79,14 +79,14 @@ func _build() -> void:
 	panel.add_child(vbox)
 
 	var header := Label.new()
-	header.text = "Map — Act %d" % RunManager.current_act
+	header.text = "Map: Act %d" % RunManager.current_act
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	header.add_theme_font_size_override("font_size", 26)
 	header.add_theme_color_override("font_color", Color(0.9, 0.82, 0.45))
 	vbox.add_child(header)
 
 	var subtitle := Label.new()
-	subtitle.text = "Your route so far and what lies ahead — ◈ marks where you stand."
+	subtitle.text = "Your route so far and what lies ahead: ◈ marks where you stand."
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 13)
 	subtitle.add_theme_color_override("font_color", Color(0.6, 0.58, 0.55))
@@ -186,12 +186,14 @@ func _scroll_to_current() -> void:
 
 ## A single non-interactive node marker, styled by type and state.
 func _make_dot(node: MapNode, is_current: bool, is_available: bool) -> Control:
-	var color := MapNode.type_color(node.node_type)
+	# The same look the map itself paints, so the peek gives away nothing the map hides.
+	var look := node.look(node.quest_payoff_id != &"" and RunManager.is_quest_active(node.quest_payoff_id))
+	var color: Color = look["color"]
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(NODE, NODE)
 	panel.size = Vector2(NODE, NODE)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.tooltip_text = MapNode.type_name(node.node_type)
+	panel.tooltip_text = look["name"]
 
 	var style := StyleBoxFlat.new()
 	style.set_corner_radius_all(NODE / 2)
@@ -199,8 +201,7 @@ func _make_dot(node: MapNode, is_current: bool, is_available: bool) -> Control:
 	style.bg_color = color.darkened(0.5)
 	style.border_color = color
 
-	var landmark := node.node_type == MapNode.NodeType.BOSS \
-		or node.node_type == MapNode.NodeType.SWORD_IN_STONE
+	var landmark: bool = look.get("landmark", false)
 
 	if is_current:
 		# Where the player stands — bright fill + thick pale-gold ring + ◈ badge.
@@ -221,7 +222,7 @@ func _make_dot(node: MapNode, is_current: bool, is_available: bool) -> Control:
 	panel.add_theme_stylebox_override("panel", style)
 
 	var lbl := Label.new()
-	lbl.text = "◈" if is_current else MapNode.type_label(node.node_type)
+	lbl.text = "◈" if is_current else look["glyph"]
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.add_theme_font_size_override("font_size", 22 if (is_current or landmark) else 18)

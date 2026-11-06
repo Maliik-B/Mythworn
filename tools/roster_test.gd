@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_consumable_ui()
 	_test_pets()
 	_test_master_of_game()
+	_test_map_node_looks()
 	_test_forgotten_relics()
 	_test_relic_names()
 	_test_liaison_relics()
@@ -3686,6 +3687,34 @@ func _test_master_of_game() -> void:
 ## record site builds one waking option per dormant relic carried and none otherwise; waking
 ## replaces the relic in place; the engine applies a woken relic's second effect, the girdle's
 ## ward and the scabbard's guard; and a record site is seated late in every act.
+## The node painter, the map peek and the legend all read MapNode.look(), so what it returns is
+## what the player can see. A payoff must be indistinguishable until armed.
+func _test_map_node_looks() -> void:
+	print("-- Map node looks --")
+	var plain := MapNode.new()
+	plain.node_type = MapNode.NodeType.COMBAT
+	var payoff := MapNode.new()
+	payoff.node_type = MapNode.NodeType.COMBAT
+	payoff.quest_payoff_id = &"raiders"
+	_check("an unarmed payoff reads as the ordinary node it sits on", payoff.look(false) == plain.look(false))
+	_check("an armed payoff reads as the quest mark", payoff.look(true) == MapNode.QUEST_MARK_LOOK)
+	_check("arming means nothing on a node with no payoff", plain.look(true) == plain.look(false))
+	var giver := MapNode.new()
+	giver.node_type = MapNode.NodeType.EVENT
+	giver.quest_giver_id = &"raiders"
+	_check("a quest giver reads as an ordinary event", giver.look() == MapNode.TYPE_LOOKS[MapNode.NodeType.EVENT])
+	var huntsman := MapNode.new()
+	huntsman.node_type = MapNode.NodeType.EVENT
+	huntsman.scripted_event_id = MapGenerator.MASTER_OF_GAME_ID
+	_check("the Master of Game shows as itself", huntsman.look()["glyph"] == "♘")
+	var elite := MapNode.new()
+	elite.node_type = MapNode.NodeType.ELITE
+	elite.weakened = true
+	_check("a weakened elite has its own drained look", elite.look() == MapNode.WEAKENED_ELITE_LOOK)
+	for id in MapGenerator.RECORD_SITE_IDS:
+		_check("record site %s has a look" % id, MapNode.SCRIPTED_LOOKS.has(id))
+
+
 func _test_forgotten_relics() -> void:
 	_reset_consumable_state()
 	RunManager.relics.clear()

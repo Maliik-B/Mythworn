@@ -33,11 +33,6 @@ const PLEDGE_PAN_PER_NODE := 0.4
 const PLEDGE_PAN_MIN := 1.4
 const PLEDGE_PAN_MAX := 2.8
 
-# Armed questline-payoff marker. A hunt-gold objective glyph the payoff node takes on once
-# the plea reveals it (distinct from the Sword's ✦ and the boss ★).
-const QUEST_GLYPH := "◎"
-const QUEST_GLYPH_COLOR := Color(1.0, 0.8, 0.3)
-
 # UI references
 var scroll_container: ScrollContainer
 var map_canvas: Control
@@ -55,6 +50,8 @@ var pet_label: Label  # The companion readout; only visible when one travels wit
 var timer_label: Label
 var seed_label: Label
 var info_label: Label
+var _legend_row: HBoxContainer
+var _legend_refresh_queued := false
 var popup_overlay: PanelContainer
 var card_detail_overlay: Control
 
@@ -201,7 +198,7 @@ void fragment() {
 	var boss_names = {1: "Sir Caedmon", 2: "Hollow Warden", 3: "Fable's End"}
 	var boss_name = boss_names.get(RunManager.current_act, "???")
 	var title = Label.new()
-	title.text = "Act %d  —  %s" % [RunManager.current_act, boss_name]
+	title.text = "Act %d: %s" % [RunManager.current_act, boss_name]
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55))
@@ -216,29 +213,43 @@ void fragment() {
 	info_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(info_label)
 
-	# Legend
-	var legend = HBoxContainer.new()
-	legend.alignment = BoxContainer.ALIGNMENT_CENTER
-	legend.add_theme_constant_override("separation", 18)
-	legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(legend)
+	# Legend. Filled by _refresh_legend from what the nodes are showing.
+	_legend_row = HBoxContainer.new()
+	_legend_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_legend_row.add_theme_constant_override("separation", 18)
+	_legend_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(_legend_row)
 
-	var legend_types = [
-		[MapNode.NodeType.COMBAT, "Combat"],
-		[MapNode.NodeType.ELITE, "Elite"],
-		[MapNode.NodeType.REST, "Rest"],
-		[MapNode.NodeType.SHOP, "Shop"],
-		[MapNode.NodeType.EVENT, "Event"],
-		[MapNode.NodeType.MYSTERY, "Mystery"],
-		[MapNode.NodeType.BOSS, "Boss"],
-	]
-	for entry in legend_types:
+
+## Queued rather than run at once: a flourish paints several nodes in a beat.
+func _queue_legend_refresh() -> void:
+	if not _legend_refresh_queued:
+		_legend_refresh_queued = true
+		_refresh_legend.call_deferred()
+
+
+## Rebuilds the legend from the looks the node buttons are wearing right now, not from the map's
+## data. So it cannot give away what the map is hiding: a payoff that has not been armed, or one
+## whose reveal has not landed yet, is painted as the ordinary node it sits on and adds nothing here.
+func _refresh_legend() -> void:
+	_legend_refresh_queued = false
+	if not is_instance_valid(_legend_row):
+		return
+	var shown := {}
+	for id in node_buttons:
+		var look: Dictionary = node_buttons[id].get_meta("look")
+		shown[look["name"]] = look
+	var looks: Array = shown.values()
+	looks.sort_custom(func(a, b): return a["order"] < b["order"])
+	for child in _legend_row.get_children():
+		child.queue_free()
+	for look in looks:
 		var lbl = Label.new()
-		lbl.text = "%s %s" % [MapNode.type_label(entry[0]), entry[1]]
+		lbl.text = "%s %s" % [look["glyph"], look["name"]]
 		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", MapNode.type_color(entry[0]))
+		lbl.add_theme_color_override("font_color", look["color"])
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		legend.add_child(lbl)
+		_legend_row.add_child(lbl)
 
 
 ## Renders a sky body (moon, aurora) in the upper portion of the screen.
@@ -1009,7 +1020,7 @@ func _count_equipped_titles() -> int:
 ## the equipped title (or "empty slot" placeholder) with its current tier and effect.
 func _show_titles_popup() -> void:
 	var earned_count: int = RunManager.earned_title_ids.size()
-	popup_overlay = _create_popup_panel("Titles (%d/%d slots filled — %d earned)" % [
+	popup_overlay = _create_popup_panel("Titles (%d/%d slots filled, %d earned)" % [
 		_count_equipped_titles(), RunManager.TITLE_SLOT_COUNT, earned_count])
 	var content: VBoxContainer = popup_overlay.get_meta("content")
 
@@ -1098,7 +1109,7 @@ func _build_empty_slot_card(slot: int) -> PanelContainer:
 	vbox.add_child(slot_label)
 
 	var empty = Label.new()
-	empty.text = "— empty —"
+	empty.text = "(empty)"
 	empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	empty.add_theme_font_size_override("font_size", 18)
 	empty.add_theme_color_override("font_color", Color(0.35, 0.35, 0.4))
@@ -1630,33 +1641,31 @@ func _create_node_button(node: MapNode) -> Button:
 	btn.size = Vector2(NODE_SIZE, NODE_SIZE)
 	# An armed payoff shows the quest glyph (the arm-reveal flourish briefly resets it to its
 	# pre-arm look, then swaps the glyph back in). Before the plea is accepted it's ordinary.
-	_style_node_button(btn, node.node_type, node.weakened, _is_quest_payoff_armed(node))
+	_paint_node(btn, node.look(_is_quest_payoff_armed(node)))
 
 	# Tooltip descriptions by node type
 	var tooltip_map = {
 		MapNode.NodeType.COMBAT: "Battle enemies for card rewards and gold",
-		MapNode.NodeType.ELITE: "Tough enemy — higher rewards + relic",
+		MapNode.NodeType.ELITE: "Tough enemy: higher rewards + relic",
 		MapNode.NodeType.REST: "Rest to heal or upgrade a card",
 		MapNode.NodeType.SHOP: "Spend gold on cards, relics, and card removal",
 		MapNode.NodeType.EVENT: "A narrative encounter with choices",
-		MapNode.NodeType.MYSTERY: "Unknown — could be anything",
+		MapNode.NodeType.MYSTERY: "Unknown: could be anything",
 		MapNode.NodeType.BOSS: "Defeat the act boss to advance",
 		MapNode.NodeType.SWORD_IN_STONE: "An ancient blade waits in stone…",
 	}
 	btn.tooltip_text = tooltip_map.get(node.node_type, "")
 	if node.node_type == MapNode.NodeType.ELITE and node.weakened:
-		btn.tooltip_text = "Weakened elite — the people sabotaged it. Easier fight, same rewards."
+		btn.tooltip_text = "Weakened elite: the people sabotaged it. Easier fight, same rewards."
 	if _is_quest_payoff_armed(node):
 		btn.tooltip_text = _quest_payoff_tooltip(node.quest_payoff_id)
-	# The Master of Game is meant to be found: its own glyph on the event colour, and the tooltip
-	# says what is sold there, so a run that wants a companion can route to it.
+	# The Master of Game is meant to be found: the tooltip says what is sold there, so a run that
+	# wants a companion can route to it.
 	if node.scripted_event_id == MapGenerator.MASTER_OF_GAME_ID:
-		btn.text = "♘"
 		btn.tooltip_text = "The Master of Game: a huntsman selling his lord's animals. A companion, 75 gold."
 	# The record site seated late in the act: a place that keeps records, where a forgotten relic
 	# can be given its name back. Named, so a keeper carrying one can route to it.
 	elif node.scripted_event_id in MapGenerator.RECORD_SITE_IDS:
-		btn.text = "✎"
 		btn.tooltip_text = RECORD_SITE_TOOLTIPS.get(node.scripted_event_id, "A place that keeps records")
 
 	btn.pressed.connect(_on_node_clicked.bind(node))
@@ -1666,17 +1675,15 @@ func _create_node_button(node: MapNode) -> Button:
 	return btn
 
 
-## Applies a node button's glyph + styleboxes for a given type (and, for elites, whether it's
-## weakened). Extracted so the pledge-change animation can set a node's pre-change look then
-## swap to its real one. A weakened elite reads as "drained" (cold, desaturated colour).
-func _style_node_button(btn: Button, node_type: int, weakened: bool = false,
-		quest_armed: bool = false) -> void:
-	btn.text = MapNode.type_label(node_type)
-	btn.add_theme_font_size_override("font_size", 20)
+## Dresses a node button in a look from MapNode: glyph, styleboxes, and its entry in the legend.
+## Separate from the node so the pledge and quest flourishes can show a node's pre-change look,
+## then swap to its real one.
+func _paint_node(btn: Button, look: Dictionary) -> void:
+	btn.set_meta("look", look)
+	btn.text = look["glyph"]
+	btn.add_theme_font_size_override("font_size", look.get("font", 20))
 
-	var base_col := MapNode.type_color(node_type)
-	if node_type == MapNode.NodeType.ELITE and weakened:
-		base_col = Color(0.5, 0.56, 0.62)  # drained
+	var base_col: Color = look["color"]
 
 	var style := StyleBoxFlat.new()
 	style.set_corner_radius_all(NODE_SIZE / 2)
@@ -1690,42 +1697,14 @@ func _style_node_button(btn: Button, node_type: int, weakened: bool = false,
 	var pressed_style := style.duplicate()
 	pressed_style.bg_color = base_col.darkened(0.6)
 
-	# The Sword in the Stone is the signature quest node — louder ring + bigger glyph.
-	if node_type == MapNode.NodeType.SWORD_IN_STONE:
-		btn.add_theme_font_size_override("font_size", 30)
-		var gold := MapNode.type_color(node_type)
-		style.bg_color = gold.darkened(0.35)
+	var loud: Array = look.get("loud", [])
+	if not loud.is_empty():
+		style.bg_color = base_col.darkened(loud[0])
 		style.set_border_width_all(5)
-		style.border_color = gold.lightened(0.25)
-		hover_style.bg_color = gold.darkened(0.15)
+		style.border_color = base_col.lightened(loud[1])
+		hover_style.bg_color = base_col.darkened(loud[2])
 		hover_style.set_border_width_all(5)
-		hover_style.border_color = gold.lightened(0.4)
-		pressed_style.set_border_width_all(5)
-
-	# The boss is the act's threat — bold, vivid, resilient to the map's darkening.
-	if node_type == MapNode.NodeType.BOSS:
-		btn.add_theme_font_size_override("font_size", 32)
-		var bc := MapNode.type_color(node_type)
-		style.bg_color = bc.darkened(0.15)
-		style.set_border_width_all(5)
-		style.border_color = bc.lightened(0.35)
-		hover_style.bg_color = bc.darkened(0.0)
-		hover_style.set_border_width_all(5)
-		hover_style.border_color = bc.lightened(0.5)
-		pressed_style.set_border_width_all(5)
-
-	# Armed questline payoff — a louder marker (a hunt-gold ring + objective glyph) that
-	# overrides the node's ordinary look once the plea reveals it.
-	if quest_armed:
-		btn.text = QUEST_GLYPH
-		btn.add_theme_font_size_override("font_size", 28)
-		var qg := QUEST_GLYPH_COLOR
-		style.bg_color = qg.darkened(0.4)
-		style.set_border_width_all(5)
-		style.border_color = qg.lightened(0.2)
-		hover_style.bg_color = qg.darkened(0.2)
-		hover_style.set_border_width_all(5)
-		hover_style.border_color = qg.lightened(0.4)
+		hover_style.border_color = base_col.lightened(loud[3])
 		pressed_style.set_border_width_all(5)
 
 	btn.add_theme_stylebox_override("normal", style)
@@ -1733,6 +1712,7 @@ func _style_node_button(btn: Button, node_type: int, weakened: bool = false,
 	btn.add_theme_stylebox_override("pressed", pressed_style)
 	btn.add_theme_stylebox_override("disabled", style.duplicate())
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	_queue_legend_refresh()
 
 
 # ============================================================
@@ -1760,9 +1740,7 @@ func _update_node_states() -> void:
 			# Landmark nodes (boss, the Sword, an armed quest payoff) stay bright even when
 			# locked so they survive the map's darkening effects and always read; ordinary
 			# future nodes dim to show they're out of reach.
-			if node.node_type == MapNode.NodeType.BOSS \
-					or node.node_type == MapNode.NodeType.SWORD_IN_STONE \
-					or _is_quest_payoff_armed(node):
+			if node.look(_is_quest_payoff_armed(node)).get("landmark", false):
 				btn.modulate = Color(0.9, 0.9, 0.9, 1.0)
 			else:
 				btn.modulate = Color(0.42, 0.42, 0.42, 0.85)
@@ -1782,24 +1760,16 @@ func _on_node_clicked(node: MapNode) -> void:
 func _on_node_hover(node: MapNode) -> void:
 	var floor_str = "Floor %d" % (node.floor_num + 1)
 	match node.node_type:
-		MapNode.NodeType.COMBAT:
-			info_label.text = "Combat — %s" % floor_str
 		MapNode.NodeType.ELITE:
-			info_label.text = "Elite Combat — %s (Relic reward)" % floor_str
+			info_label.text = "Elite Combat: %s (Relic reward)" % floor_str
 		MapNode.NodeType.BOSS:
 			var boss_names = {1: "Sir Caedmon", 2: "Hollow Warden", 3: "Fable's End"}
 			var boss_name = boss_names.get(RunManager.current_act, "???")
-			info_label.text = "Boss: %s — %s" % [boss_name, floor_str]
+			info_label.text = "Boss: %s, %s" % [boss_name, floor_str]
 		MapNode.NodeType.REST:
-			info_label.text = "Rest Site — %s" % floor_str
-		MapNode.NodeType.SHOP:
-			info_label.text = "Shop — %s" % floor_str
-		MapNode.NodeType.EVENT:
-			info_label.text = "Event — %s" % floor_str
-		MapNode.NodeType.MYSTERY:
-			info_label.text = "Mystery — %s" % floor_str
+			info_label.text = "Rest Site: %s" % floor_str
 		_:
-			info_label.text = "%s — %s" % [MapNode.type_name(node.node_type), floor_str]
+			info_label.text = "%s: %s" % [node.look(_is_quest_payoff_armed(node))["name"], floor_str]
 
 
 func _on_node_unhover() -> void:
@@ -1883,15 +1853,8 @@ func _handle_mystery(node: MapNode) -> void:
 
 func _update_node_visual(node: MapNode) -> void:
 	var btn: Button = node_buttons.get(node.id)
-	if not btn:
-		return
-	var style = StyleBoxFlat.new()
-	style.set_corner_radius_all(NODE_SIZE / 2)
-	style.set_border_width_all(3)
-	style.bg_color = MapNode.type_color(node.node_type).darkened(0.5)
-	style.border_color = MapNode.type_color(node.node_type)
-	btn.add_theme_stylebox_override("normal", style)
-	btn.text = MapNode.type_label(node.node_type)
+	if btn:
+		_paint_node(btn, node.look(_is_quest_payoff_armed(node)))
 
 
 func _scroll_to_player() -> void:
@@ -1918,9 +1881,9 @@ func _prime_pledge_changes() -> void:
 		if btn == null:
 			continue
 		if map.pledge_changes[id] == &"elite_added":
-			_style_node_button(btn, MapNode.NodeType.COMBAT, false)  # was a combat node
+			_paint_node(btn, MapNode.TYPE_LOOKS[MapNode.NodeType.COMBAT])  # was a combat node
 		else:  # &"weakened" — was a normal (un-weakened) elite
-			_style_node_button(btn, MapNode.NodeType.ELITE, false)
+			_paint_node(btn, MapNode.TYPE_LOOKS[MapNode.NodeType.ELITE])
 		btn.pivot_offset = btn.size / 2.0
 		btn.scale = Vector2(0.5, 0.5)
 		btn.modulate.a = 0.0
@@ -1986,7 +1949,7 @@ func _finish_pledge_changes() -> void:
 
 ## Flip-midpoint callback: swap the node into its real, post-change look.
 func _pledge_swap_cb(btn: Button, node: MapNode) -> Callable:
-	return func() -> void: _style_node_button(btn, node.node_type, node.weakened)
+	return func() -> void: _paint_node(btn, node.look())
 
 
 ## Scroll offset that centers the given floor's row in the viewport (floor 0 = the start row
@@ -2039,7 +2002,7 @@ func _prime_quest_reveal(quest_id: StringName) -> void:
 	if btn == null:
 		return
 	RunManager.mark_quest_revealed(quest_id)
-	_style_node_button(btn, node.node_type, node.weakened, false)  # its ordinary pre-arm look
+	_paint_node(btn, node.look(false))  # its ordinary pre-arm look
 	btn.pivot_offset = btn.size / 2.0
 	btn.scale = Vector2(0.5, 0.5)
 	btn.modulate.a = 0.0
@@ -2085,7 +2048,7 @@ func _play_quest_reveal(node: MapNode) -> void:
 
 ## Flip-midpoint callback: swap the payoff node into its armed quest-glyph look.
 func _quest_swap_cb(btn: Button, node: MapNode) -> Callable:
-	return func() -> void: _style_node_button(btn, node.node_type, node.weakened, true)
+	return func() -> void: _paint_node(btn, node.look(true))
 
 
 ## The objective toast raised when a questline's payoff reveals, keyed by quest id.
@@ -2149,7 +2112,7 @@ func _show_map_toast(text: String, anchor := ToastAnchor.TOP, dismissible := fal
 	toast.text = text
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast.add_theme_font_size_override("font_size", 20)
-	toast.add_theme_color_override("font_color", QUEST_GLYPH_COLOR)
+	toast.add_theme_color_override("font_color", MapNode.QUEST_MARK_LOOK["color"])
 	toast.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	toast.add_theme_constant_override("outline_size", 5)
 	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
