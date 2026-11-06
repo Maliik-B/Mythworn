@@ -86,7 +86,8 @@ func _walk() -> void:
 		far.floor_base == map.get_node(seat).floor_num + 1)
 	_check("a hop is not a visit", RunManager.visited_realm_ids.size() == 1
 		and RunManager.visited_realm_ids[0] == &"camelot" and not RunManager.has_visited_realm(&"yggdrasil"))
-	_check("the title still reads at its full tier", RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.ORIGINAL)
+	_check("the realm title degrades abroad, in its own words", RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.DEGRADED
+		and TitlePool.get_title(&"swords_bearer").get_name_for_tier(TitleData.Tier.DEGRADED) == "Vagrant of Renown")
 	_check("the realm's item is still in the pack", RunManager.has_consumable(&"relic_water"))
 	_check("the quest item still has somewhere to go", not RunManager.is_consumable_spent(
 		RunManager.get_consumable_by_id(&"poisoned_chalice")))
@@ -118,6 +119,8 @@ func _walk() -> void:
 		if key == "current_node" or key == "next" or key == "gold" or key == "deck" or key == "hp":
 			continue
 		_check("%s is as it was left" % key, str(before[key]) == str(after[key]))
+	_check("the realm title comes home on its Returning tier", RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.RETURNING
+		and TitlePool.get_title(&"swords_bearer").get_name_for_tier(TitleData.Tier.RETURNING) == "Returned Bearer")
 	_check("the player stands on the crossing, with its onward nodes open",
 		map.current_node_id == seat and map.get_available_next_ids() == map.get_node(seat).next_nodes)
 	_check("the crossing cannot be taken twice", seat not in map.get_available_next_ids())
@@ -180,11 +183,14 @@ func _by_word() -> void:
 	_check("by your word, no ring and the title", not RunManager.has_relic("The Oath-Ring")
 		and RunManager.earned_title_ids.has(&"guest_of_the_hall"))
 	_check("the realm remembers it was by your word", RunManager.realm_memory.get(&"yggdrasil") == &"oath_ring_word")
+	_check("the title is at home out here", RunManager.get_title_tier(&"guest_of_the_hall") == TitleData.Tier.ORIGINAL)
 	scene = await _click(scene, _way_back(RunManager.current_map))
 	scene = await _next_scene(scene)
 	await _settle(scene)
 	_print_state("AFTER the word")
 	_check("the way back was taken", not RunManager.is_abroad() and RunManager.current_map == map)
+	_check("the guest's title now reads abroad", RunManager.get_title_tier(&"guest_of_the_hall") == TitleData.Tier.DEGRADED
+		and TitlePool.get_title(&"guest_of_the_hall").get_name_for_tier(TitleData.Tier.DEGRADED) == "A Guest Abroad")
 
 
 ## What the gold gift costs, read from the event so the number lives in one place.
@@ -383,9 +389,6 @@ func _snapshot(seat: int) -> Dictionary:
 		"map nodes": nodes,
 		"quests": RunManager.active_quests.duplicate(true),
 		"visited realms": RunManager.visited_realm_ids.duplicate(),
-		"title tier": RunManager.get_title_tier(&"swords_bearer"),
-		"title left origin": RunManager._title_has_left_origin.get(&"swords_bearer", false),
-		"title returned": RunManager._title_has_returned.get(&"swords_bearer", false),
 		"pack": RunManager.consumables.map(func(c): return c.id),
 		"standing": RunManager.realm_standing.duplicate(),
 		"ordinary events": RunManager.ordinary_event_count,

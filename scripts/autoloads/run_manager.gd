@@ -640,8 +640,10 @@ func home_map() -> MapData:
 
 ## Steps through a crossing from the current node: the far map, realm and config take over, and the
 ## home ones are kept as they are. This goes round set_current_realm on purpose, because a trip with
-## a way back is not leaving: no entry in visited_realm_ids, no title tier change, nothing expires at
-## the border. One jump only for now, so a second is refused. Returns false if it could not cross.
+## a way back is not being sent somewhere: no entry in visited_realm_ids, and nothing expires at the
+## border. Titles are the shipped rule all the same: a realm's voice is distant abroad and remembers
+## you back, so realm titles degrade going out and come home on their Returning tier. One jump only
+## for now, so a second is refused. Returns false if it could not cross.
 func cross_to(realm_id: StringName) -> bool:
 	if is_abroad():
 		push_error("cross_to: already across a crossing; a second jump is not built.")
@@ -668,6 +670,7 @@ func cross_to(realm_id: StringName) -> bool:
 	current_realm_id = realm_id
 	current_map = far_map
 	realm_config = config
+	_update_title_tiers_on_realm_change(_home_realm_id, realm_id)
 	return true
 
 
@@ -682,10 +685,12 @@ func return_from_crossing() -> bool:
 		if current_map.nodes[id].visited:
 			walked += 1
 	last_crossing["nodes_walked"] = walked
+	var far_realm := current_realm_id
 	current_realm_id = _home_realm_id
 	current_map = _home_map
 	realm_config = _home_config
 	_clear_crossing()
+	_update_title_tiers_on_realm_change(far_realm, current_realm_id)
 	return true
 
 
@@ -934,8 +939,7 @@ func get_title_tier(title_id: StringName) -> TitleData.Tier:
 	var data := TitlePool.get_title(title_id)
 	if not data or data.category == TitleData.Category.PERSONALITY:
 		return TitleData.Tier.ORIGINAL
-	# A trip across a crossing is not leaving: abroad, a title reads as it did at home.
-	if home_realm_id() == data.origin_realm_id:
+	if current_realm_id == data.origin_realm_id:
 		# We're in the origin realm. If we've returned and reclaimed, back to Original.
 		# If we've returned but not reclaimed, Returning. Otherwise (still on original visit), Original.
 		var has_returned: bool = _title_has_returned.get(title_id, false)

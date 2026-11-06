@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_card_face_words()
 	_test_crossing()
 	_test_yggdrasil_edge()
+	_test_title_round_trip()
 	_test_forgotten_relics()
 	_test_relic_names()
 	_test_liaison_relics()
@@ -4196,8 +4197,8 @@ func _test_crossing() -> void:
 	# --- The two holes, abroad ---
 	_check("a hop is not a visit: the realm stays open to be sent to",
 		not RunManager.has_visited_realm(&"yggdrasil") and RunManager.visited_realm_ids.size() == 1)
-	_check("a realm title keeps its full tier and its bonus abroad",
-		RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.ORIGINAL and RunManager.title_damage_bonus_escalates())
+	_check("a realm title reads Degraded abroad, and its bonus stops escalating",
+		RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.DEGRADED and not RunManager.title_damage_bonus_escalates())
 	_check("a realm item stays in the pack", RunManager.has_consumable(&"relic_water"))
 	_check("a quest item abroad still knows its payoff is ahead (this seed seats it past the crossing)",
 		payoff_ahead and not RunManager.is_consumable_spent(RunManager.get_consumable_by_id(&"poisoned_chalice")))
@@ -4222,9 +4223,7 @@ func _test_crossing() -> void:
 	_check("the road on from the crossing is open", map.get_available_next_ids() == map.nodes[seat].next_nodes
 		and not map.get_available_next_ids().is_empty())
 	_check("the quest state is as it was left", str(RunManager.active_quests) == quests_then)
-	_check("the title never left", RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.ORIGINAL
-		and not RunManager._title_has_left_origin.get(&"swords_bearer", false)
-		and not RunManager._title_has_returned.get(&"swords_bearer", false))
+	_check("the title comes home on its Returning tier", RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.RETURNING)
 	_check("the trip is recorded for the beat to come", RunManager.last_crossing.get("from") == &"camelot"
 		and RunManager.last_crossing.get("to") == &"yggdrasil" and RunManager.last_crossing.get("node_id") == seat
 		and RunManager.last_crossing.get("floor") == map.nodes[seat].floor_num
@@ -4326,6 +4325,101 @@ func _test_yggdrasil_edge() -> void:
 	RunManager.relics.clear()
 	RunManager.realm_memory = {}
 	_reset_consumable_state()
+
+
+## The title rule across a crossing: a realm title degrades going out and comes home on its Returning
+## tier, with the shipped names, and no fresh grant. Its wording moves with the tier and its look never
+## does, since greying a title would put the rot's idiom on the keeper's own record.
+func _test_title_round_trip() -> void:
+	print("-- Titles across a crossing --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 4259)
+	var map := MapGenerator.generate(RngManager.map_rng, &"camelot", 1)
+	RunManager.current_map = map
+	for id in map.nodes:
+		if map.nodes[id].crossing_to != &"":
+			map.move_to(id)
+	RunManager.award_title(&"camelots_champion")
+	RunManager.award_title(&"swords_bearer")
+	RunManager.award_title(&"the_merciful")
+	RunManager.equip_title(0, &"camelots_champion")
+	RunManager.equip_title(1, &"swords_bearer")
+	var champion: TitleData = TitlePool.get_title(&"camelots_champion")
+	var bearer: TitleData = TitlePool.get_title(&"swords_bearer")
+	var home_hp := RunManager.max_hp
+	var look_home: Array = _title_card_look(&"camelots_champion")
+	_check("at home a realm title reads as itself", _title_card_words(&"camelots_champion") == champion.original_name
+		and RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.ORIGINAL)
+
+	var grants := [0]
+	var on_grant := func(_id): grants[0] += 1
+	Events.title_earned.connect(on_grant)
+	RunManager.cross_to(&"yggdrasil")
+	_check("abroad it degrades, in its own shipped words",
+		RunManager.get_title_tier(&"camelots_champion") == TitleData.Tier.DEGRADED
+		and _title_card_words(&"camelots_champion") == champion.degraded_name
+		and _title_card_words(&"swords_bearer") == bearer.degraded_name)
+	_check("its value moves with the tier", RunManager.max_hp == home_hp - champion.original_value + champion.degraded_value)
+	_check("the wording changed and the image did not", _title_card_look(&"camelots_champion") == look_home)
+	_check("a personality title does not care where you stand",
+		RunManager.get_title_tier(&"the_merciful") == TitleData.Tier.ORIGINAL)
+	RunManager.award_title(&"guest_of_the_hall")
+	var guest: TitleData = TitlePool.get_title(&"guest_of_the_hall")
+	_check("a title earned out here is at home out here", RunManager.get_title_tier(&"guest_of_the_hall") == TitleData.Tier.ORIGINAL
+		and _title_card_words(&"guest_of_the_hall") == "Guest of the Hall")
+	var look_guest: Array = _title_card_look(&"guest_of_the_hall")
+	grants[0] = 0
+
+	RunManager.return_from_crossing()
+	_check("back home it regrades on the shipped Returning tier",
+		RunManager.get_title_tier(&"camelots_champion") == TitleData.Tier.RETURNING
+		and _title_card_words(&"camelots_champion") == "Returned Champion"
+		and _title_card_words(&"swords_bearer") == "Returned Bearer")
+	_check("its value follows", RunManager.max_hp == home_hp - champion.original_value + champion.returning_value)
+	_check("the image never moved", _title_card_look(&"camelots_champion") == look_home)
+	_check("and coming home is not a fresh grant", grants[0] == 0)
+	_check("the title earned abroad now reads abroad", RunManager.get_title_tier(&"guest_of_the_hall") == TitleData.Tier.DEGRADED
+		and _title_card_words(&"guest_of_the_hall") == guest.degraded_name and _title_card_look(&"guest_of_the_hall") == look_guest)
+	Events.title_earned.disconnect(on_grant)
+	RunManager.mark_title_reclaimed(&"camelots_champion")
+	_check("a reclamation still brings a title back whole", RunManager.get_title_tier(&"camelots_champion") == TitleData.Tier.ORIGINAL)
+
+	# What the guest's title keeps from a strip moves with its tier, as any title's value does.
+	RunManager.equip_title(0, &"guest_of_the_hall")
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [_dummy_attacker()])
+	eng.apply_block(eng.player_stats, 8)
+	eng.strip_block(eng.player_stats)
+	_check("abroad the guest keeps a quarter of the first Block from a strip", eng.player_stats.block == 8 * guest.degraded_value / 100)
+	eng.free()
+
+	# start_run reset the run; restore the suite's baseline.
+	EnemyPool.reset_encounter_state()
+	_reset_consumable_state()
+	RunManager.earned_title_ids.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	RunManager._title_applied_max_hp_bonus = 0
+	RunManager.relics.clear()
+
+
+## A title card as the map's popup builds it, equipped. Its name label is the card's first line.
+func _title_card_label(id: StringName) -> Array:
+	var scene = load("res://scenes/map/map_scene.gd").new()
+	var panel: PanelContainer = scene._build_title_card_for_id(id, true)
+	var label: Label = panel.get_child(0).get_child(0)
+	var style: StyleBoxFlat = panel.get_theme_stylebox("panel")
+	var out := [label.text, style.bg_color, style.border_color, label.get_theme_color("font_color")]
+	panel.free()
+	scene.free()
+	return out
+
+
+func _title_card_words(id: StringName) -> String:
+	return _title_card_label(id)[0]
+
+
+func _title_card_look(id: StringName) -> Array:
+	return _title_card_label(id).slice(1)
 
 
 func _map_has_seat(map: MapData) -> bool:
