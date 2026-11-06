@@ -87,8 +87,8 @@ func _stamp() -> void:
 
 func _set_name() -> void:
 	_name.text = PassionState.tier_name(_tier)
-	var color: Color = PassionInfographic._tier_color(_tier)
-	_name.add_theme_color_override("font_color", color.darkened(0.45) if StageSkin.is_page() else color)
+	var color: Color = StageSkin.gauge_color(_tier)
+	_name.add_theme_color_override("font_color", color.darkened(0.3) if StageSkin.is_page() else color)
 	_name.reset_size()
 	_name.pivot_offset = Vector2(0.0, _name.size.y / 2.0)
 	_name.position.x = NAME_X
@@ -123,7 +123,7 @@ func _draw() -> void:
 	for i in tiers.size():
 		var top := _y_of(edges[i])
 		var bottom := _y_of(edges[i + 1])
-		var color: Color = PassionInfographic._tier_color(tiers[i])
+		var color: Color = StageSkin.gauge_color(tiers[i])
 		if tiers[i] != _tier:
 			color = color.lerp(StageSkin.c("wall"), 1.0 - DIM_BAND)
 		draw_rect(Rect2(0, top, RECT.size.x, bottom - top - 2.0), color)

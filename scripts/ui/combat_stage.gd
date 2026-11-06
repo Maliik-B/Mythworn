@@ -25,9 +25,12 @@ const WORN_CORNER := [[1864, 0, 4], [1872, 4, 4], [1880, 8, 4], [1888, 12, 4], [
 const MOOD_LEAN := 0.09
 const MOOD_POLE := 0.2
 const MOOD_FLARE := 0.14
+const GROUND_FLARE := 1.3  # how far past its new colour the ground runs before it settles
 const WEATHER_AT_LEAN := 16
 const WEATHER_AT_POLE := 46
 
+var _ground: ColorRect = null
+var _ground_tween: Tween = null
 var _mood: ColorRect = null
 var _mood_tween: Tween = null
 var _embers: CPUParticles2D = null
@@ -58,7 +61,7 @@ func _ready() -> void:
 	if washes.size() == 2:
 		_add_wash(washes[0], StageSkin.c("wash_far"))
 		_add_wash(washes[1], StageSkin.c("wash_near"))
-	_add_rect(Vector2(0, GROUND_LINE_Y), Vector2(1920, HEIGHT - GROUND_LINE_Y), StageSkin.c("ground"))
+	_ground = _add_rect(Vector2(0, GROUND_LINE_Y), Vector2(1920, HEIGHT - GROUND_LINE_Y), StageSkin.c("ground"))
 	_add_rect(Vector2(0, GROUND_LINE_Y), Vector2(1920, ART_PX), StageSkin.c("ground_line"))
 	_mood = _add_rect(Vector2.ZERO, Vector2(1920, HEIGHT), Color(0, 0, 0, 0))
 	_embers = _make_weather(StageSkin.c("ember"), GROUND_LINE_Y, Vector2(0.1, -1.0), 60.0)
@@ -70,11 +73,15 @@ func _ready() -> void:
 	add_child(wear)
 
 
-## The ground takes on the Passion band you stand in: warm above Steady, cold below it, more so at a
+## The stage takes on the Passion band you stand in: warm above Steady, cold below it, more so at a
 ## pole, with embers or frost where the look has any. The page has none, since a speck on it reads
 ## as a stain. It stays behind the bodies, so a body keeps its own colour on it. A change flares past
-## its mark, then settles.
+## its mark, then settles. On the page only the ground band takes it (see StageSkin); the leaf itself
+## keeps its hue and value, and the skyline washed on it.
 func set_mood(tier: int, instant := false) -> void:
+	if StageSkin.passion_on_keeper():
+		_set_ground_mood(tier, instant)
+		return
 	var strength := 0.0
 	var gain: float = StageSkin.MOOD_GAIN[StageSkin.active]
 	match tier:
@@ -96,6 +103,18 @@ func set_mood(tier: int, instant := false) -> void:
 	_mood_tween = create_tween()
 	_mood_tween.tween_property(_mood, "color:a", strength + MOOD_FLARE * StageSkin.MOOD_GAIN[StageSkin.active], 0.18).set_trans(Tween.TRANS_SINE)
 	_mood_tween.tween_property(_mood, "color:a", strength, 0.9).set_trans(Tween.TRANS_SINE)
+
+
+func _set_ground_mood(tier: int, instant: bool) -> void:
+	var target: Color = StageSkin.keeper_tint(tier)["ground"]
+	if _ground_tween:
+		_ground_tween.kill()
+	if instant:
+		_ground.color = target
+		return
+	_ground_tween = create_tween()
+	_ground_tween.tween_property(_ground, "color", _ground.color.lerp(target, GROUND_FLARE), 0.18).set_trans(Tween.TRANS_SINE)
+	_ground_tween.tween_property(_ground, "color", target, 0.9).set_trans(Tween.TRANS_SINE)
 
 
 func _set_weather(weather: CPUParticles2D, on: bool, strength: float) -> void:

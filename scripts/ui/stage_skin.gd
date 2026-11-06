@@ -13,6 +13,12 @@ const PAGE := &"page"
 ## The switch. A capture can set it before the combat scene loads.
 static var active: StringName = PAGE
 
+## What Passion may colour on the page. False is the lore ruling: the page itself keeps its hue and
+## value, and only the ground band and the keeper's own things (gauge, desk, hand) take the band.
+## True is the earlier tint over the whole stage, kept so the two can be compared and the ruling
+## overruled. It has no effect in the dark, where there is no page.
+static var passion_tints_whole_page := false
+
 static var _no_purple: ShaderMaterial = null
 static var _icon_grey: ShaderMaterial = null
 
@@ -22,14 +28,27 @@ const NAME_FONT_PATH := CardFace.TITLE_FONT_PATH
 const LINE_FONT_PATH := CardFace.RULES_FONT_PATH
 const NUMERAL_FONT_PATH := CardFace.NUMERAL_FONT_PATH
 
-# How strongly Passion tints the ground, by look. The page stays a page.
+# How strongly Passion tints the whole stage, by look, where it does.
 const MOOD_GAIN := {DARK: 1.0, PAGE: 0.55}
+
+# What a Passion band does to the ground and the keeper's things on the page; Steady leaves them be.
+# Blazing warms. Hollow goes to the deep blue and never to grey, which is why these are the colours
+# to arrive at and not a blue laid over them: tan under a thin blue is grey. The hand warms and does
+# not cool: a blue leaf turns the edges of its red initials and coins purple, so at the cold end the
+# leaves stay parchment against the blue desk.
+const PASSION_ON_PAGE := {
+	PassionState.Tier.BLAZING: {"ground": Color("C98F56"), "desk": Color("2C170A"), "hand": Color(1.0, 0.9, 0.74), "gauge": Color("D9681E")},
+	PassionState.Tier.INSPIRED: {"ground": Color("C2A073"), "desk": Color("241A12"), "hand": Color(1.0, 0.95, 0.87), "gauge": Color("C98F56")},
+	PassionState.Tier.WAVERING: {"ground": Color("8FA0C4"), "desk": Color("151B2C"), "hand": Color.WHITE, "gauge": Color("4A63A8")},
+	PassionState.Tier.HOLLOW: {"ground": Color("6A84BC"), "desk": Color("101B3D"), "hand": Color.WHITE, "gauge": Color("1F3C88")},
+}
 
 const LOOKS := {
 	DARK: {
 		"desk": Color(0.055, 0.05, 0.047),
 		"wear": Color(0, 0, 0, 0),
 		"stat_hp": Color(0.9, 0.3, 0.3),
+		"stat_outline": Color(0, 0, 0, 0),
 		"stat_block": Color(0.3, 0.6, 0.9),
 		"stat_energy": Color(0.9, 0.9, 0.3),
 		"stat_passion": Color(0.9, 0.5, 0.2),
@@ -98,6 +117,7 @@ const LOOKS := {
 		"banner_outline": Color(0, 0, 0),
 		"callout": Color(1.0, 0.85, 0.42),
 		"callout_outline": Color(0, 0, 0, 0.85),
+		"intent_outline": Color(0, 0, 0, 0),
 		"intent_attack": Color(1.0, 0.4, 0.3),
 		"intent_defend": Color(0.35, 0.72, 1.0),
 		"intent_buff": Color(0.36, 0.86, 0.44),
@@ -117,6 +137,7 @@ const LOOKS := {
 		"desk": Color("1C1A18"),
 		"wear": Color("1C1A18"),
 		"stat_hp": Color("D7301F"),
+		"stat_outline": Color("0F0E0C"),
 		"stat_block": Color("8DA2D6"),
 		"stat_energy": Color("E8DCBD"),
 		"stat_passion": Color("D9A06A"),
@@ -185,6 +206,7 @@ const LOOKS := {
 		"banner_outline": Color("D3C9B1"),
 		"callout": Color("1E1B18"),
 		"callout_outline": Color("E8DCBD"),
+		"intent_outline": Color("E8DCBD"),
 		"intent_attack": Color("D7301F"),
 		"intent_defend": Color("3D3A35"),
 		"intent_buff": Color("3D3A35"),
@@ -218,6 +240,25 @@ static func no_purple() -> ShaderMaterial:
 
 static func is_page() -> bool:
 	return active == PAGE
+
+
+## True when Passion colours the ground and the keeper's things, and not the whole stage.
+static func passion_on_keeper() -> bool:
+	return is_page() and not passion_tints_whole_page
+
+
+## The ground, desk and hand a Passion band asks for on the page.
+static func keeper_tint(tier: int) -> Dictionary:
+	if PASSION_ON_PAGE.has(tier):
+		return PASSION_ON_PAGE[tier]
+	return {"ground": c("ground"), "desk": c("desk"), "hand": Color.WHITE}
+
+
+## A Passion band's own colour on the gauge.
+static func gauge_color(tier: int) -> Color:
+	if is_page() and PASSION_ON_PAGE.has(tier):
+		return PASSION_ON_PAGE[tier]["gauge"]
+	return PassionInfographic._tier_color(tier)
 
 
 ## For a card's small art: on the page it goes to the ramp's greys with the figures. In the dark it

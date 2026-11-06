@@ -69,6 +69,7 @@ const STAGE_LINE_CHARS_PER_SEC := 30.0
 const STAGE_LINE_HOLD := 1.7
 const BREAK_DRAIN_TIME := 1.6
 const COIN_STAGGER := 0.04
+const KEEPER_TINT_TIME := 0.5
 const CARD_HELD_DARK := Color(1.3, 1.3, 1.0, 0.9)
 const CARD_HELD_PAGE := Color(1.05, 1.05, 1.0, 0.96)
 const PLAYER_BAR_H := 54.0
@@ -197,6 +198,9 @@ var _drag_hint: Label = null        # "right-click to cancel" affordance during 
 var _enemy_lights: Dictionary = {}  # EnemyCombatState -> the targeting light on it (see _set_lit_enemies)
 var _sheet_bodies: Dictionary = {}  # sprite set key -> where its body sits in the cell (see _sheet_body)
 var _stage: CombatStage = null
+var _desk: ColorRect = null
+var _keeper_tween: Tween = null
+var _keeper_side := 0  # the side of Steady the keeper's things are tinted to: 1 warm, -1 cold
 var _stage_line: Label = null
 var _passion_gauge: PassionGauge = null
 var _lapis_taken := false  # a body in this fight already carries the frame's lapis
@@ -489,10 +493,10 @@ func _build_ui() -> void:
 	theme = scene_theme
 
 	# The desk under everything, and the stage on it.
-	var bg = ColorRect.new()
-	bg.color = StageSkin.c("desk")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	_desk = ColorRect.new()
+	_desk.color = StageSkin.c("desk")
+	_desk.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_desk)
 	_stage = CombatStage.new()
 	add_child(_stage)
 
@@ -700,6 +704,9 @@ func _build_player_bar() -> PanelContainer:
 	powers_side.add_child(player_powers_chips)
 
 	hp_label = _make_stat_label(StageSkin.c("stat_hp"))
+	# A dark edge, so red never meets the desk's blue directly at the cold end of Passion.
+	hp_label.add_theme_color_override("font_outline_color", StageSkin.c("stat_outline"))
+	hp_label.add_theme_constant_override("outline_size", 3)
 	bar.add_child(hp_label)
 
 	block_label = _make_stat_label(StageSkin.c("stat_block"))
@@ -1908,6 +1915,9 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	intent_lbl.add_theme_font_size_override("font_size", 24)
 	intent_lbl.add_theme_color_override("font_color", StageSkin.c("intent_attack"))
 	intent_lbl.material = StageSkin.no_purple()
+	# A thin pale edge, so red never meets a blue ground directly: the two blend to purple.
+	intent_lbl.add_theme_color_override("font_outline_color", StageSkin.c("intent_outline"))
+	intent_lbl.add_theme_constant_override("outline_size", 2)
 	intent_row.add_child(intent_lbl)
 
 	# Sight mode peek — only rendered when player has Excalibur in Sight mode.
@@ -2492,7 +2502,7 @@ func _on_combat_started() -> void:
 	_log_relic_activations(RelicData.RelicTrigger.ON_COMBAT_START)
 	if RunManager.passion:
 		_passion_gauge.show_now()
-		_stage.set_mood(RunManager.get_passion_tier(), true)
+		_set_passion_tint(RunManager.get_passion_tier(), true)
 	_refresh_ui()
 	_animate_card_draw()
 
@@ -2832,9 +2842,34 @@ func _on_passion_changed(old_value: int, new_value: int) -> void:
 	var old_tier: int = RunManager.get_passion_tier_for_value(old_value)
 	var new_tier: int = RunManager.get_passion_tier_for_value(new_value)
 	if old_tier != new_tier:
-		_stage.set_mood(new_tier)
+		_set_passion_tint(new_tier)
 		# Deferred: the rest of this card's effects rebuild the hand again, and would free the coins.
 		_relight_coins.call_deferred(old_value, new_value)
+
+
+## The frame answers a Passion band: the stage, and on the page the keeper's desk and hand with it.
+func _set_passion_tint(tier: int, instant := false) -> void:
+	_stage.set_mood(tier, instant)
+	if not StageSkin.passion_on_keeper():
+		return
+	var tint: Dictionary = StageSkin.keeper_tint(tier)
+	if _keeper_tween:
+		_keeper_tween.kill()
+	if instant:
+		_desk.color = tint["desk"]
+		hand_container.modulate = tint["hand"]
+		_keeper_side = signi(tier - PassionState.Tier.STEADY)
+		return
+	_keeper_tween = create_tween().set_parallel(true)
+	_keeper_tween.tween_property(hand_container, "modulate", tint["hand"], KEEPER_TINT_TIME).set_trans(Tween.TRANS_SINE)
+	# From warm straight to cold, the desk's colour would pass through a dark purple on the way, so
+	# it goes by way of its own plain colour.
+	var side: int = signi(tier - PassionState.Tier.STEADY)
+	var by_plain: float = KEEPER_TINT_TIME * 0.4 if side * _keeper_side < 0 else 0.0
+	if by_plain > 0.0:
+		_keeper_tween.tween_property(_desk, "color", StageSkin.c("desk"), by_plain).set_trans(Tween.TRANS_SINE)
+	_keeper_tween.tween_property(_desk, "color", tint["desk"], KEEPER_TINT_TIME - by_plain) 		.set_delay(by_plain).set_trans(Tween.TRANS_SINE)
+	_keeper_side = side
 
 
 ## Crossing a band, the coins relight across the hand one after another, left to right. Each rises
