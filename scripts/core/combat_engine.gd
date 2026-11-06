@@ -545,8 +545,8 @@ func start_enemy_turn() -> void:
 			enemy.stats.reset_block()
 
 	Events.enemy_turn_started.emit()
-	# Let the "Enemy Turn" banner read before anyone acts.
-	await _pace(0.55)
+	# Let the "Enemy Turn" banner register before anyone acts.
+	await _pace(0.25)
 
 	for enemy in enemies:
 		if enemy.stats.is_dead():
@@ -561,16 +561,16 @@ func start_enemy_turn() -> void:
 		if enemy.stats.has_status(StatusEffects.STUN):
 			_reduce_status(enemy.stats, StatusEffects.STUN)
 			Events.enemy_stunned.emit(enemy)
-			await _pace(0.5)
+			await _pace(0.3)
 			resolve_chilled(enemy.stats)              # the chill still bites through a skipped turn
 			tick_end_of_turn(enemy.stats)
 			continue
 		Events.enemy_action_started.emit(enemy, enemy.current_intent)
-		await _pace(0.35)                             # anticipation / wind-up
+		await _pace(0.22)                             # anticipation / wind-up
 		execute_enemy_turn(enemy)                     # effect lands (damage flash/shake here)
 		resolve_chilled(enemy.stats)                  # Chilled ticks/freezes at the enemy's turn-end
 		tick_end_of_turn(enemy.stats)
-		await _pace(0.45)                             # let the hit read before the next enemy
+		await _pace(0.25)                             # let the hit read before the next enemy
 		if player_stats.is_dead():
 			break
 
@@ -588,7 +588,7 @@ func start_enemy_turn() -> void:
 		if not enemy.stats.is_dead():
 			enemy.select_intent()
 
-	await _pace(0.25)
+	await _pace(0.05)
 	start_player_turn()
 
 

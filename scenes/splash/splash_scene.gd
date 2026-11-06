@@ -4,11 +4,25 @@ extends Control
 var _particles: Array[ColorRect] = []
 var _time := 0.0
 var _fade_overlay: ColorRect
+var _leaving := false
 
 
 func _ready() -> void:
 	_build_ui()
 	_run_sequence()
+
+
+## Any click or key skips the splash.
+func _input(event: InputEvent) -> void:
+	if (event is InputEventMouseButton or event is InputEventKey) and event.pressed:
+		_leave()
+
+
+func _leave() -> void:
+	if _leaving:
+		return
+	_leaving = true
+	SceneTransition.change_scene("res://scenes/title/title_screen.tscn")
 
 
 func _process(delta: float) -> void:
@@ -95,8 +109,10 @@ func _run_sequence() -> void:
 	fade_in.tween_property(_fade_overlay, "modulate:a", 0.0, 0.8)
 	await fade_in.finished
 
-	# Hold (1.5s)
-	await get_tree().create_timer(1.5).timeout
+	# Hold (0.6s)
+	await get_tree().create_timer(0.6).timeout
+	if _leaving:
+		return
 
 	# Fade out to black (0.5s)
 	var fade_out = create_tween()
@@ -104,4 +120,4 @@ func _run_sequence() -> void:
 	await fade_out.finished
 
 	# Transition to title screen
-	SceneTransition.change_scene("res://scenes/title/title_screen.tscn")
+	_leave()

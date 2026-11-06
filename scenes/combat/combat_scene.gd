@@ -48,7 +48,8 @@ var _is_animating_card := false
 # inside a fixed, clipped portrait box so the character reads large enough: the monster
 # placeholder sheets carry a lot of motion padding, where the real per-enemy human art
 # frames tighter and will want less zoom. Real per-enemy art is the B5 track -- these are
-# shared CC0 stand-ins until it lands.
+# shared CC0 stand-ins until it lands. Attack strips run fast so the swing lands on the engine's
+# wind-up beat (CombatEngine.start_enemy_turn): change one with the other.
 const PORTRAIT_BOX := 130.0
 const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
 const TARGET_LIGHT_FADE := 0.08
@@ -66,38 +67,38 @@ const SPRITE_SETS := {
 	"goblin": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/",
 		"cell": 150, "zoom": 2.2,
-		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"skeleton": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/",
 		"cell": 150, "zoom": 1.8,
-		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"flyingeye": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/",
 		"cell": 150, "zoom": 2.0,
-		"anims": {"idle": ["Flight.png", 8, 10], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Flight.png", 8, 10], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"mushroom": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Mushroom/",
 		"cell": 150, "zoom": 2.2,
-		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 12], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
 	},
 	"worm": {
 		"dir": "res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/",
 		"cell": 90, "zoom": 1.4,
-		"anims": {"idle": ["Idle.png", 9, 10], "attack": ["Attack.png", 16, 16], "hit": ["Get Hit.png", 3, 12], "death": ["Death.png", 8, 10]},
+		"anims": {"idle": ["Idle.png", 9, 10], "attack": ["Attack.png", 16, 24], "hit": ["Get Hit.png", 3, 12], "death": ["Death.png", 8, 10]},
 	},
 	"wizard2": {
 		"dir": "res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/",
 		"cell": 250, "zoom": 1.8,
-		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 12], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
+		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 18], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
 	},
 	# Real Camelot per-enemy art (LuizMelo, CC0), corruption-recolored. Non-square frames.
 	"medieval_warrior": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms/",
 		"fw": 184, "fh": 137, "zoom": 1.5,
-		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 12], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
+		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
 	},
 }
 
@@ -2800,9 +2801,9 @@ func _show_turn_banner(text: String, color: Color) -> void:
 	banner.modulate.a = 0.0
 	add_child(banner)
 	var t = create_tween()
-	t.tween_property(banner, "modulate:a", 1.0, 0.15)
-	t.tween_interval(0.6)
-	t.tween_property(banner, "modulate:a", 0.0, 0.3)
+	t.tween_property(banner, "modulate:a", 1.0, 0.1)
+	t.tween_interval(0.4)
+	t.tween_property(banner, "modulate:a", 0.0, 0.2)
 	t.tween_callback(banner.queue_free)
 
 
@@ -3256,6 +3257,9 @@ func _animate_card_draw() -> void:
 		panel.scale = Vector2(0.0, 0.0)
 		panel.modulate.a = 0.0
 		var t = create_tween().set_parallel(true)
-		t.tween_property(panel, "scale", Vector2.ONE, 0.25).set_delay(delay).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		t.tween_property(panel, "modulate:a", 1.0, 0.15).set_delay(delay)
-		delay += 0.08
+		# from(): the hand's sort resets scale before a delayed tween starts, and without it every
+		# card but the first would skip the pop.
+		t.tween_property(panel, "scale", Vector2.ONE, 0.18).from(Vector2.ZERO).set_delay(delay) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		t.tween_property(panel, "modulate:a", 1.0, 0.12).set_delay(delay)
+		delay += 0.05

@@ -117,9 +117,9 @@ void fragment() {
 		card_row.add_child(panel)
 		card_panels[card] = panel
 		var t = create_tween().set_parallel(true)
-		t.tween_property(panel, "modulate:a", 1.0, 0.4).set_delay(delay + 0.2)
-		t.tween_property(panel, "position:y", 0, 0.4).set_delay(delay + 0.2).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		delay += 0.15
+		t.tween_property(panel, "modulate:a", 1.0, 0.24).set_delay(delay + 0.1)
+		t.tween_property(panel, "position:y", 0, 0.24).set_delay(delay + 0.1).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		delay += 0.08
 
 	# Skip button
 	var skip_btn = Button.new()

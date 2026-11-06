@@ -159,11 +159,11 @@ func _build_ui() -> void:
 	# Animate entrance
 	var tween = create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(title, "modulate:a", 1.0, 1.2).set_delay(0.3)
-	tween.tween_property(subtitle, "modulate:a", 1.0, 1.0).set_delay(0.8)
-	tween.tween_property(tagline, "modulate:a", 1.0, 1.0).set_delay(1.5)
-	tween.tween_property(start_btn, "modulate:a", 1.0, 0.8).set_delay(2.0)
-	tween.tween_property(settings_btn, "modulate:a", 1.0, 0.8).set_delay(2.3)
+	tween.tween_property(title, "modulate:a", 1.0, 0.8).set_delay(0.1)
+	tween.tween_property(subtitle, "modulate:a", 1.0, 0.7).set_delay(0.25)
+	tween.tween_property(tagline, "modulate:a", 1.0, 0.7).set_delay(0.4)
+	tween.tween_property(start_btn, "modulate:a", 1.0, 0.5).set_delay(0.6)
+	tween.tween_property(settings_btn, "modulate:a", 1.0, 0.5).set_delay(0.7)
 
 
 func _add_vignette() -> void:
