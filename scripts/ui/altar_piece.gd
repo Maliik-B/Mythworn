@@ -5,17 +5,28 @@ extends SetPiece
 ## left to right as the one it had inks in behind it, the thing itself coming back in the same sweep.
 ## Then the relic's own sentence of waking. Every word here is the relic's own data.
 ##
+## The plinth, the light and the words are chrome. The figures are owned art, one data slot each.
+##
 ## Trigger, once a run has started:
-##   await AltarPiece.play(parent, "A Bare Scabbard").finished
+##   await AltarPiece.play(parent, AltarPiece.HERO_RELIC).finished
 
-const PIXEL := 8
-const PLINTH_TOP := 450.0
-const PLINTH_W := 80
-const PLINTH_H := 24
-const NAME_Y := 672.0
+## The stage's one grid, in screen pixels. Every figure's scale is a whole multiple of it.
+const GRID := 6
+const PLINTH_TOP := 470.0
+const PLINTH_W := 90
+const PLINTH_H := 26
+const NAME_Y := 650.0
 const NAME_WIDTH := 1200.0
 
-const SHIELD_ICON := "res://assets/sprites/icons/in_the_void/individual/shield.png"
+## The relics that have art: a sprite on transparent ground and the screen pixels per art pixel. The
+## worn form is the same art with its colour taken out. A relic not listed stands on its name alone,
+## so a bought sprite is one line here and nothing else.
+const FIGURES := {
+	"A Plain Shield": {"path": "res://assets/sprites/icons/in_the_void/individual/shield.png", "scale": 12},
+}
+## The relic the clip stages: the one with real art for now. A Bare Scabbard is the better word if it
+## gets a sprite; until then it stands on its name.
+const HERO_RELIC := "A Plain Shield"
 
 
 ## Stages the waking of this dormant relic. Reads names and line from RelicPool.
@@ -36,14 +47,14 @@ func _run(dormant_name: String) -> void:
 
 	world.modulate = Color(0, 0, 0, 1)
 	# The shaft falls behind the plinth and the thing on it, so the thing keeps its own colour.
-	var shaft := add_shaft(960.0, 820.0, Color(1.0, 0.95, 0.84), 0.0, PLINTH_TOP + PLINTH_H * PIXEL)
-	var plinth_x := VIEW.x / 2.0 - PLINTH_W * PIXEL / 2.0
-	var plinth := add_figure(SetPiece.pixel_texture(_plinth_image(), PIXEL), Vector2(plinth_x, PLINTH_TOP))
+	var shaft := add_shaft(960.0, 820.0, Color(1.0, 0.95, 0.84), 0.0, PLINTH_TOP + PLINTH_H * GRID)
+	var plinth_x := VIEW.x / 2.0 - PLINTH_W * GRID / 2.0
+	var plinth := add_figure(SetPiece.pixel_texture(_plinth_image(), GRID), Vector2(plinth_x, PLINTH_TOP))
 	plinth.modulate = Color(0.75, 0.75, 0.75)
 
 	# The thing itself: the worn form, then the woken form over it, written in by the same sweep as
 	# the name. A relic with no figure yet stands on its name alone.
-	var figures := _figures_for(dormant_name)
+	var figures := AltarPiece.figures_for(dormant_name)
 	var worn: Sprite2D = null
 	var whole: Sprite2D = null
 	if not figures.is_empty():
@@ -53,7 +64,7 @@ func _run(dormant_name: String) -> void:
 		worn = add_figure(worn_tex, at)
 		whole = add_figure(whole_tex, at)
 		make_inkable(whole, 0.0, whole_tex.get_width())
-	var veil := add_shaft(960.0, 620.0, Color(1.0, 0.95, 0.84), 0.0, PLINTH_TOP + PLINTH_H * PIXEL)
+	var veil := add_shaft(960.0, 620.0, Color(1.0, 0.95, 0.84), 0.0, PLINTH_TOP + PLINTH_H * GRID)
 
 	var old_name := add_line(dormant.relic_name, TITLE_FACE, 72, ASH, NAME_Y, NAME_WIDTH)
 	var new_name := add_line(woken.relic_name, TITLE_FACE, 72, GOLD, NAME_Y, NAME_WIDTH)
@@ -95,7 +106,7 @@ func _run(dormant_name: String) -> void:
 		ink_in(whole, 1.6)
 	await beat(2.0)
 
-	var line := add_line(dormant.wake_line, BODY_FACE, 50, BONE, 776.0)
+	var line := add_line(dormant.wake_line, BODY_FACE, 50, BONE, 752.0)
 	ink_in(line, 0.7)
 	await beat(2.8)
 	await close()
@@ -119,103 +130,23 @@ func _plinth_image() -> Image:
 	return image
 
 
-## The worn and woken forms of a relic's figure, or empty if it has none yet. Relic art is a
-## commission: the scabbard is plain code-drawn chrome until then, and the shield is the licensed
-## icon, drained for its worn form.
-func _figures_for(dormant_name: String) -> Dictionary:
-	match dormant_name:
-		"A Bare Scabbard":
-			return {
-				"worn": SetPiece.pixel_texture(_scabbard_image(false), PIXEL),
-				"whole": SetPiece.pixel_texture(_scabbard_image(true), PIXEL),
-			}
-		"A Plain Shield":
-			var icon: Texture2D = load(SHIELD_ICON)
-			var sheet := icon.get_image()
-			sheet.decompress()
-			# Trimmed to the shield itself, or its empty margin floats it above the plinth.
-			var image := sheet.get_region(sheet.get_used_rect())
-			var plain: Image = image.duplicate()
-			for x in plain.get_width():
-				for y in plain.get_height():
-					var c := plain.get_pixel(x, y)
-					var v := c.get_luminance() * 0.7
-					plain.set_pixel(x, y, Color(v, v * 0.98, v * 0.94, c.a))
-			return {
-				"worn": SetPiece.pixel_texture(plain, PIXEL),
-				"whole": SetPiece.pixel_texture(image, PIXEL),
-			}
-	return {}
-
-
-## A long scabbard lying on its side, throat to the left, narrowing a pixel at a time to a small
-## chape. Worn: leather rubbed smooth, one tired brown, the fittings gone dull, the device gone.
-## Whole: the same shape with the tooling back on it and the fittings bright.
-func _scabbard_image(whole: bool) -> Image:
-	var w := 72
-	var h := 12
-	var image := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	var leather := Color(0.36, 0.17, 0.11) if whole else Color(0.25, 0.22, 0.19)
-	var leather_lit := Color(0.50, 0.26, 0.16) if whole else Color(0.33, 0.29, 0.25)
-	var leather_dark := Color(0.21, 0.10, 0.07) if whole else Color(0.15, 0.13, 0.12)
-	var metal := Color(0.82, 0.64, 0.30) if whole else Color(0.34, 0.32, 0.30)
-	var metal_lit := Color(0.97, 0.84, 0.50) if whole else Color(0.44, 0.42, 0.39)
-	var metal_dark := Color(0.50, 0.36, 0.15) if whole else Color(0.22, 0.21, 0.19)
-	var tooling := Color(0.90, 0.72, 0.36)
-	for x in w:
-		var top := _scabbard_top(x)
-		var bottom := _scabbard_bottom(x, h)
-		var fitted := x < 5 or (x >= 14 and x < 17) or x >= 61
-		for y in range(top, bottom + 1):
-			var c := metal if fitted else leather
-			if y == top:
-				c = metal_lit if fitted else leather_lit
-			elif y == bottom:
-				c = metal_dark if fitted else leather_dark
-			image.set_pixel(x, y, c)
-		# The throat's collar stands proud of the body.
-		if x < 3:
-			image.set_pixel(x, top - 1, metal_lit)
-			image.set_pixel(x, bottom + 1, metal_dark)
-	# The ring it hung by, on the locket.
-	for x in [7, 8, 9, 10]:
-		image.set_pixel(x, 0, metal)
-	image.set_pixel(7, 1, metal_dark)
-	image.set_pixel(10, 1, metal_dark)
-	if whole:
-		# The tooling: a running line along each edge and a repeat of small lozenges between.
-		for x in range(18, 60):
-			var top := _scabbard_top(x)
-			var bottom := _scabbard_bottom(x, h)
-			image.set_pixel(x, top + 1, tooling.darkened(0.3))
-			image.set_pixel(x, bottom - 1, tooling.darkened(0.4))
-		for x in range(20, 57, 7):
-			var mid := (_scabbard_top(x + 1) + _scabbard_bottom(x + 1, h)) / 2
-			image.set_pixel(x, mid, tooling)
-			image.set_pixel(x + 2, mid, tooling)
-			image.set_pixel(x + 1, mid - 1, tooling.lightened(0.15))
-			image.set_pixel(x + 1, mid + 1, tooling.darkened(0.1))
-	return image
-
-
-## The scabbard's upper edge at this column: it loses a pixel a side, in turns, toward the tip.
-func _scabbard_top(x: int) -> int:
-	var top := 2
-	if x > 22:
-		top += 1
-	if x > 46:
-		top += 1
-	if x > 67:
-		top += 1
-	return top
-
-
-func _scabbard_bottom(x: int, h: int) -> int:
-	var bottom := h - 3
-	if x > 34:
-		bottom -= 1
-	if x > 58:
-		bottom -= 1
-	if x > 67:
-		bottom -= 1
-	return bottom
+## The worn and woken forms of a relic's figure from its slot, or empty if it has none yet. Trimmed
+## to the thing itself, or an empty margin floats it above the plinth.
+static func figures_for(dormant_name: String) -> Dictionary:
+	if not FIGURES.has(dormant_name):
+		return {}
+	var slot: Dictionary = FIGURES[dormant_name]
+	var art: Texture2D = load(slot["path"])
+	var sheet := art.get_image()
+	sheet.decompress()
+	var image := sheet.get_region(sheet.get_used_rect())
+	var plain: Image = image.duplicate()
+	for x in plain.get_width():
+		for y in plain.get_height():
+			var c := plain.get_pixel(x, y)
+			var v := c.get_luminance() * 0.7
+			plain.set_pixel(x, y, Color(v, v * 0.98, v * 0.94, c.a))
+	return {
+		"worn": SetPiece.pixel_texture(plain, slot["scale"]),
+		"whole": SetPiece.pixel_texture(image, slot["scale"]),
+	}

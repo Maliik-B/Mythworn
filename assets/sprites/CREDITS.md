@@ -40,6 +40,10 @@ modification and commercial use; credited here regardless.
 - **License**: Free for commercial and non-commercial use
 - **Source**: https://in-the-void.itch.io/free-rpg-icons
 
+## Set pieces
+
+The sword in the Excalibur set piece (`assets/sprites/set_pieces/excalibur_sword.png`) is Clockwork Raven's `tile008`, stood upright by rotating it 45 degrees on its own pixel grid; no pixels drawn. The man beside it is the Man-at-Arms above, and the altar's shield is In The Void's `shield.png`, drained for its worn form. The stone, plinth, light and darkness on those stages are code-drawn chrome.
+
 ## Fonts
 
 Both under the SIL Open Font License 1.1; the licence text sits beside each font in `assets/fonts/`.

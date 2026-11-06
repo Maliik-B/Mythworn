@@ -1834,6 +1834,14 @@ func _test_set_pieces() -> void:
 		if woken == null or relic.wake_line == "":
 			altar_ready = false
 	_check("every forgotten relic gives the altar a woken name and a line", altar_ready)
+	var slots_ready := AltarPiece.figures_for(AltarPiece.HERO_RELIC).size() == 2 \
+		and AltarPiece.figures_for("A Bone Comb").is_empty() \
+		and ResourceLoader.exists(ExcaliburPiece.SWORD["path"]) \
+		and ResourceLoader.exists(ExcaliburPiece.CHAMPION["path"])
+	for dormant_name in AltarPiece.FIGURES:
+		if not RelicPool.dormant_names().has(dormant_name):
+			slots_ready = false
+	_check("every art slot on the stages resolves, and a slot names a real forgotten relic", slots_ready)
 
 	var host := Node.new()
 	add_child(host)
@@ -1846,7 +1854,7 @@ func _test_set_pieces() -> void:
 	leave_piece.hurry()
 	await leave_piece.finished
 	ran += 1
-	var altar_piece := AltarPiece.play(host, "A Bare Scabbard")
+	var altar_piece := AltarPiece.play(host, AltarPiece.HERO_RELIC)
 	altar_piece.hurry()
 	await altar_piece.finished
 	ran += 1
