@@ -77,7 +77,7 @@ const LOOKS := {
 		"shadow": Color("9A8F76"),
 		"dim": Color(0.2, 0.18, 0.15, 0.32),
 		"ember": Color("A8531C"),
-		"frost": Color("31507F"),
+		"frost": Color("EEF2F8"),
 		"ink": Color("1E1B18"),
 		"ink_soft": Color("3D3A35"),
 		"bar_back": Color("CFC8B8"),

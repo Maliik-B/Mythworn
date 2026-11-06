@@ -339,6 +339,17 @@ static func realm_shade(mult := 1.0) -> EnemyData:
 ## gimmick: he's the clean new hallway BODY that pairs with the debuff/support enemies
 ## for fresh compositions (added Sep 2026 to thicken the thin roster, #18). The damage
 ## race — block his rhythm or out-pace him.
+## The same man twice in one fight, whole and hollow: the shipped Man-at-Arms, same numbers and same
+## sheet, one with the colour gone. Not in any encounter table, so no seed moves.
+static func whole_and_hollow(mult := 1.0) -> Array[EnemyData]:
+	var whole := man_at_arms(mult)
+	whole.sprite_set = "man_at_arms_whole"
+	var hollow := man_at_arms(mult)
+	hollow.sprite_set = "man_at_arms_whole"
+	hollow.drained = 1.0
+	return [whole, hollow]
+
+
 static func man_at_arms(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
 		_move("Halberd Swing", EnemyMove.IntentType.ATTACK,

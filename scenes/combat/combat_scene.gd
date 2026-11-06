@@ -119,6 +119,12 @@ const SPRITE_SETS := {
 		"fw": 184, "fh": 137,
 		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
 	},
+	# The Man-at-Arms in living colour: the source the shader drains for the hollow one beside him.
+	"man_at_arms_whole": {
+		"dir": "res://assets/sprites/enemies/camelot/man_at_arms_whole/",
+		"fw": 184, "fh": 137,
+		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
+	},
 	# Real Camelot per-enemy art (LuizMelo, CC0), corruption-recolored. Non-square frames.
 	"medieval_warrior": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms/",
@@ -277,6 +283,7 @@ func _build_enemy_body(set_key: String, enemy) -> Control:
 	portrait.position = -Vector2(body.position) * scale_px
 	var mat := ShaderMaterial.new()
 	mat.shader = STAGE_BODY_SHADER
+	mat.set_shader_parameter("drain", enemy.enemy_data.drained)
 	if StageSkin.is_page():
 		var values := _sheet_values(set_key)
 		mat.set_shader_parameter("page", true)
@@ -1752,7 +1759,9 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 
 	# Animated spritesheet (idle loops; attack/hit/death play on combat events, then fall back to
 	# idle). See SPRITE_SETS / _build_enemy_body.
-	var set_key: String = ENEMY_SPRITE_SET.get(enemy.enemy_data.enemy_name, "")
+	var set_key: String = enemy.enemy_data.sprite_set
+	if set_key == "":
+		set_key = ENEMY_SPRITE_SET.get(enemy.enemy_data.enemy_name, "")
 	var stand: Control
 	if set_key != "" and SPRITE_SETS.has(set_key):
 		stand = _build_enemy_body(set_key, enemy)

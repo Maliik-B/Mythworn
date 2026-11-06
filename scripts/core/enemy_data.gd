@@ -7,6 +7,11 @@ extends Resource
 @export var moves: Array[EnemyMove] = []
 @export var sprite: Texture2D
 
+## This one enemy's look on the stage, when it is not its name's usual one: a sprite set in
+## combat_scene's SPRITE_SETS, and how much of its colour has gone, 0 to 1.
+var sprite_set: String = ""
+var drained: float = 0.0
+
 ## Statuses the enemy begins combat with, as [StatusEffectData, stacks] pairs. Lets an
 ## enemy be "armed" from turn 1 (e.g. an Enraged-retaliation elite) without having to
 ## roll a setup move first. Built in code by EnemyPool, so left untyped.

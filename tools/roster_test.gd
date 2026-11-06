@@ -70,6 +70,7 @@ func _ready() -> void:
 	await _test_chilled_freeze()
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
+	_test_whole_and_hollow()
 	_test_rewards_follow_the_run_seed()
 	_test_harness_copy_matches_engine()
 	_test_harness_copy_card_rules()
@@ -2530,6 +2531,22 @@ func _test_inner_fire_copies_itself() -> void:
 ## 6.9 GB. Fights a few real instant combats the way the harness does and checks the object
 ## count comes back to where it started. The first fight is a warm-up, since a first combat can
 ## build things once (caches, registries) that are meant to stay.
+## The side-by-side fight is one man twice: same numbers, same sheet, only the colour differs.
+func _test_whole_and_hollow() -> void:
+	var pair := EnemyPool.whole_and_hollow()
+	var plain := EnemyPool.man_at_arms()
+	var whole := pair[0]
+	var hollow := pair[1]
+	_check("whole and hollow are the shipped Man-at-Arms", whole.enemy_name == plain.enemy_name
+		and hollow.enemy_name == plain.enemy_name and whole.max_health == plain.max_health
+		and hollow.max_health == plain.max_health and hollow.moves.size() == plain.moves.size())
+	_check("whole and hollow stand on the same sheet, and only one is drained",
+		whole.sprite_set == hollow.sprite_set and whole.drained == 0.0 and hollow.drained == 1.0)
+	var scene_script: GDScript = load("res://scenes/combat/combat_scene.gd")
+	_check("their sheet is in the sprite sets", scene_script.SPRITE_SETS.has(whole.sprite_set))
+	_check("a plain Man-at-Arms keeps the shipped look", plain.sprite_set == "" and plain.drained == 0.0)
+
+
 func _test_combat_retains_nothing() -> void:
 	var policy := HarnessCombat.new()
 	_fight_instant_combat(policy)
