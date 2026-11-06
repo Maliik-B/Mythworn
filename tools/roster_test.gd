@@ -3949,28 +3949,39 @@ func _test_crossing_stage() -> void:
 		picked != null and picked.floor_num >= 8 and picked.floor_num <= 10 and picked.quest_payoff_id == &""
 		and picked.quest_giver_id == &"" and picked.scripted_event_id == &"")
 	_check("it holds the map while it plays", scene._pledge_anim_active)
-	_check("the far side waits for the cut", not crossing._far.visible)
+	_check("the other map waits for the step", crossing._cold_mat.get_shader_parameter("reach") == 0.0)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check("it adds nothing to the legend", _legend_words(scene) == legend_before)
 	_check("it changes no map data", _map_fingerprint(map) == data_before)
+	_check("the other map never reaches the run", RunManager.current_map == map)
+	var cold_ids: Array = crossing._cold_nodes
+	_check("the other map has nodes of its own", cold_ids.size() >= 10)
+	var colours := {}
+	var whole := true
+	for destination in CrossingStage.CROSSING_LOOKS:
+		var look: Dictionary = CrossingStage.CROSSING_LOOKS[destination]
+		whole = whole and look.has("glyph") and look.has("color")
+		colours[look.get("color")] = true
+	_check("every destination has a look of its own colour",
+		whole and colours.size() == CrossingStage.CROSSING_LOOKS.size())
+	_check("the crossing shown wears its destination's colour",
+		crossing._node_btn.get_theme_stylebox("normal").border_color
+		== CrossingStage.CROSSING_LOOKS[CrossingStage.SWAP_REALM]["color"])
+	var icon_look: Dictionary = crossing._node_btn.get_meta("look")
+	_check("the icon's face leaves its look and legend entry alone", icon_look == picked.look())
 
 	crossing.step_through()
-	_check("the cut brings the far side up whole, in one call", crossing._far.visible)
-	var hand: Array = crossing._far.words.get_children()
-	var all_cards := hand.size() == CrossingStage.HAND_SIZE
-	for card in hand:
-		all_cards = all_cards and card is PanelContainer
-	_check("the only words on the far side are the hand's", all_cards)
-	var named := false
-	for layer in [crossing._far.world, crossing._far.fore]:
-		for child in layer.get_children():
-			named = named or child is Label
+	for i in 3:
+		await get_tree().process_frame
+	_check("the swap is one call", crossing._cold_mat.get_shader_parameter("reach") > 0.0)
+	var worded := false
 	for prop in crossing._props:
-		named = named or prop is Label
-	_check("nothing else on the stage carries a word", not named)
+		worded = worded or prop is Label
+	_check("nothing on the stage carries a word", not worded)
+	_check("nothing is left to say where you were", crossing._header != null)
 	for layer in CrossingStage.COLD_LAYERS:
-		_check("the far side's layer exists: %s" % layer[0], ResourceLoader.exists(CrossingStage.COLD_DIR + layer[0]))
+		_check("the other map's layer exists: %s" % layer[0], ResourceLoader.exists(CrossingStage.COLD_DIR + layer[0]))
 
 	crossing.close()
 	await get_tree().process_frame
@@ -3979,6 +3990,8 @@ func _test_crossing_stage() -> void:
 	for id in scene.node_buttons:
 		all_back = all_back and scene.node_buttons[id].modulate.a > 0.0
 	_check("every node it hid is back", all_back)
+	_check("the icon is an ordinary node again", crossing_node_text(scene, picked))
+	_check("the header is back", scene._legend_row.get_parent().get_parent().get_parent().modulate.a == 1.0)
 	_check("the map's data is still as it was", _map_fingerprint(map) == data_before)
 
 	# Each look of the light, and the road the ink-fading one has to give back.
@@ -3999,6 +4012,10 @@ func _test_crossing_stage() -> void:
 	scene.queue_free()
 	await get_tree().process_frame
 	RunManager.current_map = null
+
+
+func crossing_node_text(scene: Node, node: MapNode) -> bool:
+	return scene.node_buttons[node.id].text == node.look()["glyph"]
 
 
 func _map_fingerprint(map: MapData) -> String:

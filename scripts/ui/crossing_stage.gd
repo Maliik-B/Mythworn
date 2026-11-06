@@ -1,31 +1,36 @@
 class_name CrossingStage
 extends MapFlourish
 ## The crossing, staged for the clip. Nothing in the game calls this and it changes no map data: the
-## real node is built elsewhere and stays out of the clip. At one map node a slit of plain light opens,
-## white snow is driven out of it along the field, the ground takes a low drift of white, then one hard
-## cut to a cold frame with your hand of cards on screen. Nothing here carries a word: it is unnamed.
-## Light picks the look of the light, to choose between by eye.
+## real node is built elsewhere and stays out of the clip. By default the crossing is only its node
+## icon: a face of plain light, a ring in its destination's colour, and a little fine snow drifting off
+## it. Each destination has its own colour, so a player can hunt for the one they want and can read
+## where a crossing goes before stepping on it. Stepping through swaps the map
+## itself. The other map's ground turns up outward from the icon on a stepped front, each node pinching
+## shut or opening as the front reaches it, until the whole map is a different one with the icon still
+## where it was, now the way back. Nothing here carries a word: it is unnamed. The other map is a
+## throwaway from the generator and never reaches the run. Light.SLIT, EATEN and NONE are the earlier
+## looks, with their hard cut to a cold frame and the hand.
 ##
-## The light has no glow, swirl, rim or tear. The snow is flat white, and shrinks to nothing rather
-## than fading, because white at part alpha over a dark field reads as grey. It flies more than it
-## falls, sparse and far, because snow pouring down from one point onto a round white reads as a spill.
-## Camelot's palette around it is left alone: no dimming and no cold tint on this side of the cut. No
-## creatures on the far one.
+## The light has no glow, swirl, rim or tear: it is the icon's own face, in one flat tone, with nothing
+## behind it. The snow is flat white, and shrinks to nothing rather than fading, because white at part
+## alpha over a dark field reads as grey. Camelot's palette is left alone until the front reaches it.
+## No creatures, and none of the other realm's aurora or wisps.
 ##
 ## Trigger, on a map scene open for at least two frames:
 ##   var crossing := CrossingStage.play(get_tree().current_scene)
-##   await crossing.stepped  # the frame of the hard cut
-##   await crossing.held     # about 3 s in; the cold frame stays up until crossing.close()
+##   await crossing.stepped  # the frame the swap starts
+##   await crossing.held     # about 3 s in; the other map stays up until crossing.close()
 
 signal stepped
 signal held
 
 enum Light {
+	ICON,  # the node's own face is the light, and stepping through swaps the map
 	SLIT,  # a slit a person could only just step through, opening slowly
 	EATEN,  # a patch with its edge eaten back, thin enough for the map to show through
 	NONE,  # no shape: only the snow, the white, and the map's own ink fading where it falls
 }
-const DEFAULT_LIGHT := Light.SLIT
+const DEFAULT_LIGHT := Light.ICON
 
 # The far side's layers, back to front, on the 384x216 grid: Admurin's Snowy Mountains, in its own
 # palette. [file, rows lifted], so the trees stand clear of the hand's row. Flat snow under the lot.
@@ -43,6 +48,52 @@ const COLD_PIXEL := 5
 const SUN_AT := Vector2(915, 105)  # the sun like the moon, flat, over the first layer
 const SUN_RADIUS := 13
 const SUN_COLOR := Color(0.84, 0.84, 0.81)
+
+# One look per destination: a crossing node wears the colour of where it goes. Glyphs are the real
+# node's placeholders, and this is the same table as MapNode.CROSSING_LOOKS on the realm branch.
+const CROSSING_LOOKS := {
+	&"yggdrasil": {"glyph": "❄", "color": Color(0.42, 0.55, 0.78)},
+	&"camelot": {"glyph": "☀", "color": Color(0.99, 0.83, 0.42)},
+}
+const SWAP_HOME := &"camelot"
+
+# The icon.
+const ICON_ON_FRAME := Vector2(960, 540)
+const ICON_STEP_AT := 1.5
+const ICON_FROM_ZOOM := 1.5
+const ICON_TO_ZOOM := 1.62
+const ICON_FACE := Color(0.94, 0.94, 0.92)
+const ICON_INK := Color(0.16, 0.2, 0.27)
+const ICON_RING := 7
+const ICON_FONT := 26
+const ICON_BREATH := 0.75  # seconds each way, at the scale below: enough to catch the eye, no more
+const ICON_BREATH_SCALE := 1.1
+const ICON_SNOW_AMOUNT := 24
+const ICON_SNOW_LIFETIME := 1.3
+const ICON_SNOW_SPEED := Vector2(18, 42)  # canvas units a second, so it stays near the icon's footprint
+const ICON_SNOW_SCALE := Vector2(1.0, 1.7)
+const ICON_SNOW_DRIFT := Vector2(0.45, 1.0)
+const ICON_SNOW_SPREAD := 50.0
+const ICON_SNOW_FROM := 16.0
+
+# The swap: a front running out from the icon at one speed, while the camera lets go to show the map.
+const SWAP_LEN := 0.85
+const SWAP_REACH := 1100.0  # canvas units
+const SWAP_END_ZOOM := 1.08
+const SWAP_FLIP := 0.09  # each half of a node's turn
+const SWAP_POP := 1.22
+const SWAP_HEADER_OUT := 0.18
+const SWAP_ROAD_FEATHER := 36.0
+const SWAP_ROAD_WIDTH := 3.0
+const SWAP_SNOW_AMOUNT := 170
+const SWAP_SNOW_SPEED := Vector2(120, 210)  # frame pixels a second
+const SWAP_SNOW_SCALE := Vector2(1.0, 2.0)
+const SWAP_GRAPH_SEED := 7741  # a fixed throwaway map, so every take is the same one
+const SWAP_REALM := &"yggdrasil"
+const SWAP_ICE_MIX := 0.05  # how much of a node's own colour stays: more, and red turns mauve
+# The cold map's rows lifted, as COLD_LAYERS, only far enough to clear the bottom bar.
+const COLD_MAP_LIFTS: Array[int] = [0, 2, 4, 6, 6]
+const COLD_MAP_GROUND_FROM := 203
 
 const STEP_AT := 1.9
 const HELD_AT := 3.0
@@ -86,6 +137,7 @@ const HAND_STEP := 210.0
 const SLIT_SHADER := preload("res://assets/shaders/plain_light.gdshader")
 const EATEN_SHADER := preload("res://assets/shaders/eaten_light.gdshader")
 const GROUND_SHADER := preload("res://assets/shaders/snow_patch.gdshader")
+const COLD_GROUND_SHADER := preload("res://assets/shaders/cold_ground.gdshader")
 
 ## Where the node stands on the frame, for a drawn cursor to step onto.
 var target_on_frame := NODE_ON_FRAME
@@ -97,6 +149,17 @@ var _stepped := false
 var _light := DEFAULT_LIGHT
 var _inked_roads: Array[Line2D] = []
 var _inked_nodes: Array[Button] = []
+var _at := Vector2.ZERO
+var _camera_tween: Tween
+var _icon_snow: CPUParticles2D
+var _cold_rect: TextureRect
+var _cold_mat: ShaderMaterial
+var _cold_snow: CPUParticles2D
+var _cold_roads: Array[Line2D] = []
+var _old_roads: Array[Line2D] = []
+var _cold_nodes: Array[Button] = []
+var _header: Control
+var _ice := Color.WHITE
 
 
 ## Starts the shot on an open map scene. `node_id` -1 picks an ordinary node on floors 8 to 10.
@@ -113,8 +176,11 @@ func step_through() -> void:
 	if _stepped:
 		return
 	_stepped = true
-	_far.visible = true
-	_far.zoom_to(1.035, HELD_AT - STEP_AT + 0.5)
+	if _light == Light.ICON:
+		_swap_the_map()
+	else:
+		_far.visible = true
+		_far.zoom_to(1.035, HELD_AT - STEP_AT + 0.5)
 	stepped.emit()
 
 
@@ -124,6 +190,12 @@ func close() -> void:
 		_far.queue_free()
 	for road in _inked_roads:
 		road.gradient = null
+	for road in _old_roads:
+		road.gradient = null
+	if _light == Light.ICON and is_instance_valid(_node_btn):
+		_take_off_the_face(_node_btn)
+	if is_instance_valid(_header):
+		_header.modulate.a = 1.0
 	finish_now()
 
 
@@ -137,8 +209,11 @@ func _run(map_scene: Node, node_id: int) -> void:
 	var map: MapData = RunManager.current_map
 	var node: MapNode = map.get_node(node_id) if node_id >= 0 else _pick_node(map)
 	_node_btn = _scene.node_buttons[node.id]
-	_node_btn.modulate.a = 0.0  # no glyph to name it: the light stands where the node did
 	var at: Vector2 = _scene._get_node_center(node)
+	if _light == Light.ICON:
+		_run_icon(at)
+		return
+	_node_btn.modulate.a = 0.0  # no glyph to name it: the light stands where the node did
 
 	_begin(Rect2(NODE_ON_FRAME - Vector2.ONE, Vector2(2, 2)))
 	_camera_step(1.0, _focus, _zoom, at, FROM_ZOOM)
@@ -183,6 +258,241 @@ func _pick_node(map: MapData) -> MapNode:
 			best_off = off
 			best = n
 	return best
+
+
+# ============================================================
+# THE ICON, AND THE SWAP
+# ============================================================
+
+func _run_icon(at: Vector2) -> void:
+	_at = at
+	target_on_frame = ICON_ON_FRAME
+	_begin(Rect2(ICON_ON_FRAME - Vector2.ONE, Vector2(2, 2)))
+	_camera_step(1.0, _focus, _zoom, at, ICON_FROM_ZOOM)
+	_camera_tween = _tween()
+	_camera_tween.tween_method(_camera_step.bind(at, ICON_FROM_ZOOM, at, ICON_TO_ZOOM), 0.0, 1.0, ICON_STEP_AT)
+
+	_put_on_the_face(_node_btn, CROSSING_LOOKS[SWAP_REALM])
+	var breath := _tween().set_loops()
+	breath.tween_property(_node_btn, "scale", Vector2(ICON_BREATH_SCALE, ICON_BREATH_SCALE), ICON_BREATH) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	breath.tween_property(_node_btn, "scale", Vector2.ONE, ICON_BREATH) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	_icon_snow = _make_snow(ICON_SNOW_AMOUNT, ICON_SNOW_LIFETIME, ICON_SNOW_SPEED, ICON_SNOW_SCALE)
+	_icon_snow.direction = ICON_SNOW_DRIFT.normalized()
+	_icon_snow.spread = ICON_SNOW_SPREAD
+	_icon_snow.position = at
+	_icon_snow.emission_rect_extents = Vector2(ICON_SNOW_FROM, ICON_SNOW_FROM)
+	_canvas.add_child(_icon_snow)
+	_props.append(_icon_snow)
+
+	_build_the_other_map(at)
+
+	var timeline := _tween_at(ICON_STEP_AT)
+	timeline.tween_callback(step_through)
+	timeline.tween_interval(HELD_AT - ICON_STEP_AT)
+	timeline.tween_callback(func() -> void: held.emit())
+
+
+## The icon's face is the plain light: one flat tone, with nothing shining around it. Its ring is the
+## ring every node has, in the colour of where it goes. Worn on the button directly, so its look and its
+## place in the legend stay what they were. close() takes it off.
+func _put_on_the_face(btn: Button, look: Dictionary) -> void:
+	var face := StyleBoxFlat.new()
+	face.set_corner_radius_all(_scene.NODE_SIZE / 2)
+	face.bg_color = ICON_FACE
+	face.set_border_width_all(ICON_RING)
+	face.border_color = look["color"]
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		btn.add_theme_stylebox_override(state, face)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		btn.add_theme_color_override(state, ICON_INK)
+	btn.add_theme_font_size_override("font_size", ICON_FONT)
+	btn.text = look["glyph"]
+	btn.modulate = Color.WHITE
+	btn.pivot_offset = btn.size / 2.0
+	btn.z_index = RAISED_Z
+	if not _raised.has(btn):
+		_raised.append(btn)
+
+
+func _take_off_the_face(btn: Button) -> void:
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		btn.remove_theme_color_override(state)
+	_scene._paint_node(btn, btn.get_meta("look"))
+
+
+## Built hidden and whole before the shot needs it, so the swap has nothing still loading.
+func _build_the_other_map(at: Vector2) -> void:
+	var accent: Color = RealmRegistry.get_realm(SWAP_REALM).get_accent_for_act(1)
+	_ice = accent.lerp(Color.WHITE, 0.55)
+	_build_cold_ground()
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SWAP_GRAPH_SEED
+	var map: MapData = MapGenerator.generate(rng, SWAP_REALM, 1, 1.0, false)
+	# The whole map is nudged so one of its nodes lands on the icon: the icon stays where it is, and it
+	# is the world around it that has changed.
+	var landing: MapNode = null
+	var best := INF
+	for id in map.nodes:
+		var d: float = _scene._get_node_center(map.nodes[id]).distance_squared_to(at)
+		if d < best:
+			best = d
+			landing = map.nodes[id]
+	var nudge: Vector2 = at - _scene._get_node_center(landing)
+
+	var first_button := 0
+	for i in _canvas.get_child_count():
+		var child := _canvas.get_child(i)
+		if child is Line2D and child.points.size() == 2 and not _props.has(child):
+			_old_roads.append(child)
+		if child is Button:
+			first_button = i
+			break
+	for id in map.nodes:
+		var node: MapNode = map.nodes[id]
+		var from: Vector2 = _scene._get_node_center(node) + nudge
+		for next_id in node.next_nodes:
+			var road := Line2D.new()
+			road.add_point(from)
+			road.add_point(_scene._get_node_center(map.get_node(next_id)) + nudge)
+			road.width = SWAP_ROAD_WIDTH
+			road.default_color = Color(_ice.r, _ice.g, _ice.b, 0.85)
+			road.gradient = Gradient.new()
+			road.visible = false
+			_canvas.add_child(road)
+			_canvas.move_child(road, first_button)
+			first_button += 1
+			_props.append(road)
+			_cold_roads.append(road)
+		if node == landing:
+			continue
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(_scene.NODE_SIZE, _scene.NODE_SIZE)
+		btn.size = btn.custom_minimum_size
+		btn.position = from - btn.size / 2.0
+		btn.pivot_offset = btn.size / 2.0
+		btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.scale = Vector2(0.0, 1.0)
+		_scene._paint_node(btn, _cold_look(node.look()))
+		btn.visible = false
+		_canvas.add_child(btn)
+		_props.append(btn)
+		_cold_nodes.append(btn)
+
+
+## A node of the other map keeps its glyph, in the realm's own cold palette.
+func _cold_look(look: Dictionary) -> Dictionary:
+	var cold := look.duplicate()
+	cold["color"] = _ice.lerp(look["color"], SWAP_ICE_MIX)
+	return cold
+
+
+## The pack's layers flattened into one picture, under the map's canvas and over everything Camelot
+## has behind it, with the bottom bar left on top. Its front stays at nothing until the swap.
+func _build_cold_ground() -> void:
+	var picture: Image = null
+	for i in COLD_LAYERS.size():
+		var layer: Texture2D = load(COLD_DIR + COLD_LAYERS[i][0])
+		var image: Image = layer.get_image()
+		image.convert(Image.FORMAT_RGBA8)
+		if picture == null:
+			picture = image
+			picture.blend_rect(_sun_image(), Rect2i(Vector2i.ZERO, _sun_image().get_size()), Vector2i(SUN_AT / COLD_PIXEL))
+			continue
+		if i == COLD_LAYERS.size() - 1:
+			var rows := picture.get_height() - COLD_MAP_GROUND_FROM
+			picture.fill_rect(Rect2i(0, COLD_MAP_GROUND_FROM, picture.get_width(), rows), COLD_GROUND)
+		picture.blend_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i(0, -COLD_MAP_LIFTS[i]))
+	_cold_rect = TextureRect.new()
+	_cold_rect.texture = SetPiece.pixel_texture(picture, COLD_PIXEL)
+	_cold_rect.size = SetPiece.VIEW
+	_cold_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cold_mat = ShaderMaterial.new()
+	_cold_mat.shader = COLD_GROUND_SHADER
+	_cold_mat.set_shader_parameter("center", ICON_ON_FRAME)
+	_cold_mat.set_shader_parameter("reach", 0.0)
+	_cold_rect.material = _cold_mat
+	_scene.add_child(_cold_rect)
+	_scene.move_child(_cold_rect, _scene.scroll_container.get_index() - 1)
+	_props.append(_cold_rect)
+	_cold_snow = _make_snow(SWAP_SNOW_AMOUNT, FAR_LIFETIME, SWAP_SNOW_SPEED, SWAP_SNOW_SCALE)
+	_cold_snow.emitting = false
+	_cold_rect.add_child(_cold_snow)
+
+
+## One place giving way to another: the front runs out from the icon, and each thing turns over as it
+## is reached, by distance alone, so the swap is one motion and no node is a beat of its own.
+func _swap_the_map() -> void:
+	if _camera_tween != null and _camera_tween.is_valid():
+		_camera_tween.kill()
+	_icon_snow.emitting = false
+	_cold_snow.emitting = true
+	_cold_snow.position = ICON_ON_FRAME
+	for road in _old_roads:
+		road.gradient = Gradient.new()  # runs black to white until _set_front gives it its colours
+	_set_front(0.0)
+	for road in _cold_roads:
+		road.visible = true
+	_tween().tween_method(_camera_step.bind(_at, _zoom, _at, SWAP_END_ZOOM), 0.0, 1.0, SWAP_LEN) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_tween().tween_method(_set_front, 0.0, SWAP_REACH, SWAP_LEN)
+
+	var speed := SWAP_REACH / SWAP_LEN
+	for id in _scene.node_buttons:
+		var btn: Button = _scene.node_buttons[id]
+		if btn == _node_btn:
+			continue
+		if not _raised.has(btn):
+			_raised.append(btn)
+		var out := _tween_at((btn.position + btn.size / 2.0).distance_to(_at) / speed)
+		btn.pivot_offset = btn.size / 2.0
+		out.tween_property(btn, "scale:x", 0.0, SWAP_FLIP).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		out.tween_callback(func() -> void: btn.modulate.a = 0.0)
+	for btn in _cold_nodes:
+		var open := _tween_at((btn.position + btn.size / 2.0).distance_to(_at) / speed)
+		open.tween_callback(func() -> void:
+			btn.visible = true
+			btn.scale = Vector2(0.0, SWAP_POP))
+		open.tween_property(btn, "scale:x", SWAP_POP, SWAP_FLIP).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		open.tween_property(btn, "scale", Vector2.ONE, SWAP_FLIP * 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	# The icon turns over too, in place: it is the way back now, so it wears the colour of home.
+	var turn := _tween()
+	turn.tween_property(_node_btn, "scale:x", 0.0, SWAP_FLIP).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	turn.tween_callback(_put_on_the_face.bind(_node_btn, CROSSING_LOOKS[SWAP_HOME]))
+	turn.tween_property(_node_btn, "scale:x", 1.0, SWAP_FLIP).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	# Nothing on the frame may still say where you were.
+	_header = _scene._legend_row.get_parent().get_parent().get_parent()
+	_tween().tween_property(_header, "modulate:a", 0.0, SWAP_HEADER_OUT)
+
+
+func _set_front(reach: float) -> void:
+	_cold_mat.set_shader_parameter("reach", reach * _zoom)
+	var on_frame := reach * _zoom
+	_cold_snow.emission_rect_extents = Vector2(minf(on_frame, 1300.0), minf(on_frame, 800.0))
+	for road in _old_roads:
+		_hand_over(road, reach, false)
+	for road in _cold_roads:
+		_hand_over(road, reach, true)
+
+
+## A road turns over along its length as the front passes it: the old map's goes, the new map's comes.
+func _hand_over(road: Line2D, reach: float, arriving: bool) -> void:
+	var offsets := PackedFloat32Array()
+	var colors := PackedColorArray()
+	var col: Color = road.default_color
+	for i in INK_STOPS:
+		var along := float(i) / (INK_STOPS - 1)
+		var reached := smoothstep(reach - SWAP_ROAD_FEATHER, reach + SWAP_ROAD_FEATHER,
+			road.points[0].lerp(road.points[1], along).distance_to(_at))
+		offsets.append(along)
+		colors.append(Color(col.r, col.g, col.b, col.a * ((1.0 - reached) if arriving else reached)))
+	road.gradient.offsets = offsets
+	road.gradient.colors = colors
 
 
 # ============================================================
