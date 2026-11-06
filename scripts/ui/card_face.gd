@@ -10,9 +10,9 @@ extends RefCounted
 const SIZE := Vector2(200, 290)
 
 # The one place the faces name their fonts, so trying another is a one-line change.
-const TITLE_FONT_PATH := "res://assets/fonts/marcellus_sc/MarcellusSC-Regular.ttf"
+const TITLE_FONT_PATH := "res://assets/fonts/grenze_gotisch/GrenzeGotisch-Bold.tres"
 const RULES_FONT_PATH := "res://assets/fonts/eb_garamond/EBGaramond-Variable.ttf"
-const NUMERAL_FONT_PATH := TITLE_FONT_PATH  # the slab's numeral and the cost coin
+const NUMERAL_FONT_PATH := "res://assets/fonts/castoro_titling/CastoroTitling-Regular.ttf"  # the slab's numeral and the cost coin
 
 const INSET := 12.0
 const HEADER_H := 40.0
@@ -31,16 +31,13 @@ const RULES_LINE_SPACING := -2
 const NUMBER_SIZE := 50
 const MAX_PIPS := 4
 
-const INK := Color(0.94, 0.925, 0.886)
-const DIM := Color(0.745, 0.714, 0.667)
-const NUMBER_UP := Color(1.0, 0.77, 0.36)
-const NUMBER_DOWN := Color(0.59, 0.557, 0.557)
-const PASSION_UP := Color(1.0, 0.667, 0.353)
-const PASSION_DOWN := Color(0.51, 0.667, 0.96)
+const NAME_SIZE := 28
+const NAME_SIZE_MIN := 20
+const KIND_SIZE := 13
 
 const TYPE_NAMES := ["Attack", "Skill", "Power"]
 const RARITY_NAMES := ["Starter", "Common", "Uncommon", "Rare"]
-const RARITY_COLORS := [DIM, DIM, Color(0.45, 0.78, 0.95), Color(0.95, 0.8, 0.3)]
+const RARITY_COLORS := ["card_dim", "card_dim", "card_uncommon", "card_rare"]
 
 const NUMBER_GLOW := preload("res://assets/ui/card_number_glow.tres")
 
@@ -59,6 +56,7 @@ static func build(card: CardData, source: CombatantStats, sigil: Control) -> Pan
 
 	var zones := Control.new()
 	panel.add_child(zones)
+	_add_inset(zones)
 	_add_header(zones, card, sigil)
 	_add_name(zones, card)
 
@@ -79,7 +77,7 @@ static func build(card: CardData, source: CombatantStats, sigil: Control) -> Pan
 	rules.size = Vector2(SIZE.x - INSET * 2.0, foot_top - rules_top - 2.0)
 	rules.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rules.add_theme_font_override("font", load(RULES_FONT_PATH))
-	rules.add_theme_color_override("font_color", INK)
+	rules.add_theme_color_override("font_color", StageSkin.c("card_ink"))
 	rules.add_theme_constant_override("line_spacing", RULES_LINE_SPACING)
 	zones.add_child(rules)
 	_set_rules(rules, text["rules"])
@@ -99,38 +97,59 @@ static func show_target(panel: PanelContainer, card: CardData, source: Combatant
 		_apply_number(number, panel.find_child("SlabGlow", true, false), _slab_value(card, source, target))
 
 
-static func _card_style(card: CardData) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.set_corner_radius_all(10)
-	style.set_border_width_all(3)
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			style.bg_color = Color(0.3, 0.12, 0.1)
-			style.border_color = Color(0.9, 0.25, 0.2)
-		CardData.CardType.SKILL:
-			style.bg_color = Color(0.1, 0.14, 0.3)
-			style.border_color = Color(0.25, 0.45, 0.9)
-		CardData.CardType.POWER:
-			style.bg_color = Color(0.28, 0.24, 0.08)
-			style.border_color = Color(0.9, 0.75, 0.15)
-	if card.upgraded:
-		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
+## "attack", "skill", "power" or "curse": which of the look's colours a card takes.
+static func _colour_key(card: CardData) -> String:
 	# Unplayable curses read as sickly and dead: they only clog a hand slot.
 	if card.unplayable:
-		style.bg_color = Color(0.14, 0.13, 0.12)
-		style.border_color = Color(0.46, 0.42, 0.36)
+		return "curse"
+	return ["attack", "skill", "power"][card.card_type]
+
+
+static func _card_style(card: CardData) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	var key := _colour_key(card)
+	style.set_corner_radius_all(0 if StageSkin.is_page() else 10)
+	style.set_border_width_all(2 if StageSkin.is_page() else 3)
+	style.bg_color = StageSkin.c("card_bg_" + key)
+	style.border_color = StageSkin.c("card_edge_" + key)
+	if card.upgraded:
+		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
 	return style
+
+
+## A leaf's inner rule, in a look that has one.
+static func _add_inset(zones: Control) -> void:
+	var color := StageSkin.c("card_inset")
+	if color.a <= 0.0:
+		return
+	var inset := Panel.new()
+	inset.position = Vector2(3, 3)
+	inset.size = SIZE - Vector2(10, 10)
+	var style := StyleBoxFlat.new()
+	style.draw_center = false
+	style.set_border_width_all(1)
+	style.border_color = color
+	inset.add_theme_stylebox_override("panel", style)
+	zones.add_child(inset)
+
+
+## The rules inside a card, between its slab and its foot.
+static func _rule_color(card_style: StyleBoxFlat) -> Color:
+	var color := StageSkin.c("card_inset")
+	return color if color.a > 0.0 else card_style.border_color.darkened(0.3)
 
 
 static func _add_header(zones: Control, card: CardData, sigil: Control) -> void:
 	var coin := PanelContainer.new()
-	coin.position = Vector2(8, 6)
+	coin.position = Vector2(9, 8)
 	coin.size = Vector2(32, 32)
 	var coin_style := StyleBoxFlat.new()
 	coin_style.set_corner_radius_all(16)
-	coin_style.bg_color = Color(0.18, 0.14, 0.06)
+	coin_style.bg_color = StageSkin.c("card_coin_" + _colour_key(card))
 	coin_style.set_border_width_all(2)
-	coin_style.border_color = Color(0.95, 0.8, 0.2)
+	coin_style.border_color = StageSkin.c("card_coin_edge")
+	if coin_style.border_color.a <= 0.0:
+		coin_style.border_color = coin_style.bg_color
 	coin.add_theme_stylebox_override("panel", coin_style)
 	var cost := Label.new()
 	cost.text = card.cost_label()
@@ -138,7 +157,7 @@ static func _add_header(zones: Control, card: CardData, sigil: Control) -> void:
 	cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	cost.add_theme_font_override("font", load(NUMERAL_FONT_PATH))
 	cost.add_theme_font_size_override("font_size", 21)
-	cost.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
+	cost.add_theme_color_override("font_color", StageSkin.c("card_coin_text"))
 	coin.add_child(cost)
 	zones.add_child(coin)
 
@@ -146,9 +165,9 @@ static func _add_header(zones: Control, card: CardData, sigil: Control) -> void:
 	kind.text = _kind_line(card)
 	kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	kind.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	kind.add_theme_font_override("font", load(TITLE_FONT_PATH))
-	kind.add_theme_font_size_override("font_size", 10)
-	kind.add_theme_color_override("font_color", RARITY_COLORS[card.rarity])
+	kind.add_theme_font_override("font", load(RULES_FONT_PATH))
+	kind.add_theme_font_size_override("font_size", KIND_SIZE)
+	kind.add_theme_color_override("font_color", StageSkin.c(RARITY_COLORS[card.rarity]))
 	# Clipped so its first measure, in the default font before the override reaches it, cannot
 	# widen the label and pull the text off centre.
 	kind.clip_text = true
@@ -168,21 +187,38 @@ static func _add_header(zones: Control, card: CardData, sigil: Control) -> void:
 static func _kind_line(card: CardData) -> String:
 	var kind: String = "Memory" if card.is_memory else TYPE_NAMES[card.card_type]
 	var grade: String = "Trick" if card.trick else RARITY_NAMES[card.rarity]
-	return ("%s · %s" % [kind, grade]).to_upper()
+	var line := "%s · %s" % [kind, grade]
+	return line if StageSkin.is_page() else line.to_upper()
 
 
+## The name, a size smaller or on two lines if it needs them, its initial rubricated in a look that
+## does that: red for an attack, lapis for a skill, the logo's own move.
 static func _add_name(zones: Control, card: CardData) -> void:
-	var title := Label.new()
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.text = card.card_name
-	title.position = Vector2(8, NAME_Y)
-	title.size = Vector2(SIZE.x - 16.0, NAME_H)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.add_theme_font_override("font", load(TITLE_FONT_PATH))
-	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_constant_override("line_spacing", -3)
-	title.add_theme_color_override("font_color", INK)
+	var font: Font = load(TITLE_FONT_PATH)
+	var width := SIZE.x - 16.0
+	var font_size := NAME_SIZE
+	while font_size > NAME_SIZE_MIN and font and font.get_string_size(card.card_name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width:
+		font_size -= 2
+	var lines := 1
+	if font and font.get_string_size(card.card_name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width:
+		lines = 2
+	var line_h: float = font.get_height(font_size) - 6.0 if font else 24.0
+	var title := RichTextLabel.new()
+	title.bbcode_enabled = true
+	title.scroll_active = false
+	title.clip_contents = false
+	title.position = Vector2(8, NAME_Y + (NAME_H - line_h * lines) / 2.0 - 3.0)
+	title.size = Vector2(width, line_h * lines + 8.0)
+	title.add_theme_font_override("normal_font", font)
+	title.add_theme_font_size_override("normal_font_size", font_size)
+	title.add_theme_constant_override("line_separation", -6)
+	title.add_theme_color_override("default_color", StageSkin.c("card_ink"))
+	var rubric := StageSkin.c("card_rubric_" + _colour_key(card))
+	if rubric.a > 0.0:
+		title.text = "[center][color=#%s]%s[/color]%s[/center]" % [rubric.to_html(false),
+			card.card_name.substr(0, 1), card.card_name.substr(1)]
+	else:
+		title.text = "[center]%s[/center]" % card.card_name
 	zones.add_child(title)
 
 
@@ -212,9 +248,9 @@ static func _add_slab(zones: Control, card: CardData, card_style: StyleBoxFlat, 
 	slab.position = Vector2(INSET, SLAB_Y)
 	slab.size = Vector2(SIZE.x - INSET * 2.0, SLAB_H)
 	var style := StyleBoxFlat.new()
-	style.bg_color = card_style.bg_color.darkened(0.38)
+	style.bg_color = card_style.bg_color if StageSkin.is_page() else card_style.bg_color.darkened(0.38)
 	style.set_border_width_all(1)
-	style.border_color = card_style.border_color.darkened(0.3)
+	style.border_color = _rule_color(card_style)
 	slab.add_theme_stylebox_override("panel", style)
 	zones.add_child(slab)
 
@@ -251,15 +287,20 @@ static func _apply_number(number: Label, glow: Control, value: Dictionary) -> vo
 	number.text = value["text"]
 	var up: bool = value["number"] > value["printed"]
 	var down: bool = value["number"] < value["printed"]
-	number.add_theme_color_override("font_color", NUMBER_UP if up else (NUMBER_DOWN if down else INK))
+	number.add_theme_color_override("font_color",
+		StageSkin.c("card_number_up") if up else (StageSkin.c("card_number_down") if down else StageSkin.c("card_ink")))
 	if glow:
-		glow.visible = up
+		glow.visible = up and not StageSkin.is_page()
 
 
 ## The card's icon if it has one, else the glyph for its type: the same art today's frame carried.
 static func _make_emblem(card: CardData, card_style: StyleBoxFlat) -> Control:
 	var box := Vector2(SLAB_NUMBER_X, SLAB_H)
 	var icon_file := CardVisuals.icon_path(card.card_name)
+	if icon_file == "" and card.card_type == CardData.CardType.ATTACK:
+		icon_file = CardVisuals.DEFAULT_ATTACK_ICON
+	elif icon_file == "" and card.card_type == CardData.CardType.SKILL:
+		icon_file = CardVisuals.DEFAULT_SKILL_ICON
 	if icon_file != "":
 		var icon := TextureRect.new()
 		icon.texture = load(icon_file)
@@ -268,19 +309,16 @@ static func _make_emblem(card: CardData, card_style: StyleBoxFlat) -> Control:
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		icon.position = Vector2(8, (SLAB_H - 36.0) / 2.0)
 		icon.size = Vector2(36, 36)
-		icon.material = StageSkin.no_purple()
+		icon.material = StageSkin.icon_material()
 		return icon
 	var glyph := Label.new()
-	match card.card_type:
-		CardData.CardType.ATTACK: glyph.text = "⚔"
-		CardData.CardType.SKILL: glyph.text = "◆"
-		CardData.CardType.POWER: glyph.text = "★"
+	glyph.text = "★"
 	glyph.size = box
 	glyph.position = Vector2(2, 0)
 	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	glyph.add_theme_font_size_override("font_size", 24)
-	glyph.add_theme_color_override("font_color", card_style.border_color.lightened(0.3))
+	glyph.add_theme_color_override("font_color", StageSkin.c("card_dim") if StageSkin.is_page() else card_style.border_color.lightened(0.3))
 	glyph.material = StageSkin.no_purple()
 	return glyph
 
@@ -304,14 +342,14 @@ static func _rules_height(font: Font, text: String, width: float, font_size: int
 
 static func _add_foot(zones: Control, card: CardData, card_style: StyleBoxFlat, text: Dictionary, foot_top: float) -> void:
 	var rule := ColorRect.new()
-	rule.color = card_style.border_color.darkened(0.3)
+	rule.color = _rule_color(card_style)
 	rule.position = Vector2(INSET, foot_top)
 	rule.size = Vector2(SIZE.x - INSET * 2.0, 1)
 	zones.add_child(rule)
 
 	var font: Font = load(RULES_FONT_PATH)
 	if text["trick"] != "":
-		var reminder := _foot_label(font, 14, DIM)
+		var reminder := _foot_label(font, 14, StageSkin.c("card_dim"))
 		reminder.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		reminder.text = text["trick"]
 		reminder.position = Vector2(INSET, foot_top + 2.0)
@@ -323,7 +361,7 @@ static func _add_foot(zones: Control, card: CardData, card_style: StyleBoxFlat, 
 
 	if text["passion"] != "":
 		var warm: bool = text["passion_total"] > 0
-		var col := PASSION_UP if warm else PASSION_DOWN
+		var col := StageSkin.c("card_passion_up") if warm else StageSkin.c("card_passion_down")
 		var sentence := _foot_label(font, 15, col)
 		sentence.text = text["passion"]
 		sentence.position = Vector2(INSET + 2.0, foot_top + 2.0)
@@ -339,7 +377,7 @@ static func _add_foot(zones: Control, card: CardData, card_style: StyleBoxFlat, 
 		zones.add_child(pips)
 
 	if card.exhaust:
-		var exhaust := _foot_label(font, 15, DIM)
+		var exhaust := _foot_label(font, 15, StageSkin.c("card_dim"))
 		exhaust.text = "Exhaust"
 		exhaust.position = Vector2(INSET, foot_top + 2.0)
 		exhaust.size = Vector2(SIZE.x - INSET * 2.0 - 2.0, FOOT_H - 4.0)

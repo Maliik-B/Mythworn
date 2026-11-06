@@ -60,6 +60,8 @@ const BODY_FIT_H := STAGE_FEET_Y - 56.0  # a body may rise to the top bar's lowe
 const STATUS_COLUMN_W := 124.0  # beside the feet, on each side, so statuses never move a body
 const ENEMY_MIN_W := 320.0
 const LOG_RECT := Rect2(1370, 68, 520, 624)
+const ENEMY_NAME_SIZE := 40
+const ENEMY_NAME_BOX_H := 40.0
 # A boss's line runs as a subtitle on the ground under his feet, where his name and bar were.
 const STAGE_LINE_RECT := Rect2(440, 562, 1040, 132)  # inside the centre square, for a phone crop
 const STAGE_LINE_SIZE := 46
@@ -67,6 +69,12 @@ const STAGE_LINE_CHARS_PER_SEC := 30.0
 const STAGE_LINE_HOLD := 1.7
 const BREAK_DRAIN_TIME := 1.6
 const COIN_STAGGER := 0.04
+const CARD_HELD_DARK := Color(1.3, 1.3, 1.0, 0.9)
+const CARD_HELD_PAGE := Color(1.05, 1.05, 1.0, 0.96)
+const PLAYER_BAR_H := 54.0
+const STAT_SIZE := 32
+const CAPTION_SIZE := 22
+const END_TURN_H := 266.0
 const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
 const TARGET_LIGHT_FADE := 0.08
 const DRAG_CARD_CLEARANCE := 8.0
@@ -80,6 +88,9 @@ const CHIP_SEP := 6
 const CHIP_ROW_MAX_W := 400.0
 
 const STAGE_BODY_SHADER := preload("res://assets/ui/stage_body.gdshader")
+const STAGE_SHADOW_SHADER := preload("res://assets/ui/stage_shadow.gdshader")
+const CAST_SQUASH := 0.1
+const CAST_SKEW := -0.7  # radians; thrown right, away from the window at the upper left
 
 const SPRITE_SETS := {
 	"goblin": {
@@ -185,7 +196,6 @@ var _drag_offset := Vector2.ZERO
 var _drag_hint: Label = null        # "right-click to cancel" affordance during a drag
 var _enemy_lights: Dictionary = {}  # EnemyCombatState -> the targeting light on it (see _set_lit_enemies)
 var _sheet_bodies: Dictionary = {}  # sprite set key -> where its body sits in the cell (see _sheet_body)
-var _shadow_tex: GradientTexture2D = null
 var _stage: CombatStage = null
 var _stage_line: Label = null
 var _passion_gauge: PassionGauge = null
@@ -281,7 +291,7 @@ func _build_enemy_body(set_key: String, enemy) -> Control:
 		_lapis_taken = true
 	mat.set_shader_parameter("drain", drained)
 	portrait.material = mat
-	stand.add_child(_make_body_shadow())
+	stand.add_child(_make_cast_shadow(atlas, body, scale_px))
 	stand.add_child(_make_target_light(enemy, portrait))
 	stand.add_child(portrait)
 
@@ -311,30 +321,26 @@ func _make_stand(body_size: Vector2) -> Control:
 	return stand
 
 
-## The shadow on the ground under a body. Anchored to the stand, so it fits any size of body.
-func _make_body_shadow() -> TextureRect:
-	if _shadow_tex == null:
-		var grad := Gradient.new()
-		grad.offsets = PackedFloat32Array([0.0, 0.7, 1.0])
-		grad.colors = PackedColorArray([Color.WHITE, Color.WHITE, Color(1, 1, 1, 0)])
-		_shadow_tex = GradientTexture2D.new()
-		_shadow_tex.gradient = grad
-		_shadow_tex.fill = GradientTexture2D.FILL_RADIAL
-		_shadow_tex.fill_from = Vector2(0.5, 0.5)
-		_shadow_tex.fill_to = Vector2(1.0, 0.5)
-	var shadow := TextureRect.new()
-	shadow.texture = _shadow_tex
-	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	shadow.stretch_mode = TextureRect.STRETCH_SCALE
-	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	shadow.modulate = StageSkin.c("shadow")
-	shadow.anchor_left = -0.12
-	shadow.anchor_right = 1.12
-	shadow.anchor_bottom = 1.0
-	shadow.anchor_top = 1.0
-	shadow.offset_top = -9.0
-	shadow.offset_bottom = 9.0
-	return shadow
+## The body's shadow, flat on the ground and thrown away from the window: its own frame, flipped at
+## the feet, squashed and sheared. It shares the body's atlas, so it moves with the swing.
+func _make_cast_shadow(atlas: AtlasTexture, body: Rect2i, scale_px: int) -> Sprite2D:
+	var cast := Sprite2D.new()
+	cast.texture = atlas
+	cast.centered = false
+	cast.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	cast.scale = Vector2(scale_px, -scale_px * CAST_SQUASH)
+	cast.skew = CAST_SKEW
+	# Rows of the cell land at x + sin(skew) * squash * row and y - cos(skew) * squash * row, so this puts
+	# the feet's row back on the stand's bottom edge, the columns on the body's own.
+	var squash := scale_px * CAST_SQUASH
+	var feet_row := float(body.end.y)
+	cast.position = Vector2(-body.position.x * scale_px - sin(CAST_SKEW) * squash * feet_row,
+		body.size.y * scale_px + cos(CAST_SKEW) * squash * feet_row)
+	var mat := ShaderMaterial.new()
+	mat.shader = STAGE_SHADOW_SHADER
+	mat.set_shader_parameter("flat_color", StageSkin.c("shadow"))
+	cast.material = mat
+	return cast
 
 
 ## Switches an animator to a state (idle/attack/hit/death). Only idle loops; the others
@@ -476,6 +482,12 @@ func _make_click_event() -> InputEventMouseButton:
 # ============================================================
 
 func _build_ui() -> void:
+	# Everything in the fight is set in the rules' face unless it says otherwise. The scene's own
+	# theme, so no other screen moves.
+	var scene_theme := Theme.new()
+	scene_theme.default_font = load(StageSkin.LINE_FONT_PATH)
+	theme = scene_theme
+
 	# The desk under everything, and the stage on it.
 	var bg = ColorRect.new()
 	bg.color = StageSkin.c("desk")
@@ -576,6 +588,7 @@ void fragment() {
 
 func _build_top_bar() -> HBoxContainer:
 	var bar = HBoxContainer.new()
+	bar.custom_minimum_size.y = 36.0
 
 	# Map peek — glance at your route / what's ahead without leaving combat. Sits at
 	# the far left (map-in-the-corner), set apart from the pile counts on the right.
@@ -637,7 +650,12 @@ func _build_top_bar() -> HBoxContainer:
 func _make_pile_button(color: Color) -> Button:
 	var btn = Button.new()
 	btn.flat = true
-	btn.add_theme_font_size_override("font_size", 20)
+	# No margins of its own, so the top bar keeps its height at this size.
+	btn.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	btn.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+	btn.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	btn.add_theme_font_size_override("font_size", 24)
 	btn.add_theme_color_override("font_color", color)
 	btn.add_theme_color_override("font_hover_color", color.lightened(0.3))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -647,13 +665,14 @@ func _make_pile_button(color: Color) -> Button:
 func _build_player_bar() -> PanelContainer:
 	var panel = PanelContainer.new()
 	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.105, 0.098, 0.09, 0.95)
+	style.bg_color = StageSkin.c("bar_panel")
 	style.set_corner_radius_all(6)
 	style.content_margin_left = 20
 	style.content_margin_right = 20
-	style.content_margin_top = 10
-	style.content_margin_bottom = 10
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	panel.add_theme_stylebox_override("panel", style)
+	panel.custom_minimum_size.y = PLAYER_BAR_H
 
 	var bar = HBoxContainer.new()
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -669,6 +688,7 @@ func _build_player_bar() -> PanelContainer:
 	bar.add_child(powers_side)
 
 	player_powers_prefix = _make_stat_label(Color(0.9, 0.78, 0.4))
+	player_powers_prefix.add_theme_font_size_override("font_size", CAPTION_SIZE)
 	player_powers_prefix.text = "Powers:"
 	player_powers_prefix.visible = false
 	powers_side.add_child(player_powers_prefix)
@@ -679,16 +699,16 @@ func _build_player_bar() -> PanelContainer:
 	player_powers_chips.add_theme_constant_override("v_separation", 4)
 	powers_side.add_child(player_powers_chips)
 
-	hp_label = _make_stat_label(Color(0.9, 0.3, 0.3))
+	hp_label = _make_stat_label(StageSkin.c("stat_hp"))
 	bar.add_child(hp_label)
 
-	block_label = _make_stat_label(Color(0.3, 0.6, 0.9))
+	block_label = _make_stat_label(StageSkin.c("stat_block"))
 	bar.add_child(block_label)
 
-	energy_label = _make_stat_label(Color(0.9, 0.9, 0.3))
+	energy_label = _make_stat_label(StageSkin.c("stat_energy"))
 	bar.add_child(energy_label)
 
-	passion_label = _make_stat_label(Color(0.9, 0.5, 0.2))
+	passion_label = _make_stat_label(StageSkin.c("stat_passion"))
 	passion_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	passion_label.mouse_entered.connect(_show_passion_infographic)
 	passion_label.mouse_exited.connect(_hide_passion_infographic)
@@ -701,6 +721,7 @@ func _build_player_bar() -> PanelContainer:
 	bar.add_child(status_side)
 
 	player_status_prefix = _make_stat_label(Color(0.7, 0.7, 0.55))
+	player_status_prefix.add_theme_font_size_override("font_size", CAPTION_SIZE)
 	player_status_prefix.text = "Effects:"
 	player_status_prefix.visible = false
 	status_side.add_child(player_status_prefix)
@@ -809,45 +830,48 @@ func _build_bottom_area() -> HBoxContainer:
 
 	end_turn_btn = Button.new()
 	end_turn_btn.text = "End Turn"
-	end_turn_btn.custom_minimum_size = Vector2(END_TURN_W, 60)
-	end_turn_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	end_turn_btn.add_theme_font_size_override("font_size", 20)
-	end_turn_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-
-	var et_style = StyleBoxFlat.new()
-	et_style.set_corner_radius_all(10)
-	et_style.set_border_width_all(2)
-	et_style.bg_color = Color(0.24, 0.17, 0.08)
-	et_style.border_color = Color(0.8, 0.6, 0.2)
-	et_style.content_margin_left = 12
-	et_style.content_margin_right = 12
-	et_style.content_margin_top = 8
-	et_style.content_margin_bottom = 8
-	end_turn_btn.add_theme_stylebox_override("normal", et_style)
-
-	var et_hover = et_style.duplicate()
-	et_hover.bg_color = Color(0.34, 0.24, 0.08)
-	et_hover.border_color = Color(1.0, 0.78, 0.25)
-	end_turn_btn.add_theme_stylebox_override("hover", et_hover)
-
-	var et_pressed = et_style.duplicate()
-	et_pressed.bg_color = Color(0.16, 0.12, 0.04)
-	end_turn_btn.add_theme_stylebox_override("pressed", et_pressed)
-
-	var et_disabled = et_style.duplicate()
-	et_disabled.bg_color = Color(0.12, 0.12, 0.12)
-	et_disabled.border_color = Color(0.3, 0.3, 0.3)
-	end_turn_btn.add_theme_stylebox_override("disabled", et_disabled)
-	end_turn_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-
-	end_turn_btn.add_theme_color_override("font_color", Color(0.9, 0.75, 0.35))
-	end_turn_btn.add_theme_color_override("font_hover_color", Color(1.0, 0.9, 0.5))
-	end_turn_btn.add_theme_color_override("font_disabled_color", Color(0.4, 0.4, 0.4))
+	end_turn_btn.custom_minimum_size = Vector2(END_TURN_W, END_TURN_H)
+	end_turn_btn.size_flags_vertical = Control.SIZE_SHRINK_END
+	_style_end_button(end_turn_btn)
 
 	end_turn_btn.pressed.connect(_on_end_turn_pressed)
 	bottom.add_child(end_turn_btn)
 
 	return bottom
+
+
+## End Turn's look, and Continue's, which takes its place: a slab of the desk, its words in the title
+## face. Two lines where it is narrow.
+func _style_end_button(btn: Button) -> void:
+	btn.autowrap_mode = TextServer.AUTOWRAP_WORD
+	btn.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
+	btn.add_theme_font_size_override("font_size", 38)
+	btn.add_theme_constant_override("line_spacing", -16)
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var style = StyleBoxFlat.new()
+	style.set_border_width_all(2)
+	style.bg_color = StageSkin.c("end_bg")
+	style.border_color = StageSkin.c("end_edge")
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	btn.add_theme_stylebox_override("normal", style)
+	var hover = style.duplicate()
+	hover.bg_color = style.bg_color.lightened(0.1)
+	hover.border_color = style.border_color.lightened(0.25)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed = style.duplicate()
+	pressed.bg_color = style.bg_color.darkened(0.25)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	var disabled = style.duplicate()
+	disabled.bg_color = StageSkin.c("desk")
+	disabled.border_color = Color(0.3, 0.29, 0.27)
+	btn.add_theme_stylebox_override("disabled", disabled)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	btn.add_theme_color_override("font_color", StageSkin.c("end_text"))
+	btn.add_theme_color_override("font_hover_color", StageSkin.c("end_text").lightened(0.2))
+	btn.add_theme_color_override("font_disabled_color", Color(0.4, 0.39, 0.37))
 
 
 func _make_hp_bar(width: int, height: int) -> Control:
@@ -868,11 +892,9 @@ func _make_hp_bar(width: int, height: int) -> Control:
 	trail.value = 100
 	var trail_bg = StyleBoxFlat.new()
 	trail_bg.bg_color = StageSkin.c("bar_back")
-	trail_bg.set_corner_radius_all(3)
 	trail.add_theme_stylebox_override("background", trail_bg)
 	var trail_fill = StyleBoxFlat.new()
 	trail_fill.bg_color = StageSkin.c("bar_trail")
-	trail_fill.set_corner_radius_all(3)
 	trail.add_theme_stylebox_override("fill", trail_fill)
 	container.add_child(trail)
 
@@ -884,13 +906,22 @@ func _make_hp_bar(width: int, height: int) -> Control:
 	bar.value = 100
 	var bg_style = StyleBoxFlat.new()
 	bg_style.bg_color = Color(0, 0, 0, 0)
-	bg_style.set_corner_radius_all(3)
 	bar.add_theme_stylebox_override("background", bg_style)
 	var fill_style = StyleBoxFlat.new()
 	fill_style.bg_color = StageSkin.c("bar_high")
-	fill_style.set_corner_radius_all(3)
 	bar.add_theme_stylebox_override("fill", fill_style)
 	container.add_child(bar)
+
+	var frame_style = StyleBoxFlat.new()
+	frame_style.draw_center = false
+	frame_style.set_border_width_all(2)
+	frame_style.border_color = StageSkin.c("bar_frame")
+	var frame = Panel.new()
+	frame.name = "Frame"
+	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_theme_stylebox_override("panel", frame_style)
+	container.add_child(frame)
 
 	_hp_trail_bars[bar] = trail
 	return container
@@ -898,7 +929,7 @@ func _make_hp_bar(width: int, height: int) -> Control:
 
 func _make_stat_label(color: Color) -> Label:
 	var lbl = Label.new()
-	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.add_theme_font_size_override("font_size", STAT_SIZE)
 	lbl.add_theme_color_override("font_color", color)
 	return lbl
 
@@ -1266,9 +1297,9 @@ func _get_personality_label(pers: CardData.PersonalityType) -> String:
 
 func _get_personality_color(pers: CardData.PersonalityType) -> Color:
 	if pers == CardData.PersonalityType.PRIMARY:
-		return Color(0.9, 0.5, 0.2) # Warm orange for magic
+		return StageSkin.c("school_water") # Warm orange for magic
 	if pers == CardData.PersonalityType.SECONDARY:
-		return Color(0.4, 0.6, 0.9) # Cool blue for physical
+		return StageSkin.c("school_physical") # Cool blue for physical
 	if pers == CardData.PersonalityType.NEGATIVE:
 		return Color(0.55, 0.5, 0.42) # Dead ash for curses
 	return Color(0.6, 0.6, 0.6)
@@ -1281,7 +1312,7 @@ func _personality_sigil(pers: CardData.PersonalityType) -> String:
 	if pers == CardData.PersonalityType.PRIMARY:
 		return "≈"  # water ripples
 	if pers == CardData.PersonalityType.SECONDARY:
-		return "⚔"  # ⚔
+		return "+" if StageSkin.is_page() else "⚔"
 	return ""
 
 
@@ -1315,9 +1346,10 @@ func _make_resonance_sigil(card: CardData) -> Control:
 		# COIN (below, pole cards only) is what marks the deep +25%, so the glyph itself doesn't
 		# have to carry the lean/extreme distinction.
 		lbl.add_theme_font_size_override("font_size", 28)
-		lbl.add_theme_color_override("font_color", col.lightened(0.34))
-		lbl.add_theme_constant_override("outline_size", 5)
-		lbl.add_theme_color_override("font_outline_color", Color(col.r, col.g, col.b, 0.85))
+		lbl.add_theme_color_override("font_color", col if StageSkin.is_page() else col.lightened(0.34))
+		if not StageSkin.is_page():
+			lbl.add_theme_constant_override("outline_size", 5)
+			lbl.add_theme_color_override("font_outline_color", Color(col.r, col.g, col.b, 0.85))
 		lbl.tooltip_text = "%s. Resonant: +%d%% damage at your current Passion." \
 			% [pole_name, roundi((zm - 1.0) * 100.0)]
 		var pulse := lbl.create_tween().set_loops()
@@ -1359,10 +1391,22 @@ func _make_resonance_sigil(card: CardData) -> Control:
 	disc.set_anchors_preset(Control.PRESET_FULL_RECT)
 	disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var ds := StyleBoxFlat.new()
-	ds.bg_color = Color(col.r, col.g, col.b, 0.30)
-	ds.set_corner_radius_all(21)
-	ds.shadow_color = Color(col.r, col.g, col.b, 0.5)
-	ds.shadow_size = 8
+	if StageSkin.is_page():
+		# A rubricated disc, the cost coin's twin, with the mark struck out of it in the leaf's colour.
+		ds.bg_color = col
+		ds.set_corner_radius_all(16)
+		disc.set_anchors_preset(Control.PRESET_CENTER)
+		disc.offset_left = -16.0
+		disc.offset_top = -16.0
+		disc.offset_right = 16.0
+		disc.offset_bottom = 16.0
+		if extreme:
+			lbl.add_theme_color_override("font_color", StageSkin.c("card_coin_text"))
+	else:
+		ds.bg_color = Color(col.r, col.g, col.b, 0.30)
+		ds.set_corner_radius_all(21)
+		ds.shadow_color = Color(col.r, col.g, col.b, 0.5)
+		ds.shadow_size = 8
 	disc.add_theme_stylebox_override("panel", ds)
 	disc.modulate.a = 1.0 if extreme else 0.0
 	holder.add_child(disc)
@@ -1380,7 +1424,7 @@ func _make_resonance_sigil(card: CardData) -> Control:
 ## The ⚔ (Physical) glyph's ink sits high in its font box, so plain vertical-centring leaves it
 ## near the top of the halo coin; nudge it down. ≈ (Water) is already close to centred.
 func _sigil_v_nudge(pole: CardData.PersonalityType) -> int:
-	if pole == CardData.PersonalityType.SECONDARY:
+	if pole == CardData.PersonalityType.SECONDARY and not StageSkin.is_page():
 		return 4
 	return 1
 
@@ -1544,7 +1588,7 @@ func _update_card_highlights() -> void:
 	for card in card_nodes:
 		var panel: PanelContainer = card_nodes[card]
 		if card == selected_card:
-			panel.modulate = Color(1.4, 1.4, 1.1)
+			panel.modulate = CARD_HELD_PAGE if StageSkin.is_page() else Color(1.4, 1.4, 1.1)
 		elif not combat_engine.can_play_card(card):
 			panel.modulate = Color(0.5, 0.5, 0.5)
 		else:
@@ -1568,7 +1612,7 @@ func _start_drag(card: CardData, event: InputEvent) -> void:
 	panel.global_position = start_pos
 	panel.z_index = 35
 	panel.rotation_degrees = 0
-	panel.modulate = Color(1.3, 1.3, 1.0, 0.9)
+	panel.modulate = CARD_HELD_PAGE if StageSkin.is_page() else CARD_HELD_DARK
 	_drag_panel = panel
 
 	# Right-click cancel affordance, following the cursor.
@@ -1739,7 +1783,7 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 2)
 	panel.add_child(vbox)
 
 	# The body's place: a column that stands the body on the ground, with the statuses beside its feet.
@@ -1765,7 +1809,6 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 		port_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		port_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
 		port_icon.add_theme_font_size_override("font_size", 72)
-		stand.add_child(_make_body_shadow())
 		stand.add_child(_make_target_light(enemy, port_icon))
 		stand.add_child(port_icon)
 	place.add_child(stand)
@@ -1788,16 +1831,29 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	status_chips.offset_top = -BODY_MAX_H
 	place.add_child(status_chips)
 
+	# The name in a box of fixed height: the title face's line is much taller than its letters, and
+	# the ground has only so much room above the banner. As wide as it needs, so a long name widens
+	# its column rather than running into the next.
+	var name_font: Font = load(StageSkin.NAME_FONT_PATH)
+	var name_box := Control.new()
+	name_box.name = "EnemyName"
+	name_box.custom_minimum_size = Vector2(name_font.get_string_size(enemy.enemy_data.enemy_name, HORIZONTAL_ALIGNMENT_LEFT, -1, ENEMY_NAME_SIZE).x, ENEMY_NAME_BOX_H)
+	name_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(name_box)
 	var name_lbl = Label.new()
-	name_lbl.name = "EnemyName"
 	name_lbl.text = enemy.enemy_data.enemy_name
-	name_lbl.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
-	name_lbl.add_theme_font_size_override("font_size", 26)
+	name_lbl.add_theme_font_override("font", name_font)
+	name_lbl.add_theme_font_size_override("font_size", ENEMY_NAME_SIZE)
 	name_lbl.add_theme_color_override("font_color", StageSkin.c("ink"))
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_lbl)
+	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Its line box hangs off the top of the fixed one, far enough up to leave the bar clear.
+	name_lbl.anchor_right = 1.0
+	name_lbl.offset_top = (ENEMY_NAME_BOX_H - name_font.get_height(ENEMY_NAME_SIZE)) / 2.0 - 3.0
+	name_lbl.offset_bottom = name_lbl.offset_top + name_font.get_height(ENEMY_NAME_SIZE)
+	name_box.add_child(name_lbl)
 
-	var hp_bar_container = _make_hp_bar(240, 22)
+	var hp_bar_container = _make_hp_bar(280, 26)
 	hp_bar_container.name = "HPBarContainer"
 	var enemy_hp_bar: ProgressBar = hp_bar_container.get_child(1)
 	enemy_hp_bar.name = "HPBar"
@@ -1809,7 +1865,7 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	# HP text overlaid inside the bar
 	var hp_lbl = Label.new()
 	hp_lbl.name = "HP"
-	hp_lbl.add_theme_font_size_override("font_size", 15)
+	hp_lbl.add_theme_font_size_override("font_size", 21)
 	hp_lbl.add_theme_color_override("font_color", StageSkin.c("bar_text"))
 	hp_lbl.add_theme_color_override("font_shadow_color", StageSkin.c("bar_text_shadow"))
 	hp_lbl.add_theme_constant_override("shadow_offset_x", 1)
@@ -1822,7 +1878,7 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	# Block sits off the bar's left end, outside its width, so the bar holds the column's centre.
 	var block_lbl = Label.new()
 	block_lbl.name = "Block"
-	block_lbl.add_theme_font_size_override("font_size", 18)
+	block_lbl.add_theme_font_size_override("font_size", 22)
 	block_lbl.add_theme_color_override("font_color", StageSkin.c("block"))
 	block_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	block_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1843,13 +1899,13 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 
 	var intent_name_lbl = Label.new()
 	intent_name_lbl.name = "IntentName"
-	intent_name_lbl.add_theme_font_size_override("font_size", 20)
+	intent_name_lbl.add_theme_font_size_override("font_size", 24)
 	intent_name_lbl.add_theme_color_override("font_color", StageSkin.c("ink_soft"))
 	intent_row.add_child(intent_name_lbl)
 
 	var intent_lbl = Label.new()
 	intent_lbl.name = "Intent"
-	intent_lbl.add_theme_font_size_override("font_size", 20)
+	intent_lbl.add_theme_font_size_override("font_size", 24)
 	intent_lbl.add_theme_color_override("font_color", StageSkin.c("intent_attack"))
 	intent_lbl.material = StageSkin.no_purple()
 	intent_row.add_child(intent_lbl)
@@ -1941,6 +1997,14 @@ func _self_cost_tooltip(move: EnemyMove, cost: int) -> String:
 		move.move_name, to_you, SELF_COST_GLYPH, cost]
 
 
+## The swords and skull come from a system emoji font, in colours of their own. The page goes without
+## them: the threat's colour and its words say the same.
+func _stage_glyph(icon: String) -> String:
+	if not StageSkin.is_page():
+		return icon
+	return icon.replace("⚔", "").replace("☠", "")
+
+
 ## Short single-line summary of an EnemyMove for the Sight-mode "Then:" preview.
 ## Strips the modifier-aware bracket form used in current-intent rendering —
 ## the next move hasn't resolved yet, so showing modified values is misleading.
@@ -1981,7 +2045,7 @@ func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String
 		icon += SELF_COST_GLYPH
 		value_str += " (%s%d)" % [SELF_COST_GLYPH, self_cost]
 	# Name first, then the icon+value readout (kept inline for the compact "Then:" peek).
-	return "%s %s%s" % [move.move_name, icon, value_str]
+	return "%s %s%s" % [move.move_name, _stage_glyph(icon), value_str]
 
 
 func _update_enemy_panel(enemy: EnemyCombatState) -> void:
@@ -2125,7 +2189,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 		intent_lbl.add_theme_color_override("font_color", intent_color)
 		intent_name_lbl.text = enemy.current_intent.move_name
 		intent_name_lbl.visible = true
-		intent_lbl.text = "%s%s" % [icon, value_str]
+		intent_lbl.text = ("%s%s" % [_stage_glyph(icon), value_str]).strip_edges()
 	else:
 		intent_name_lbl.text = ""
 		intent_name_lbl.visible = false
@@ -2249,10 +2313,11 @@ const STATUS_ICONS := {
 func _populate_status_chips(container: Node, stats: CombatantStats) -> void:
 	for child in container.get_children():
 		child.queue_free()
+	var on_stage: bool = stats != combat_engine.player_stats
 	for effect in stats.statuses:
 		var stacks: int = stats.statuses[effect]
 		if stacks > 0:
-			container.add_child(_make_status_chip(effect, stacks))
+			container.add_child(_make_status_chip(effect, stacks, on_stage))
 
 
 ## Rebuilds `container` with one chip per active character POWER. Distinct gold look
@@ -2297,9 +2362,10 @@ func _make_power_chip(power: PowerData, stacks: int) -> PanelContainer:
 ## One status chip: name (+ optional glyph) and stack count, tinted green for buffs
 ## and red for debuffs, with a rich tooltip (kind · stacks, what it does, how it
 ## fades) and a subtle hover-highlight so it reads as inspectable.
-func _make_status_chip(effect: StatusEffectData, stacks: int) -> PanelContainer:
+func _make_status_chip(effect: StatusEffectData, stacks: int, on_stage := false) -> PanelContainer:
 	var chip = PanelContainer.new()
 	chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var plain_words: bool = on_stage and StageSkin.is_page()
 	var accent := Color(0.4, 0.75, 0.45) if effect.is_buff else Color(0.82, 0.4, 0.4)
 	var style = StyleBoxFlat.new()
 	style.set_corner_radius_all(6)
@@ -2310,14 +2376,15 @@ func _make_status_chip(effect: StatusEffectData, stacks: int) -> PanelContainer:
 	style.content_margin_right = 8
 	style.content_margin_top = 3
 	style.content_margin_bottom = 3
-	chip.add_theme_stylebox_override("panel", style)
+	# On the page a status is only its words on the ground, with no pill round it.
+	chip.add_theme_stylebox_override("panel", StyleBoxEmpty.new() if plain_words else style)
 
 	var lbl = Label.new()
 	var glyph: String = STATUS_ICONS.get(effect.effect_name, "")
 	lbl.text = ("%s %s %d" % [glyph, effect.effect_name, stacks]) if glyph != "" \
 		else ("%s %d" % [effect.effect_name, stacks])
-	lbl.add_theme_font_size_override("font_size", 14)
-	lbl.add_theme_color_override("font_color", accent.lightened(0.45))
+	lbl.add_theme_font_size_override("font_size", 22 if plain_words else 18)
+	lbl.add_theme_color_override("font_color", StageSkin.c("ink_soft") if plain_words else accent.lightened(0.45))
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(lbl)
 
@@ -2837,7 +2904,8 @@ func _show_turn_banner(text: String, color: Color) -> void:
 	banner.text = text
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	banner.add_theme_font_size_override("font_size", 34)
+	banner.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
+	banner.add_theme_font_size_override("font_size", 28)
 	banner.add_theme_color_override("font_color", color)
 	banner.add_theme_color_override("font_outline_color", StageSkin.c("banner_outline"))
 	banner.add_theme_constant_override("outline_size", 6)
@@ -2846,7 +2914,7 @@ func _show_turn_banner(text: String, color: Color) -> void:
 	# Full width so the text is truly screen-centered, placed in the gap between the
 	# enemy panels and the player readout: computed, not hardcoded.
 	banner.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	var banner_h := 48.0
+	var banner_h := 42.0
 	var gap_y := _turn_banner_gap_center() - banner_h / 2.0
 	banner.offset_left = 0
 	banner.offset_right = 0
@@ -2895,7 +2963,7 @@ func _screen_shake(intensity: float = 8.0, duration: float = 0.2) -> void:
 func _spawn_damage_number(text: String, color: Color, target_panel: Control) -> void:
 	var lbl = Label.new()
 	lbl.text = text
-	lbl.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
+	lbl.add_theme_font_override("font", load(StageSkin.NUMERAL_FONT_PATH))
 	lbl.add_theme_font_size_override("font_size", 56)
 	lbl.add_theme_color_override("font_color", color)
 	lbl.add_theme_color_override("font_outline_color", StageSkin.c("number_outline"))
@@ -2988,9 +3056,9 @@ func _animate_hand_discard() -> void:
 func _show_continue_button(text: String, callback: Callable) -> void:
 	continue_btn = Button.new()
 	continue_btn.text = text
-	continue_btn.custom_minimum_size = Vector2(200, 60)
-	continue_btn.add_theme_font_size_override("font_size", 22)
-	continue_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	continue_btn.custom_minimum_size = Vector2(200, END_TURN_H)
+	continue_btn.size_flags_vertical = Control.SIZE_SHRINK_END
+	_style_end_button(continue_btn)
 	continue_btn.pressed.connect(callback)
 	# Add next to the end turn button, and widen the spacer by as much so the hand stays centred.
 	end_turn_btn.get_parent().add_child(continue_btn)
@@ -3282,7 +3350,7 @@ func _animate_enemy_death(enemy: EnemyCombatState) -> void:
 		var p = ColorRect.new()
 		p.custom_minimum_size = Vector2(5, 5)
 		p.size = Vector2(5, 5)
-		p.color = Color(randf_range(0.6, 1.0), randf_range(0.2, 0.5), randf_range(0.1, 0.3), 0.8)
+		p.color = StageSkin.c("flake_a").lerp(StageSkin.c("flake_b"), randf())
 		p.position = center
 		p.z_index = 20
 		add_child(p)

@@ -3,25 +3,72 @@ extends RefCounted
 ## The combat stage's look, in one place. `active` is the one switch: everything the stage draws
 ## on its ground (the ground itself, the washes behind it, names, bars, numbers, banners, pills)
 ## reads its colour here, so changing look is one assignment and no colour for it lives anywhere
-## else. The desk under the stage, with the player bar and the hand on it, is dark in both.
+## else. The desk under the stage, with the player bar on it, is dark in both. The hand follows the
+## look: parchment leaves on the page, type-coloured cards in the dark.
 ## Neither look has purple in it, on purpose.
 
 const DARK := &"dark"
 const PAGE := &"page"
 
 ## The switch. A capture can set it before the combat scene loads.
-static var active: StringName = DARK
+static var active: StringName = PAGE
 
 static var _no_purple: ShaderMaterial = null
+static var _icon_grey: ShaderMaterial = null
 
 # The faces the stage's words are set in, so a swap is here and nowhere else. They follow the card
 # face's picks.
 const NAME_FONT_PATH := CardFace.TITLE_FONT_PATH
 const LINE_FONT_PATH := CardFace.RULES_FONT_PATH
+const NUMERAL_FONT_PATH := CardFace.NUMERAL_FONT_PATH
+
+# How strongly Passion tints the ground, by look. The page stays a page.
+const MOOD_GAIN := {DARK: 1.0, PAGE: 0.55}
 
 const LOOKS := {
 	DARK: {
 		"desk": Color(0.055, 0.05, 0.047),
+		"wear": Color(0, 0, 0, 0),
+		"stat_hp": Color(0.9, 0.3, 0.3),
+		"stat_block": Color(0.3, 0.6, 0.9),
+		"stat_energy": Color(0.9, 0.9, 0.3),
+		"stat_passion": Color(0.9, 0.5, 0.2),
+		"bar_frame": Color(0, 0, 0, 0),
+		"bar_panel": Color(0.105, 0.098, 0.09, 0.95),
+		"flake_a": Color(0.9, 0.3, 0.2, 0.8),
+		"flake_b": Color(0.65, 0.25, 0.15, 0.8),
+		"end_bg": Color(0.24, 0.17, 0.08),
+		"end_edge": Color(0.8, 0.6, 0.2),
+		"end_text": Color(0.9, 0.75, 0.35),
+		"school_water": Color(0.9, 0.5, 0.2),
+		"school_physical": Color(0.4, 0.6, 0.9),
+		"card_ink": Color(0.94, 0.925, 0.886),
+		"card_dim": Color(0.745, 0.714, 0.667),
+		"card_number_up": Color(1.0, 0.77, 0.36),
+		"card_number_down": Color(0.59, 0.557, 0.557),
+		"card_passion_up": Color(1.0, 0.667, 0.353),
+		"card_passion_down": Color(0.51, 0.667, 0.96),
+		"card_bg_attack": Color(0.3, 0.12, 0.1),
+		"card_edge_attack": Color(0.9, 0.25, 0.2),
+		"card_bg_skill": Color(0.1, 0.14, 0.3),
+		"card_edge_skill": Color(0.25, 0.45, 0.9),
+		"card_bg_power": Color(0.28, 0.24, 0.08),
+		"card_edge_power": Color(0.9, 0.75, 0.15),
+		"card_bg_curse": Color(0.14, 0.13, 0.12),
+		"card_edge_curse": Color(0.46, 0.42, 0.36),
+		"card_rubric_attack": Color(0, 0, 0, 0),
+		"card_rubric_skill": Color(0, 0, 0, 0),
+		"card_rubric_power": Color(0, 0, 0, 0),
+		"card_rubric_curse": Color(0, 0, 0, 0),
+		"card_coin_attack": Color(0.18, 0.14, 0.06),
+		"card_coin_skill": Color(0.18, 0.14, 0.06),
+		"card_coin_power": Color(0.18, 0.14, 0.06),
+		"card_coin_curse": Color(0.18, 0.14, 0.06),
+		"card_coin_edge": Color(0.95, 0.8, 0.2),
+		"card_coin_text": Color(0.95, 0.9, 0.3),
+		"card_inset": Color(0, 0, 0, 0),
+		"card_uncommon": Color(0.45, 0.78, 0.95),
+		"card_rare": Color(0.95, 0.8, 0.3),
 		"wall": Color(0.075, 0.07, 0.065),
 		"ruling": Color(0, 0, 0, 0),
 		"wash_far": Color(0.115, 0.107, 0.098),
@@ -68,42 +115,83 @@ const LOOKS := {
 	},
 	PAGE: {
 		"desk": Color("1C1A18"),
+		"wear": Color("1C1A18"),
+		"stat_hp": Color("D7301F"),
+		"stat_block": Color("8DA2D6"),
+		"stat_energy": Color("E8DCBD"),
+		"stat_passion": Color("D9A06A"),
+		"bar_frame": Color("1E1B18"),
+		"bar_panel": Color(0, 0, 0, 0),
+		"flake_a": Color("3D3A35"),
+		"flake_b": Color("6F7274"),
+		"end_bg": Color("2A2622"),
+		"end_edge": Color("8C7A4E"),
+		"end_text": Color("E8DCBD"),
+		"school_water": Color("A8531C"),
+		"school_physical": Color("1F3C88"),
+		"card_ink": Color("1E1B18"),
+		"card_dim": Color("5A5750"),
+		"card_number_up": Color("A8531C"),
+		"card_number_down": Color("8C8676"),
+		"card_passion_up": Color("A8531C"),
+		"card_passion_down": Color("1F3C88"),
+		"card_bg_attack": Color("E8DCBD"),
+		"card_edge_attack": Color("0F0E0C"),
+		"card_bg_skill": Color("E8DCBD"),
+		"card_edge_skill": Color("0F0E0C"),
+		"card_bg_power": Color("E8DCBD"),
+		"card_edge_power": Color("0F0E0C"),
+		"card_bg_curse": Color("B8AC93"),
+		"card_edge_curse": Color("0F0E0C"),
+		"card_rubric_attack": Color("D7301F"),
+		"card_rubric_skill": Color("1F3C88"),
+		"card_rubric_power": Color("8C7A4E"),
+		"card_rubric_curse": Color("3D3A35"),
+		"card_coin_attack": Color("D7301F"),
+		"card_coin_skill": Color("1F3C88"),
+		"card_coin_power": Color("8C7A4E"),
+		"card_coin_curse": Color("5A5750"),
+		"card_coin_edge": Color(0, 0, 0, 0),
+		"card_coin_text": Color("E8DCBD"),
+		"card_inset": Color("B8AC93"),
+		"card_uncommon": Color("1F3C88"),
+		"card_rare": Color("8C6A1E"),
 		"wall": Color("D3C9B1"),
 		"ruling": Color("CCC2AA"),
 		"wash_far": Color("C7BCA3"),
 		"wash_near": Color("BBAF96"),
 		"ground": Color("B8AC93"),
-		"ground_line": Color("8F846C"),
+		"ground_line": Color("B8AC93"),
 		"shadow": Color("9A8F76"),
-		"dim": Color(0.2, 0.18, 0.15, 0.32),
-		"ember": Color("A8531C"),
-		"frost": Color("EEF2F8"),
+		"dim": Color(0.2, 0.18, 0.15, 0.2),
+		"ember": Color(0, 0, 0, 0),
+		"frost": Color(0, 0, 0, 0),
 		"ink": Color("1E1B18"),
 		"ink_soft": Color("3D3A35"),
-		"bar_back": Color("CFC8B8"),
-		"bar_trail": Color("8C8676"),
+		"bar_back": Color("8C8676"),
+		"bar_trail": Color("5A5750"),
 		"bar_high": Color("1E1B18"),
-		"bar_mid": Color("3D3A35"),
-		"bar_low": Color("D7301F"),
+		"bar_mid": Color("2A2622"),
+		"bar_low": Color("3D3A35"),
 		"bar_text": Color("E8DCBD"),
 		"bar_text_shadow": Color(0, 0, 0, 0.6),
-		"number_hurt": Color("D7301F"),
-		"number_heal": Color("2F6B3A"),
-		"number_block": Color("1F3C88"),
+		"number_hurt": Color("1E1B18"),
+		"number_heal": Color("3D3A35"),
+		"number_block": Color("3D3A35"),
 		"number_outline": Color("E8DCBD"),
-		"block": Color("1F3C88"),
+		"block": Color("3D3A35"),
 		"banner_you": Color("1E1B18"),
 		"banner_enemy": Color("D7301F"),
 		"banner_outline": Color("D3C9B1"),
 		"callout": Color("1E1B18"),
 		"callout_outline": Color("E8DCBD"),
 		"intent_attack": Color("D7301F"),
-		"intent_defend": Color("1F3C88"),
-		"intent_buff": Color("2F6B3A"),
-		"intent_debuff": Color("6B5A2E"),
-		"intent_passion": Color("A8531C"),
+		"intent_defend": Color("3D3A35"),
+		"intent_buff": Color("3D3A35"),
+		"intent_debuff": Color("D7301F"),
+		"intent_passion": Color("D7301F"),
 		"line": Color("1E1B18"),
-		"line_outline": Color("D3C9B1"),
+		"line_outline": Color(0, 0, 0, 0),
 		"pile_map": Color("3D3A35"),
 		"pile_draw": Color("3D3A35"),
 		"pile_exhaust": Color("3D3A35"),
@@ -130,3 +218,15 @@ static func no_purple() -> ShaderMaterial:
 
 static func is_page() -> bool:
 	return active == PAGE
+
+
+## For a card's small art: on the page it goes to the ramp's greys with the figures. In the dark it
+## only loses any purple.
+static func icon_material() -> ShaderMaterial:
+	if not is_page():
+		return no_purple()
+	if _icon_grey == null:
+		_icon_grey = ShaderMaterial.new()
+		_icon_grey.shader = load("res://assets/ui/stage_body.gdshader")
+		_icon_grey.set_shader_parameter("drain", 1.0)
+	return _icon_grey

@@ -8,6 +8,7 @@ uniform float drain : hint_range(0.0, 1.0) = 0.0;
 uniform bool baked = false;
 
 const vec3 LAPIS_OUT = vec3(0.353, 0.384, 0.463);
+const float LAPIS_VALUE = 0.235;
 
 void fragment() {
 	vec3 c = COLOR.rgb;
@@ -15,7 +16,7 @@ void fragment() {
 	if (baked) {
 		bool lapis = c.b > c.r * 1.3 && c.b > c.g * 1.25 && c.b > 0.25;
 		if (lapis) {
-			COLOR.rgb = mix(c, LAPIS_OUT * value / 0.2, drain);
+			COLOR.rgb = mix(c, LAPIS_OUT * value / LAPIS_VALUE, drain);
 		}
 	} else {
 		float purple = clamp((min(c.r, c.b) - c.g) * 6.0, 0.0, 1.0);

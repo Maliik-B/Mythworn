@@ -49,9 +49,11 @@ The sword in the Excalibur set piece (`assets/sprites/set_pieces/excalibur_sword
 
 ## Fonts
 
-Both under the SIL Open Font License 1.1; the licence text sits beside each font in `assets/fonts/`.
+All under the SIL Open Font License 1.1; the licence text sits beside each font in `assets/fonts/`.
 
-- **Marcellus SC** (card names and numerals), Copyright (c) 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI). https://fonts.google.com/specimen/Marcellus+SC
+- **Grenze Gotisch** (names and card titles), Copyright 2020 The Grenze Gotisch Project Authors. https://github.com/Omnibus-Type/Grenze-Gotisch
+- **Castoro Titling** (numerals), by Tiro Typeworks. https://github.com/TiroTypeworks/Castoro
+- **Marcellus SC** (kept for trying against the others, not in use), Copyright (c) 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI). https://fonts.google.com/specimen/Marcellus+SC
 - **EB Garamond** (card rules), Copyright 2017 The EB Garamond Project Authors. https://github.com/octaviopardo/EBGaramond12
 
 ## Backgrounds

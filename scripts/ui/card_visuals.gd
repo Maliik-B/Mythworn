@@ -7,6 +7,9 @@ class_name CardVisuals
 const _CR := "res://assets/sprites/icons/clockwork_raven/Clockwork raven - Weapons and Potions - Free pack/individual_64x64/"
 const _ITV := "res://assets/sprites/icons/in_the_void/individual/"
 const _CUS := "res://assets/sprites/icons/custom/"
+# For a card with no art of its own, so the hand never falls back on a system emoji.
+const DEFAULT_ATTACK_ICON := _CR + "tile000.png"
+const DEFAULT_SKILL_ICON := _ITV + "shield.png"
 
 const CARD_ICONS := {
 	# Starter attacks
