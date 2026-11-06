@@ -52,7 +52,7 @@ LOOK_FOR = (
     ("hit", r"^(take ?|get ?)?hit"),
     ("death", r"^death"),
 )
-DEFAULT_FPS = {"idle": 8, "attack": 18, "hit": 13, "death": 10, "break": 8}
+DEFAULT_FPS = {"idle": 8, "attack": 18, "hit": 8, "death": 10, "break": 8}
 
 # Every sheet the game has now. key: (source folder, cell, {state: file}, lapis colours, patches)
 MONSTERS = "assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/"

@@ -570,7 +570,7 @@ func start_enemy_turn() -> void:
 		execute_enemy_turn(enemy)                     # effect lands (damage flash/shake here)
 		resolve_chilled(enemy.stats)                  # Chilled ticks/freezes at the enemy's turn-end
 		tick_end_of_turn(enemy.stats)
-		await _pace(0.25)                             # let the hit read before the next enemy
+		await _pace(0.45)                             # let the hit be felt before the next enemy
 		if player_stats.is_dead():
 			break
 

@@ -6,6 +6,8 @@ shader_type canvas_item;
 
 uniform float drain : hint_range(0.0, 1.0) = 0.0;
 uniform bool baked = false;
+// Toward white, for the blink of a landed hit. Modulate cannot do this on a near-black sprite.
+uniform float flash : hint_range(0.0, 1.0) = 0.0;
 
 const vec3 LAPIS_OUT = vec3(0.353, 0.384, 0.463);
 const float LAPIS_VALUE = 0.235;
@@ -22,4 +24,5 @@ void fragment() {
 		float purple = clamp((min(c.r, c.b) - c.g) * 6.0, 0.0, 1.0);
 		COLOR.rgb = mix(c, vec3(value) * vec3(0.98, 1.0, 1.04), max(drain, purple));
 	}
+	COLOR.rgb = mix(COLOR.rgb, vec3(1.0), flash);
 }

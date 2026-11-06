@@ -69,6 +69,25 @@ const STAGE_LINE_CHARS_PER_SEC := 30.0
 const STAGE_LINE_HOLD := 1.7
 const BREAK_DRAIN_TIME := 1.6
 const COIN_STAGGER := 0.04
+# A landed hit's weight. All of it comes after the effect, which lands on the click, and none of it
+# holds input. Hit strips run at 8 fps in SPRITE_SETS so the flinch can be seen.
+const HIT_FULL_WEIGHT := 20.0  # the damage that counts as a full-weight hit; less scales down
+const HIT_STOP_LIGHT := 0.08  # every body on the stage holds still this long at impact...
+const HIT_STOP_HEAVY := 0.12  # ...and this long for a full-weight hit
+const HIT_SHOVE_LIGHT := 2  # sprite pixels the struck body is knocked back...
+const HIT_SHOVE_HEAVY := 5  # ...and for a full-weight hit
+const HIT_SHOVE_RETURN := 0.32
+const HIT_FLASH := 0.85
+const HIT_FLASH_FADE := 0.14
+const HIT_END_HOLD := 0.12  # the flinch's last frame stays a beat before the body goes back to idle
+const NUMBER_POP := 0.12
+const NUMBER_HOLD := 0.7  # a damage number stays solid this long, so it can be read
+const NUMBER_FADE := 0.3
+const NUMBER_RISE := 34.0
+const NUMBER_STAGGER := 0.09  # the hits of one multi-hit card come up one after another
+const NUMBER_STEP := Vector2(46.0, -34.0)
+const DEATH_HOLD := 0.55  # a felled body plays out its fall before it starts to go
+const DEATH_FADE := 0.4
 const KEEPER_TINT_TIME := 0.5
 const CARD_HELD_DARK := Color(1.3, 1.3, 1.0, 0.9)
 const CARD_HELD_PAGE := Color(1.05, 1.05, 1.0, 0.96)
@@ -98,55 +117,55 @@ const SPRITE_SETS := {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Goblin/",
 		"baked": "res://assets/sprites/baked/goblin/",
 		"cell": 150,
-		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 8], "death": ["Death.png", 4, 9]},
 	},
 	"skeleton": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Skeleton/",
 		"baked": "res://assets/sprites/baked/skeleton/", "lapis": true,
 		"cell": 150,
-		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 8], "death": ["Death.png", 4, 9]},
 	},
 	"flyingeye": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Flying eye/",
 		"baked": "res://assets/sprites/baked/flyingeye/",
 		"cell": 150,
-		"anims": {"idle": ["Flight.png", 8, 10], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Flight.png", 8, 10], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 8], "death": ["Death.png", 4, 9]},
 	},
 	"mushroom": {
 		"dir": "res://assets/sprites/enemies/monsters_main/Monsters_Creatures_Fantasy/Mushroom/",
 		"baked": "res://assets/sprites/baked/mushroom/",
 		"cell": 150,
-		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 13], "death": ["Death.png", 4, 9]},
+		"anims": {"idle": ["Idle.png", 4, 7], "attack": ["Attack.png", 8, 18], "hit": ["Take Hit.png", 4, 8], "death": ["Death.png", 4, 9]},
 	},
 	"worm": {
 		"dir": "res://assets/sprites/enemies/fire_worm/Fire Worm/Sprites/Worm/",
 		"baked": "res://assets/sprites/baked/worm/",
 		"cell": 90,
-		"anims": {"idle": ["Idle.png", 9, 10], "attack": ["Attack.png", 16, 24], "hit": ["Get Hit.png", 3, 12], "death": ["Death.png", 8, 10]},
+		"anims": {"idle": ["Idle.png", 9, 10], "attack": ["Attack.png", 16, 24], "hit": ["Get Hit.png", 3, 8], "death": ["Death.png", 8, 10]},
 	},
 	"wizard2": {
 		"dir": "res://assets/sprites/bosses/evil_wizard_2/EVil Wizard 2/Sprites/",
 		"baked": "res://assets/sprites/baked/wizard2/",
 		"cell": 250,
-		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 18], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
+		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 18], "hit": ["Take hit.png", 3, 8], "death": ["Death.png", 7, 10]},
 	},
 	# Sir Caedmon's one slot, one line, as tools/bake_sheet.py prints it: a bought sheet replaces this
 	# line and nothing else. A "break" strip, given with --strip, plays as his bar breaks in place of
 	# "hit". A stand-in until then: the Man-at-Arms in living colour, whose lapis is what drains.
-	"caedmon": {"dir": "res://assets/sprites/baked/caedmon/", "baked": "res://assets/sprites/baked/caedmon/", "lapis": true, "fw": 184, "fh": 137, "anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]}},
+	"caedmon": {"dir": "res://assets/sprites/baked/caedmon/", "baked": "res://assets/sprites/baked/caedmon/", "lapis": true, "fw": 184, "fh": 137, "anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 8], "death": ["Death.png", 9, 10]}},
 	# The Man-at-Arms in living colour: the source the shader drains for the hollow one beside him.
 	"man_at_arms_whole": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms_whole/",
 		"baked": "res://assets/sprites/baked/man_at_arms_whole/", "lapis": true,
 		"fw": 184, "fh": 137,
-		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
+		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 8], "death": ["Death.png", 9, 10]},
 	},
 	# Real Camelot per-enemy art (LuizMelo, CC0), corruption-recolored. Non-square frames.
 	"medieval_warrior": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms/",
 		"baked": "res://assets/sprites/baked/medieval_warrior/",
 		"fw": 184, "fh": 137,
-		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
+		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 8], "death": ["Death.png", 9, 10]},
 	},
 }
 
@@ -200,6 +219,8 @@ var _sheet_bodies: Dictionary = {}  # sprite set key -> where its body sits in t
 var _stage: CombatStage = null
 var _desk: ColorRect = null
 var _keeper_tween: Tween = null
+var _hit_stop_left := 0.0  # while above zero the stage's bodies hold their frames
+var _numbers_up: Dictionary = {}  # target panel, or null for the player -> damage numbers still rising
 var _keeper_side := 0  # the side of Steady the keeper's things are tinted to: 1 warm, -1 cold
 var _stage_line: Label = null
 var _passion_gauge: PassionGauge = null
@@ -222,6 +243,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if _enemy_anims.is_empty():
+		return
+	if _hit_stop_left > 0.0:
+		_hit_stop_left -= delta
 		return
 	for enemy in _enemy_anims:
 		_anim_tick(_enemy_anims[enemy], delta)
@@ -358,6 +382,7 @@ func _anim_set_state(anim: Dictionary, state: String) -> void:
 	anim["frames"] = int(info[1])
 	anim["fps"] = float(info[2])
 	anim["loop"] = (state == "idle")
+	anim["ending"] = false
 	anim["state"] = state
 	anim["frame"] = 0
 	anim["elapsed"] = 0.0
@@ -379,15 +404,22 @@ func _anim_tick(anim: Dictionary, delta: float) -> void:
 	var frame_time := 1.0 / fps
 	while anim["elapsed"] >= frame_time:
 		anim["elapsed"] -= frame_time
+		if anim.get("ending", false):
+			_anim_set_state(anim, "idle")
+			return
 		anim["frame"] = int(anim["frame"]) + 1
 		if anim["frame"] >= int(anim["frames"]):
 			if anim["loop"]:
 				anim["frame"] = 0
 			else:
-				# One-shot done: hold its last frame a beat, then return to idle.
+				# One-shot done. A fall stays down; a flinch holds its last frame a beat, then idles.
 				anim["frame"] = int(anim["frames"]) - 1
 				_anim_apply_frame(anim)
-				_anim_set_state(anim, "idle")
+				if anim["state"] == "death":
+					anim["fps"] = 0.0
+					return
+				anim["ending"] = true
+				anim["elapsed"] = frame_time - (HIT_END_HOLD if anim["state"] == "hit" else 0.0)
 				return
 		_anim_apply_frame(anim)
 
@@ -2625,6 +2657,8 @@ func _on_player_damaged(amount: int, new_hp: int) -> void:
 	var mag := clampf(float(amount) / 18.0, 0.4, 1.6)
 	_screen_shake(10.0 * mag, 0.25)
 	_flash_damage_overlay(mag)
+	_start_hit_stop(amount)
+	_spawn_damage_number("-%d" % amount, StageSkin.c("stat_hp"), null, amount)
 	_refresh_ui()
 
 
@@ -2642,11 +2676,59 @@ func _on_enemy_damaged(enemy, amount: int, new_hp: int) -> void:
 		enemy.enemy_data.enemy_name, amount, new_hp])
 	RunManager.run_stats["damage_dealt"] = RunManager.run_stats.get("damage_dealt", 0) + amount
 	var panel = enemy_nodes.get(enemy)
-	_spawn_damage_number("-%d" % amount, StageSkin.c("number_hurt"), panel)
+	_spawn_damage_number("-%d" % amount, StageSkin.c("number_hurt"), panel, amount)
 	# Flinch on a real hit; a killing blow skips straight to the death throe below.
 	if amount > 0 and new_hp > 0:
 		_enemy_play(enemy, "hit")
+	if amount > 0:
+		_land_hit(enemy, amount)
 	_refresh_ui()
+
+
+## The weight of a hit that has landed: the stage's bodies hold still for a moment, the struck one
+## blinks and is knocked back, and comes back as its flinch plays. Bigger hits weigh more. This only
+## moves pictures, after the effect has already happened, and it stops no input.
+func _land_hit(enemy, amount: int) -> void:
+	var weight := clampf(float(amount) / HIT_FULL_WEIGHT, 0.0, 1.0)
+	var stop := _start_hit_stop(amount)
+	var anim = _enemy_anims.get(enemy)
+	var panel: Control = enemy_nodes.get(enemy)
+	if anim == null or panel == null or not is_instance_valid(anim["rect"]):
+		return
+	_flash_body(anim, stop)
+	var stand: Control = panel.get_meta("stand", panel)
+	if not stand.has_meta("home_x"):
+		stand.set_meta("home_x", stand.position.x)
+	var home: float = stand.get_meta("home_x")
+	var px: float = anim["rect"].size.x / float(anim["fw"])
+	var shove := roundf(lerpf(HIT_SHOVE_LIGHT, HIT_SHOVE_HEAVY, weight))
+	if anim.get("shove_tween") and anim["shove_tween"].is_valid():
+		anim["shove_tween"].kill()
+	stand.position.x = home - shove * px
+	var back := create_tween()
+	back.tween_interval(stop)
+	back.tween_method(func(left: float): stand.position.x = home - roundf(left) * px, shove, 0.0, HIT_SHOVE_RETURN) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	anim["shove_tween"] = back
+
+
+## Holds every body on the stage for a moment at impact. Returns how long, for what goes with it.
+func _start_hit_stop(amount: int) -> float:
+	var stop := lerpf(HIT_STOP_LIGHT, HIT_STOP_HEAVY, clampf(float(amount) / HIT_FULL_WEIGHT, 0.0, 1.0))
+	_hit_stop_left = maxf(_hit_stop_left, stop)
+	return stop
+
+
+## A blink toward white, held for `hold` and then let go.
+func _flash_body(anim: Dictionary, hold: float) -> void:
+	var mat: ShaderMaterial = anim["rect"].material
+	if anim.get("flash_tween") and anim["flash_tween"].is_valid():
+		anim["flash_tween"].kill()
+	mat.set_shader_parameter("flash", HIT_FLASH)
+	var t := create_tween()
+	t.tween_interval(hold)
+	t.tween_method(func(v: float): mat.set_shader_parameter("flash", v), HIT_FLASH, 0.0, HIT_FLASH_FADE)
+	anim["flash_tween"] = t
 
 
 ## An enemy mended itself (the Hollow Prelate's self-heal). Green log + float + bar
@@ -2739,9 +2821,7 @@ func _drain_body(enemy) -> void:
 	if anim == null or not is_instance_valid(anim["rect"]):
 		return
 	var body: TextureRect = anim["rect"]
-	var flash := create_tween()
-	flash.tween_property(body, "modulate", Color(1.7, 1.7, 1.7), 0.05)
-	flash.tween_property(body, "modulate", Color.WHITE, 0.3)
+	_flash_body(anim, HIT_STOP_HEAVY)
 	var mat: ShaderMaterial = body.material
 	var drain := create_tween()
 	drain.tween_method(func(v: float): mat.set_shader_parameter("drain", v), 0.0, 1.0, BREAK_DRAIN_TIME) \
@@ -2995,7 +3075,7 @@ func _screen_shake(intensity: float = 8.0, duration: float = 0.2) -> void:
 	tween.tween_property(_main_container, "position", base_pos, duration / steps)
 
 
-func _spawn_damage_number(text: String, color: Color, target_panel: Control) -> void:
+func _spawn_damage_number(text: String, color: Color, target_panel: Control, amount := 0) -> void:
 	var lbl = Label.new()
 	lbl.text = text
 	lbl.add_theme_font_override("font", load(StageSkin.NUMERAL_FONT_PATH))
@@ -3016,13 +3096,31 @@ func _spawn_damage_number(text: String, color: Color, target_panel: Control) -> 
 		# The player has no body on the stage: their numbers rise off the player bar.
 		lbl.position = Vector2(hp_label.global_position.x - 260.0, _player_bar.global_position.y - 64.0)
 
+	# The hits of a multi-hit card land in one call: each number comes up a step on from the last.
+	var key = target_panel
+	var up: int = _numbers_up.get(key, 0)
+	_numbers_up[key] = up + 1
+	lbl.position += NUMBER_STEP * (up % 4)
 	add_child(lbl)
+	lbl.pivot_offset = Vector2(100.0, 34.0)
+	lbl.modulate.a = 0.0
 
+	var delay := NUMBER_STAGGER * (up % 4)
+	var pop := 1.2 + 0.4 * clampf(float(amount) / HIT_FULL_WEIGHT, 0.0, 1.0)
+	var total := NUMBER_POP + NUMBER_HOLD + NUMBER_FADE
 	var tween = create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(lbl, "position:y", lbl.position.y - 60, 0.8).set_ease(Tween.EASE_OUT)
-	tween.tween_property(lbl, "modulate:a", 0.0, 0.8).set_delay(0.3)
-	tween.chain().tween_callback(lbl.queue_free)
+	tween.tween_property(lbl, "modulate:a", 1.0, 0.01).set_delay(delay)
+	tween.tween_property(lbl, "scale", Vector2.ONE, NUMBER_POP).from(Vector2.ONE * pop).set_delay(delay) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(lbl, "position:y", lbl.position.y - NUMBER_RISE, total).set_delay(delay).set_ease(Tween.EASE_OUT)
+	tween.tween_property(lbl, "modulate:a", 0.0, NUMBER_FADE).set_delay(delay + NUMBER_POP + NUMBER_HOLD)
+	tween.chain().tween_callback(_number_done.bind(lbl, key))
+
+
+func _number_done(lbl: Label, key) -> void:
+	lbl.queue_free()
+	_numbers_up[key] = maxi(0, _numbers_up.get(key, 1) - 1)
 
 
 func _on_combat_won() -> void:
@@ -3396,16 +3494,18 @@ func _animate_enemy_death(enemy: EnemyCombatState) -> void:
 		t.tween_property(p, "position", target_pos, randf_range(0.4, 0.8)).set_ease(Tween.EASE_OUT)
 		t.tween_property(p, "modulate:a", 0.0, 0.6).set_delay(0.2)
 		t.chain().tween_callback(p.queue_free)
-	# Fade and sink the panel, then remove it. Detach it from enemy_nodes up front so any refresh in
-	# the same frame can't re-touch the corpse. An empty column of its width takes its place, so the
-	# bodies still standing don't slide across the stage.
-	panel.pivot_offset = Vector2(panel.size.x / 2.0, BODY_MAX_H)
+	# His words leave at once, since his bar no longer tells the truth. The body plays out its fall,
+	# then goes. Detach the panel from enemy_nodes up front so any refresh in the same frame can't
+	# re-touch the corpse. An empty column of its width takes its place, so the bodies still standing
+	# don't slide across the stage.
+	for child in panel.get_child(0).get_children():
+		if child.name != &"Place":
+			create_tween().tween_property(child, "modulate:a", 0.0, 0.15)
 	enemy_nodes.erase(enemy)
 	var t = create_tween()
-	t.set_parallel(true)
-	t.tween_property(panel, "modulate:a", 0.0, 0.5)
-	t.tween_property(panel, "scale", Vector2(0.3, 0.3), 0.5).set_ease(Tween.EASE_IN)
-	t.chain().tween_callback(_leave_empty_column.bind(panel))
+	t.tween_interval(DEATH_HOLD)
+	t.tween_property(panel, "modulate:a", 0.0, DEATH_FADE)
+	t.tween_callback(_leave_empty_column.bind(panel))
 
 
 func _leave_empty_column(panel: Control) -> void:
