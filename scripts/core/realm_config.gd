@@ -9,6 +9,10 @@ extends RefCounted
 ## NOTE: the Fable liaison "gift" (Bram's briefing / Neve's supplies) is a SEPARATE
 ## run-start boon, not one of these knobs — see RunManager's pending-gift handling.
 
+## The config half of the (realm, config) key the content pools look up (RealmRoutes). It picks the
+## content; every knob below only tunes it, which is why Camelot's two pledges share one route.
+var route_id: StringName = RealmRoutes.BASE
+
 ## Enemy stat multiplier applied to every encounter this run
 ## (threaded into EnemyPool.get_*_encounter's difficulty_mult).
 var enemy_difficulty_mult: float = 1.0

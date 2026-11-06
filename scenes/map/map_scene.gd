@@ -206,11 +206,11 @@ void fragment() {
 			tagline_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			vbox.add_child(tagline_lbl)
 
-	# Act / boss line, paired with the hover info label
-	var boss_names = {1: "Sir Caedmon", 2: "Hollow Warden", 3: "Fable's End"}
-	var boss_name = boss_names.get(RunManager.current_act, "???")
+	# Act / boss line, paired with the hover info label. A route with no boss to name just says the act.
+	var boss_name := EnemyPool.boss_name(RunManager.current_act)
 	var title = Label.new()
-	title.text = "Act %d: %s" % [RunManager.current_act, boss_name]
+	title.text = "Act %d" % RunManager.current_act if boss_name == "" \
+		else "Act %d: %s" % [RunManager.current_act, boss_name]
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 20)
 	title.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55))
@@ -1765,9 +1765,7 @@ func _on_node_hover(node: MapNode) -> void:
 		MapNode.NodeType.ELITE:
 			info_label.text = "Elite Combat: %s (Relic reward)" % floor_str
 		MapNode.NodeType.BOSS:
-			var boss_names = {1: "Sir Caedmon", 2: "Hollow Warden", 3: "Fable's End"}
-			var boss_name = boss_names.get(RunManager.current_act, "???")
-			info_label.text = "Boss: %s, %s" % [boss_name, floor_str]
+			info_label.text = "Boss: %s, %s" % [EnemyPool.boss_name(RunManager.current_act), floor_str]
 		MapNode.NodeType.REST:
 			info_label.text = "Rest Site: %s" % floor_str
 		_:
@@ -1819,6 +1817,10 @@ func _enter_node(node: MapNode) -> void:
 				RunManager.pending_special_event = &"raider_plea"
 			elif node.scripted_event_id != &"":
 				RunManager.pending_special_event = node.scripted_event_id
+			elif not EventPool.has_events(RunManager.current_realm_id, RunManager.realm_config.route_id):
+				# A route with no events yet: the node is a fight instead of an empty scene.
+				_start_combat(_combat_encounter(node.floor_num), 16 + node.floor_num * 2)
+				return
 			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		MapNode.NodeType.SWORD_IN_STONE:
 			# Reuse the event scene with a flag — Excalibur is a one-shot event
@@ -1830,6 +1832,10 @@ func _enter_node(node: MapNode) -> void:
 
 func _start_combat(enemies: Array[EnemyData], gold_reward: int = 0,
 		relic_reward: bool = false, is_boss: bool = false) -> void:
+	# An empty table has already said so loudly. Opening a fight against nobody would hide that.
+	if enemies.is_empty():
+		RunManager.pending_act_complete = false
+		return
 	RunManager.pending_enemies.clear()
 	for e in enemies:
 		RunManager.pending_enemies.append(e)
@@ -2149,9 +2155,10 @@ func _elite_encounter(weakened := false) -> Array[EnemyData]:
 
 
 func _boss_encounter() -> Array[EnemyData]:
-	# Act 1 is Sir Caedmon (EnemyPool). Acts 2-3 are out of demo scope and keep
-	# their legacy placeholder bosses until those acts get built.
-	if RunManager.current_act <= 1:
+	# The route's table answers for the boss (Act 1 of Camelot is Sir Caedmon) and refuses loudly if
+	# it has none. Camelot's Acts 2-3 are out of demo scope and keep their legacy placeholder bosses
+	# until those acts get built; no other realm falls through to them.
+	if RunManager.current_act <= 1 or RunManager.current_realm_id != &"camelot":
 		return EnemyPool.get_boss(RunManager.realm_config.enemy_difficulty_mult)
 	var result: Array[EnemyData] = []
 	result.append(_make_boss())

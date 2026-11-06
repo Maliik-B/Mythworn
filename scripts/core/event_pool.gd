@@ -1,9 +1,13 @@
 class_name EventPool
-## Builds and returns random narrative events.
+## Builds and returns random narrative events, from the pool of the route the run is standing on
+## (RealmRoutes). A route with no events answers null, loudly: map_scene turns an event node on such
+## a route into a fight before anything asks, so nothing else's event is ever served in its place.
 
 
 static func get_random_event(rng: RandomNumberGenerator) -> EventData:
 	var pool = _build_pool()
+	if pool.is_empty():
+		return null
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
@@ -14,6 +18,8 @@ static func get_random_event(rng: RandomNumberGenerator) -> EventData:
 ## from the filtered pool, so the rng advances exactly as the unfiltered draw would.
 static func get_random_event_filtered(rng: RandomNumberGenerator, allow_treasure_reveal: bool) -> EventData:
 	var pool := _build_pool()
+	if pool.is_empty():
+		return null
 	if allow_treasure_reveal:
 		return pool[rng.randi_range(0, pool.size() - 1)]
 	var filtered: Array[EventData] = []
@@ -25,7 +31,36 @@ static func get_random_event_filtered(rng: RandomNumberGenerator, allow_treasure
 	return filtered[rng.randi_range(0, filtered.size() - 1)]
 
 
+## The pool of the current route, refusing loudly if it has nothing to draw.
 static func _build_pool() -> Array[EventData]:
+	var pool := pool_for(RunManager.current_realm_id, RunManager.realm_config.route_id)
+	if pool.is_empty():
+		push_error("EventPool: route '%s' has no events. Its table is empty, so nothing was served."
+			% RealmRoutes.current_key())
+	return pool
+
+
+## True if the route has random events to draw. Asking builds the pool and draws nothing.
+static func has_events(realm_id: StringName, config_id: StringName) -> bool:
+	return not pool_for(realm_id, config_id).is_empty()
+
+
+## Every route's events. A route with a row and no events has not had its picks land.
+static func pool_for(realm_id: StringName, config_id: StringName) -> Array[EventData]:
+	var pool: Array[EventData] = []
+	match RealmRoutes.key(realm_id, config_id):
+		"camelot/base":
+			pool = _camelot_pool()
+		# Yggdrasil's first config, on the realm's affairs, and Journey to the West: empty until
+		# their picks land.
+		"yggdrasil/base", "journey_to_the_west/base":
+			pass
+		_:
+			push_error("EventPool: no such route '%s'." % RealmRoutes.key(realm_id, config_id))
+	return pool
+
+
+static func _camelot_pool() -> Array[EventData]:
 	var pool: Array[EventData] = []
 
 	pool.append(_man_off_the_field())

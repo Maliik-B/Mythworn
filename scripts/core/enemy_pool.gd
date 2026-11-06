@@ -7,9 +7,9 @@ class_name EnemyPool
 ## encounter lists live in code) and, for a solo developer, keeps the
 ## content diffable and reviewable instead of hidden in the editor.
 ##
-## Organization is realm-first so the other realms can bolt on their own sections
-## the same way RealmRegistry hangs realms off one place. Camelot is all that ships
-## in the demo, so it is all that lives here for now.
+## Organization is realm-first: _TABLES is keyed by (realm_id, config_id), and every get_* call
+## below answers for the route the run is standing on (RealmRoutes). A row with nothing in it is a
+## realm whose content has not landed, and asking it for a fight is a loud error and an empty list.
 ##
 ## Regular enemies, the two elites, and the Act-1 boss (Sir Caedmon) all live here.
 ## map_scene delegates its combat / elite / boss nodes to the get_*_encounter calls.
@@ -24,11 +24,10 @@ const AddCardEffectScript = preload("res://scripts/core/effects/add_card_effect.
 # ENCOUNTER TABLE (the StS-style composition puzzle)
 # ============================================================
 
-## The last composition we handed out this session. Used to damp back-to-back
-## repeats without hard-banning them (StS soft-avoids recent encounters rather
-## than forbidding them outright). Persisting across runs is harmless: the curated
-## opener re-anchors every run's first fight anyway.
-static var _last_key: String = ""
+## The last composition handed out on each route. Used to damp back-to-back repeats without
+## hard-banning them (StS soft-avoids recent encounters rather than forbidding them outright). By
+## route so a trip across a crossing leaves the home realm's memory where it was.
+static var _last_keys: Dictionary = {}
 
 ## The regular-combat encounter pool. Each entry: [key, base_weight, comp_builder].
 ## Weight is what an encounter is drawn at once the curated opener is past; the
@@ -57,22 +56,82 @@ const _COMBAT_POOL := [
 	["rotting_shade", 0.9],       # poison + curse pollution — layered attrition
 ]
 
+## Camelot's four elites. Order matters: the bag is shuffled from this list, so changing it moves
+## every seeded run.
+const _CAMELOT_ELITES := ["champion", "prophet", "verdict", "prelate"]
+
+## Every route's encounters, realm_id -> config_id -> a row of:
+##   opener: the composition floors 0 and 1 always get
+##   combat: [key, weight] rows for regular fights
+##   elites: the elite keys that fill the shuffle-bag
+##   boss: the boss key, and boss_names: act -> name, for the map's headings
+const _TABLES := {
+	&"camelot": {
+		RealmRoutes.BASE: {
+			"opener": "knight_solo",
+			"combat": _COMBAT_POOL,
+			"elites": _CAMELOT_ELITES,
+			"boss": "caedmon",
+			"boss_names": {1: "Sir Caedmon", 2: "Hollow Warden", 3: "Fable's End"},
+		},
+	},
+	&"yggdrasil": {
+		# The realm's first config, on the realm's affairs. Empty until the pick lands.
+		RealmRoutes.BASE: {},
+	},
+	&"journey_to_the_west": {
+		RealmRoutes.BASE: {},
+	},
+}
+
+
+## The row for a route, empty if the route has none.
+static func table_for(realm_id: StringName, config_id: StringName) -> Dictionary:
+	return _TABLES.get(realm_id, {}).get(config_id, {})
+
+
+## True if the route has regular fights to serve.
+static func has_encounters(realm_id: StringName, config_id: StringName) -> bool:
+	return table_for(realm_id, config_id).has("combat")
+
+
+## The name of the boss the current route ends `act` on, or "" if it has none to name.
+static func boss_name(act: int) -> String:
+	var row := table_for(RunManager.current_realm_id, RunManager.realm_config.route_id)
+	return row.get("boss_names", {}).get(act, "")
+
+
+## The current route's row, refusing loudly if it lacks what was asked for. The empty list its caller
+## returns is the point: nothing else's content is served in its place.
+static func _row_with(what: String) -> Dictionary:
+	var row := table_for(RunManager.current_realm_id, RunManager.realm_config.route_id)
+	if not row.has(what):
+		push_error("EnemyPool: route '%s' has no %s. Its table is empty, so nothing was served."
+			% [RealmRoutes.current_key(), what])
+		return {}
+	return row
+
 
 ## Builds one regular-combat encounter for a map node.
 ## floor_num drives a gentle within-act difficulty ramp and gates the curated
 ## opener; difficulty_mult is the injection point for the A2 realm-config knob
 ## (court-vs-common-folk), defaulting to neutral so A1 works standalone.
 static func get_combat_encounter(floor_num: int, difficulty_mult: float = 1.0) -> Array[EnemyData]:
+	var row := _row_with("combat")
+	if row.is_empty():
+		var nothing: Array[EnemyData] = []
+		return nothing
 	var mult := _encounter_mult(floor_num, difficulty_mult)
+	var route := RealmRoutes.current_key()
 
 	# Curated easy opener: a lone Unmarked Knight. The clean teacher, solo, so a
 	# first-timer meets attack/guard/rally with nothing else going on.
-	if floor_num <= 1:
-		_last_key = "knight_solo"
-		return _compose("knight_solo", mult)
+	if floor_num <= 1 and row.has("opener"):
+		_last_keys[route] = row["opener"]
+		return _compose(row["opener"], mult)
 
-	var key := _pick_encounter_key(floor_num)
-	_last_key = key
+	var key := _pick_encounter_key(floor_num, row["combat"], _last_keys.get(route, ""))
+	_last_keys[route] = key
 	return _compose(key, mult)
 
 
@@ -89,11 +148,11 @@ static func _act_mult() -> float:
 	return 1.0 + (RunManager.current_act - 1) * 0.35
 
 
-static func _pick_encounter_key(floor_num: int) -> String:
+static func _pick_encounter_key(floor_num: int, rows: Array, last_key: String) -> String:
 	# Gate the attrition pairing (Golem + Conspirator) out of the early act — the
 	# sim showed it costs ~half your HP on a fresh deck. It appears once decks ramp.
 	var pool := []
-	for entry in _COMBAT_POOL:
+	for entry in rows:
 		if entry[0] == "golem_conspirator" and floor_num < 5:
 			continue
 		# The Herald's banner snowballs a paired bruiser fast; keep it out of the early act
@@ -103,11 +162,11 @@ static func _pick_encounter_key(floor_num: int) -> String:
 		pool.append(entry)
 	var total := 0.0
 	for entry in pool:
-		total += _effective_weight(entry[0], entry[1])
+		total += _effective_weight(entry[0], entry[1], last_key)
 	var roll := RngManager.enemy_rng.randf() * total
 	var cumulative := 0.0
 	for entry in pool:
-		cumulative += _effective_weight(entry[0], entry[1])
+		cumulative += _effective_weight(entry[0], entry[1], last_key)
 		if roll <= cumulative:
 			return entry[0]
 	return pool[0][0]
@@ -115,8 +174,8 @@ static func _pick_encounter_key(floor_num: int) -> String:
 
 ## Soft anti-repeat: the composition we just used is heavily discounted (not
 ## banned) so consecutive-identical fights are rare but not impossible.
-static func _effective_weight(key: String, base: float) -> float:
-	if key == _last_key:
+static func _effective_weight(key: String, base: float, last_key: String) -> float:
+	if key == last_key:
 		return base * 0.15
 	return base
 
@@ -172,10 +231,11 @@ static func _compose(key: String, mult: float) -> Array[EnemyData]:
 	return result
 
 
-## Shuffle-bag of the four elites, drawn without replacement so a run meets distinct elites
-## before any repeat. A path holds up to MAX_ELITES_PER_PATH=3 elite nodes, so a run samples
-## 3 of the 4 (which one sits out varies). Reset per run by reset_encounter_state().
-static var _elite_bag: Array[String] = []
+## Shuffle-bags of each route's elites, route key -> keys left, drawn without replacement so a run
+## meets distinct elites before any repeat. A path holds up to MAX_ELITES_PER_PATH=3 elite nodes, so
+## a run samples 3 of Camelot's 4 (which one sits out varies). By route so a fight across a crossing
+## takes nothing out of the home realm's bag. Reset per run by reset_encounter_state().
+static var _elite_bags: Dictionary = {}
 
 
 ## One elite for an elite node. The four test different axes: Champion (adaptability /
@@ -183,12 +243,18 @@ static var _elite_bag: Array[String] = []
 ## punishes chip/multi-hit, rewards big single hits), Hollow Prelate (a throughput / DPS
 ## check — out-damage its heal+shield). difficulty_mult is the A2 hook.
 static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData]:
-	var mult := _act_mult() * difficulty_mult
-	if _elite_bag.is_empty():
-		_elite_bag = ["champion", "prophet", "verdict", "prelate"]
-		RngManager.shuffle(_elite_bag, RngManager.enemy_rng)
-	var pick: String = _elite_bag.pop_back()
 	var result: Array[EnemyData] = []
+	var row := _row_with("elites")
+	if row.is_empty():
+		return result
+	var mult := _act_mult() * difficulty_mult
+	var route := RealmRoutes.current_key()
+	var bag: Array = _elite_bags.get(route, [])
+	if bag.is_empty():
+		bag = row["elites"].duplicate()
+		RngManager.shuffle(bag, RngManager.enemy_rng)
+		_elite_bags[route] = bag
+	var pick: String = bag.pop_back()
 	match pick:
 		"prophet":
 			result.append(false_prophet(mult))
@@ -201,12 +267,12 @@ static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData
 	return result
 
 
-## Clears per-run encounter memory — the elite shuffle-bag and the last-combat key — so
+## Clears per-run encounter memory — the elite shuffle-bags and the last-combat keys — so
 ## a fresh run's elites don't repeat and it doesn't inherit the prior run's anti-repeat
 ## state. Called from RunManager.start_run.
 static func reset_encounter_state() -> void:
-	_elite_bag.clear()
-	_last_key = ""
+	_elite_bags.clear()
+	_last_keys.clear()
 
 
 ## The raider questline payoff fight: The Boar (a bandit war-chief the countryside calls a
@@ -241,11 +307,18 @@ static func get_barrow_warden() -> Array[EnemyData]:
 	return result
 
 
-## The Act-1 boss: Sir Caedmon. (Acts 2-3 are out of demo scope; map_scene still
-## routes those to its legacy boss builders.)
+## The route's boss. Camelot's is the Act-1 boss, Sir Caedmon. (Camelot's Acts 2-3 are out of demo
+## scope; map_scene still routes those to its legacy boss builders.)
 static func get_boss(difficulty_mult: float = 1.0) -> Array[EnemyData]:
 	var result: Array[EnemyData] = []
-	result.append(sir_caedmon(_act_mult() * difficulty_mult))
+	var row := _row_with("boss")
+	if row.is_empty():
+		return result
+	match row["boss"]:
+		"caedmon":
+			result.append(sir_caedmon(_act_mult() * difficulty_mult))
+		_:
+			push_error("EnemyPool: route '%s' names unknown boss '%s'." % [RealmRoutes.current_key(), row["boss"]])
 	return result
 
 

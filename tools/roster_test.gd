@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_starter_deck()
 	_test_map_planarity()
 	_test_realm_config()
+	_test_realm_routes()
 	_test_event_scheduling()
 	_test_scheduled_room()
 	_test_memory_cards()
@@ -744,6 +745,45 @@ func _map_has_crossing(map: MapData) -> bool:
 ## The A2 realm-config system: neutral by default, and the wired knobs flow through —
 ## enemy difficulty scales encounter HP, and elite frequency biases the map's elite count
 ## (without breaking planarity). reward_rarity / map_boon are fielded but not yet wired.
+## Content is looked up by (realm, config). Camelot's row serves what it always has. A row with
+## nothing in it refuses loudly and serves nothing, never Camelot's. A realm marked implemented with
+## an empty row fails here, so the flag cannot go up before the content does.
+func _test_realm_routes() -> void:
+	print("-- Realm routes --")
+	_check("a fresh config sits on the realm's first route", RealmConfig.new().route_id == RealmRoutes.BASE)
+	_check("Camelot's route has its regulars and all 11 pool events",
+		EnemyPool.has_encounters(&"camelot", RealmRoutes.BASE)
+		and EventPool.pool_for(&"camelot", RealmRoutes.BASE).size() == 11)
+	_check("Camelot's route serves Sir Caedmon and names its bosses",
+		EnemyPool.get_boss()[0].enemy_name == "Sir Caedmon" and EnemyPool.boss_name(1) == "Sir Caedmon")
+
+	var saved_realm := RunManager.current_realm_id
+	var saved_config := RunManager.realm_config
+	RunManager.current_realm_id = &"yggdrasil"
+	RunManager.realm_config = RealmConfig.new()
+	print("  (the ERROR lines that follow are empty tables refusing, on purpose)")
+	_check("Yggdrasil's first config serves no regular fight, Camelot's or anyone's",
+		EnemyPool.get_combat_encounter(4).is_empty())
+	_check("nor an elite", EnemyPool.get_elite_encounter().is_empty())
+	_check("nor a boss, and it names none", EnemyPool.get_boss().is_empty() and EnemyPool.boss_name(1) == "")
+	_check("nor an event", EventPool._build_pool().is_empty()
+		and EventPool.get_random_event(RngManager.event_rng) == null
+		and EventPool.get_random_event_filtered(RngManager.event_rng, true) == null)
+	RunManager.current_realm_id = saved_realm
+	RunManager.realm_config = saved_config
+
+	# Loud on every run until the picks land, and a failure the moment a realm claims it is ready.
+	for realm in RealmRegistry.get_all_realms():
+		var ready_to_ship: bool = EnemyPool.has_encounters(realm.realm_id, RealmRoutes.BASE) \
+			and not EnemyPool.table_for(realm.realm_id, RealmRoutes.BASE).get("elites", []).is_empty() \
+			and EnemyPool.table_for(realm.realm_id, RealmRoutes.BASE).has("boss") \
+			and EventPool.has_events(realm.realm_id, RealmRoutes.BASE)
+		if realm.implemented:
+			_check("implemented realm %s has regulars, elites, a boss and events" % realm.realm_id, ready_to_ship)
+		elif not ready_to_ship:
+			print("  PENDING %s has an empty table, awaiting its picks" % realm.realm_id)
+
+
 func _test_realm_config() -> void:
 	var cfg := RealmConfig.new()
 	_check("RealmConfig defaults are neutral",
