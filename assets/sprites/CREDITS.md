@@ -18,6 +18,8 @@ These CC0 packs stand in for the Camelot demo enemies; the shipped strips are re
 modification and commercial use; credited here regardless.
 - **Medieval Warrior Pack** (Man-at-Arms): bearded armored warrior (idle, attack, hit, death).
   CC0 — https://luizmelo.itch.io/medieval-warrior-pack
+  `man_at_arms_whole/` is the same strips recolored by hand into living colour, also not AI; it
+  stands in for Sir Caedmon until his own sheet lands.
 
 ## Bosses
 

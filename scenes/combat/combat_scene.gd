@@ -59,6 +59,12 @@ const BODY_MAX_H := STAGE_FEET_Y - STAGE_TOP_Y
 const STATUS_COLUMN_W := 124.0  # beside the feet, on each side, so statuses never move a body
 const ENEMY_MIN_W := 320.0
 const LOG_RECT := Rect2(1370, 68, 520, 624)
+# A boss's line runs as a subtitle on the ground under his feet, where his name and bar were.
+const STAGE_LINE_RECT := Rect2(440, 562, 1040, 132)  # inside the centre square, for a phone crop
+const STAGE_LINE_SIZE := 46
+const STAGE_LINE_CHARS_PER_SEC := 30.0
+const STAGE_LINE_HOLD := 1.7
+const BREAK_DRAIN_TIME := 1.6
 const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
 const TARGET_LIGHT_FADE := 0.08
 const DRAG_CARD_CLEARANCE := 8.0
@@ -104,6 +110,14 @@ const SPRITE_SETS := {
 		"cell": 250,
 		"anims": {"idle": ["Idle.png", 8, 9], "attack": ["Attack1.png", 8, 18], "hit": ["Take hit.png", 3, 12], "death": ["Death.png", 7, 10]},
 	},
+	# Sir Caedmon's one slot. A bought sheet replaces this entry and nothing else: its folder, its
+	# cell, its strips. Give it an optional "break" strip and that plays as his bar breaks, in place
+	# of "hit". A stand-in until then: the Man-at-Arms in living colour, whose lapis is what drains.
+	"caedmon": {
+		"dir": "res://assets/sprites/enemies/camelot/man_at_arms_whole/",
+		"fw": 184, "fh": 137,
+		"anims": {"idle": ["Idle.png", 6, 8], "attack": ["Attack1.png", 4, 18], "hit": ["Hit.png", 3, 13], "death": ["Death.png", 9, 10]},
+	},
 	# Real Camelot per-enemy art (LuizMelo, CC0), corruption-recolored. Non-square frames.
 	"medieval_warrior": {
 		"dir": "res://assets/sprites/enemies/camelot/man_at_arms/",
@@ -130,7 +144,7 @@ const ENEMY_SPRITE_SET := {
 	"Champion of the Usurper": "skeleton",
 	"The Beast at the Stone": "skeleton",
 	"The False Prophet": "wizard2",
-	"Sir Caedmon": "wizard2",
+	"Sir Caedmon": "caedmon",
 	"Hollow Warden": "worm",
 	"Fable's End": "wizard2",
 	# Sep/Oct-2026 roster (thickening + content furnishing).
@@ -160,6 +174,8 @@ var _drag_hint: Label = null        # "right-click to cancel" affordance during 
 var _enemy_lights: Dictionary = {}  # EnemyCombatState -> the targeting light on it (see _set_lit_enemies)
 var _sheet_bodies: Dictionary = {}  # sprite set key -> where its body sits in the cell (see _sheet_body)
 var _shadow_tex: GradientTexture2D = null
+var _stage: CombatStage = null
+var _stage_line: Label = null
 var _target_glow_tex: GradientTexture2D = null
 var _target_glow_mat: CanvasItemMaterial = null
 
@@ -465,7 +481,8 @@ func _build_ui() -> void:
 	bg.color = StageSkin.c("desk")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
-	add_child(CombatStage.new())
+	_stage = CombatStage.new()
+	add_child(_stage)
 
 	# Vignette
 	var vignette = ColorRect.new()
@@ -1767,6 +1784,7 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	place.add_child(status_chips)
 
 	var name_lbl = Label.new()
+	name_lbl.name = "EnemyName"
 	name_lbl.text = enemy.enemy_data.enemy_name
 	name_lbl.add_theme_font_override("font", load(StageSkin.NAME_FONT_PATH))
 	name_lbl.add_theme_font_size_override("font_size", 26)
@@ -2570,69 +2588,136 @@ func _on_enemy_died(enemy) -> void:
 		var panel: Control = enemy_nodes.get(enemy)
 		if panel:
 			_log("[color=wheat]%s: \"%s\"[/color]" % [enemy.enemy_data.enemy_name, final_line])
-			_show_enemy_speech(panel, final_line)
+			_show_stage_line(final_line)
 	_animate_enemy_death(enemy)
 	_refresh_ui()
 
 
-## A multi-phase boss crossed into a new phase: its bar refilled and its moveset
-## swapped. Flash the model, float a speech bubble with the transition line, and
-## refresh so the new HP bar + intent read immediately.
+## A multi-phase boss crossed into a new phase: its bar refilled and its moveset swapped. The clip
+## opens on this, so it has room: his bar shatters and his name and intent leave the ground, the
+## stage dims around him, the colour goes out of him, and what he says runs large where they were.
+## Nothing here holds input; the fight can go on under it, and the bar and intent come back with
+## the new phase when the line is done.
 func _on_enemy_phase_changed(enemy, _phase_index: int, line: String) -> void:
 	_log("[color=wheat]%s changes![/color]" % enemy.enemy_data.enemy_name)
 	var panel: Control = enemy_nodes.get(enemy)
 	if panel:
-		panel.pivot_offset = panel.size / 2.0
-		var t = create_tween()
-		t.tween_property(panel, "modulate", Color(1.5, 1.5, 1.5, 1.0), 0.15)
-		t.tween_property(panel, "modulate", Color(1, 1, 1, 1.0), 0.4)
+		_shatter_bar(panel)
 		_screen_shake(8.0, 0.3)
+		_enemy_play(enemy, "break" if _has_strip(enemy, "break") else "hit")
+		_drain_body(enemy)
 		if line != "":
-			_show_enemy_speech(panel, line)
+			var seconds := _show_stage_line(line)
+			_stage.dim(seconds)
+			_hide_enemy_words(panel, seconds)
 	_refresh_ui()
 
 
-## A transient speech bubble anchored above an enemy's model — used for boss
-## phase-transition lines. Auto-fades so it never blocks the board for long.
-func _show_enemy_speech(panel: Control, text: String) -> void:
-	var bubble := PanelContainer.new()
-	bubble.z_index = 60
-	bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.09, 0.085, 0.078, 0.96)
-	style.set_corner_radius_all(10)
-	style.set_border_width_all(2)
-	style.border_color = Color(0.7, 0.66, 0.56)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	style.content_margin_top = 10
-	style.content_margin_bottom = 10
-	bubble.add_theme_stylebox_override("panel", style)
+func _has_strip(enemy, state: String) -> bool:
+	var anim = _enemy_anims.get(enemy)
+	return anim != null and SPRITE_SETS[anim["set"]]["anims"].has(state)
+
+
+## The old bar in pieces, thrown off where it was. They are loose on the scene, so the panel's own
+## bar can already be the new phase's underneath them.
+func _shatter_bar(panel: Control) -> void:
+	var bar: Control = panel.get_child(0).get_node("HPBarContainer")
+	var rect := bar.get_global_rect()
+	var pieces := 16
+	var w := rect.size.x / pieces
+	for i in pieces:
+		var piece := ColorRect.new()
+		piece.color = StageSkin.c("bar_high")
+		piece.size = Vector2(w - 1.0, rect.size.y)
+		piece.position = rect.position + Vector2(i * w, 0.0)
+		piece.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		piece.z_index = 30
+		add_child(piece)
+		var off := (float(i) - (pieces - 1) / 2.0) / pieces
+		var across := create_tween()
+		across.tween_property(piece, "position:x", piece.position.x + off * randf_range(180.0, 420.0), 0.7)
+		var flight := create_tween()
+		flight.tween_property(piece, "position:y", piece.position.y - randf_range(20.0, 70.0), 0.16) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		flight.tween_property(piece, "position:y", piece.position.y + randf_range(40.0, 110.0), 0.54) \
+			.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		var fade := create_tween()
+		fade.tween_interval(0.35)
+		fade.tween_property(piece, "modulate:a", 0.0, 0.35)
+		fade.tween_callback(piece.queue_free)
+
+
+## A blink of light, then the colour goes out of the body and stays out. A shaking hand with it.
+func _drain_body(enemy) -> void:
+	var anim = _enemy_anims.get(enemy)
+	if anim == null or not is_instance_valid(anim["rect"]):
+		return
+	var body: TextureRect = anim["rect"]
+	var flash := create_tween()
+	flash.tween_property(body, "modulate", Color(1.7, 1.7, 1.7), 0.05)
+	flash.tween_property(body, "modulate", Color.WHITE, 0.3)
+	var mat: ShaderMaterial = body.material
+	var drain := create_tween()
+	drain.tween_method(func(v: float): mat.set_shader_parameter("drain", v), 0.0, 1.0, BREAK_DRAIN_TIME) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# He shakes by a whole sprite pixel, to stay on the grid.
+	var px: float = body.size.x / float(anim["fw"])
+	var home := body.position
+	var shake := create_tween().set_loops(10)
+	shake.tween_callback(func(): if is_instance_valid(body): body.position.x = home.x + px)
+	shake.tween_interval(0.12)
+	shake.tween_callback(func(): if is_instance_valid(body): body.position.x = home.x)
+	shake.tween_interval(0.12)
+
+
+## The name, the bar and the intent leave the ground for as long as a line runs on it.
+func _hide_enemy_words(panel: Control, seconds: float) -> void:
+	for child in panel.get_child(0).get_children():
+		if child.name == &"Place":
+			continue
+		var t := create_tween()
+		t.tween_property(child, "modulate:a", 0.0, 0.12)
+		t.tween_interval(seconds - 0.12)
+		t.tween_property(child, "modulate:a", 1.0, 0.3)
+
+
+## A line said out loud, run out large on the ground under the bodies. Returns how long it stays.
+func _show_stage_line(text: String) -> float:
+	if is_instance_valid(_stage_line):
+		_stage_line.queue_free()
 	var lbl := Label.new()
 	lbl.text = text
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	lbl.custom_minimum_size.x = 320
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 17)
-	lbl.add_theme_color_override("font_color", Color(0.95, 0.93, 0.88))
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.position = STAGE_LINE_RECT.position
+	lbl.size = STAGE_LINE_RECT.size
+	lbl.z_index = 60
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bubble.add_child(lbl)
-	add_child(bubble)
-	# Anchor above the model, kept on-screen.
-	await get_tree().process_frame  # let the bubble size itself before positioning
-	if not is_instance_valid(bubble) or not is_instance_valid(panel):
-		if is_instance_valid(bubble):
-			bubble.queue_free()
-		return
-	var body := _body_rect(panel)
-	var target := Vector2(body.get_center().x - bubble.size.x / 2.0, body.position.y - bubble.size.y - 12)
-	bubble.global_position = Vector2(clampf(target.x, 10, 1920 - bubble.size.x - 10), maxf(STAGE_TOP_Y, target.y))
-	bubble.modulate.a = 0.0
+	lbl.add_theme_font_override("font", load(StageSkin.LINE_FONT_PATH))
+	lbl.add_theme_font_size_override("font_size", STAGE_LINE_SIZE)
+	lbl.add_theme_constant_override("line_spacing", -6)
+	lbl.add_theme_color_override("font_color", StageSkin.c("line"))
+	lbl.add_theme_color_override("font_outline_color", StageSkin.c("line_outline"))
+	lbl.add_theme_constant_override("outline_size", 8)
+	lbl.visible_ratio = 0.0
+	add_child(lbl)
+	_stage_line = lbl
+	var run := text.length() / STAGE_LINE_CHARS_PER_SEC
 	var t := create_tween()
-	t.tween_property(bubble, "modulate:a", 1.0, 0.25)
-	t.tween_interval(2.8)
-	t.tween_property(bubble, "modulate:a", 0.0, 0.5)
-	t.tween_callback(bubble.queue_free)
+	t.tween_interval(0.25)
+	t.tween_property(lbl, "visible_ratio", 1.0, run)
+	t.tween_interval(STAGE_LINE_HOLD)
+	t.tween_property(lbl, "modulate:a", 0.0, 0.3)
+	t.tween_callback(lbl.queue_free)
+	return 0.25 + run + STAGE_LINE_HOLD
+
+
+## For a capture: breaks an enemy's bar through the engine's real path, wherever its HP stands.
+func trigger_boss_break(enemy) -> void:
+	var left: int = enemy.stats.current_hp
+	enemy.stats.current_hp = 0
+	combat_engine._on_damage_dealt(enemy.stats, left)
 
 
 func _on_block_gained(target, amount: int) -> void:

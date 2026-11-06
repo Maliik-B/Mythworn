@@ -10,6 +10,9 @@ const ART_PX := 4  # the world's grid: one sprite pixel at a regular's scale
 const RULING_STEP := 36
 const RULING_MARGIN := 56
 
+var _dim: ColorRect = null
+var _dim_tween: Tween = null
+
 # A realm's skyline, as flat washes on the art grid. A realm with none here has a bare wall.
 const WASHES := {
 	&"camelot": ["res://assets/sprites/realms/horizon_camelot_far.png", "res://assets/sprites/realms/horizon_camelot_near.png"],
@@ -35,6 +38,19 @@ func _ready() -> void:
 		_add_wash(washes[1], StageSkin.c("wash_near"))
 	_add_rect(Vector2(0, GROUND_LINE_Y), Vector2(1920, HEIGHT - GROUND_LINE_Y), StageSkin.c("ground"))
 	_add_rect(Vector2(0, GROUND_LINE_Y), Vector2(1920, ART_PX), StageSkin.c("ground_line"))
+
+
+## Darkens the ground around the bodies for this long, then lets it back. They stand in front of it.
+func dim(seconds: float) -> void:
+	if not is_instance_valid(_dim):
+		_dim = _add_rect(Vector2.ZERO, Vector2(1920, HEIGHT), StageSkin.c("dim"))
+	if _dim_tween:
+		_dim_tween.kill()
+	_dim.modulate.a = 0.0
+	_dim_tween = create_tween()
+	_dim_tween.tween_property(_dim, "modulate:a", 1.0, 0.25)
+	_dim_tween.tween_interval(maxf(0.0, seconds - 0.25))
+	_dim_tween.tween_property(_dim, "modulate:a", 0.0, 0.5)
 
 
 func _add_rect(pos: Vector2, rect_size: Vector2, color: Color) -> ColorRect:
