@@ -4105,7 +4105,7 @@ func _test_crossing() -> void:
 			found += 1
 			if n.crossing_to != MapGenerator.CROSSING_REALM \
 					or n.floor_num < MapGenerator.CROSSING_MIN_FLOOR or n.floor_num > MapGenerator.CROSSING_MAX_FLOOR \
-					or (n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT) \
+					or n.node_type == MapNode.NodeType.BOSS or n.node_type == MapNode.NodeType.SWORD_IN_STONE \
 					or n.quest_giver_id != &"" or n.quest_payoff_id != &"" or n.scripted_event_id != &"" \
 					or n.next_nodes.is_empty() or seat_map.get_nodes_on_floor(n.floor_num).size() < 2:
 				well_placed = false
@@ -4113,6 +4113,24 @@ func _test_crossing() -> void:
 			seated += 1
 	_check("a crossing is seated exactly once on every Camelot first map (%d of 20)" % seated, seated == 20)
 	_check("on floors 8 to 10, on an ordinary node nothing else claimed, with another way past it", well_placed)
+	# Seed 7260 once had no free combat or event node on those floors, and so no crossing at all.
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 7260)
+	var mystery_map := MapGenerator.generate(RngManager.map_rng, &"camelot", 1)
+	var mystery_seat := -1
+	for id in mystery_map.nodes:
+		if mystery_map.nodes[id].crossing_to != &"":
+			mystery_seat = id
+	_check("a map with nothing plainer free seats it on a Mystery",
+		mystery_seat != -1 and mystery_map.nodes[mystery_seat].node_type == MapNode.NodeType.MYSTERY)
+	# Seed 22438 has no free Mystery either: elites, shops and rests only. It gives up an elite.
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 22438)
+	var bare_map := MapGenerator.generate(RngManager.map_rng, &"camelot", 1)
+	var bare_seat := -1
+	for id in bare_map.nodes:
+		if bare_map.nodes[id].crossing_to != &"":
+			bare_seat = id
+	_check("a map with no Mystery free gives up an elite, as a last resort",
+		bare_seat != -1 and bare_map.nodes[bare_seat].node_type == MapNode.NodeType.ELITE)
 	var plain_rng := RandomNumberGenerator.new()
 	plain_rng.seed = 900
 	_check("no other map has one", not _map_has_seat(MapGenerator.generate(plain_rng, &"camelot", 2))

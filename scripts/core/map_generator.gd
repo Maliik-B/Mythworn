@@ -382,7 +382,15 @@ static func _place_record_site(map: MapData, rng: RandomNumberGenerator) -> void
 # The crossing: a node that leads out of the realm and back. Seated once on the first map of a run,
 # late enough that the player has a deck to take with them, and shown from the start, so it is there
 # to be planned around. One jump and back only for now. It takes an ordinary node nothing else has
-# claimed, never the only node on its floor, so stepping through is always a choice of route.
+# claimed, never the only node on its floor, so stepping through is always a choice of route. Every
+# run has to have one, so it falls back along this list only when nothing earlier is free: that way
+# no seed's seat moves, and a rare map gives up an elite or a service only because it has to.
+const CROSSING_SEAT_KINDS := [
+	[MapNode.NodeType.COMBAT, MapNode.NodeType.EVENT],
+	[MapNode.NodeType.MYSTERY],
+	[MapNode.NodeType.ELITE],
+	[MapNode.NodeType.SHOP, MapNode.NodeType.REST],
+]
 const CROSSING_REALM := &"yggdrasil"
 const CROSSING_MIN_FLOOR := 8
 const CROSSING_MAX_FLOOR := 10
@@ -390,23 +398,32 @@ const CROSSING_MAX_FLOOR := 10
 
 static func _place_crossing(map: MapData, rng: RandomNumberGenerator) -> void:
 	var cands: Array[int] = []
-	for id in map.nodes:
-		var n: MapNode = map.nodes[id]
-		if n.floor_num < CROSSING_MIN_FLOOR or n.floor_num > CROSSING_MAX_FLOOR:
-			continue
-		if _is_reserved_node(map, n):
-			continue
-		if n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT:
-			continue
-		if map.get_nodes_on_floor(n.floor_num).size() < 2:
-			continue
-		cands.append(id)
+	for kinds in CROSSING_SEAT_KINDS:
+		cands = _crossing_seats(map, kinds)
+		if not cands.is_empty():
+			break
 	if cands.is_empty():
+		push_error("MapGenerator: no node on floors %d to %d can seat a crossing." % [CROSSING_MIN_FLOOR, CROSSING_MAX_FLOOR])
 		return
 	var fork := RandomNumberGenerator.new()
 	fork.seed = hash(str(rng.seed) + "crossing")
 	RngManager.shuffle(cands, fork)
 	map.nodes[cands[0]].crossing_to = CROSSING_REALM
+
+
+## The free nodes of these kinds in the crossing's floors, leaving out any alone on its floor and any
+## the pledge is about to animate.
+static func _crossing_seats(map: MapData, kinds: Array) -> Array[int]:
+	var seats: Array[int] = []
+	for id in map.nodes:
+		var n: MapNode = map.nodes[id]
+		if n.floor_num < CROSSING_MIN_FLOOR or n.floor_num > CROSSING_MAX_FLOOR:
+			continue
+		if _is_reserved_node(map, n) or n.node_type not in kinds or map.pledge_changes.has(id):
+			continue
+		if map.get_nodes_on_floor(n.floor_num).size() >= 2:
+			seats.append(id)
+	return seats
 
 
 # A crossing's far side: the edge of another realm, with no boss and one way back. One table, so it
