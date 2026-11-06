@@ -124,7 +124,7 @@ class EventChoice extends RefCounted:
 	## does the telling. It costs nothing but the event's other options.
 	var wakes_relic: StringName = &""
 	## If non-empty, this choice plays a staged moment over the event scene before its result reads:
-	## &"excalibur_take" or &"excalibur_leave". Presentation only: every effect and word on the choice
-	## is unchanged.
+	## &"excalibur_take" or &"excalibur_leave". A choice that wakes a relic stages itself (AltarPiece)
+	## and needs no tag. Presentation only: every effect and word on the choice is unchanged.
 	var set_piece: StringName = &""
 

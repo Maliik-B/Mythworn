@@ -1826,6 +1826,14 @@ func _test_set_pieces() -> void:
 	_check("the words the refusal stamps and the take names still resolve",
 		TitlePool.get_title(walk.awarded_title_id) != null
 		and RelicPool.get_relic_by_name(String(take.granted_relic_id)) != null)
+	var altar_ready := true
+	for dormant_name in RelicPool.dormant_names():
+		var relic := RelicPool.get_relic_by_name(dormant_name)
+		var woken := RelicPool.get_relic_by_name(String(relic.wakes_into))
+		if woken == null or relic.wake_line == "":
+			altar_ready = false
+	_check("every forgotten relic gives the altar a woken name and a line", altar_ready)
+
 	var host := Node.new()
 	add_child(host)
 	var ran := 0
@@ -1837,7 +1845,16 @@ func _test_set_pieces() -> void:
 	leave_piece.hurry()
 	await leave_piece.finished
 	ran += 1
-	_check("the take and the refusal both run to their end", ran == 2)
+	var altar_piece := AltarPiece.play(host, "A Bare Scabbard")
+	altar_piece.hurry()
+	await altar_piece.finished
+	ran += 1
+	# The figureless path: a relic with no drawing yet stands on its name alone.
+	var bare_piece := AltarPiece.play(host, "A Bone Comb")
+	bare_piece.hurry()
+	await bare_piece.finished
+	ran += 1
+	_check("the take, the refusal and the altar with and without a figure all run to their end", ran == 4)
 	host.queue_free()
 
 	var waiting_before: int = TitleEarnedPopup._queue.size()
@@ -2364,7 +2381,8 @@ func _test_scene_scripts_compile() -> void:
 			"res://scenes/game_over/game_over_scene.gd",
 			"res://scenes/title/title_screen.gd",
 			"res://scenes/splash/splash_scene.gd",
-			"res://scripts/ui/set_piece.gd", "res://scripts/ui/excalibur_piece.gd"]:
+			"res://scripts/ui/set_piece.gd", "res://scripts/ui/excalibur_piece.gd",
+			"res://scripts/ui/altar_piece.gd"]:
 		var scr = load(path)
 		var compiled: bool = scr != null and scr is GDScript and scr.reload() == OK
 		_check("compiles: %s" % path, compiled)

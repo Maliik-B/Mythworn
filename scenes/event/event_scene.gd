@@ -812,6 +812,9 @@ func _on_choice_selected(index: int) -> void:
 ## Opens the stage this choice calls for, if any. Fire and forget: the stage shields the scene from
 ## input and frees itself.
 func _open_set_piece(choice: EventData.EventChoice) -> void:
+	if choice.wakes_relic != &"":
+		AltarPiece.play(self, String(choice.wakes_relic))
+		return
 	match choice.set_piece:
 		&"excalibur_take":
 			TitleEarnedPopup.hold()
