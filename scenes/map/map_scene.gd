@@ -102,7 +102,7 @@ func _ready() -> void:
 	# Returning to the map having just armed a questline: reveal the now-armed payoff node
 	# once. (Mutually exclusive with the pledge flourish, which only plays on a fresh map.) At
 	# most one questline is pending a reveal per return -- arming always happens inside an event.
-	elif not RunManager.is_abroad() and RunManager.first_unrevealed_quest() != &"":
+	elif RunManager.first_unrevealed_quest() != &"":
 		_prime_quest_reveal(RunManager.first_unrevealed_quest())
 	AudioManager.play_music("map")
 
@@ -2017,7 +2017,10 @@ func _prime_quest_reveal(quest_id: StringName) -> void:
 	_end_flourish()
 	var node := _quest_payoff_node(quest_id)
 	if node == null:
-		RunManager.mark_quest_revealed(quest_id)  # nothing to reveal; don't retry
+		# Abroad, its payoff is on the map at home, so it waits for the way back. Otherwise there is
+		# nothing to reveal; don't retry.
+		if not RunManager.is_abroad():
+			RunManager.mark_quest_revealed(quest_id)
 		return
 	var btn: Button = node_buttons.get(node.id)
 	if btn == null:

@@ -10,9 +10,14 @@ class_name RealmRoutes
 ## A realm's first config.
 const BASE := &"base"
 
+## STAND-IN, so the crossing runs end to end while the real picks land: Yggdrasil's far side, served
+## with Camelot's own enemies and no events. Only RunManager.cross_to installs it. When the first
+## config lands, point CROSSING_CONFIGS at it and delete this row from both pools.
+const STANDIN_EDGE := &"standin_edge"
+
 ## The realm a crossing opens on -> the config its far side runs on.
 const CROSSING_CONFIGS := {
-	&"yggdrasil": BASE,
+	&"yggdrasil": STANDIN_EDGE,
 }
 
 

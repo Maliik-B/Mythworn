@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_master_of_game()
 	_test_map_node_looks()
 	_test_card_face_words()
+	_test_crossing()
 	_test_forgotten_relics()
 	_test_relic_names()
 	_test_liaison_relics()
@@ -4081,6 +4082,182 @@ func _test_master_of_game() -> void:
 ## ward and the scabbard's guard; and a record site is seated late in every act.
 ## The node painter, the map peek and the legend all read MapNode.look(), so what it returns is
 ## what the player can see. A payoff must be indistinguishable until armed.
+## The crossing: one node on Camelot's first map, a far map of about five nodes, and a way back that
+## puts everything where it was. tools/crossing_walk walks the same road through the real scenes.
+func _test_crossing() -> void:
+	print("-- The crossing --")
+	_reset_consumable_state()
+
+	# --- The seat ---
+	var seated := 0
+	var well_placed := true
+	for s in range(20):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 900 + s
+		var seat_map := MapGenerator.generate(rng, &"camelot", 1)
+		var found := 0
+		for id in seat_map.nodes:
+			var n: MapNode = seat_map.nodes[id]
+			if n.crossing_to == &"":
+				continue
+			found += 1
+			if n.crossing_to != MapGenerator.CROSSING_REALM \
+					or n.floor_num < MapGenerator.CROSSING_MIN_FLOOR or n.floor_num > MapGenerator.CROSSING_MAX_FLOOR \
+					or (n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT) \
+					or n.quest_giver_id != &"" or n.quest_payoff_id != &"" or n.scripted_event_id != &"" \
+					or n.next_nodes.is_empty() or seat_map.get_nodes_on_floor(n.floor_num).size() < 2:
+				well_placed = false
+		if found == 1:
+			seated += 1
+	_check("a crossing is seated exactly once on every Camelot first map (%d of 20)" % seated, seated == 20)
+	_check("on floors 8 to 10, on an ordinary node nothing else claimed, with another way past it", well_placed)
+	var plain_rng := RandomNumberGenerator.new()
+	plain_rng.seed = 900
+	_check("no other map has one", not _map_has_seat(MapGenerator.generate(plain_rng, &"camelot", 2))
+		and not _map_has_seat(MapGenerator.generate(plain_rng, &"yggdrasil", 1)))
+
+	# --- Setting out: what has to survive the trip ---
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 4259)
+	var map := MapGenerator.generate(RngManager.map_rng, &"camelot", 1)
+	RunManager.current_map = map
+	var seat := -1
+	for id in map.nodes:
+		if map.nodes[id].crossing_to != &"":
+			seat = id
+	print("  (the ERROR lines in this block are crossings refused, on purpose)")
+	_check("nobody crosses from off the map", not RunManager.cross_to(&"yggdrasil") and not RunManager.is_abroad())
+	map.move_to(seat)
+	_check("a realm with no far side cannot be crossed to", not RunManager.cross_to(&"journey_to_the_west"))
+	_check("there is no way back when nobody left", not RunManager.return_from_crossing())
+	RunManager.award_title(&"swords_bearer")
+	RunManager.equip_title(0, &"swords_bearer")
+	RunManager.add_consumable(ConsumablePool.get_consumable(&"relic_water"))
+	RunManager.add_consumable(ConsumablePool.get_consumable(&"poisoned_chalice"))
+	RunManager.arm_quest(MapGenerator.QUEST_ID)
+	RunManager.set_realm_standing(&"camelot", 25)
+	EnemyPool.get_elite_encounter()
+	EnemyPool.get_combat_encounter(5)
+	var home_config := RunManager.realm_config
+	var quests_then := str(RunManager.active_quests)
+	var last_key_then: String = EnemyPool._last_keys["camelot/base"]
+	var bag_then: Array = EnemyPool._elite_bags["camelot/base"].duplicate()
+	var map_rng_then: int = RngManager.map_rng.state
+	var events_then := RunManager.ordinary_event_count
+	var payoff_ahead := MapGenerator.quest_payoff_ahead(map, MapGenerator.QUEST_ID)
+
+	# --- Across ---
+	_check("stepping through lands on the far map", RunManager.cross_to(&"yggdrasil") and RunManager.is_abroad())
+	var far: MapData = RunManager.current_map
+	_check("the realm and route are the far side's, with the home map kept",
+		RunManager.current_realm_id == &"yggdrasil" and RunManager.realm_config.route_id == RealmRoutes.STANDIN_EDGE
+		and RunManager.home_realm_id() == &"camelot" and RunManager.home_map() == map)
+	_check("building the far map drew nothing from the run's map stream", RngManager.map_rng.state == map_rng_then)
+	var kinds := {}
+	var way_back := -1
+	for id in far.nodes:
+		kinds[far.nodes[id].node_type] = true
+		if far.nodes[id].crossing_to != &"":
+			way_back = id
+	_check("it has about 5 nodes, no boss, no rest and no shop", far.nodes.size() == 5
+		and not kinds.has(MapNode.NodeType.BOSS) and not kinds.has(MapNode.NodeType.REST) and not kinds.has(MapNode.NodeType.SHOP))
+	_check("one way back, leading home", way_back != -1 and far.nodes[way_back].crossing_to == &"camelot")
+	var from_landing := MapGenerator._reachable_from(far, far.starting_node_ids[0])
+	_check("every road reaches the way back and no node is a dead end", from_landing.size() == 4
+		and from_landing.has(way_back) and _dead_ends(far) == [way_back])
+	_check("with no events on the route, the arrival and the event slot are fights",
+		far.nodes[0].node_type == MapNode.NodeType.COMBAT and far.nodes[1].node_type == MapNode.NodeType.COMBAT)
+	var far_look: Dictionary = far.nodes[way_back].look()
+	var slotted := MapGenerator.generate_edge(RandomNumberGenerator.new(), &"camelot", 9, false,
+		[{"floor": 0, "column": 3, "type": MapNode.NodeType.EVENT, "next": [], "scripted": &"master_of_game"}])
+	_check("an authored event in a slot stays an event on a route with no pool",
+		slotted.nodes[0].node_type == MapNode.NodeType.EVENT and slotted.nodes[0].scripted_event_id == &"master_of_game")
+	_check("each crossing wears the realm it opens on, and neither has a name",
+		far_look == MapNode.CROSSING_LOOKS[&"camelot"] and map.nodes[seat].look() == MapNode.CROSSING_LOOKS[&"yggdrasil"]
+		and far_look["name"] == "" and far_look["unnamed"] and far_look["glyph"] != map.nodes[seat].look()["glyph"])
+	_check("a second jump is refused", not RunManager.cross_to(&"yggdrasil") and RunManager.current_map == far)
+
+	# --- What the far side serves ---
+	var depth: int = far.act_floor(far.nodes[0])
+	_check("a far fight counts from just past the crossing", depth == map.nodes[seat].floor_num + 1)
+	var stand_in := EnemyPool.get_combat_encounter(depth)
+	_check("the stand-in table serves a fight", not stand_in.is_empty())
+	_check("and an elite for the guardian's slot", not EnemyPool.get_elite_encounter().is_empty())
+	_check("and no boss, naming none", EnemyPool.get_boss().is_empty() and EnemyPool.boss_name(1) == "")
+	_check("and no event", not EventPool.has_events(RunManager.current_realm_id, RunManager.realm_config.route_id))
+	_check("the home realm's encounter memory is untouched by the far fights",
+		EnemyPool._last_keys["camelot/base"] == last_key_then and EnemyPool._elite_bags["camelot/base"] == bag_then)
+	_check("a beat pinned at home neither fires nor counts abroad",
+		RunManager.next_ordinary_event_script() == &"" and RunManager.ordinary_event_count == events_then)
+
+	# --- The two holes, abroad ---
+	_check("a hop is not a visit: the realm stays open to be sent to",
+		not RunManager.has_visited_realm(&"yggdrasil") and RunManager.visited_realm_ids.size() == 1)
+	_check("a realm title keeps its full tier and its bonus abroad",
+		RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.ORIGINAL and RunManager.title_damage_bonus_escalates())
+	_check("a realm item stays in the pack", RunManager.has_consumable(&"relic_water"))
+	_check("a quest item abroad still knows its payoff is ahead (this seed seats it past the crossing)",
+		payoff_ahead and not RunManager.is_consumable_spent(RunManager.get_consumable_by_id(&"poisoned_chalice")))
+	var carried := ConsumablePool.get_consumable(&"writ")
+	RunManager.discard_consumable(RunManager.get_consumable_by_id(&"relic_water"))
+	RunManager.add_consumable(carried)
+	var standing_then := RunManager.get_realm_standing(&"camelot")
+	RunManager.use_consumable_on_map(carried)
+	_check("a standing item spent abroad moves the realm it came from",
+		RunManager.get_realm_standing(&"camelot") == standing_then + carried.value
+		and RunManager.get_realm_standing(&"yggdrasil") == 0)
+
+	# --- The way back ---
+	for id in [0, 2, 3]:
+		far.move_to(id)
+	far.move_to(way_back)
+	_check("the way back returns", RunManager.return_from_crossing() and not RunManager.is_abroad())
+	_check("the same map, position and config come back, not copies",
+		RunManager.current_map == map and map.current_node_id == seat and RunManager.realm_config == home_config)
+	_check("the realm and route are home's", RunManager.current_realm_id == &"camelot"
+		and RunManager.realm_config.route_id == RealmRoutes.BASE)
+	_check("the road on from the crossing is open", map.get_available_next_ids() == map.nodes[seat].next_nodes
+		and not map.get_available_next_ids().is_empty())
+	_check("the quest state is as it was left", str(RunManager.active_quests) == quests_then)
+	_check("the title never left", RunManager.get_title_tier(&"swords_bearer") == TitleData.Tier.ORIGINAL
+		and not RunManager._title_has_left_origin.get(&"swords_bearer", false)
+		and not RunManager._title_has_returned.get(&"swords_bearer", false))
+	_check("the trip is recorded for the beat to come", RunManager.last_crossing.get("from") == &"camelot"
+		and RunManager.last_crossing.get("to") == &"yggdrasil" and RunManager.last_crossing.get("node_id") == seat
+		and RunManager.last_crossing.get("floor") == map.nodes[seat].floor_num
+		and RunManager.last_crossing.get("nodes_walked") == 4)
+
+	# --- A run that ends abroad ---
+	RunManager.cross_to(&"yggdrasil")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 4259)
+	_check("a new run starts at home with no trip on record", not RunManager.is_abroad()
+		and RunManager.current_realm_id == &"camelot" and RunManager.home_map() == null
+		and RunManager.last_crossing.is_empty() and RunManager.visited_realm_ids.size() == 1)
+	_check("and on the realm's first route", RunManager.realm_config.route_id == RealmRoutes.BASE)
+
+	# start_run reset the run; restore the suite's baseline character + passion + encounter bag.
+	EnemyPool.reset_encounter_state()
+	_reset_consumable_state()
+	RunManager.earned_title_ids.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	RunManager.relics.clear()
+
+
+func _map_has_seat(map: MapData) -> bool:
+	for id in map.nodes:
+		if map.nodes[id].crossing_to != &"":
+			return true
+	return false
+
+
+## Nodes with nowhere onward.
+func _dead_ends(map: MapData) -> Array:
+	var out := []
+	for id in map.nodes:
+		if map.nodes[id].next_nodes.is_empty():
+			out.append(id)
+	return out
+
+
 func _test_map_node_looks() -> void:
 	print("-- Map node looks --")
 	var plain := MapNode.new()

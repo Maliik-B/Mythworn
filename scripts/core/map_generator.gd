@@ -411,7 +411,9 @@ static func _place_crossing(map: MapData, rng: RandomNumberGenerator) -> void:
 
 # A crossing's far side: the edge of another realm, with no boss and one way back. The way back is
 # two steps past the arrival by the short road; the long road goes through a guardian to reach it.
-# One table, so the realm's pick can reshape it: the slots are what its content fills.
+# One table, so the realm's pick can reshape it: the slots are what its content fills. A slot's
+# optional `scripted` names the authored event it opens (event_scene._build_special_event), and an
+# event slot with neither that nor a pool to draw from is a fight.
 #
 #   floor 3:         way back
 #   floor 2:                    guardian
@@ -427,24 +429,24 @@ const _EDGE_LAYOUT := [
 
 
 ## Builds the far map. `home_realm` is where its way back leads; `floor_base` is the depth the player
-## came from, which the far map's fights scale to. With no events to draw (`has_events` false), an
-## event slot is a fight.
+## came from, which the far map's fights scale to; `has_events` is whether the route has a pool.
 static func generate_edge(rng: RandomNumberGenerator, home_realm: StringName, floor_base: int,
-		has_events: bool) -> MapData:
+		has_events: bool, layout: Array = _EDGE_LAYOUT) -> MapData:
 	var map := MapData.new()
 	map.floor_base = floor_base
 	var top := 0
-	for i in _EDGE_LAYOUT.size():
-		var slot: Dictionary = _EDGE_LAYOUT[i]
+	for i in layout.size():
+		var slot: Dictionary = layout[i]
 		var node := MapNode.new()
 		node.id = i
 		node.floor_num = slot["floor"]
 		node.column = slot["column"]
 		node.node_type = slot["type"]
 		node.next_nodes.assign(slot["next"])
+		node.scripted_event_id = slot.get("scripted", &"")
 		if slot.get("way_back", false):
 			node.crossing_to = home_realm
-		elif node.node_type == MapNode.NodeType.EVENT and not has_events:
+		elif node.node_type == MapNode.NodeType.EVENT and node.scripted_event_id == &"" and not has_events:
 			node.node_type = MapNode.NodeType.COMBAT
 		map.nodes[i] = node
 		top = maxi(top, node.floor_num)

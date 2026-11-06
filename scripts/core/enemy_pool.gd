@@ -78,6 +78,12 @@ const _TABLES := {
 	&"yggdrasil": {
 		# The realm's first config, on the realm's affairs. Empty until the pick lands.
 		RealmRoutes.BASE: {},
+		# STAND-IN, reached only through the crossing: Camelot's own enemies, no boss. Replace with
+		# the real edge and delete this row (see RealmRoutes.STANDIN_EDGE).
+		RealmRoutes.STANDIN_EDGE: {
+			"combat": _COMBAT_POOL,
+			"elites": _CAMELOT_ELITES,
+		},
 	},
 	&"journey_to_the_west": {
 		RealmRoutes.BASE: {},
