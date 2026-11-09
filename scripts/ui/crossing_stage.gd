@@ -310,6 +310,7 @@ func _put_on_the_face(btn: Button, look: Dictionary) -> void:
 		btn.add_theme_color_override(state, ICON_INK)
 	btn.add_theme_font_size_override("font_size", ICON_FONT)
 	btn.text = look["glyph"]
+	NodeFace.centre(btn)
 	btn.modulate = Color.WHITE
 	btn.pivot_offset = btn.size / 2.0
 	btn.z_index = RAISED_Z

@@ -1719,6 +1719,7 @@ func _paint_node(btn: Button, look: Dictionary) -> void:
 	btn.add_theme_stylebox_override("pressed", pressed_style)
 	btn.add_theme_stylebox_override("disabled", style.duplicate())
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	NodeFace.centre(btn)
 	_queue_legend_refresh()
 
 
