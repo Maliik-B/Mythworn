@@ -13,6 +13,7 @@ var energy_label: Label
 var block_label: Label
 var passion_label: Label
 var _passion_popup: Control
+var _inspect: Control = null  # the enlarged card a right-click opens (CardInspect)
 var _map_overlay: MapPreviewOverlay = null  # read-only route peek (see _on_view_map)
 var player_status_prefix: Label
 var player_status_chips: HFlowContainer
@@ -450,6 +451,14 @@ func _input(event: InputEvent) -> void:
 	if is_instance_valid(_map_overlay):
 		return
 
+	# An open inspect view takes every click on its own dim; Escape closes it before anything else
+	# sees the key.
+	if is_instance_valid(_inspect):
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+			_close_inspect()
+			get_viewport().set_input_as_handled()
+		return
+
 	# Status-chip click, resolved before GUI routing. Clicking a status/effect chip pins
 	# its description (immediate, and it stays until the next click elsewhere); clicking
 	# anywhere else dismisses an open pin. Manual hit-testing (rather than the chip's
@@ -487,6 +496,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(_inspect):
+		return
 	if combat_engine == null or combat_engine.phase != CombatEngine.Phase.PLAYER_TURN:
 		return
 
@@ -1550,9 +1561,37 @@ func _add_flavor_label(parent: Control, card: CardData) -> void:
 	parent.add_child(flavor_lbl)
 
 
+## The card enlarged, with its rarity, flavor and keyword reminders (CardInspect). The face is built
+## the same way the hand's is, so its numbers are what the card would land for now.
+func _open_inspect(card: CardData) -> void:
+	_close_inspect()
+	var source: CombatantStats = combat_engine.player_stats if combat_engine else null
+	var face := CardFace.build(card, source, _make_resonance_sigil(card))
+	_inspect = CardInspect.build(card, face, _close_inspect)
+	add_child(_inspect)
+
+
+func _close_inspect() -> void:
+	if is_instance_valid(_inspect):
+		_inspect.queue_free()
+	_inspect = null
+
+
 func _on_card_input(event: InputEvent, card: CardData) -> void:
 	# No engine (e.g. the card manifest reuses this render outside combat) → not interactive.
 	if combat_engine == null:
+		return
+	# While the inspect view is open, a press the cursor's stale hover still delivers to a card (the
+	# view appears under a cursor that has not moved) closes the view and does nothing else.
+	if is_instance_valid(_inspect):
+		if event is InputEventMouseButton and event.pressed:
+			_close_inspect()
+		return
+	# Right-click inspects the card (a right-click during a drag cancels it, in _input, first).
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT \
+			and not _dragging_card:
+		_open_inspect(card)
+		get_viewport().set_input_as_handled()
 		return
 	if not (event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT):
