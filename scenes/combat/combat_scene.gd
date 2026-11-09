@@ -79,6 +79,9 @@ const HIT_SHOVE_HEAVY := 5  # ...and for a full-weight hit
 const HIT_SHOVE_RETURN := 0.32
 const HIT_FLASH := 0.85
 const HIT_FLASH_FADE := 0.14
+const HP_PULSE_SWELL := 0.16     # how far the HP readout swells on a blow, at full weight
+const HP_PULSE_LIGHT := 0.55     # how much brighter it goes
+const HP_PULSE_SETTLE := 0.32    # how long it takes to settle, after the stage's stop
 const HIT_END_HOLD := 0.12  # the flinch's last frame stays a beat before the body goes back to idle
 const NUMBER_POP := 0.12
 const NUMBER_HOLD := 0.7  # a damage number stays solid this long, so it can be read
@@ -209,7 +212,8 @@ const ENEMY_SPRITE_SET := {
 # Card art icons live in CardVisuals (single source, shared with the reward screen
 # and the deck / Passion full-card renders).
 var _hp_trail_bars: Dictionary = {} # ProgressBar -> trail ProgressBar
-var _damage_flash: ColorRect
+var _damage_flash: ColorRect  # the blue 'absorbed' pulse only; a hit never lays anything over the frame
+var _hp_pulse: Tween
 var _dragging_card: CardData = null
 var _drag_panel: PanelContainer = null
 var _drag_offset := Vector2.ZERO
@@ -552,9 +556,9 @@ void fragment() {
 	vignette.visible = not StageSkin.is_page()
 	add_child(vignette)
 
-	# Damage flash overlay (hidden by default)
+	# The blue absorbed pulse (hidden by default)
 	_damage_flash = ColorRect.new()
-	_damage_flash.color = Color(0.8, 0.05, 0.05, 0.0)
+	_damage_flash.color = Color(0.3, 0.6, 0.95, 0.0)
 	_damage_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_damage_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_damage_flash.z_index = 40
@@ -618,7 +622,7 @@ void fragment() {
 	_passion_gauge = PassionGauge.new()
 	add_child(_passion_gauge)
 
-	# Add damage flash on top of everything
+	# Absorbed pulse on top of everything
 	add_child(_damage_flash)
 
 
@@ -2646,7 +2650,7 @@ func _float_move_callout(epanel: Control, text: String) -> void:
 func _on_player_damaged(amount: int, new_hp: int) -> void:
 	if amount <= 0:
 		# The attack was fully absorbed by block — no HP lost. Give a soft "absorbed"
-		# cue (blue, no screen shake) instead of the misleading red damage flash.
+		# cue (blue, no screen shake) instead of any red cue.
 		_log("[color=aqua]Absorbed.[/color]")
 		_flash_absorb_overlay()
 		_refresh_ui()
@@ -2656,8 +2660,7 @@ func _on_player_damaged(amount: int, new_hp: int) -> void:
 	# Scale the reaction to the hit so a chip reads differently from a haymaker.
 	var mag := clampf(float(amount) / 18.0, 0.4, 1.6)
 	_screen_shake(10.0 * mag, 0.25)
-	_flash_damage_overlay(mag)
-	_start_hit_stop(amount)
+	_pulse_hp_readout(mag, _start_hit_stop(amount))
 	_spawn_damage_number("-%d" % amount, StageSkin.c("stat_hp"), null, amount)
 	_refresh_ui()
 
@@ -3446,27 +3449,34 @@ func _spawn_victory_particles() -> void:
 
 
 # ============================================================
-# DAMAGE FLASH
+# HIT AND ABSORB CUES
 # ============================================================
 
-func _flash_damage_overlay(intensity: float = 1.0) -> void:
-	if not _damage_flash:
+## A blow on you answers on the HP readout and nowhere else: the readout swells and brightens, holds
+## through the stage's stop, and settles. Nothing is laid over the frame, so the page stays the page.
+func _pulse_hp_readout(intensity: float, hold: float) -> void:
+	if hp_label == null:
 		return
-	_damage_flash.color = Color(0.8, 0.05, 0.05, clampf(0.35 * intensity, 0.12, 0.55))
-	var t = create_tween()
-	t.tween_property(_damage_flash, "color:a", 0.0, 0.3).set_ease(Tween.EASE_OUT)
+	if _hp_pulse and _hp_pulse.is_valid():
+		_hp_pulse.kill()
+	hp_label.pivot_offset = Vector2(0.0, hp_label.size.y * 0.5)
+	hp_label.scale = Vector2.ONE * (1.0 + HP_PULSE_SWELL * intensity)
+	var light := 1.0 + HP_PULSE_LIGHT * intensity
+	hp_label.modulate = Color(light, light, light)
+	_hp_pulse = create_tween().set_parallel(true)
+	_hp_pulse.tween_property(hp_label, "scale", Vector2.ONE, HP_PULSE_SETTLE).set_delay(hold) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	_hp_pulse.tween_property(hp_label, "modulate", Color.WHITE, HP_PULSE_SETTLE).set_delay(hold)
 
 
-## Soft blue "absorbed" pulse for a fully-blocked hit — distinct from the red
-## damage flash, and no screen shake, so block reads as safe rather than as a hit.
+## Soft blue "absorbed" pulse for a fully-blocked hit, with no screen shake, so block reads as safe
+## rather than as a hit.
 func _flash_absorb_overlay() -> void:
 	if not _damage_flash:
 		return
 	_damage_flash.color = Color(0.3, 0.6, 0.95, 0.16)
 	var t = create_tween()
 	t.tween_property(_damage_flash, "color:a", 0.0, 0.25).set_ease(Tween.EASE_OUT)
-	# Restore the red base so the next real hit flashes red, not blue.
-	t.tween_callback(func(): _damage_flash.color = Color(0.8, 0.05, 0.05, 0.0))
 
 
 # ============================================================
