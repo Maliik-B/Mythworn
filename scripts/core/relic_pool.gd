@@ -462,7 +462,7 @@ static func _build_pool() -> Array[RelicData]:
 		"A scabbard tooled for a blade longer than yours, the leather worn smooth where a device was. Heal 2 HP at the start of each turn.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.HEAL, 2, &"Excalibur's Scabbard",
-		"The tooling comes back under your thumb, and you know the blade it was made for, whether or not you carry it."))
+		"The colour comes back under your thumb, and you know the blade it was made for, whether or not you carry it."))
 
 	# -- RARE --
 	pool.append(_relic("Chained Folio", "A folio chained to its lectern so nothing could carry it off. Gain 5 Block at the start of each turn.",
