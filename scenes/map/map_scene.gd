@@ -53,6 +53,11 @@ var _pledge_anim_active := false  # true while a flourish plays: the rewrite or 
 var _flourish: MapFlourish = null
 
 func _ready() -> void:
+	# A map opened before the splash and the title could measure its glyphs (a direct launch, a
+	# capture) waits the two frames here, so no glyph is ever seen moving into its place.
+	NodeFace.prime_for_map()
+	if not NodeFace.is_settled():
+		await NodeFace.settled()
 	if not RunManager.run_active:
 		var character = _create_test_character()
 		RunManager.start_run(character)

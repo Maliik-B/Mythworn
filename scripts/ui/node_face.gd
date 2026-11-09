@@ -12,12 +12,64 @@ extends RefCounted
 ## look once. A control only draws a frame after it is made, so a glyph not yet measured is centred
 ## two frames after it is first painted, and every one waiting on it is moved together.
 ##
+## prime() measures every look the map and the crossing can wear before any of them is shown, so
+## the first map of a session opens with each glyph already in place and nothing moves on screen.
+## The splash and the title call it, and the map waits on settled() if it was opened before they did.
+##
 ## Does nothing in a headless run, which draws nothing to read.
 
 const PROBE_PAD := 24  # transparent room around the probe button, in case a glyph overhangs its line
+const DEFAULT_FONT := 20  # a look with no "font" of its own (MapNode)
+const CROSSING_FONT := 26  # CrossingStage.ICON_FONT, which wears the same button
 
 static var _shifts: Dictionary = {}  # key -> Vector2, once measured
 static var _waiting: Dictionary = {}  # key -> the buttons waiting on a measurement
+static var _primed := false
+static var _measuring := 0  # probes drawn and not yet read back
+
+
+## prime() for the map's own node size, which is the one every button wears.
+static func prime_for_map() -> void:
+	var size: int = load("res://scenes/map/map_scene.gd").NODE_SIZE
+	prime(Vector2.ONE * size)
+
+
+## Measures every glyph the map and the crossing can show, for a node button `box` big. Safe to call
+## again: the second call finds the first's work done or under way.
+static func prime(box: Vector2) -> void:
+	if _primed:
+		return
+	_primed = true
+	var template := Button.new()
+	var font: Font = template.get_theme_font("font")
+	template.free()
+	var wanted: Array = []
+	for look in MapNode.TYPE_LOOKS.values():
+		wanted.append([look["glyph"], look.get("font", DEFAULT_FONT)])
+	for look in MapNode.SCRIPTED_LOOKS.values():
+		wanted.append([look["glyph"], look.get("font", DEFAULT_FONT)])
+	wanted.append([MapNode.WEAKENED_ELITE_LOOK["glyph"], DEFAULT_FONT])
+	wanted.append([MapNode.QUEST_MARK_LOOK["glyph"], MapNode.QUEST_MARK_LOOK.get("font", DEFAULT_FONT)])
+	for look in CrossingStage.CROSSING_LOOKS.values():
+		wanted.append([look["glyph"], CROSSING_FONT])
+	for pair in wanted:
+		var key := "%s|%d|%d|%d" % [pair[0], pair[1], int(box.x), font.get_rid().get_id() if font else 0]
+		if _shifts.has(key) or _waiting.has(key):
+			continue
+		_waiting[key] = []
+		_measure(key, font, pair[0], pair[1], box)
+
+
+## True when nothing is left to measure, so a map built now draws its glyphs where they belong.
+static func is_settled() -> bool:
+	return _measuring == 0
+
+
+## Waits for every probe prime() started. Returns at once when there are none.
+static func settled() -> void:
+	var loop := Engine.get_main_loop() as SceneTree
+	while _measuring > 0 and loop != null:
+		await loop.process_frame
 
 
 ## Re-centres the glyph `btn` wears, in every state's stylebox. Call after the styleboxes and the
@@ -79,8 +131,10 @@ static func _measure(key: String, font: Font, glyph: String, font_size: int, box
 		probe.add_theme_color_override(state, Color.WHITE)
 	viewport.add_child(probe)
 	loop.root.add_child(viewport)
+	_measuring += 1
 	await loop.process_frame
 	await loop.process_frame
+	_measuring -= 1
 	var image := viewport.get_texture().get_image()
 	viewport.queue_free()
 	var shift := _shift_from(image, box)

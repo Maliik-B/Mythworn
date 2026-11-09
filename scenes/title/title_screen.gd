@@ -6,6 +6,7 @@ var _time := 0.0
 
 
 func _ready() -> void:
+	NodeFace.prime_for_map()
 	_build_ui()
 	AudioManager.play_music("map")
 
