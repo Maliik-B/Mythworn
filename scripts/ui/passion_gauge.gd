@@ -8,7 +8,9 @@ extends Control
 const RECT := Rect2(44, 84, 20, 596)
 const NAME_X := 56.0  # from the spine's left edge to the name's
 const NAME_SIZE := 56
-const NAME_REST_SCALE := 0.5
+const NAME_REST_SCALE := 0.5  # Steady's, and the smallest
+const NAME_LEAN_SCALE := 0.68  # Inspired and Wavering
+const NAME_POLE_SCALE := 0.9  # Blazing and Hollow rest large, so a pole reads from across the room
 const NEEDLE_TIME := 0.32
 const STAMP_FROM := 1.45
 const STAMP_TIME := 0.14
@@ -47,7 +49,7 @@ func show_now() -> void:
 	_tier = RunManager.get_passion_tier()
 	_needle.position.y = _y_of(RunManager.passion.current_value)
 	_set_name()
-	_name.scale = Vector2.ONE * NAME_REST_SCALE
+	_name.scale = Vector2.ONE * _rest_scale()
 	_place_name(_needle.position.y)
 	queue_redraw()
 
@@ -81,8 +83,18 @@ func _stamp() -> void:
 	_name_tween.tween_property(_name, "scale", Vector2.ONE, STAMP_TIME) \
 		.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	_name_tween.chain().tween_interval(STAMP_HOLD)
-	_name_tween.chain().tween_property(_name, "scale", Vector2.ONE * NAME_REST_SCALE, 0.25) \
+	_name_tween.chain().tween_property(_name, "scale", Vector2.ONE * _rest_scale(), 0.25) \
 		.set_trans(Tween.TRANS_SINE)
+
+
+## How large the name rests at in this band: the poles largest, Steady smallest.
+func _rest_scale() -> float:
+	match _tier:
+		PassionState.Tier.BLAZING, PassionState.Tier.HOLLOW:
+			return NAME_POLE_SCALE
+		PassionState.Tier.INSPIRED, PassionState.Tier.WAVERING:
+			return NAME_LEAN_SCALE
+	return NAME_REST_SCALE
 
 
 func _set_name() -> void:

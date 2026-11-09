@@ -34,13 +34,14 @@ const MOOD_GAIN := {DARK: 1.0, PAGE: 0.55}
 # What a Passion band does on the page, Steady leaving it all be. "ground" only if the reach allows.
 # Blazing warms. Hollow goes to the deep blue and never to grey, which is why these are the colours
 # to arrive at and not a blue laid over them: tan under a thin blue is grey. The hand warms and does
-# not cool: a blue leaf turns the edges of its red initials and coins purple, so at the cold end the
-# leaves stay parchment against the blue desk.
+# not cool: a blue leaf turns the edges of its red initials and coins purple. So the cold end does
+# not tint the hand as a whole ("hand" stays white): "leaf" is a tint for the leaf's own paper and its
+# slab alone, set as the panel's self_modulate, which its children (initial, coin, rules) never see.
 const PASSION_ON_PAGE := {
-	PassionState.Tier.BLAZING: {"ground": Color("C98F56"), "desk": Color("2C170A"), "hand": Color(1.0, 0.9, 0.74), "gauge": Color("D9681E")},
-	PassionState.Tier.INSPIRED: {"ground": Color("C2A073"), "desk": Color("241A12"), "hand": Color(1.0, 0.95, 0.87), "gauge": Color("C98F56")},
-	PassionState.Tier.WAVERING: {"ground": Color("8FA0C4"), "desk": Color("151B2C"), "hand": Color.WHITE, "gauge": Color("4A63A8")},
-	PassionState.Tier.HOLLOW: {"ground": Color("6A84BC"), "desk": Color("101B3D"), "hand": Color.WHITE, "gauge": Color("1F3C88")},
+	PassionState.Tier.BLAZING: {"ground": Color("C98F56"), "desk": Color("2C170A"), "hand": Color(1.0, 0.9, 0.74), "leaf": Color.WHITE, "gauge": Color("D9681E")},
+	PassionState.Tier.INSPIRED: {"ground": Color("C2A073"), "desk": Color("241A12"), "hand": Color(1.0, 0.95, 0.87), "leaf": Color.WHITE, "gauge": Color("C98F56")},
+	PassionState.Tier.WAVERING: {"ground": Color("8FA0C4"), "desk": Color("18233F"), "hand": Color.WHITE, "leaf": Color(0.86, 0.92, 1.08), "gauge": Color("4A63A8")},
+	PassionState.Tier.HOLLOW: {"ground": Color("6A84BC"), "desk": Color("122B64"), "hand": Color.WHITE, "leaf": Color(0.72, 0.82, 1.14), "gauge": Color("1F3C88")},
 }
 
 const LOOKS := {
@@ -256,7 +257,7 @@ static func ground_tint(tier: int) -> Color:
 static func keeper_tint(tier: int) -> Dictionary:
 	if PASSION_ON_PAGE.has(tier):
 		return PASSION_ON_PAGE[tier]
-	return {"ground": c("ground"), "desk": c("desk"), "hand": Color.WHITE}
+	return {"ground": c("ground"), "desk": c("desk"), "hand": Color.WHITE, "leaf": Color.WHITE}
 
 
 ## A Passion band's own colour on the gauge.

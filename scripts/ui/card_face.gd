@@ -245,6 +245,7 @@ static func _slab_value(card: CardData, source: CombatantStats, target: Combatan
 
 static func _add_slab(zones: Control, card: CardData, card_style: StyleBoxFlat, value: Dictionary) -> void:
 	var slab := Panel.new()
+	slab.name = "Slab"
 	slab.position = Vector2(INSET, SLAB_Y)
 	slab.size = Vector2(SIZE.x - INSET * 2.0, SLAB_H)
 	var style := StyleBoxFlat.new()

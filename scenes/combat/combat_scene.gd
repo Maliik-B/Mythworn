@@ -225,6 +225,7 @@ var _desk: ColorRect = null
 var _keeper_tween: Tween = null
 var _hit_stop_left := 0.0  # while above zero the stage's bodies hold their frames
 var _numbers_up: Dictionary = {}  # target panel, or null for the player -> damage numbers still rising
+var _leaf_tint := Color.WHITE  # the cold bands' tint for a hand leaf's own paper (see StageSkin.PASSION_ON_PAGE)
 var _keeper_side := 0  # the side of Steady the keeper's things are tinted to: 1 warm, -1 cold
 var _stage_line: Label = null
 var _passion_gauge: PassionGauge = null
@@ -1483,6 +1484,7 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	var source: CombatantStats = combat_engine.player_stats if combat_engine else null
 	var panel := CardFace.build(card, source, sigil)
 	panel.size_flags_vertical = Control.SIZE_SHRINK_END
+	_tint_leaf(panel)
 
 	# Make all children pass clicks through to the panel
 	_ignore_mouse_recursive(panel.get_child(0))
@@ -2941,9 +2943,13 @@ func _set_passion_tint(tier: int, instant := false) -> void:
 	if instant:
 		_desk.color = tint["desk"]
 		hand_container.modulate = tint["hand"]
+		_set_leaf_tint(tint["leaf"])
 		_keeper_side = signi(tier - PassionState.Tier.STEADY)
 		return
 	_keeper_tween = create_tween().set_parallel(true)
+	var from_leaf := _leaf_tint
+	_keeper_tween.tween_method(func(k: float): _set_leaf_tint(from_leaf.lerp(tint["leaf"], k)), 0.0, 1.0, KEEPER_TINT_TIME) \
+		.set_trans(Tween.TRANS_SINE)
 	_keeper_tween.tween_property(hand_container, "modulate", tint["hand"], KEEPER_TINT_TIME).set_trans(Tween.TRANS_SINE)
 	# From warm straight to cold, the desk's colour would pass through a dark purple on the way, so
 	# it goes by way of its own plain colour.
@@ -2951,8 +2957,25 @@ func _set_passion_tint(tier: int, instant := false) -> void:
 	var by_plain: float = KEEPER_TINT_TIME * 0.4 if side * _keeper_side < 0 else 0.0
 	if by_plain > 0.0:
 		_keeper_tween.tween_property(_desk, "color", StageSkin.c("desk"), by_plain).set_trans(Tween.TRANS_SINE)
-	_keeper_tween.tween_property(_desk, "color", tint["desk"], KEEPER_TINT_TIME - by_plain) 		.set_delay(by_plain).set_trans(Tween.TRANS_SINE)
+	_keeper_tween.tween_property(_desk, "color", tint["desk"], KEEPER_TINT_TIME - by_plain) \
+		.set_delay(by_plain).set_trans(Tween.TRANS_SINE)
 	_keeper_side = side
+
+
+## The cold bands tint each leaf's own paper and its slab, and nothing on it: the panel's own
+## self_modulate never reaches the initial, the coin or the rules, which a tint over the whole card
+## turned to purple edges.
+func _set_leaf_tint(tint: Color) -> void:
+	_leaf_tint = tint
+	for panel in hand_container.get_children():
+		_tint_leaf(panel)
+
+
+func _tint_leaf(panel: Control) -> void:
+	panel.self_modulate = _leaf_tint
+	var slab: Control = panel.find_child("Slab", true, false)
+	if slab:
+		slab.self_modulate = _leaf_tint
 
 
 ## Crossing a band, the coins relight across the hand one after another, left to right. Each rises
