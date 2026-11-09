@@ -6,6 +6,11 @@ extends RefCounted
 ## Passion sentence and Exhaust. A card with no number (a Power, a draw) has no slab and gives the
 ## room to its rules. No word is written here: CardData.get_face_text only says which zone each
 ## sentence sits in.
+##
+## The band is one level line: the cost coin and the school coin sit at the same height, the same
+## distance in from either edge, with the type centred between them. A card with no school coin
+## gets a faint empty one, so every band is the same shape. Rarity, flavor and keyword reminders are
+## not on the face; the inspect view (CardInspect) shows them.
 
 const SIZE := Vector2(200, 290)
 
@@ -21,7 +26,11 @@ const NAME_Y := 40.0
 const NAME_H := 46.0
 const SLAB_Y := 86.0
 const SLAB_H := 66.0
-const SLAB_NUMBER_X := 48.0  # the emblem sits to the left of this, the numeral to the right
+const EMBLEM := 36.0  # the slab's icon, and the gap to the numeral: one unit, centred on the slab
+const UNIT_GAP := 10.0
+const COIN := 32.0  # the cost coin and the school coin are the same disc
+const COIN_INSET := 25.0  # a coin's centre, in from the card's edge
+const COIN_Y := 24.0  # and down from its top
 const RULES_GAP := 6.0
 const FOOT_H := 28.0
 const FOOT_H_TRICK := 44.0  # a Trick's reminder runs to two lines
@@ -36,7 +45,7 @@ const NAME_SIZE_MIN := 20
 const KIND_SIZE := 13
 
 const TYPE_NAMES := ["Attack", "Skill", "Power"]
-const RARITY_NAMES := ["Starter", "Common", "Uncommon", "Rare"]
+const RARITY_NAMES := ["Starter", "Common", "Uncommon", "Rare"]  # the inspect view's
 const RARITY_COLORS := ["card_dim", "card_dim", "card_uncommon", "card_rare"]
 
 const NUMBER_GLOW := preload("res://assets/ui/card_number_glow.tres")
@@ -110,6 +119,10 @@ static func _card_style(card: CardData) -> StyleBoxFlat:
 	var key := _colour_key(card)
 	style.set_corner_radius_all(0 if StageSkin.is_page() else 10)
 	style.set_border_width_all(2 if StageSkin.is_page() else 3)
+	# The zones are laid out in the card's own 200x290, so the border takes no room from them: with
+	# the border's width as margin every zone sat 2 px right of where it was placed, and the band was
+	# 14 px in from the left edge and 10 from the right.
+	style.set_content_margin_all(0)
 	style.bg_color = StageSkin.c("card_bg_" + key)
 	style.border_color = StageSkin.c("card_edge_" + key)
 	if card.upgraded:
@@ -123,7 +136,7 @@ static func _add_inset(zones: Control) -> void:
 	if color.a <= 0.0:
 		return
 	var inset := Panel.new()
-	inset.position = Vector2(3, 3)
+	inset.position = Vector2(5, 5)
 	inset.size = SIZE - Vector2(10, 10)
 	var style := StyleBoxFlat.new()
 	style.draw_center = false
@@ -140,55 +153,83 @@ static func _rule_color(card_style: StyleBoxFlat) -> Color:
 
 
 static func _add_header(zones: Control, card: CardData, sigil: Control) -> void:
-	var coin := PanelContainer.new()
-	coin.position = Vector2(9, 8)
-	coin.size = Vector2(32, 32)
+	var half := COIN / 2.0
+	var coin := Panel.new()
+	coin.name = "CostCoin"
+	coin.position = Vector2(COIN_INSET - half, COIN_Y - half)
+	coin.size = Vector2(COIN, COIN)
 	var coin_style := StyleBoxFlat.new()
-	coin_style.set_corner_radius_all(16)
+	coin_style.set_corner_radius_all(int(half))
 	coin_style.bg_color = StageSkin.c("card_coin_" + _colour_key(card))
 	coin_style.set_border_width_all(2)
 	coin_style.border_color = StageSkin.c("card_coin_edge")
 	if coin_style.border_color.a <= 0.0:
 		coin_style.border_color = coin_style.bg_color
 	coin.add_theme_stylebox_override("panel", coin_style)
+	zones.add_child(coin)
 	var cost := Label.new()
 	cost.text = card.cost_label()
+	cost.size = coin.size
 	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	cost.add_theme_font_override("font", load(NUMERAL_FONT_PATH))
-	cost.add_theme_font_size_override("font_size", 21)
+	var cost_font: Font = load(NUMERAL_FONT_PATH)
+	cost.add_theme_font_override("font", cost_font)
+	cost.add_theme_font_size_override("font_size", NodeFace.COIN_COST_FONT)
 	cost.add_theme_color_override("font_color", StageSkin.c("card_coin_text"))
 	coin.add_child(cost)
-	zones.add_child(coin)
+	# The numeral is set by what it inks, not by its line: a "1" sat 2.5 px high in this coin.
+	NodeFace.centre_glyph(cost.text, cost_font, NodeFace.COIN_COST_FONT, coin.size,
+		func(shift: Vector2) -> void:
+			if is_instance_valid(cost):
+				cost.position = shift)
+
+	# The school coin's place, mirrored: an empty ring under whatever sits there, so a card with no
+	# school (a Power, a Trick) still ends its band the way the others do.
+	var school_centre := Vector2(SIZE.x - COIN_INSET, COIN_Y)
+	var ring := Panel.new()
+	ring.name = "SchoolRing"
+	ring.position = school_centre - Vector2(half, half)
+	ring.size = Vector2(COIN, COIN)
+	var ring_style := StyleBoxFlat.new()
+	ring_style.draw_center = false
+	ring_style.set_corner_radius_all(int(half))
+	ring_style.set_border_width_all(2)
+	var ring_colour := StageSkin.c("card_dim")
+	ring_style.border_color = Color(ring_colour.r, ring_colour.g, ring_colour.b, 0.4)
+	ring.add_theme_stylebox_override("panel", ring_style)
+	zones.add_child(ring)
 
 	var kind := Label.new()
+	kind.name = "CardKind"
 	kind.text = _kind_line(card)
 	kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	kind.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	kind.add_theme_font_override("font", load(RULES_FONT_PATH))
 	kind.add_theme_font_size_override("font_size", KIND_SIZE)
-	kind.add_theme_color_override("font_color", StageSkin.c(RARITY_COLORS[card.rarity]))
+	kind.add_theme_color_override("font_color", StageSkin.c("card_dim"))
 	# Clipped so its first measure, in the default font before the override reaches it, cannot
-	# widen the label and pull the text off centre.
+	# widen the label and pull the text off centre. It spans the card, so its middle is the card's.
 	kind.clip_text = true
-	kind.position = Vector2(42, 0)
-	kind.size = Vector2(SIZE.x - 42.0 - SCHOOL_COIN_W, HEADER_H + 4.0)
+	kind.position = Vector2(0, COIN_Y - 24.0)
+	kind.size = Vector2(SIZE.x, 48.0)
 	zones.add_child(kind)
 
 	if sigil:
-		var holder := CenterContainer.new()
-		holder.position = Vector2(SIZE.x - SCHOOL_COIN_W, 2.0)
-		holder.size = Vector2(42, 42)
+		var holder := Control.new()
+		holder.name = "SchoolCoin"
+		var box := NodeFace.COIN_SCHOOL_BOX
+		holder.position = school_centre - box / 2.0
+		holder.size = box
+		sigil.size = box
 		holder.add_child(sigil)
 		zones.add_child(holder)
 
 
-## "ATTACK · COMMON". A Trick and a memory card say so, since that is what they are.
+## The type alone, "Attack": rarity and the Trick keyword are not the band's (the Trick's reminder is
+## in the foot, and the inspect view carries the rarity). A memory card says so.
 static func _kind_line(card: CardData) -> String:
 	var kind: String = "Memory" if card.is_memory else TYPE_NAMES[card.card_type]
-	var grade: String = "Trick" if card.trick else RARITY_NAMES[card.rarity]
-	var line := "%s · %s" % [kind, grade]
-	return line if StageSkin.is_page() else line.to_upper()
+	return kind if StageSkin.is_page() else kind.to_upper()
 
 
 ## The name, a size smaller or on two lines if it needs them, its initial rubricated in a look that
@@ -265,20 +306,35 @@ static func _add_slab(zones: Control, card: CardData, card_style: StyleBoxFlat, 
 	glow.material = additive
 	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	glow.stretch_mode = TextureRect.STRETCH_SCALE
-	glow.position = Vector2(SLAB_NUMBER_X + 8.0, -14.0)
-	glow.size = Vector2(slab.size.x - SLAB_NUMBER_X - 16.0, SLAB_H + 28.0)
 	slab.add_child(glow)
 
 	var number := Label.new()
 	number.name = "SlabNumber"
-	number.position = Vector2(SLAB_NUMBER_X, 0)
-	number.size = Vector2(slab.size.x - SLAB_NUMBER_X, SLAB_H)
 	number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	number.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	number.add_theme_font_override("font", load(NUMERAL_FONT_PATH))
 	number.add_theme_font_size_override("font_size", NUMBER_SIZE)
 	slab.add_child(number)
 	_apply_number(number, glow, value)
+
+
+## The icon and the numeral as one unit, a fixed gap apart, centred on the slab. The unit's width
+## follows the numeral ("6" or "12×3"), so it is laid out again whenever the text changes.
+static func _place_unit(slab: Control) -> void:
+	var emblem: Control = slab.get_child(0)
+	var glow: Control = slab.find_child("SlabGlow", false, false)
+	var number: Label = slab.find_child("SlabNumber", false, false)
+	if emblem == null or glow == null or number == null:
+		return
+	var font: Font = number.get_theme_font("font")
+	var width: float = font.get_string_size(number.text, HORIZONTAL_ALIGNMENT_LEFT, -1, NUMBER_SIZE).x
+	var left: float = (slab.size.x - (EMBLEM + UNIT_GAP + width)) / 2.0
+	emblem.position = Vector2(left, (SLAB_H - EMBLEM) / 2.0)
+	emblem.size = Vector2(EMBLEM, EMBLEM)
+	number.position = Vector2(left + EMBLEM + UNIT_GAP, 0)
+	number.size = Vector2(width, SLAB_H)
+	glow.position = Vector2(number.position.x - 8.0, -14.0)
+	glow.size = Vector2(width + 16.0, SLAB_H + 28.0)
 
 
 ## Warm and lit when Passion lifts the hit, grey when it cuts it, plain when it leaves it alone.
@@ -292,11 +348,12 @@ static func _apply_number(number: Label, glow: Control, value: Dictionary) -> vo
 		StageSkin.c("card_number_up") if up else (StageSkin.c("card_number_down") if down else StageSkin.c("card_ink")))
 	if glow:
 		glow.visible = up and not StageSkin.is_page()
+	if number.get_parent() is Control:
+		_place_unit(number.get_parent())
 
 
 ## The card's icon if it has one, else the glyph for its type: the same art today's frame carried.
 static func _make_emblem(card: CardData, card_style: StyleBoxFlat) -> Control:
-	var box := Vector2(SLAB_NUMBER_X, SLAB_H)
 	var icon_file := CardVisuals.icon_path(card.card_name)
 	if icon_file == "" and card.card_type == CardData.CardType.ATTACK:
 		icon_file = CardVisuals.DEFAULT_ATTACK_ICON
@@ -308,14 +365,10 @@ static func _make_emblem(card: CardData, card_style: StyleBoxFlat) -> Control:
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		icon.position = Vector2(8, (SLAB_H - 36.0) / 2.0)
-		icon.size = Vector2(36, 36)
 		icon.material = StageSkin.icon_material()
 		return icon
 	var glyph := Label.new()
 	glyph.text = "★"
-	glyph.size = box
-	glyph.position = Vector2(2, 0)
 	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	glyph.add_theme_font_size_override("font_size", 24)

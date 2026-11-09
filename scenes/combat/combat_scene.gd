@@ -235,6 +235,10 @@ var _target_glow_mat: CanvasItemMaterial = null
 
 
 func _ready() -> void:
+	# The card coins' glyphs are measured before the first hand is drawn, so none moves on screen.
+	NodeFace.prime_for_map()
+	if not NodeFace.is_settled():
+		await NodeFace.settled()
 	_build_ui()
 	_connect_events()
 	_start_combat()
@@ -1419,9 +1423,26 @@ func _make_resonance_sigil(card: CardData) -> Control:
 		else:
 			lbl.tooltip_text = "%s card. Commit to its Passion pole for +25%% damage." % pole_name
 
+	# Both shapes below hold the glyph as a full-rect label in the 42x42 coin place, and set it by
+	# what it inks (the swords sat 2 px high and the ripples 3 px low): NodeFace measures the glyph
+	# once and the answer is written into the label's offsets.
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	NodeFace.centre_glyph(glyph, load(StageSkin.LINE_FONT_PATH), lbl.get_theme_font_size("font_size"),
+		NodeFace.COIN_SCHOOL_BOX,
+		func(shift: Vector2) -> void:
+			if is_instance_valid(lbl):
+				lbl.offset_left = shift.x
+				lbl.offset_right = shift.x
+				lbl.offset_top = shift.y
+				lbl.offset_bottom = shift.y)
+
 	# A neutral-schooled card never rides the zone → no coin; a bare glyph is enough.
 	if not rides_zone:
-		return lbl
+		var bare := Control.new()
+		bare.custom_minimum_size = NodeFace.COIN_SCHOOL_BOX
+		bare.add_child(lbl)
+		return bare
 
 	# A pole card sits in a fixed 42×42 holder (so the glyph never shifts across tiers) over a halo
 	# COIN that is only opaque at the extreme (+25%). The coin is kept present-but-transparent at
@@ -1454,23 +1475,9 @@ func _make_resonance_sigil(card: CardData) -> Control:
 	disc.add_theme_stylebox_override("panel", ds)
 	disc.modulate.a = 1.0 if extreme else 0.0
 	holder.add_child(disc)
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# The ⚔ glyph's ink sits high in its font box; nudge it down so it centres inside the coin.
-	var nudge := _sigil_v_nudge(pole)
-	lbl.offset_top = nudge
-	lbl.offset_bottom = nudge
 	holder.add_child(lbl)
 	holder.set_meta("halo_disc", disc)
 	return holder
-
-
-## The ⚔ (Physical) glyph's ink sits high in its font box, so plain vertical-centring leaves it
-## near the top of the halo coin; nudge it down. ≈ (Water) is already close to centred.
-func _sigil_v_nudge(pole: CardData.PersonalityType) -> int:
-	if pole == CardData.PersonalityType.SECONDARY and not StageSkin.is_page():
-		return 4
-	return 1
 
 
 # ============================================================

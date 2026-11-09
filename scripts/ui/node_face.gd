@@ -16,11 +16,20 @@ extends RefCounted
 ## the first map of a session opens with each glyph already in place and nothing moves on screen.
 ## The splash and the title call it, and the map waits on settled() if it was opened before they did.
 ##
+## The same reading serves a loose glyph in a Label (the card's cost and school coins): centre_glyph
+## takes the box the glyph is centred in and a callback that is handed the shift to apply, so the
+## caller decides whether it moves a position or an anchor offset.
+##
 ## Does nothing in a headless run, which draws nothing to read.
 
 const PROBE_PAD := 24  # transparent room around the probe button, in case a glyph overhangs its line
 const DEFAULT_FONT := 20  # a look with no "font" of its own (MapNode)
 const CROSSING_FONT := 26  # CrossingStage.ICON_FONT, which wears the same button
+const COIN_COST_FONT := 21  # CardFace's cost numeral, in the coin of this size
+const COIN_COST_BOX := Vector2(32, 32)
+const COIN_SCHOOL_SIZES := [22, 28]  # the school glyph's flat and resonant sizes
+const COIN_SCHOOL_BOX := Vector2(42, 42)
+const COIN_SCHOOL_GLYPHS := ["≈", "+", "⚔"]
 
 static var _shifts: Dictionary = {}  # key -> Vector2, once measured
 static var _waiting: Dictionary = {}  # key -> the buttons waiting on a measurement
@@ -58,6 +67,27 @@ static func prime(box: Vector2) -> void:
 			continue
 		_waiting[key] = []
 		_measure(key, font, pair[0], pair[1], box)
+	_prime_coins()
+
+
+## The card's two coins: every cost it can print and every school glyph at each size it wears, so a
+## hand dealt on the first turn of a session has its glyphs centred when it is first drawn.
+static func _prime_coins() -> void:
+	var cost_font: Font = load(CardFace.NUMERAL_FONT_PATH)
+	var school_font: Font = load(StageSkin.LINE_FONT_PATH)
+	for glyph in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "X"]:
+		_prime_glyph(glyph, cost_font, COIN_COST_FONT, COIN_COST_BOX)
+	for glyph in COIN_SCHOOL_GLYPHS:
+		for size in COIN_SCHOOL_SIZES:
+			_prime_glyph(glyph, school_font, size, COIN_SCHOOL_BOX)
+
+
+static func _prime_glyph(glyph: String, font: Font, font_size: int, box: Vector2) -> void:
+	var key := _glyph_key(glyph, font, font_size, box)
+	if _shifts.has(key) or _waiting.has(key):
+		return
+	_waiting[key] = []
+	_measure(key, font, glyph, font_size, box)
 
 
 ## True when nothing is left to measure, so a map built now draws its glyphs where they belong.
@@ -86,6 +116,27 @@ static func centre(btn: Button) -> void:
 		return
 	_waiting[key] = [btn]
 	_measure(key, btn.get_theme_font("font"), btn.text, btn.get_theme_font_size("font_size"), btn.size)
+
+
+## Centres `glyph`, drawn in `font` at `font_size`, on the middle of a `box` it is centred in by
+## line box. `place` is called with the shift to apply, at once if the glyph is already measured and
+## otherwise two frames after the first draw; it is not called in a headless run.
+static func centre_glyph(glyph: String, font: Font, font_size: int, box: Vector2, place: Callable) -> void:
+	if glyph == "":
+		return
+	var key := _glyph_key(glyph, font, font_size, box)
+	if _shifts.has(key):
+		place.call(_shifts[key])
+		return
+	if _waiting.has(key):
+		_waiting[key].append(place)
+		return
+	_waiting[key] = [place]
+	_measure(key, font, glyph, font_size, box)
+
+
+static func _glyph_key(glyph: String, font: Font, font_size: int, box: Vector2) -> String:
+	return "%s|%d|%d|%d" % [glyph, font_size, int(box.x), font.get_rid().get_id() if font else 0]
 
 
 static func _key(btn: Button) -> String:
@@ -139,9 +190,12 @@ static func _measure(key: String, font: Font, glyph: String, font_size: int, box
 	viewport.queue_free()
 	var shift := _shift_from(image, box)
 	_shifts[key] = shift
-	for btn in _waiting.get(key, []):
-		if is_instance_valid(btn) and _key(btn) == key:
-			_apply(btn, shift)
+	for waiter in _waiting.get(key, []):
+		if waiter is Callable:
+			if waiter.is_valid():
+				waiter.call(shift)
+		elif is_instance_valid(waiter) and _key(waiter) == key:
+			_apply(waiter, shift)
 	_waiting.erase(key)
 
 
