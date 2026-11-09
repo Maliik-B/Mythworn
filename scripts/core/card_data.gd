@@ -133,6 +133,10 @@ func get_active_effects() -> Array[CardEffect]:
 
 
 ## The reminder line a Trick card carries, so the keyword is taught on every card that has it.
+## The reminder for Exhaust, worded as the pair of Trick's ("Unplayed, it leaves").
+const EXHAUST_REMINDER := "Exhaust. Played, it leaves for the rest of combat."
+
+
 ## Empty for any other card. Bankable tricks say they stay; the rest say they leave.
 func trick_reminder() -> String:
 	if not trick:

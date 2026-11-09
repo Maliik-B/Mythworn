@@ -59,8 +59,14 @@ static func build(card: CardData, face: PanelContainer, on_close: Callable) -> C
 	holder.add_child(face)
 	group.add_child(holder)
 
-	notes.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	group.add_child(notes)
+	# The notes hang from the card's top edge, so the panel starts on the cost-coin line on every
+	# card and only grows downward; a column the card's height keeps it level with the face.
+	var side := VBoxContainer.new()
+	side.custom_minimum_size = Vector2(NOTES_W, card_size.y)
+	side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	side.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	side.add_child(notes)
+	group.add_child(side)
 	return overlay
 
 
@@ -112,6 +118,8 @@ static func _keywords(card: CardData) -> Array:
 	var seen := {}
 	if card.trick:
 		out.append({"name": "Trick", "text": card.trick_reminder()})
+	if card.exhaust:
+		out.append({"name": "Exhaust", "text": CardData.EXHAUST_REMINDER})
 	for effect in card.get_active_effects():
 		if effect is StatusApplyEffect and effect.status_effect != null:
 			var status: StatusEffectData = effect.status_effect
