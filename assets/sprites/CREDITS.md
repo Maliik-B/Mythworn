@@ -45,7 +45,12 @@ ramp, one outline, one window, lapis on one object. An algorithmic recolor of CC
 
 ## Set pieces
 
-The sword in the Excalibur set piece (`assets/sprites/set_pieces/excalibur_sword.png`) is Clockwork Raven's `tile008`, stood upright by rotating it 45 degrees on its own pixel grid; no pixels drawn. The man beside it is the Man-at-Arms above, and the altar's shield is In The Void's `shield.png`, drained for its worn form. The stone, plinth, light and darkness on those stages are code-drawn chrome.
+The sword in the Excalibur set piece (`assets/sprites/set_pieces/excalibur_sword.png`) and the altar's scabbard (`scabbard_bare.png`, `scabbard_ornate.png`) are one CC0 model, rendered and baked: the page's colours and outline put on a nearest-neighbour reduction of an orthographic render, no pixels drawn. Both bakes of the scabbard are the one render, the bare in the page's grey ramp and the ornate in kermes and burnished gold. See "Sword + Scabbard" below. The man beside the sword is the Man-at-Arms above, and the stone, plinth, light and darkness on those stages are code-drawn chrome. The altar's shield (In The Void's `shield.png`, drained for its worn form) is kept as a second figure that is not staged.
+
+### Sword + Scabbard (IkBenAnders)
+- **Contents**: a low-poly sword and scabbard, `sword.blend` (served as `sword_14.blend`), rendered with Blender and baked by `tools/bake_prop.py`.
+- **License**: CC0, as stated on the page (textures from ambientCG, public domain). Page dated 21 May 2023, checked 9 November 2026.
+- **Source**: https://opengameart.org/content/sword-scabbard
 
 ## Fonts
 

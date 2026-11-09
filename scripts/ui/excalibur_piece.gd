@@ -25,13 +25,13 @@ const STONE_H := 30
 const STONE_TOP := 550.0
 ## The sword: hilt up, tip down, on transparent ground. `scale` is screen pixels per art pixel.
 ## `seated_rows` is how much shows above the stone before it moves (sunk to the hilt); `guard_row` is
-## where the light catches it. tile008 is 16 art pixels, half the Man-at-Arms' density, so it stands
-## at twice his scale on the same grid; stood upright by rotation on its own grid, nothing drawn.
+## where the light catches it. It is 75 art pixels tall on the man's own grid (scale 6), a CC0 model
+## rendered and baked to the page look by tools/bake_prop.py, so a sword here is as dense as he is.
 const SWORD := {
 	"path": "res://assets/sprites/set_pieces/excalibur_sword.png",
-	"scale": 12,
-	"seated_rows": 10,
-	"guard_row": 6,
+	"scale": 6,
+	"seated_rows": 22,
+	"guard_row": 15,
 }
 ## The man at the foot of the stone. `cell` is one frame of the strip; `flip` turns him to the stone.
 ## `slumped` is the take, `hunched` the refusal's opening, `settled` its one cut.

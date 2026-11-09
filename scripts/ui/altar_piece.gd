@@ -19,14 +19,19 @@ const NAME_Y := 650.0
 const NAME_WIDTH := 1200.0
 
 ## The relics that have art: a sprite on transparent ground and the screen pixels per art pixel. The
-## worn form is the same art with its colour taken out. A relic not listed stands on its name alone,
-## so a bought sprite is one line here and nothing else.
+## worn form is the same art with its colour taken out, or its own sprite when the slot names a
+## `worn_path` (two bakes of one render, the same silhouette, so the sweep changes only the colour).
+## A relic not listed stands on its name alone, so a bought sprite is one line here and nothing else.
 const FIGURES := {
 	"A Plain Shield": {"path": "res://assets/sprites/icons/in_the_void/individual/shield.png", "scale": 12},
+	"A Bare Scabbard": {
+		"path": "res://assets/sprites/set_pieces/scabbard_ornate.png",
+		"worn_path": "res://assets/sprites/set_pieces/scabbard_bare.png",
+		"scale": 6,
+	},
 }
-## The relic the clip stages: the one with real art for now. A Bare Scabbard is the better word if it
-## gets a sprite; until then it stands on its name.
-const HERO_RELIC := "A Plain Shield"
+## The relic the clip stages: the scabbard, bare and then in its kermes and gold.
+const HERO_RELIC := "A Bare Scabbard"
 
 
 ## Stages the waking of this dormant relic. Reads names and line from RelicPool.
@@ -141,11 +146,17 @@ static func figures_for(dormant_name: String) -> Dictionary:
 	sheet.decompress()
 	var image := sheet.get_region(sheet.get_used_rect())
 	var plain: Image = image.duplicate()
-	for x in plain.get_width():
-		for y in plain.get_height():
-			var c := plain.get_pixel(x, y)
-			var v := c.get_luminance() * 0.7
-			plain.set_pixel(x, y, Color(v, v * 0.98, v * 0.94, c.a))
+	if slot.has("worn_path"):
+		var worn_art: Texture2D = load(slot["worn_path"])
+		plain = worn_art.get_image()
+		plain.decompress()
+		plain = plain.get_region(plain.get_used_rect())
+	else:
+		for x in plain.get_width():
+			for y in plain.get_height():
+				var c := plain.get_pixel(x, y)
+				var v := c.get_luminance() * 0.7
+				plain.set_pixel(x, y, Color(v, v * 0.98, v * 0.94, c.a))
 	return {
 		"worn": SetPiece.pixel_texture(plain, slot["scale"]),
 		"whole": SetPiece.pixel_texture(image, slot["scale"]),
