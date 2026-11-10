@@ -81,6 +81,7 @@ func _ready() -> void:
 	_test_harness_copy_new_rules()
 	_test_harness_policy_decides()
 	await _test_map_flourish()
+	await _test_map_key()
 	await _test_crossing_stage()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
@@ -4181,7 +4182,8 @@ func _test_crossing_stage() -> void:
 		all_back = all_back and scene.node_buttons[id].modulate.a > 0.0
 	_check("every node it hid is back", all_back)
 	_check("the icon is an ordinary node again", crossing_node_text(scene, picked))
-	_check("the header is back", scene._legend_row.get_parent().get_parent().get_parent().modulate.a == 1.0)
+	_check("the header and the key are back",
+		scene._header.modulate.a == 1.0 and scene._legend_plate.modulate.a == 1.0)
 	_check("the map's data is still as it was", _map_fingerprint(map) == data_before)
 
 	# Each look of the light, and the road the ink-fading one has to give back.
@@ -4220,10 +4222,70 @@ func _map_fingerprint(map: MapData) -> String:
 
 func _legend_words(scene: Node) -> PackedStringArray:
 	var words: PackedStringArray = []
-	for label in scene._legend_row.get_children():
-		if not label.is_queued_for_deletion():
-			words.append(label.text)
+	for row in scene._legend_key.get_children():
+		if not row.is_queued_for_deletion():
+			words.append(row.get_child(1).text)
 	return words
+
+
+## R3: the node key sits in the left margin clear of every node and names what the map shows, once a
+## kind. Pointing at an entry rings every node of that kind and steps the rest back, the pulse waits
+## while it does, and leaving the entry gives every node its light back.
+func _test_map_key() -> void:
+	print("-- Map key --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 424242)
+	RunManager.realm_config = RealmConfig.new()
+	RunManager.current_map = null
+	var scene = load("res://scenes/map/map_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	for i in 3:
+		await get_tree().process_frame
+	var kinds := {}
+	var leftmost := INF
+	for id in scene.node_buttons:
+		var btn: Button = scene.node_buttons[id]
+		kinds[btn.get_meta("look")["name"]] = true
+		leftmost = minf(leftmost, btn.global_position.x)
+	var rows: Array = scene._legend_key.get_children()
+	_check("the key sits in the left margin, clear of every node",
+		scene._legend_plate.get_parent() == scene and scene._legend_plate.get_global_rect().end.x < leftmost)
+	_check("the key names every kind the map shows, once", rows.size() == kinds.size() and rows.size() > 3)
+
+	var kind: String = rows[0].get_child(1).text
+	scene._update_node_states()
+	var before := {}
+	var matching := 0
+	for id in scene.node_buttons:
+		before[id] = scene.node_buttons[id].modulate
+		if scene.node_buttons[id].get_meta("look")["name"] == kind:
+			matching += 1
+	var canvas_at_rest: int = scene.map_canvas.get_child_count()
+	rows[0].mouse_entered.emit()
+	var lit_right := true
+	for id in scene.node_buttons:
+		var btn: Button = scene.node_buttons[id]
+		if btn.get_meta("look")["name"] == kind:
+			lit_right = lit_right and btn.modulate == Color.WHITE
+		else:
+			lit_right = lit_right and is_equal_approx(btn.modulate.a, scene.LEGEND_DIM)
+	_check("pointing at %s rings each of its %d nodes" % [kind, matching],
+		scene._legend_rings.size() == matching and matching > 0)
+	_check("and lights them while the rest step back", lit_right)
+	await get_tree().process_frame
+	var held := true
+	for id in scene.node_buttons:
+		if scene.node_buttons[id].get_meta("look")["name"] != kind:
+			held = held and is_equal_approx(scene.node_buttons[id].modulate.a, scene.LEGEND_DIM)
+	_check("the pulse waits while the key points", held)
+	rows[0].mouse_exited.emit()
+	var given_back := true
+	for id in scene.node_buttons:
+		given_back = given_back and scene.node_buttons[id].modulate == before[id]
+	_check("leaving the entry gives every node its light back",
+		given_back and scene._legend_rings.is_empty() and scene.map_canvas.get_child_count() == canvas_at_rest)
+	scene.queue_free()
+	await get_tree().process_frame
+	RunManager.current_map = null
 
 
 ## The card face moves sentences between zones and must never lose or change one: for every shipped

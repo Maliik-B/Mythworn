@@ -159,6 +159,7 @@ var _cold_roads: Array[Line2D] = []
 var _old_roads: Array[Line2D] = []
 var _cold_nodes: Array[Button] = []
 var _header: Control
+var _key: Control
 var _ice := Color.WHITE
 
 
@@ -196,6 +197,8 @@ func close() -> void:
 		_take_off_the_face(_node_btn)
 	if is_instance_valid(_header):
 		_header.modulate.a = 1.0
+	if is_instance_valid(_key):
+		_key.modulate.a = 1.0
 	finish_now()
 
 
@@ -466,9 +469,11 @@ func _swap_the_map() -> void:
 	turn.tween_callback(_put_on_the_face.bind(_node_btn, CROSSING_LOOKS[SWAP_HOME]))
 	turn.tween_property(_node_btn, "scale:x", 1.0, SWAP_FLIP).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
-	# Nothing on the frame may still say where you were.
-	_header = _scene._legend_row.get_parent().get_parent().get_parent()
+	# Nothing on the frame may still say where you were: the header, nor the key in the margin.
+	_header = _scene._header
+	_key = _scene._legend_plate
 	_tween().tween_property(_header, "modulate:a", 0.0, SWAP_HEADER_OUT)
+	_tween().tween_property(_key, "modulate:a", 0.0, SWAP_HEADER_OUT)
 
 
 func _set_front(reach: float) -> void:

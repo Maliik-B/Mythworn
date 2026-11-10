@@ -13,7 +13,7 @@ const NODE_SPACING_Y := 90
 const MAP_MARGIN_X := 80
 const MAP_MARGIN_Y := 60
 # Extra top margin so the top row (boss) never rides up under the realm sigil /
-# legend / act title, and stays out of the darkest top-of-map effects. The
+# act title, and stays out of the darkest top-of-map effects. The
 # always-readable header text tolerates the effects; the node icons should not.
 const MAP_MARGIN_TOP := 165
 const NODE_SIZE := 50
@@ -21,6 +21,14 @@ const NODE_SIZE := 50
 # A sentence a line at this size is what fits a quest's toast in the phone crop.
 const QUEST_TOAST_SIZE := 44
 const QUEST_TOAST_OUTLINE := 12
+
+# The node key: down the left margin under the shield, where no node goes. Pointing at an entry
+# rings every node of that kind and steps the rest back.
+const LEGEND_AT := Vector2(34, 178)
+const LEGEND_PLATE := Color(0.05, 0.04, 0.08, 0.62)
+const LEGEND_NAME := Color(0.82, 0.78, 0.70)
+const LEGEND_RING_PAD := 7.0
+const LEGEND_DIM := 0.25
 
 # The deck grid draws each card's face at this fraction of its size, so a deck fits a few rows.
 const DECK_FACE_SCALE := 0.8
@@ -43,8 +51,12 @@ var pet_label: Label  # The companion readout; only visible when one travels wit
 var timer_label: Label
 var seed_label: Label
 var info_label: Label
-var _legend_row: HBoxContainer
+var _header: Control  # the realm header floating over the top of the map
+var _legend_plate: PanelContainer
+var _legend_key: VBoxContainer
 var _legend_refresh_queued := false
+var _legend_lit := ""  # the kind of node the key is pointing at, or ""
+var _legend_rings: Array[Control] = []
 var popup_overlay: PanelContainer
 var card_detail_overlay: Control
 
@@ -121,6 +133,7 @@ func _build_floating_header(realm_name: String, realm_tagline: String,
 	header.offset_bottom = HEADER_HEIGHT
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header)
+	_header = header
 
 	# Gradient backdrop — opaque at top, transparent at bottom.
 	var grad = ColorRect.new()
@@ -159,7 +172,7 @@ void fragment() {
 			sigil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			header.add_child(sigil)
 
-	# Content (text labels + legend), positioned with a top inset.
+	# Content (text labels), positioned with a top inset.
 	var inset = MarginContainer.new()
 	inset.set_anchors_preset(Control.PRESET_FULL_RECT)
 	inset.add_theme_constant_override("margin_left", 20)
@@ -212,12 +225,26 @@ void fragment() {
 	info_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(info_label)
 
-	# Legend. Filled by _refresh_legend from what the nodes are showing.
-	_legend_row = HBoxContainer.new()
-	_legend_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_legend_row.add_theme_constant_override("separation", 18)
-	_legend_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(_legend_row)
+
+## The key to the node glyphs, on a dark plate in the left margin. Filled by _refresh_legend from what
+## the nodes are showing.
+func _build_legend_key() -> void:
+	_legend_plate = PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = LEGEND_PLATE
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 12
+	style.content_margin_right = 14
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	_legend_plate.add_theme_stylebox_override("panel", style)
+	_legend_plate.position = LEGEND_AT
+	_legend_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_legend_plate)
+	_legend_key = VBoxContainer.new()
+	_legend_key.add_theme_constant_override("separation", 3)
+	_legend_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_legend_plate.add_child(_legend_key)
 
 
 ## Queued rather than run at once: a flourish paints several nodes in a beat.
@@ -232,23 +259,75 @@ func _queue_legend_refresh() -> void:
 ## whose reveal has not landed yet, is painted as the ordinary node it sits on and adds nothing here.
 func _refresh_legend() -> void:
 	_legend_refresh_queued = false
-	if not is_instance_valid(_legend_row):
+	if not is_instance_valid(_legend_key):
 		return
+	_light_legend("")
 	var shown := {}
 	for id in node_buttons:
 		var look: Dictionary = node_buttons[id].get_meta("look")
 		shown[look["name"]] = look
 	var looks: Array = shown.values()
 	looks.sort_custom(func(a, b): return a["order"] < b["order"])
-	for child in _legend_row.get_children():
+	# Out of the column before freeing, so a rebuild never leaves a row standing to the frame's end.
+	for child in _legend_key.get_children():
+		_legend_key.remove_child(child)
 		child.queue_free()
 	for look in looks:
-		var lbl = Label.new()
-		lbl.text = "%s %s" % [look["glyph"], look["name"]]
-		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", look["color"])
-		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_legend_row.add_child(lbl)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.mouse_entered.connect(_light_legend.bind(look["name"]))
+		row.mouse_exited.connect(_light_legend.bind(""))
+		var glyph := Label.new()
+		glyph.text = look["glyph"]
+		glyph.custom_minimum_size = Vector2(20, 0)
+		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		glyph.add_theme_font_size_override("font_size", 16)
+		glyph.add_theme_color_override("font_color", look["color"])
+		row.add_child(glyph)
+		var kind := Label.new()
+		kind.text = look["name"]
+		kind.add_theme_font_size_override("font_size", 14)
+		kind.add_theme_color_override("font_color", LEGEND_NAME)
+		row.add_child(kind)
+		_legend_key.add_child(row)
+	_legend_plate.visible = not looks.is_empty()
+
+
+## Points the map at one kind of node: every node wearing that look gets a ring and full light, and
+## the rest step back. "" gives the nodes back their states. Held off while a flourish repaints.
+func _light_legend(look_name: String) -> void:
+	if look_name == _legend_lit or (_pledge_anim_active and look_name != ""):
+		return
+	for ring in _legend_rings:
+		if is_instance_valid(ring):
+			ring.get_parent().remove_child(ring)
+			ring.queue_free()
+	_legend_rings.clear()
+	_legend_lit = look_name
+	if look_name == "":
+		_update_node_states()
+		return
+	for id in node_buttons:
+		var btn: Button = node_buttons[id]
+		var look: Dictionary = btn.get_meta("look")
+		if look["name"] != look_name:
+			btn.modulate.a = LEGEND_DIM
+			continue
+		btn.modulate = Color.WHITE
+		var ring := Panel.new()
+		var side := NODE_SIZE + LEGEND_RING_PAD * 2.0
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0, 0, 0, 0)
+		style.set_border_width_all(3)
+		style.border_color = (look["color"] as Color).lightened(0.35)
+		style.set_corner_radius_all(int(side / 2.0))
+		ring.add_theme_stylebox_override("panel", style)
+		ring.size = Vector2(side, side)
+		ring.position = btn.position - Vector2(LEGEND_RING_PAD, LEGEND_RING_PAD)
+		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		map_canvas.add_child(ring)
+		_legend_rings.append(ring)
 
 
 ## Renders a sky body (moon, aurora) in the upper portion of the screen.
@@ -645,9 +724,10 @@ func _process(delta: float) -> void:
 		_timer_accum -= 1.0
 		timer_label.text = RunManager.get_run_time_string()
 
-	# Pulse available nodes (paused during the changed-node flourish's camera pan).
+	# Pulse available nodes (paused during the changed-node flourish's camera pan, and while the key
+	# is pointing at a kind of node, which sets their light itself).
 	_pulse_time += delta
-	if not _pledge_anim_active:
+	if not _pledge_anim_active and _legend_lit == "":
 		for id in _available_nodes:
 			var btn: Button = node_buttons.get(id)
 			if btn:
@@ -811,6 +891,7 @@ void fragment() {
 	# player can still click nodes that pass behind the header.
 	var sigil_path: String = realm.sigil_path if realm else ""
 	_build_floating_header(realm_name, realm_tagline, accent, sigil_path)
+	_build_legend_key()
 
 
 ## Anchored variant — attaches the bottom bar to the bottom edge of the screen
