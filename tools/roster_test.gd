@@ -67,6 +67,7 @@ func _ready() -> void:
 	_test_king_abroad()
 	_test_vn_data()
 	_test_profile_intro()
+	await _test_vn_setting_lines()
 	_test_boss_reward()
 	await _test_frozen_skips()
 	await _test_chilled_freeze()
@@ -2112,6 +2113,41 @@ func _test_profile_intro() -> void:
 
 	# Restore fresh defaults so running this suite doesn't consume the player's intro.
 	ProfileManager.reset_seen_cutscenes()
+
+
+## R1: a place-and-time line is a setting beat, set as the running head above the panel. It takes no
+## click of its own and a later one replaces it; it carries no full stop, and the narration after it
+## no longer repeats the place.
+func _test_vn_setting_lines() -> void:
+	var cairn := CharacterPool.build_emo_hybrid()
+	var settings := []
+	for vn in [VNPool.build_sendoff(cairn), VNPool.build_sendoff_single(cairn, &"bram"),
+			VNPool.build_sendoff_single(cairn, &"neve")]:
+		for beat in vn.beats:
+			if beat.setting:
+				settings.append(beat.text)
+	_check("the send-offs name their places as setting beats",
+		settings == ["The Fable office, before deployment", "Dispatch", "The Records desk", "Dispatch"])
+	var stops := false
+	for s in settings:
+		stops = stops or s.ends_with(".")
+	_check("a setting line carries no full stop", not stops)
+
+	RunManager.pending_vn = VNPool.build_sendoff(cairn)
+	var scene: Control = load("res://scenes/vn/vn_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	await get_tree().process_frame
+	_check("the first setting is the head and costs no click",
+		scene._head.visible and scene._head_label.text == "The Fable office, before deployment"
+		and scene._beat_index == 1 and scene._text_label.text.begins_with("Two desks"))
+	# Click through to Neve's part, stopping short of the last beat so nothing changes scene.
+	while scene._head_label.text != "Dispatch" and scene._beat_index < scene._vn.beats.size() - 1:
+		scene._advance()
+	_check("a later setting replaces the head as the scene moves",
+		scene._head_label.text == "Dispatch" and scene._text_label.text.begins_with("Neve holds the kit"))
+	scene.queue_free()
+	await get_tree().process_frame
+	RunManager.pending_vn = null
 
 
 func _count_elites(map: MapData) -> int:

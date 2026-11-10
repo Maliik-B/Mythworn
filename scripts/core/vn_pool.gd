@@ -24,7 +24,8 @@ const C_FOLK := Color(0.72, 0.66, 0.52)        # homespun
 static func build_sendoff(character: CharacterData) -> VNData:
 	var vn := VNData.new()
 	vn.title = "Before Deployment"
-	vn.add_beat("", "The Fable office, before deployment. Two desks, two coworkers, the same tired morning.", C_NARRATION)
+	vn.add_setting("The Fable office, before deployment")
+	vn.add_beat("", "Two desks, two coworkers, the same tired morning.", C_NARRATION)
 	_add_bram_beats(vn, _keeper(character))
 	_add_neve_beats(vn, _keeper(character))
 	return vn
@@ -64,7 +65,8 @@ static func _add_bram_beats(vn: VNData, keeper: String) -> void:
 
 ## Neve — Dispatch. Warm veteran; hands over the kit.
 static func _add_neve_beats(vn: VNData, keeper: String) -> void:
-	vn.add_beat("", "Dispatch. Neve holds the kit a second longer than she needs to.", C_NARRATION)
+	vn.add_setting("Dispatch")
+	vn.add_beat("", "Neve holds the kit a second longer than she needs to.", C_NARRATION)
 	vn.add_beat("Neve", "Camelot. Political realm. Everyone smiles while they take something off you.", C_NEVE)
 	vn.add_beat(keeper, "You say that about every realm.", C_KEEPER)
 	vn.add_beat("Neve", "I mean it about every realm.", C_NEVE)
@@ -79,7 +81,8 @@ static func _add_neve_beats(vn: VNData, keeper: String) -> void:
 ## Bram, returning run: no re-briefing (you know the file), the lore-decay running gag, and a
 ## dry vote of confidence that passes for warmth out of Records.
 static func _add_bram_return_beats(vn: VNData, keeper: String) -> void:
-	vn.add_beat("", "The Records desk. The Camelot folder is already on the corner, squared to the edge. Bram saw you coming.", C_NARRATION)
+	vn.add_setting("The Records desk")
+	vn.add_beat("", "The Camelot folder is already on the corner, squared to the edge. Bram saw you coming.", C_NARRATION)
 	vn.add_beat("Bram", "You know the file. Same realm, same weapon-of-heroes footnote, same half of it gone stale since you last read it.", C_BRAM)
 	vn.add_beat(keeper, "Comforting.", C_KEEPER)
 	vn.add_beat("Bram", "It's the work. Nothing out there holds still long enough to be worth learning properly.", C_BRAM)
@@ -89,7 +92,8 @@ static func _add_bram_return_beats(vn: VNData, keeper: String) -> void:
 ## Neve, returning run: she skips the speech you've both heard, reads you over the way she
 ## always does, and sends you off with the blunt affection of a veteran who's done this before.
 static func _add_neve_return_beats(vn: VNData, keeper: String) -> void:
-	vn.add_beat("", "Dispatch. Neve has the kit packed already. Probably had it packed since the last time.", C_NARRATION)
+	vn.add_setting("Dispatch")
+	vn.add_beat("", "Neve has the kit packed already. Probably had it packed since the last time.", C_NARRATION)
 	vn.add_beat("Neve", "Camelot again. I won't do the speech. You've heard the speech.", C_NEVE)
 	vn.add_beat(keeper, "Everyone smiles while they take something off me.", C_KEEPER)
 	vn.add_beat("Neve", "See. You listen.", C_NEVE)

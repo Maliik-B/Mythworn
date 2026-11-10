@@ -4,6 +4,12 @@ extends Control
 ## scene. Content-agnostic plumbing — the realm-entry VN and the Fable send-off both feed
 ## it a VNData via RunManager.pending_vn. See VNData + docs/GAME_DESIGN.md § Realms.
 
+# The running head: a setting beat's place and time, set above the panel in the card title's face.
+const HEAD_FONT_SIZE := 40
+const HEAD_COLOR := Color(0.88, 0.76, 0.48)
+const HEAD_RULE_LENGTH := 150.0
+const HEAD_FADE := 0.35
+
 var _vn: VNData
 var _next_scene: String = "res://scenes/map/map_scene.tscn"
 var _beat_index: int = 0
@@ -14,6 +20,8 @@ var _speaker_label: Label
 var _text_label: RichTextLabel
 var _prompt_label: Label
 var _choices_box: VBoxContainer
+var _head: HBoxContainer
+var _head_label: Label
 
 
 func _ready() -> void:
@@ -80,8 +88,60 @@ func _build_ui() -> void:
 	_choices_box.visible = false
 	vbox.add_child(_choices_box)
 
+	# The running head sits just above the panel, centred, with a fine rule either side. Hidden until
+	# a segment names its place.
+	var head_box := CenterContainer.new()
+	head_box.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	head_box.offset_top = -418
+	head_box.offset_bottom = -354
+	head_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(head_box)
+	_head = HBoxContainer.new()
+	_head.add_theme_constant_override("separation", 28)
+	_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_head.visible = false
+	head_box.add_child(_head)
+	_head.add_child(_head_rule())
+	_head_label = Label.new()
+	_head_label.add_theme_font_override("font", load(CardFace.TITLE_FONT_PATH))
+	_head_label.add_theme_font_size_override("font_size", HEAD_FONT_SIZE)
+	_head_label.add_theme_color_override("font_color", HEAD_COLOR)
+	_head.add_child(_head_label)
+	_head.add_child(_head_rule())
+
+
+func _head_rule() -> ColorRect:
+	var rule := ColorRect.new()
+	rule.color = Color(HEAD_COLOR, 0.55)
+	rule.custom_minimum_size = Vector2(HEAD_RULE_LENGTH, 1.5)
+	rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rule
+
+
+## A new place fades in over the old one; the same place named again changes nothing.
+func _set_head(text: String) -> void:
+	if _head.visible and _head_label.text == text:
+		return
+	_head_label.text = text
+	_head.visible = true
+	_head.modulate.a = 0.0
+	create_tween().tween_property(_head, "modulate:a", 1.0, HEAD_FADE)
+
 
 func _show_beat(idx: int) -> void:
+	# Setting beats are read as the head, not as lines: each one passed over replaces the head, and the
+	# panel shows the first ordinary beat after them, so a setting costs no click.
+	while idx < _vn.beats.size() and _vn.beats[idx].setting:
+		_set_head(_vn.beats[idx].text)
+		idx += 1
+	if idx >= _vn.beats.size():
+		# A segment that ends on a setting line has nothing under it; the next click moves on.
+		_beat_index = _vn.beats.size() - 1
+		_speaker_label.visible = false
+		_text_label.text = ""
+		_prompt_label.visible = _vn.choices.is_empty()
+		return
 	_beat_index = idx
 	var beat: VNData.VNBeat = _vn.beats[idx]
 	_speaker_label.text = beat.speaker

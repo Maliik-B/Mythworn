@@ -7,11 +7,14 @@ extends RefCounted
 ## authored and rendered by vn_scene. See docs/GAME_DESIGN.md § Realms and
 ## [[demo-liaisons-bram-neve]] for the demo content this plumbing will carry.
 
-## One line of dialogue: who speaks, what they say, and an accent colour for the name.
+## One line of dialogue: who speaks, what they say, and an accent colour for the name. A setting
+## beat names only the place and the time: vn_scene sets it as a running head above the panel, where
+## it stays until the next setting beat, and it takes no click of its own.
 class VNBeat:
 	var speaker: String = ""
 	var text: String = ""
 	var speaker_color: Color = Color(0.85, 0.82, 0.70)  # warm parchment default
+	var setting := false
 	func _init(p_speaker: String = "", p_text: String = "",
 			p_color: Color = Color(0.85, 0.82, 0.70)) -> void:
 		speaker = p_speaker
@@ -40,6 +43,14 @@ var choices: Array[VNChoice] = []   # empty = dialogue only; the VN just continu
 func add_beat(speaker: String, text: String,
 		color: Color = Color(0.85, 0.82, 0.70)) -> VNData:
 	beats.append(VNBeat.new(speaker, text, color))
+	return self
+
+
+## A place-and-time line ("Dispatch"), set as a heading rather than read as narration.
+func add_setting(text: String) -> VNData:
+	var beat := VNBeat.new("", text)
+	beat.setting = true
+	beats.append(beat)
 	return self
 
 
