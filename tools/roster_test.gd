@@ -3852,8 +3852,9 @@ func _test_map_node_looks() -> void:
 
 
 ## The map's flourishes are presentation: however one ends, the map is left at rest, showing what the
-## run says is true. A click carried over from the last screen cannot skip one, and the click that
-## does hurry one is used up, so it cannot also land on a node.
+## run says is true. A click carried over from the last screen cannot skip one, the pledge's reveal
+## plays out the first time it is shown, and the click that does hurry one is used up, so it cannot
+## also land on a node.
 func _test_map_flourish() -> void:
 	print("-- Map flourish --")
 	RunManager.start_run(CharacterPool.build_emo_hybrid(), 424242)
@@ -3878,7 +3879,15 @@ func _test_map_flourish() -> void:
 	_check("a click in the grace does not skip the flourish", scene._flourish != null)
 	scene._flourish._age = MapFlourish.HURRY_AFTER
 	scene._input(click)
-	_check("a click after the grace hurries it", scene._flourish == null)
+	_check("a click after the grace does not skip the pledge's first showing", scene._flourish != null)
+	# The replay has been seen, so it can be hurried, and the map is left at rest however it ends.
+	scene._prime_pledge_changes()
+	for i in 3:
+		await get_tree().process_frame
+	_check("the rewrite replays", scene._flourish != null)
+	scene._flourish._age = MapFlourish.HURRY_AFTER
+	scene._input(click)
+	_check("a click after the grace hurries the replay", scene._flourish == null)
 	_check("the hurrying click is used up", get_viewport().is_input_handled())
 	await get_tree().process_frame
 	_check_map_at_rest(scene, at_rest, "hurried rewrite")

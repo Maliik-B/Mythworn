@@ -82,7 +82,7 @@ func _ready() -> void:
 	_scroll_to_player.call_deferred()
 	# First map open after a pledge: animate only the nodes the pledge changed.
 	if fresh_map and not RunManager.current_map.pledge_changes.is_empty():
-		_prime_pledge_changes()
+		_prime_pledge_changes(true)
 	# Returning to the map having just armed a questline: reveal the now-armed payoff node
 	# once. (Mutually exclusive with the pledge flourish, which only plays on a fresh map.) At
 	# most one questline is pending a reveal per return -- arming always happens inside an event.
@@ -652,8 +652,9 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# A click hurries a flourish to its end state. The press is used up here, so it cannot also
-	# land on a node. Clicks inside the grace are dropped, as they always were during a flourish.
+	# A click hurries a flourish to its end state, unless it is the pledge's reveal showing for the
+	# first time, which plays out. The press is used up here either way, so it cannot also land on
+	# a node. Clicks inside the grace are dropped, as they always were during a flourish.
 	if _flourish == null or not (event is InputEventMouseButton and event.pressed):
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
@@ -1888,7 +1889,9 @@ func _scroll_to_player() -> void:
 ## Set each changed node to its PRE-change look synchronously, so there's no first-frame flash of the
 ## final state, then start the flourish after layout. Each stays visible and bright until the ink
 ## reaches it, since the change only reads if you saw what was there. Replays on an open map.
-func _prime_pledge_changes() -> void:
+## `first_showing` is the reveal on the map's first open: the only time the player sees what their
+## pledge did, so no click cuts it short. The debug replay can be hurried.
+func _prime_pledge_changes(first_showing := false) -> void:
 	_end_flourish()
 	var map = RunManager.current_map
 	for id in map.pledge_changes:
@@ -1901,11 +1904,11 @@ func _prime_pledge_changes() -> void:
 			_paint_node(btn, MapNode.TYPE_LOOKS[MapNode.NodeType.ELITE])
 		btn.modulate = Color.WHITE
 	_pledge_anim_active = true
-	_play_pledge_changes.call_deferred()
+	_play_pledge_changes.call_deferred(first_showing)
 
 
 ## Ink spreads from where you stand and each changed node flips as the front reaches it.
-func _play_pledge_changes() -> void:
+func _play_pledge_changes(first_showing: bool) -> void:
 	await get_tree().process_frame  # the scroll has to have settled for the camera to frame from it
 	var map = RunManager.current_map
 	if map == null or map.pledge_changes.is_empty():
@@ -1924,7 +1927,9 @@ func _play_pledge_changes() -> void:
 	if flips.is_empty():
 		_finish_pledge_changes()
 		return
-	_start_flourish().play_rewrite(_ink_origin(middle / flips.size()), flips)
+	var flourish := _start_flourish()
+	flourish.hurriable = not first_showing
+	flourish.play_rewrite(_ink_origin(middle / flips.size()), flips)
 
 
 ## Where the ink starts: your node, or before you have one, the opening node nearest the action.

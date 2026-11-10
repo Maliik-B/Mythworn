@@ -67,6 +67,10 @@ const HURRY_AFTER := 0.7
 
 const RING_SHADER := preload("res://assets/shaders/ink_ring.gdshader")
 
+## False for a reveal the player has not seen yet: it plays to its end whatever is clicked. A
+## replay, and the quest's mark, can be hurried once HURRY_AFTER has passed.
+var hurriable := true
+
 var _canvas: Control
 var _anchor := Vector2.ZERO
 var _focus := Vector2.ZERO
@@ -96,7 +100,7 @@ func _process(delta: float) -> void:
 
 ## True once a click may hurry this flourish.
 func can_hurry() -> bool:
-	return _age >= HURRY_AFTER
+	return hurriable and _age >= HURRY_AFTER
 
 
 # ============================================================
