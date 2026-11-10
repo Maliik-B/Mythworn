@@ -3515,6 +3515,25 @@ func _test_one_card_look() -> void:
 	poor.free()
 	shop.free()
 
+	# The footer: the four actions are not inside any scroll.
+	var live: Control = load("res://scenes/shop/shop_scene.gd").new()
+	add_child(live)
+	await get_tree().process_frame
+	var leave: Button = null
+	var all: Array = live.find_children("*", "Button", true, false)
+	for b in all:
+		if b.text == "Leave Shop":
+			leave = b
+	var in_scroll := false
+	var up: Node = leave
+	while up and up != live:
+		if up is ScrollContainer:
+			in_scroll = true
+		up = up.get_parent()
+	_check("the shop's Leave button is found", leave != null)
+	_check("and sits in a footer outside the scroll", leave != null and not in_scroll)
+	live.queue_free()
+
 	var map: Control = load("res://scenes/map/map_scene.gd").new()
 	var detail: Control = map._render_full_card(probe)
 	_check("the deck's detail view is the face with the inspect notes beside it",

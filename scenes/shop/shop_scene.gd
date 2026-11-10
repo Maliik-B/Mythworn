@@ -34,6 +34,7 @@ var info_label: Label
 var deck_section: VBoxContainer
 var deck_visible := false
 var _main_vbox: VBoxContainer
+var _main_scroll: ScrollContainer
 var _inspect: Control
 
 
@@ -134,10 +135,17 @@ void fragment() {
 	add_child(vignette)
 
 	# Main scroll so the entire shop can scroll if content overflows
+	# The actions sit under it in a footer that never scrolls (see below).
+	var page = VBoxContainer.new()
+	page.set_anchors_preset(Control.PRESET_FULL_RECT)
+	page.add_theme_constant_override("separation", 0)
+	add_child(page)
+
 	var main_scroll = ScrollContainer.new()
-	main_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	main_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(main_scroll)
+	page.add_child(main_scroll)
+	_main_scroll = main_scroll
 
 	var margin = MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -218,19 +226,23 @@ void fragment() {
 
 		_refresh_shop_consumables()
 
-	# ── Divider ──
-	var divider = HSeparator.new()
-	divider.add_theme_constant_override("separation", 8)
-	divider.add_theme_stylebox_override("separator", _make_divider_style())
-	_main_vbox.add_child(divider)
-
-	# ── Section: Actions ──
-	_add_section_header("Actions", Color(0.5, 0.75, 0.6))
+	# ── Footer: Actions, fixed under the scroll so they are always in reach ──
+	var footer = PanelContainer.new()
+	var footer_style = StyleBoxFlat.new()
+	footer_style.bg_color = Color(0.09, 0.07, 0.15)
+	footer_style.border_width_top = 2
+	footer_style.border_color = Color(0.55, 0.4, 0.2, 0.7)
+	footer_style.content_margin_top = 12
+	footer_style.content_margin_bottom = 12
+	footer_style.content_margin_left = 40
+	footer_style.content_margin_right = 40
+	footer.add_theme_stylebox_override("panel", footer_style)
+	page.add_child(footer)
 
 	var btn_row = HBoxContainer.new()
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	btn_row.add_theme_constant_override("separation", 30)
-	_main_vbox.add_child(btn_row)
+	footer.add_child(btn_row)
 
 	var remove_btn = _make_gold_button("Remove a Card  (%d gold)" % _effective_remove_cost(), Vector2(280, 52))
 	remove_btn.pressed.connect(_on_remove_pressed)
@@ -396,14 +408,6 @@ func _make_gold_button(text: String, min_size: Vector2) -> Button:
 	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.95, 0.8))
 
 	return btn
-
-
-func _make_divider_style() -> StyleBoxFlat:
-	var s = StyleBoxFlat.new()
-	s.bg_color = Color(0.4, 0.3, 0.18, 0.4)
-	s.content_margin_top = 1
-	s.content_margin_bottom = 1
-	return s
 
 
 # ============================================================
@@ -773,6 +777,7 @@ func _show_deck_for_removal() -> void:
 	deck_visible = true
 	deck_section.visible = true
 	info_label.text = "Click a card to remove it (%d gold)" % _effective_remove_cost()
+	_scroll_to_end.call_deferred()
 
 	for child in deck_section.get_children():
 		child.queue_free()
@@ -837,6 +842,12 @@ func _show_deck_for_removal() -> void:
 		btn.add_theme_stylebox_override("hover", hover_style)
 
 		flow.add_child(btn)
+
+
+## The removal list opens at the foot of the page; bring it into view.
+func _scroll_to_end() -> void:
+	await get_tree().process_frame
+	_main_scroll.scroll_vertical = int(_main_scroll.get_v_scroll_bar().max_value)
 
 
 func _on_cancel_remove() -> void:
