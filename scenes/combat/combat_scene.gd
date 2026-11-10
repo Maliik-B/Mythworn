@@ -38,6 +38,7 @@ var _hand_coins: Dictionary = {} # CardData -> halo-coin Panel (pole cards only)
 
 var continue_btn: Button
 var _main_container: MarginContainer
+var _shake_tween: Tween  # the one screen shake running, so a second replaces it (_screen_shake)
 var _hover_popup: PanelContainer
 var _status_pin: PanelContainer  # click-pinned status/effect description (see _show_status_pin)
 var _last_play_ms := -100000  # when a card last played, for the double-click guard
@@ -3137,14 +3138,32 @@ func _screen_shake(intensity: float = 8.0, duration: float = 0.2) -> void:
 	# option now, not a dead print). Persisted via ProfileManager.
 	if not ProfileManager.screen_shake:
 		return
-	var base_pos = _main_container.position
-	var tween = create_tween()
+	# The layout fills the screen by its anchors, so it is moved by sliding all four offsets the
+	# same way and always comes home to zero. Setting its position instead would write its size
+	# at that moment into the offsets, and a size that was too wide for one frame would stay. A
+	# shake that starts during another replaces it rather than taking a moved spot as home.
+	if _shake_tween and _shake_tween.is_valid():
+		_shake_tween.kill()
+	_shake_tween = create_tween()
 	var steps := 6
+	var from := _shake_offset()
 	for i in steps:
 		var offset = Vector2(randf_range(-intensity, intensity), randf_range(-intensity, intensity))
 		intensity *= 0.7
-		tween.tween_property(_main_container, "position", base_pos + offset, duration / steps)
-	tween.tween_property(_main_container, "position", base_pos, duration / steps)
+		_shake_tween.tween_method(_set_shake_offset, from, offset, duration / steps)
+		from = offset
+	_shake_tween.tween_method(_set_shake_offset, from, Vector2.ZERO, duration / steps)
+
+
+func _shake_offset() -> Vector2:
+	return Vector2(_main_container.offset_left, _main_container.offset_top)
+
+
+func _set_shake_offset(offset: Vector2) -> void:
+	_main_container.offset_left = offset.x
+	_main_container.offset_right = offset.x
+	_main_container.offset_top = offset.y
+	_main_container.offset_bottom = offset.y
 
 
 func _spawn_damage_number(text: String, color: Color, target_panel: Control, amount := 0) -> void:
