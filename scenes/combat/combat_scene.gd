@@ -39,6 +39,7 @@ var _hand_coins: Dictionary = {} # CardData -> halo-coin Panel (pole cards only)
 var continue_btn: Button
 var _main_container: MarginContainer
 var _shake_tween: Tween  # the one screen shake running, so a second replaces it (_screen_shake)
+var _block_icon_tex: AtlasTexture = null  # the Defend card's shield, cropped (_block_icon_texture)
 var _hover_popup: PanelContainer
 var _hover_note: HoverNote  # the one panel for statuses and powers: hover shows, a click pins
 var _last_play_ms := -100000  # when a card last played, for the double-click guard
@@ -62,6 +63,8 @@ const BODY_FIT_H := STAGE_FEET_Y - 56.0  # a body may rise to the top bar's lowe
 const STATUS_COLUMN_W := 124.0  # beside the feet, on each side, so statuses never move a body
 const ENEMY_MIN_W := 320.0
 const LOG_RECT := Rect2(1370, 68, 520, 624)
+const INTENT_ICON_SCALE := 1.5  # the Defend intent's shield, beside a 24 px number
+const PREVIEW_ICON_SCALE := 0.75  # the same shield in the 14 px Sight preview
 const ENEMY_NAME_SIZE := 40
 const ENEMY_NAME_BOX_H := 40.0
 # A boss's line runs as a subtitle on the ground under his feet, where his name and bar were.
@@ -1989,6 +1992,13 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	intent_name_lbl.add_theme_color_override("font_color", StageSkin.c("ink_soft"))
 	intent_row.add_child(intent_name_lbl)
 
+	# A Defend move shows the Defend card's shield in place of a glyph, so Block reads as the
+	# same thing on both sides of the fight.
+	var intent_icon := _block_icon(INTENT_ICON_SCALE)
+	intent_icon.name = "IntentIcon"
+	intent_icon.visible = false
+	intent_row.add_child(intent_icon)
+
 	var intent_lbl = Label.new()
 	intent_lbl.name = "Intent"
 	intent_lbl.add_theme_font_size_override("font_size", 24)
@@ -2000,12 +2010,18 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	intent_row.add_child(intent_lbl)
 
 	# Sight mode peek — only rendered when player has Excalibur in Sight mode.
-	# Sits below the current intent in a dimmer color: "Then: <move>".
-	var next_intent_lbl = Label.new()
+	# Sits below the current intent in a dimmer color: "Then: <move>". Rich text, so a
+	# Defend move can carry the same shield inline.
+	var next_intent_lbl = RichTextLabel.new()
 	next_intent_lbl.name = "NextIntent"
-	next_intent_lbl.add_theme_font_size_override("font_size", 14)
-	next_intent_lbl.add_theme_color_override("font_color", StageSkin.c("ink_soft"))
-	next_intent_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	next_intent_lbl.bbcode_enabled = true
+	next_intent_lbl.fit_content = true
+	next_intent_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	next_intent_lbl.scroll_active = false
+	next_intent_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	next_intent_lbl.add_theme_font_size_override("normal_font_size", 14)
+	next_intent_lbl.add_theme_color_override("default_color", StageSkin.c("ink_soft"))
+	next_intent_lbl.material = StageSkin.icon_material()  # for the shield; the words are grey already
 	next_intent_lbl.visible = false
 	vbox.add_child(next_intent_lbl)
 
@@ -2094,11 +2110,13 @@ func _stage_glyph(icon: String) -> String:
 	return icon.replace("⚔", "").replace("☠", "")
 
 
-## Short single-line summary of an EnemyMove for the Sight-mode "Then:" preview.
+## Short single-line summary of an EnemyMove for the Sight-mode "Then:" preview, written into
+## `lbl`. A Defend move takes the Defend card's shield and its Block, as the current intent does.
 ## Strips the modifier-aware bracket form used in current-intent rendering —
 ## the next move hasn't resolved yet, so showing modified values is misleading.
-func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String:
+func _show_intent_preview(lbl: RichTextLabel, move: EnemyMove) -> void:
 	var icon := "•"
+	var shield := false
 	var value_str := ""
 	match move.intent_type:
 		EnemyMove.IntentType.ATTACK:
@@ -2108,7 +2126,11 @@ func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String
 					value_str = " %d" % effect.value
 					break
 		EnemyMove.IntentType.DEFEND:
-			icon = "◆"
+			shield = true
+			for effect in move.effects:
+				if effect is BlockEffect:
+					value_str = " %d" % effect.value
+					break
 		EnemyMove.IntentType.ATTACK_DEBUFF:
 			icon = "⚔☠"
 			for effect in move.effects:
@@ -2134,7 +2156,42 @@ func _format_intent_preview(move: EnemyMove, _enemy: EnemyCombatState) -> String
 		icon += SELF_COST_GLYPH
 		value_str += " (%s%d)" % [SELF_COST_GLYPH, self_cost]
 	# Name first, then the icon+value readout (kept inline for the compact "Then:" peek).
-	return "%s %s%s" % [move.move_name, _stage_glyph(icon), value_str]
+	lbl.clear()
+	lbl.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
+	lbl.add_text("Then: %s " % move.move_name)
+	if shield:
+		var tex: Texture2D = _block_icon_texture()
+		lbl.add_image(tex, roundi(tex.get_width() * PREVIEW_ICON_SCALE),
+			roundi(tex.get_height() * PREVIEW_ICON_SCALE))
+	else:
+		lbl.add_text(_stage_glyph(icon))
+	lbl.add_text(value_str)
+	lbl.pop()
+
+
+## The Defend card's shield, cropped to what it inks so it sits on a line of text.
+func _block_icon_texture() -> Texture2D:
+	if _block_icon_tex == null:
+		var source: Texture2D = load(CardVisuals.icon_path("Defend"))
+		_block_icon_tex = AtlasTexture.new()
+		_block_icon_tex.atlas = source
+		_block_icon_tex.region = Rect2(source.get_image().get_used_rect())
+	return _block_icon_tex
+
+
+## The shield as a picture `scale` times its pixel size, drawn as the cards draw their icons.
+func _block_icon(scale: float) -> TextureRect:
+	var tex := _block_icon_texture()
+	var icon := TextureRect.new()
+	icon.texture = tex
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.material = StageSkin.icon_material()
+	icon.custom_minimum_size = tex.get_size() * scale
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
 
 
 func _update_enemy_panel(enemy: EnemyCombatState) -> void:
@@ -2153,7 +2210,8 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 	var status_chips: VBoxContainer = vbox.get_node("Place/Statuses")
 	var intent_name_lbl: Label = vbox.get_node("IntentRow/IntentName")
 	var intent_lbl: Label = vbox.get_node("IntentRow/Intent")
-	var next_intent_lbl: Label = vbox.get_node("NextIntent")
+	var intent_icon: TextureRect = vbox.get_node("IntentRow/IntentIcon")
+	var next_intent_lbl: RichTextLabel = vbox.get_node("NextIntent")
 
 	if hp_container:
 		var hp_lbl: Label = hp_container.get_node("HP")
@@ -2181,6 +2239,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 
 	if enemy.current_intent:
 		var icon := ""
+		var shield := false  # a Defend move: the shield picture stands where a glyph would
 		var intent_color := StageSkin.c("ink")
 		var value_str := ""
 		match enemy.current_intent.intent_type:
@@ -2208,7 +2267,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 							value_str = " %d" % effect.value
 						break
 			EnemyMove.IntentType.DEFEND:
-				icon = "◆"
+				shield = true
 				intent_color = StageSkin.c("intent_defend")
 				for effect in enemy.current_intent.effects:
 					if effect is BlockEffect:
@@ -2271,6 +2330,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 		# distinct spark glyph + the Passion readout's own colour, so the eye goes to that stat.
 		if _intent_affects_passion(enemy.current_intent):
 			icon = "✧"
+			shield = false
 			intent_color = StageSkin.c("intent_passion")
 			value_str = _passion_intent_readout(enemy.current_intent)
 		# Name stays a muted constant color (flavor); the emphasized value carries the
@@ -2279,17 +2339,19 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 		intent_name_lbl.text = enemy.current_intent.move_name
 		intent_name_lbl.visible = true
 		intent_lbl.text = ("%s%s" % [_stage_glyph(icon), value_str]).strip_edges()
+		intent_icon.visible = shield
 	else:
 		intent_name_lbl.text = ""
 		intent_name_lbl.visible = false
 		intent_lbl.text = ""
+		intent_icon.visible = false
 
 	# Sight mode: render the next-turn intent below the current one. Hidden when
 	# the player doesn't hold Excalibur or has it set to Sword mode.
 	var sight_active = RunManager.has_excalibur() \
 		and RunManager.excalibur_mode == RunManager.ExcaliburMode.SIGHT
 	if sight_active and enemy.next_intent and not enemy.stats.is_dead():
-		next_intent_lbl.text = "Then: %s" % _format_intent_preview(enemy.next_intent, enemy)
+		_show_intent_preview(next_intent_lbl, enemy.next_intent)
 		next_intent_lbl.visible = true
 	else:
 		next_intent_lbl.visible = false
