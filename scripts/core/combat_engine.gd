@@ -30,6 +30,10 @@ var player_stats: CombatantStats
 var enemies: Array[EnemyCombatState] = []
 var piles: PileManager
 var _current_card: CardData = null # Set during card resolution for zone penalty
+## A staged moment on the scene (a boss going down and getting up into his next phase) holds the
+## fight: no card is played, nothing in the pack is used, the turn does not end, and the enemy turn
+## waits before anyone acts. Counted, so two holds need two releases. The harness never holds.
+var _holds := 0
 ## Energy spent by the X-cost card currently resolving (X). Read by x_scaled effects
 ## so a torrent repeats once per energy; 0 outside an X-cost resolution.
 var _current_x: int = 0
@@ -432,7 +436,7 @@ func _apply_pending_combat_boon() -> void:
 ## pack and meant for combat, and using it would do something (a heal at full health, a favour
 ## already armed and an oil already waiting are refused so a stray click never wastes one).
 func can_use_consumable(item: ConsumableData) -> bool:
-	if phase != Phase.PLAYER_TURN or item == null or not item.usable_in_combat:
+	if phase != Phase.PLAYER_TURN or is_held() or item == null or not item.usable_in_combat:
 		return false
 	if not RunManager.consumables.has(item):
 		return false
@@ -511,6 +515,8 @@ func _process_powers() -> void:
 
 
 func end_player_turn() -> void:
+	if is_held():
+		return
 	phase = Phase.PLAYER_TURN_END
 	tick_end_of_turn(player_stats)
 
@@ -553,6 +559,7 @@ func start_enemy_turn() -> void:
 			continue
 		# Per-enemy: tick start -> announce + wind-up -> act -> settle -> tick end
 		tick_start_of_turn(enemy.stats)
+		await _until_released()  # a tick can break a boss's bar, and he gets up before anyone acts
 		if enemy.stats.is_dead():
 			Events.enemy_died.emit(enemy)
 			continue
@@ -595,10 +602,29 @@ func start_enemy_turn() -> void:
 ## Enemy-turn pacing beat. Awaits a real timer during normal play; returns
 ## immediately when `instant` is set (the balance harness), so the exact same
 ## turn logic runs either paced-for-readability or as fast as the CPU allows.
+## Every beat also waits out a hold, so nothing resolves under a staged moment.
 func _pace(seconds: float) -> void:
-	if instant:
-		return
-	await get_tree().create_timer(seconds).timeout
+	if not instant:
+		await get_tree().create_timer(seconds).timeout
+	await _until_released()
+
+
+func hold() -> void:
+	_holds += 1
+
+
+func release() -> void:
+	_holds = maxi(0, _holds - 1)
+
+
+func is_held() -> bool:
+	return _holds > 0
+
+
+## Returns once nothing holds the fight. At once when nothing does, as in the harness.
+func _until_released() -> void:
+	while _holds > 0 and is_inside_tree():
+		await get_tree().process_frame
 
 
 func execute_enemy_turn(enemy: EnemyCombatState) -> void:
@@ -611,7 +637,7 @@ func execute_enemy_turn(enemy: EnemyCombatState) -> void:
 # -- Card Play --
 
 func can_play_card(card: CardData) -> bool:
-	if phase != Phase.PLAYER_TURN:
+	if phase != Phase.PLAYER_TURN or is_held():
 		return false
 	if card.unplayable:
 		return false

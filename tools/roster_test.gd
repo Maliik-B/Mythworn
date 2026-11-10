@@ -82,6 +82,7 @@ func _ready() -> void:
 	_test_harness_copy_new_rules()
 	_test_harness_policy_decides()
 	await _test_map_flourish()
+	await _test_restage_holds()
 	await _test_map_key()
 	await _test_crossing_stage()
 	await _test_event_page()
@@ -4174,6 +4175,94 @@ func _test_map_flourish() -> void:
 	scene.queue_free()
 	await get_tree().process_frame
 	RunManager.current_map = null
+
+
+## Caedmon's phase change is restaged, and the fight is held for it (decided 10 Nov): from
+## the break until he is up, no card is played, nothing in the pack is used and the turn does not
+## end; an enemy turn under a hold resolves no intent until it lifts. Then the fight goes on.
+func _test_restage_holds() -> void:
+	print("-- The restage holds the fight --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 424242)
+	RunManager.add_consumable(ConsumablePool.get_consumable(&"traveller_salve"))
+	RunManager.pending_enemies.clear()
+	RunManager.pending_enemies.append(EnemyPool.sir_caedmon())
+	var scene = load("res://scenes/combat/combat_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	for i in 4:
+		await get_tree().process_frame
+	var eng: CombatEngine = scene.combat_engine
+	var boss: EnemyCombatState = eng.enemies[0]
+	eng.player_stats.current_hp = eng.player_stats.max_hp - 20  # so the salve would have work to do
+	scene.trigger_boss_break(boss)
+	_check("the break brings in his next phase", boss.phase_index == 1)
+	_check("the break holds the fight", eng.is_held())
+	var anim: Dictionary = scene._enemy_anims[boss]
+	_check("he goes down on his death strip", anim["state"] == "fall" and anim["staged"])
+	var card: CardData = eng.piles.hand[0]
+	var hand_before := eng.piles.hand.size()
+	_check("no card plays while he is down",
+		not eng.can_play_card(card) and not eng.play_card(card, boss.stats) and eng.piles.hand.size() == hand_before)
+	_check("nothing in the pack is used while he is down", not eng.can_use_consumable(RunManager.consumables[0]))
+	scene._on_end_turn_pressed()
+	_check("the turn does not end while he is down",
+		eng.phase == CombatEngine.Phase.PLAYER_TURN and scene.end_turn_btn.disabled)
+	scene._enemy_play(boss, "hit")
+	_check("a flinch does not cut into the fall", anim["state"] == "fall")
+	var chips: Control = scene.enemy_nodes[boss].get_child(0).get_node("Place/Statuses")
+	var hide_by := Time.get_ticks_msec() + 500
+	while chips.visible and Time.get_ticks_msec() < hide_by:
+		await get_tree().process_frame
+	_check("his statuses leave with his name while he is down", not chips.visible)
+	var seen := {}
+	Engine.time_scale = 4.0
+	var until := Time.get_ticks_msec() + 4000
+	while eng.is_held() and Time.get_ticks_msec() < until:
+		seen[anim["state"]] = true
+		await get_tree().process_frame
+	Engine.time_scale = 1.0
+	_check("he gets up on the strip played backwards", seen.has("fall") and seen.has("rise"))
+	_check("the hold lifts once he is up", not eng.is_held() and not anim["staged"])
+	await get_tree().process_frame
+	var words_back := true
+	for child in scene.enemy_nodes[boss].get_child(0).get_children():
+		if child is CanvasItem and child.name != &"Place":
+			words_back = words_back and child.modulate.a > 0.99
+	_check("his name, bar and intent are back", words_back)
+	_check("and his statuses with them", chips.visible and chips.modulate.a > 0.99)
+	_check("then the fight is the keeper's again",
+		eng.can_play_card(card) and not scene.end_turn_btn.disabled)
+	scene.queue_free()
+	await get_tree().process_frame
+
+	# An enemy turn under a hold: nobody acts until it lifts, then the turn plays out as before.
+	var e2 := CombatEngine.new()
+	add_child(e2)
+	e2.start_combat([], 80, 80, [EnemyPool.sir_caedmon()])
+	var caed: EnemyCombatState = e2.enemies[0]
+	for move in caed.enemy_data.phase_movesets[0]:
+		if move.move_name == "Vanguard Strike":
+			caed.current_intent = move
+	e2.player_stats.block = 0
+	var hp_before := e2.player_stats.current_hp
+	e2.hold()
+	e2.end_player_turn()
+	_check("a held turn does not end", e2.phase == CombatEngine.Phase.PLAYER_TURN)
+	e2.start_enemy_turn()
+	Engine.time_scale = 4.0
+	var wait := Time.get_ticks_msec() + 400
+	while Time.get_ticks_msec() < wait:
+		await get_tree().process_frame
+	_check("no intent resolves while the fight is held",
+		e2.player_stats.current_hp == hp_before and e2.phase == CombatEngine.Phase.ENEMY_TURN)
+	e2.release()
+	wait = Time.get_ticks_msec() + 800
+	while e2.phase != CombatEngine.Phase.PLAYER_TURN and Time.get_ticks_msec() < wait:
+		await get_tree().process_frame
+	Engine.time_scale = 1.0
+	_check("once it lifts, the intent resolves and the turn comes back",
+		e2.player_stats.current_hp < hp_before and e2.phase == CombatEngine.Phase.PLAYER_TURN)
+	e2.free()
+	RunManager.consumables.clear()
 
 
 func _check_map_at_rest(scene: Node, canvas_children: int, tag: String) -> void:

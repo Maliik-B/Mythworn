@@ -73,6 +73,8 @@ const STAGE_LINE_SIZE := 46
 const STAGE_LINE_CHARS_PER_SEC := 30.0
 const STAGE_LINE_HOLD := 1.7
 const BREAK_DRAIN_TIME := 1.6
+const RESTAGE_RISE_FPS := 6.0  # he gets up slower than he went down
+const RESTAGE_WORDS_IN := 0.3  # the new phase's name, bar and intent come back over this
 const COIN_STAGGER := 0.04
 # A landed hit's weight. All of it comes after the effect, which lands on the click, and none of it
 # holds input. Hit strips run at 8 fps in SPRITE_SETS so the flinch can be seen.
@@ -385,16 +387,20 @@ func _make_cast_shadow(atlas: AtlasTexture, body: Rect2i, scale_px: int) -> Spri
 	return cast
 
 
-## Switches an animator to a state (idle/attack/hit/death). Only idle loops; the others
-## play through once and _anim_tick returns them to idle.
+## Switches an animator to a state (idle/attack/hit/death, or fall/rise). Only idle loops; the
+## others play through once and _anim_tick returns them to idle. "fall" is the death strip held on
+## its last frame like a death, and "rise" is the same strip played backwards, slower, into idle.
 func _anim_set_state(anim: Dictionary, state: String) -> void:
 	var sset: Dictionary = SPRITE_SETS[anim["set"]]
-	if not sset["anims"].has(state):
+	var strip := "death" if state == "fall" or state == "rise" else state
+	if not sset["anims"].has(strip):
 		state = "idle"
-	var info: Array = sset["anims"][state]
-	anim["atlas"].atlas = anim["textures"][state]
+		strip = "idle"
+	var info: Array = sset["anims"][strip]
+	anim["atlas"].atlas = anim["textures"][strip]
 	anim["frames"] = int(info[1])
-	anim["fps"] = float(info[2])
+	anim["fps"] = RESTAGE_RISE_FPS if state == "rise" else float(info[2])
+	anim["reverse"] = state == "rise"
 	anim["loop"] = (state == "idle")
 	anim["ending"] = false
 	anim["state"] = state
@@ -405,7 +411,10 @@ func _anim_set_state(anim: Dictionary, state: String) -> void:
 
 func _anim_apply_frame(anim: Dictionary) -> void:
 	var fw: int = int(anim["fw"])
-	anim["atlas"].region = Rect2(anim["frame"] * fw, 0, fw, int(anim["fh"]))
+	var frame: int = anim["frame"]
+	if anim.get("reverse", false):
+		frame = int(anim["frames"]) - 1 - frame
+	anim["atlas"].region = Rect2(frame * fw, 0, fw, int(anim["fh"]))
 
 
 func _anim_tick(anim: Dictionary, delta: float) -> void:
@@ -429,7 +438,7 @@ func _anim_tick(anim: Dictionary, delta: float) -> void:
 				# One-shot done. A fall stays down; a flinch holds its last frame a beat, then idles.
 				anim["frame"] = int(anim["frames"]) - 1
 				_anim_apply_frame(anim)
-				if anim["state"] == "death":
+				if anim["state"] == "death" or anim["state"] == "fall":
 					anim["fps"] = 0.0
 					return
 				anim["ending"] = true
@@ -438,12 +447,13 @@ func _anim_tick(anim: Dictionary, delta: float) -> void:
 		_anim_apply_frame(anim)
 
 
-## Plays a one-shot state on an enemy's animator (no-op if it has none, or is dead).
+## Plays a one-shot state on an enemy's animator (no-op if it has none, is dead, or is being
+## restaged: a flinch never cuts into his fall or his getting up).
 func _enemy_play(enemy, state: String) -> void:
 	var anim = _enemy_anims.get(enemy)
 	if anim == null or not is_instance_valid(anim.get("rect")):
 		return
-	if anim["state"] == "death":
+	if anim["state"] == "death" or anim.get("staged", false):
 		return
 	_anim_set_state(anim, state)
 
@@ -1463,7 +1473,8 @@ func _on_card_input(event: InputEvent, card: CardData) -> void:
 		return
 
 	if not combat_engine.can_play_card(card):
-		_log("[color=red]Not enough energy![/color]")
+		if not combat_engine.is_held():  # a held fight is waiting on the stage, not on energy
+			_log("[color=red]Not enough energy![/color]")
 		return
 
 	selected_card = card
@@ -2283,8 +2294,8 @@ func _refresh_ui() -> void:
 
 	_update_card_highlights()
 
-	# End turn button
-	var can_act = combat_engine.phase == CombatEngine.Phase.PLAYER_TURN
+	# End turn button: off while the fight is held for a staged moment, too.
+	var can_act = combat_engine.phase == CombatEngine.Phase.PLAYER_TURN and not combat_engine.is_held()
 	end_turn_btn.disabled = not can_act
 
 	# What the pack can do changes with HP and phase, so it redraws with everything else.
@@ -2657,24 +2668,63 @@ func _on_enemy_died(enemy) -> void:
 	_refresh_ui()
 
 
-## A multi-phase boss crossed into a new phase: its bar refilled and its moveset swapped. The clip
-## opens on this, so it has room: his bar shatters and his name and intent leave the ground, the
-## stage dims around him, the colour goes out of him, and what he says runs large where they were.
-## Nothing here holds input; the fight can go on under it, and the bar and intent come back with
-## the new phase when the line is done.
+## A multi-phase boss crossed into a new phase: its bar refilled and its moveset swapped. His bar
+## shatters and his name and intent leave the ground. A boss with a line to say and a fall to play
+## is restaged (_restage_rise); one without plays the flinch, the colour goes out of him, and the
+## fight goes on.
 func _on_enemy_phase_changed(enemy, _phase_index: int, line: String) -> void:
 	_log("[color=wheat]%s changes![/color]" % enemy.enemy_data.enemy_name)
 	var panel: Control = enemy_nodes.get(enemy)
 	if panel:
 		_shatter_bar(panel)
 		_screen_shake(8.0, 0.3)
-		_enemy_play(enemy, "break" if _has_strip(enemy, "break") else "hit")
-		_drain_body(enemy)
-		if line != "":
-			var seconds := _show_stage_line(line)
-			_stage.dim(seconds)
-			_hide_enemy_words(panel, seconds)
+		if line != "" and _has_strip(enemy, "death"):
+			_restage_rise(enemy, panel, line)
+		else:
+			_enemy_play(enemy, "break" if _has_strip(enemy, "break") else "hit")
+			_drain_body(enemy)
+			if line != "":
+				var seconds := _show_stage_line(line)
+				_stage.dim(seconds)
+				_hide_enemy_words(panel, seconds)
 	_refresh_ui()
+
+
+## The restage chosen on 10 Nov, from frames we own: he goes down on his death strip, stays
+## down while his line runs and the colour goes out of him, and gets up on the same strip played
+## backwards, hollow. The fight is held for all of it, so no card, pack item or End Turn lands and
+## the enemy turn waits; the new phase's name, bar and intent come in once he is up, and then the
+## fight goes on. What the blow that broke him still had to do has already resolved with it.
+func _restage_rise(enemy, panel: Control, line: String) -> void:
+	var anim = _enemy_anims.get(enemy)
+	if anim == null or not is_instance_valid(anim["rect"]):
+		return
+	combat_engine.hold()
+	anim["staged"] = true
+	_flash_body(anim, HIT_STOP_HEAVY)
+	_anim_set_state(anim, "fall")
+	var frames: int = int(anim["frames"])
+	# The hit stop holds the animators at impact, so the fall lands that much later.
+	var down: float = frames / float(anim["fps"]) + HIT_STOP_HEAVY
+	var said := _stage_line_seconds(line)
+	var rise := frames / RESTAGE_RISE_FPS
+	var up := down + said + rise
+	_stage.dim(down + said)
+	_hide_enemy_words(panel, up)
+	var t := create_tween()
+	t.tween_interval(down)
+	t.tween_callback(func() -> void:
+		_show_stage_line(line)
+		_drain_colour(anim))
+	t.tween_interval(said)
+	t.tween_callback(func() -> void:
+		if is_instance_valid(anim["rect"]):
+			_anim_set_state(anim, "rise"))
+	t.tween_interval(rise + RESTAGE_WORDS_IN)
+	t.tween_callback(func() -> void:
+		anim["staged"] = false
+		combat_engine.release()
+		_refresh_ui())
 
 
 func _has_strip(enemy, state: String) -> bool:
@@ -2718,10 +2768,7 @@ func _drain_body(enemy) -> void:
 		return
 	var body: TextureRect = anim["rect"]
 	_flash_body(anim, HIT_STOP_HEAVY)
-	var mat: ShaderMaterial = body.material
-	var drain := create_tween()
-	drain.tween_method(func(v: float): mat.set_shader_parameter("drain", v), 0.0, 1.0, BREAK_DRAIN_TIME) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_drain_colour(anim)
 	# He shakes by a whole sprite pixel, to stay on the grid.
 	var px: float = body.size.x / float(anim["fw"])
 	var home := body.position
@@ -2732,7 +2779,19 @@ func _drain_body(enemy) -> void:
 	shake.tween_interval(0.12)
 
 
-## The name, the bar and the intent leave the ground for as long as a line runs on it.
+## The colour goes out of a body and stays out.
+func _drain_colour(anim: Dictionary) -> void:
+	if not is_instance_valid(anim["rect"]):
+		return
+	var mat: ShaderMaterial = anim["rect"].material
+	var drain := create_tween()
+	drain.tween_method(func(v: float): mat.set_shader_parameter("drain", v), 0.0, 1.0, BREAK_DRAIN_TIME) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## The name, the bar and the intent leave the ground for as long as a line runs on it, and so do his
+## statuses: in a staged moment a boss's chips go with his words, as a rule (since 10 Nov). The
+## chips' column stands beside his feet outside the layout, so it is hidden outright, hover and all.
 func _hide_enemy_words(panel: Control, seconds: float) -> void:
 	for child in panel.get_child(0).get_children():
 		if child.name == &"Place":
@@ -2741,6 +2800,15 @@ func _hide_enemy_words(panel: Control, seconds: float) -> void:
 		t.tween_property(child, "modulate:a", 0.0, 0.12)
 		t.tween_interval(seconds - 0.12)
 		t.tween_property(child, "modulate:a", 1.0, 0.3)
+	var chips: Control = panel.get_child(0).get_node_or_null("Place/Statuses")
+	if chips == null:
+		return
+	var c := create_tween()
+	c.tween_property(chips, "modulate:a", 0.0, 0.12)
+	c.tween_callback(func() -> void: chips.visible = false)
+	c.tween_interval(seconds - 0.12)
+	c.tween_callback(func() -> void: chips.visible = true)
+	c.tween_property(chips, "modulate:a", 1.0, 0.3)
 
 
 ## A line said out loud, run out large on the ground under the bodies. Returns how long it stays.
@@ -2765,14 +2833,18 @@ func _show_stage_line(text: String) -> float:
 	lbl.visible_ratio = 0.0
 	add_child(lbl)
 	_stage_line = lbl
-	var run := text.length() / STAGE_LINE_CHARS_PER_SEC
 	var t := create_tween()
 	t.tween_interval(0.25)
-	t.tween_property(lbl, "visible_ratio", 1.0, run)
+	t.tween_property(lbl, "visible_ratio", 1.0, text.length() / STAGE_LINE_CHARS_PER_SEC)
 	t.tween_interval(STAGE_LINE_HOLD)
 	t.tween_property(lbl, "modulate:a", 0.0, 0.3)
 	t.tween_callback(lbl.queue_free)
-	return 0.25 + run + STAGE_LINE_HOLD
+	return _stage_line_seconds(text)
+
+
+## How long a line stays up on the ground before it starts to fade.
+func _stage_line_seconds(text: String) -> float:
+	return 0.25 + text.length() / STAGE_LINE_CHARS_PER_SEC + STAGE_LINE_HOLD
 
 
 ## For a capture: breaks an enemy's bar through the engine's real path, wherever its HP stands.
@@ -3082,7 +3154,7 @@ func _on_combat_lost() -> void:
 
 
 func _on_end_turn_pressed() -> void:
-	if combat_engine.phase == CombatEngine.Phase.PLAYER_TURN:
+	if combat_engine.phase == CombatEngine.Phase.PLAYER_TURN and not combat_engine.is_held():
 		AudioManager.play_sfx("button_click")
 		if _dragging_card:
 			_cancel_drag()
