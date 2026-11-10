@@ -30,6 +30,10 @@ var pending_act_complete: bool = false
 ## instead of pulling from EventPool. Used for realm signature nodes like
 ## Camelot's Sword in the Stone. Cleared on consumption.
 var pending_special_event: StringName = &""
+## An event's page held across a fight in the middle of it: {"resume": the event id the fight
+## returns to, "parts": the page's parts as words}. The event scene takes it when it builds that
+## id, and drops it otherwise. Empty when no event is waiting on a fight.
+var event_story: Dictionary = {}
 ## Count of ORDINARY (random-pool) event nodes entered this run. Quest/signature events
 ## route through pending_special_event before the scene change, so they never reach the
 ## random branch and never advance this count — it tracks only the player's "Nth event".
@@ -240,6 +244,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	pending_relic_reward = false
 	pending_relic_is_boss = false
 	pending_special_event = &""
+	event_story = {}
 	pending_event_combat = false
 	ordinary_event_count = 0
 	# Scheduled story beats pinned to an ordinary-event ordinal (empty = fully random).

@@ -83,6 +83,7 @@ func _ready() -> void:
 	await _test_map_flourish()
 	await _test_map_key()
 	await _test_crossing_stage()
+	await _test_event_page()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -4204,6 +4205,84 @@ func _test_crossing_stage() -> void:
 	scene.queue_free()
 	await get_tree().process_frame
 	RunManager.current_map = null
+
+
+## R9: an event's page keeps its story. The opening stays when a choice is taken, the choice stays as a
+## marked line with its result and summary under it, and the Reliquary's next stage goes on below in
+## the same scene. Across the chapel beast's fight the page is carried to the stage it returns to,
+## taken once, and a page left for some other id is dropped.
+func _test_event_page() -> void:
+	print("-- Event page --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 424242)
+	var entry := EventPool._reliquary()
+	RunManager.pending_special_event = &"reliquary"
+	var scene: Control = load("res://scenes/event/event_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	await get_tree().process_frame
+	_check("an event opens on its description with its choices under it",
+		scene._told.size() == 1 and scene._told[0].text == entry.description
+		and scene.choice_container.get_child_count() == entry.choices.size())
+	scene._on_choice_selected(0)  # cross the yard: -6 HP, then the struck stage
+	await get_tree().process_frame
+	var kinds: Array = []
+	for part in scene._parts:
+		kinds.append(part["kind"])
+	_check("the opening, the choice taken, its result and summary stay, then the next stage",
+		kinds == ["text", "choice", "text", "summary", "rule", "text"]
+		and scene._parts[1]["text"] == entry.choices[0].text
+		and scene._parts[2]["text"] == entry.choices[0].result_text
+		and scene._parts[3]["text"] == "-6 HP")
+	_check("what has been read steps back, and the choice taken stays bright",
+		scene._told[0].self_modulate == scene.STORY_PAST and scene._told[1].self_modulate == Color.WHITE)
+	var struck: EventData = scene._build_special_event(&"reliquary_struck")
+	_check("the struck stage plays in the same scene, with its own choices",
+		scene.desc_label.text == struck.description and RunManager.pending_special_event == &""
+		and scene.choice_container.get_child_count() == struck.choices.size())
+
+	# Staying with her starts the chapel beast's fight. The fight is not launched here: the hand-off is
+	# checked on its own, with the id the fight sets.
+	var stay: EventData.EventChoice = scene.event.choices[1]
+	scene._take_choice(stay)
+	RunManager.pending_special_event = &"reliquary_won"
+	scene._carry_story_into_fight()
+	var carried_parts: int = scene._parts.size()
+	_check("the page goes with the fight to the stage it returns to, ending on the choice that started it",
+		RunManager.event_story.get("resume") == &"reliquary_won"
+		and RunManager.event_story["parts"].size() == carried_parts
+		and RunManager.event_story["parts"][-1]["text"] == stay.text)
+	scene.queue_free()
+	await get_tree().process_frame
+	var won: Control = load("res://scenes/event/event_scene.tscn").instantiate()
+	get_tree().root.add_child(won)
+	await get_tree().process_frame
+	_check("after the fight the page opens on the story so far, then the won stage under a rule",
+		won._parts.size() == carried_parts + 2 and won._parts[carried_parts]["kind"] == "rule"
+		and won._parts[0]["text"] == entry.description
+		and won.desc_label.text == won.event.description and won._told[0].self_modulate == won.STORY_PAST)
+	_check("the carried page is taken once", RunManager.event_story.is_empty())
+	won.queue_free()
+	await get_tree().process_frame
+
+	# A page left for another id is dropped, never shown on the next event.
+	RunManager.event_story = {"resume": &"raider_victory", "parts": [{"kind": "text", "text": "stale"}]}
+	RunManager.pending_special_event = &"reliquary"
+	var other: Control = load("res://scenes/event/event_scene.tscn").instantiate()
+	get_tree().root.add_child(other)
+	await get_tree().process_frame
+	_check("a page left for another stage is dropped", other._parts.size() == 1 and RunManager.event_story.is_empty())
+	# A one-stage outcome appends too: heed the warning, and the description stays above the result.
+	other._on_choice_selected(1)
+	await get_tree().process_frame
+	var leave_found := false
+	for c in other._story.get_children():
+		if c is Button and c.text == "Continue":
+			leave_found = true
+	_check("a one-stage event keeps its description above the result, with Continue at the foot",
+		other._parts.size() >= 3 and other._parts[0]["text"] == entry.description
+		and other._parts[2]["text"] == entry.choices[1].result_text and leave_found)
+	other.queue_free()
+	await get_tree().process_frame
+	RunManager.pending_special_event = &""
 
 
 func crossing_node_text(scene: Node, node: MapNode) -> bool:

@@ -5,9 +5,24 @@ extends Control
 var event: EventData
 var main_vbox: VBoxContainer
 var info_label: Label
-var desc_label: RichTextLabel
+var desc_label: RichTextLabel  # the description of the stage being played
 var choice_container: VBoxContainer
 var follow_up_container: VBoxContainer
+
+# The event's page: everything that has happened in it, in order, so a player can scroll back to the
+# story and what they chose. Choices and follow-ups sit at its foot; each new part goes above them.
+const STORY_PAST := Color(1, 1, 1, 0.68)  # what has been read steps back a little
+const STORY_TEXT := Color(0.8, 0.78, 0.7)
+const KEPT_CHOICE := Color(0.8, 0.55, 0.9)
+const STORY_FADE_IN := 0.3
+const STORY_SCROLL_LEAD := 24.0
+const STORY_SCROLL_TIME := 0.35
+var _title_label: Label
+var _story_scroll: ScrollContainer
+var _story: VBoxContainer
+var _told: Array[Control] = []  # the parts told so far, oldest first
+var _parts: Array[Dictionary] = []  # the same parts as words, carried across a fight
+var _story_open := false  # false while the page is first laid out, so its opening does not fade in
 ## Whether the consumable the last choice offered went into the pack. False when the player
 ## met a full pack and left the new thing behind. Read by the effect summary.
 var _consumable_taken := true
@@ -19,8 +34,9 @@ func _ready() -> void:
 	# Realm-signature events are hand-authored and route through this same scene
 	# via RunManager.pending_special_event. The flag is consumed here so that
 	# subsequent regular event nodes pull from the normal pool again.
-	if RunManager.pending_special_event != &"":
-		event = _build_special_event(RunManager.pending_special_event)
+	var special := RunManager.pending_special_event
+	if special != &"":
+		event = _build_special_event(special)
 		RunManager.pending_special_event = &""
 	else:
 		# Ordinary event node. A scripted beat may be pinned to this visit's ordinal (e.g.
@@ -36,7 +52,21 @@ func _ready() -> void:
 				and MapGenerator.has_treasure_payoff(map, map.current_node_id)
 			event = EventPool.get_random_event_filtered(RngManager.event_rng, treasure_ok)
 	_build_ui()
+	# A fight in the middle of an event (the Reliquary's chapel beast) left its page for the stage
+	# it returns to: what came before is told again, then this stage goes on under it.
+	var carried: Dictionary = RunManager.event_story
+	RunManager.event_story = {}
+	var resumed: bool = special != &"" and carried.get("resume", &"") == special
+	if resumed:
+		for part in carried.get("parts", []):
+			_tell_part(part)
+		_dim_story()
+		_tell_part({"kind": "rule"})
+	desc_label = _tell_part({"kind": "text", "text": event.description})
+	_story_open = true
 	_show_choices()
+	if resumed:
+		_scroll_to(desc_label)
 	AudioManager.play_music("rest")
 
 
@@ -593,25 +623,14 @@ void fragment() {
 	margin.add_child(main_vbox)
 
 	# Title
-	var title = Label.new()
-	title.text = event.event_name
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Color(0.8, 0.55, 0.9))
-	main_vbox.add_child(title)
+	_title_label = Label.new()
+	_title_label.text = event.event_name
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title_label.add_theme_font_size_override("font_size", 34)
+	_title_label.add_theme_color_override("font_color", Color(0.8, 0.55, 0.9))
+	main_vbox.add_child(_title_label)
 
-	# Description
-	desc_label = RichTextLabel.new()
-	desc_label.text = event.description
-	desc_label.bbcode_enabled = false
-	desc_label.fit_content = true
-	desc_label.scroll_active = false
-	desc_label.custom_minimum_size.y = 80
-	desc_label.add_theme_font_size_override("normal_font_size", 18)
-	desc_label.add_theme_color_override("default_color", Color(0.8, 0.78, 0.7))
-	main_vbox.add_child(desc_label)
-
-	# HP / Gold bar
+	# HP / Gold bar, fixed above the page with the map peek, so they stay put while it scrolls.
 	info_label = Label.new()
 	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	info_label.add_theme_font_size_override("font_size", 18)
@@ -632,16 +651,113 @@ void fragment() {
 	map_btn.pressed.connect(_on_view_map)
 	map_row.add_child(map_btn)
 
+	# The page: the story told so far, then the choices and the follow-ups at its foot.
+	_story_scroll = ScrollContainer.new()
+	_story_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_story_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main_vbox.add_child(_story_scroll)
+	_story = VBoxContainer.new()
+	_story.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_story.add_theme_constant_override("separation", 18)
+	_story_scroll.add_child(_story)
+
 	# Choice buttons container
 	choice_container = VBoxContainer.new()
 	choice_container.add_theme_constant_override("separation", 12)
-	main_vbox.add_child(choice_container)
+	_story.add_child(choice_container)
 
 	# Follow-up area (card reward / removal)
 	follow_up_container = VBoxContainer.new()
 	follow_up_container.add_theme_constant_override("separation", 14)
 	follow_up_container.visible = false
-	main_vbox.add_child(follow_up_container)
+	_story.add_child(follow_up_container)
+
+
+# ============================================================
+# THE PAGE
+# ============================================================
+
+## Adds one part of the story above the choices: a paragraph, the choice that was taken, an effect
+## summary, or the rule between two stages. Recorded as words too, so a fight can carry the page.
+## Once the page is open, a new part fades in where it lands.
+func _tell_part(part: Dictionary) -> Control:
+	var node: Control
+	match part.get("kind", ""):
+		"text":
+			var para := RichTextLabel.new()
+			para.text = part["text"]
+			para.bbcode_enabled = false
+			para.fit_content = true
+			para.scroll_active = false
+			para.add_theme_font_size_override("normal_font_size", 18)
+			para.add_theme_color_override("default_color", STORY_TEXT)
+			node = para
+		"choice":
+			node = _kept_choice(part["text"])
+		"summary":
+			var summary := Label.new()
+			summary.text = part["text"]
+			summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			summary.add_theme_font_size_override("font_size", 20)
+			summary.add_theme_color_override("font_color", Color(0.9, 0.8, 0.4))
+			node = summary
+		_:
+			var row := CenterContainer.new()
+			var rule := ColorRect.new()
+			rule.color = Color(KEPT_CHOICE, 0.35)
+			rule.custom_minimum_size = Vector2(520, 1)
+			row.add_child(rule)
+			node = row
+	_story.add_child(node)
+	_story.move_child(node, choice_container.get_index())
+	_told.append(node)
+	_parts.append(part)
+	if _story_open:
+		node.modulate.a = 0.0
+		create_tween().tween_property(node, "modulate:a", 1.0, STORY_FADE_IN)
+	return node
+
+
+## The choice that was taken, kept in the flow: a lilac rule down its left and the words bright.
+func _kept_choice(text: String) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.set_meta("kept", true)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0)
+	style.border_width_left = 3
+	style.border_color = KEPT_CHOICE
+	style.content_margin_left = 18
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
+	panel.add_theme_stylebox_override("panel", style)
+	var words := Label.new()
+	words.text = "▸ " + text
+	words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	words.add_theme_font_size_override("font_size", 17)
+	words.add_theme_color_override("font_color", KEPT_CHOICE)
+	panel.add_child(words)
+	return panel
+
+
+## What has been read steps back a little, so the newest part stands out. The choices taken stay
+## bright: they are the page's spine.
+func _dim_story() -> void:
+	for node in _told:
+		if not node.has_meta("kept"):
+			node.self_modulate = STORY_PAST
+
+
+## Brings a part near the top of the page, once the page has laid out the words just added. Short of
+## the page's end, so a page that fits does not move at all.
+func _scroll_to(node: Control) -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not is_instance_valid(node) or not is_instance_valid(_story_scroll):
+		return
+	var bar := _story_scroll.get_v_scroll_bar()
+	var target := clampf(node.position.y - STORY_SCROLL_LEAD, 0.0, maxf(0.0, bar.max_value - bar.page))
+	create_tween().tween_property(_story_scroll, "scroll_vertical", int(target), STORY_SCROLL_TIME)
 
 
 func _update_info() -> void:
@@ -658,6 +774,7 @@ func _on_view_map() -> void:
 # ============================================================
 
 func _show_choices() -> void:
+	choice_container.visible = true
 	for i in event.choices.size():
 		var choice = event.choices[i]
 		var btn = _make_choice_button(choice, i)
@@ -745,7 +862,10 @@ func _on_choice_selected(index: int) -> void:
 		# here for the same reason: the launch skips _apply_effects.
 		if choice.spends_consumable != &"":
 			RunManager.spend_consumable_by_id(choice.spends_consumable)
+		# The page goes with the fight to the stage it returns to, ending on the choice that started it.
+		_take_choice(choice)
 		_start_event_combat(choice.starts_combat)
+		_carry_story_into_fight()
 		return
 
 	# A wager rolls once on selection: the win/loss overrides the gold and the result text
@@ -784,12 +904,14 @@ func _on_choice_selected(index: int) -> void:
 	_open_set_piece(choice)
 
 	_apply_effects(choice)
-	choice_container.visible = false
 
-	# Show result text
-	desc_label.text = choice.result_text
+	# The result goes on the page under the choice that was taken, the story above it kept.
+	var kept := _take_choice(choice)
+	if choice.result_text != "":
+		_tell_part({"kind": "text", "text": choice.result_text})
 	_update_info()
 	_show_effect_summary(choice)
+	_scroll_to(kept)
 
 	# Check if player died from event effects
 	if RunManager.current_hp <= 0:
@@ -802,11 +924,30 @@ func _on_choice_selected(index: int) -> void:
 	elif choice.remove_card:
 		_show_card_removal()
 	elif choice.next_event_id != &"":
-		# A multi-stage event: advance to the next authored beat after the player reads
-		# this outcome (The Reliquary's warned -> struck -> fight chain).
+		# A multi-stage event: the next authored beat goes on under this outcome (The
+		# Reliquary's warned -> struck -> fight chain).
 		_show_next_beat(choice.next_event_id)
 	else:
 		_show_done()
+
+
+## Leaves the page for the stage the fight returns to (the id the fight set), so that stage opens on
+## the story so far. A fight that returns to no event carries nothing.
+func _carry_story_into_fight() -> void:
+	if RunManager.pending_special_event != &"":
+		RunManager.event_story = {"resume": RunManager.pending_special_event, "parts": _parts.duplicate(true)}
+
+
+## Clears the stage's buttons and keeps the one taken as a line in the flow, the story above it
+## stepping back.
+func _take_choice(choice: EventData.EventChoice) -> Control:
+	# Hidden, not pulled out: the button that was pressed is still inside its own signal.
+	for btn in choice_container.get_children():
+		btn.visible = false
+		btn.queue_free()
+	choice_container.visible = false
+	_dim_story()
+	return _tell_part({"kind": "choice", "text": choice.text})
 
 
 ## Opens the stage this choice calls for, if any. Fire and forget: the stage shields the scene from
@@ -1060,13 +1201,7 @@ func _show_effect_summary(choice: EventData.EventChoice) -> void:
 			parts.append("Cursed: %s" % curse.card_name)
 
 	if parts.size() > 0:
-		var summary = Label.new()
-		summary.text = ", ".join(parts)
-		summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		summary.add_theme_font_size_override("font_size", 20)
-		summary.add_theme_color_override("font_color", Color(0.9, 0.8, 0.4))
-		main_vbox.add_child(summary)
-		main_vbox.move_child(summary, main_vbox.get_child_count() - 2)
+		_tell_part({"kind": "summary", "text": ", ".join(parts)})
 
 
 # ============================================================
@@ -1320,22 +1455,17 @@ func _show_done() -> void:
 	leave_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	leave_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	leave_btn.pressed.connect(_on_leave)
-	main_vbox.add_child(leave_btn)
+	_story.add_child(leave_btn)
 
 
-## A Continue that advances to the next authored beat of a multi-stage event: stashes the
-## next special-event id and reloads the event scene, which builds that beat.
+## The next authored beat of a multi-stage event goes on the same page, under a rule, with its own
+## choices at the foot. Nothing that came before is taken off.
 func _show_next_beat(next_id: StringName) -> void:
-	var btn = Button.new()
-	btn.text = "Continue"
-	btn.custom_minimum_size = Vector2(200, 55)
-	btn.add_theme_font_size_override("font_size", 20)
-	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	btn.pressed.connect(func():
-		RunManager.pending_special_event = next_id
-		SceneTransition.change_scene("res://scenes/event/event_scene.tscn"))
-	main_vbox.add_child(btn)
+	event = _build_special_event(next_id)
+	_title_label.text = event.event_name
+	_tell_part({"kind": "rule"})
+	desc_label = _tell_part({"kind": "text", "text": event.description})
+	_show_choices()
 
 
 func _show_game_over() -> void:
@@ -1348,7 +1478,7 @@ func _show_game_over() -> void:
 	death_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	death_label.add_theme_font_size_override("font_size", 28)
 	death_label.add_theme_color_override("font_color", Color(0.9, 0.2, 0.2))
-	main_vbox.add_child(death_label)
+	_story.add_child(death_label)
 
 	var game_over_btn = Button.new()
 	game_over_btn.text = "Game Over"
@@ -1357,7 +1487,7 @@ func _show_game_over() -> void:
 	game_over_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	game_over_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	game_over_btn.pressed.connect(_on_game_over)
-	main_vbox.add_child(game_over_btn)
+	_story.add_child(game_over_btn)
 
 
 func _on_game_over() -> void:
