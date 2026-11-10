@@ -3528,6 +3528,24 @@ func _test_consumable_ui() -> void:
 	_check("a change in what is usable rebuilds the pack, with no old slot left in the row",
 		bar.get_child_count() == shown and bar.get_child(bar.get_child_count() - 1) != first_slot)
 	RunManager.discard_consumable(salve)
+	# R13: a click on an item opens its menu; Use waits with the reason, Drop empties the slot.
+	RunManager.add_consumable(salve)
+	var salve_btn: Button = null
+	for child in bar.get_children():
+		if child is Button and child.text.begins_with(salve.display_name):
+			salve_btn = child
+	_check("a waiting item is still a live button, so it can be dropped",
+		salve_btn != null and not salve_btn.disabled)
+	salve_btn.pressed.emit()
+	_check("a click on an item opens its menu", bar.is_menu_open() and bar.menu_item() == salve)
+	var menu_use: Button = bar._menu.get_child(0).get_child(0)
+	_check("at full health the menu's Use waits", menu_use.disabled)
+	salve_btn.pressed.emit()
+	_check("a second click on the item closes its menu", not bar.is_menu_open())
+	salve_btn.pressed.emit()
+	bar._on_menu_drop()
+	_check("Drop empties the slot and closes the menu",
+		not RunManager.consumables.has(salve) and not bar.is_menu_open())
 	eng.free()
 	bar.free()
 	cbar.free()

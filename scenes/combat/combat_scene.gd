@@ -630,10 +630,11 @@ void fragment() {
 	add_child(_passion_gauge)
 
 	# What a status or a power does: one panel, on hover, pinned by a click. Nothing over the fight
-	# (the enlarged card, the map peek) or a drag in hand shows it.
+	# (the enlarged card, the map peek, a pack item's menu) or a drag in hand shows it.
 	_hover_note = HoverNote.new()
 	_hover_note.blocked = func() -> bool:
-		return is_instance_valid(_inspect) or _dragging_card != null or is_instance_valid(_map_overlay)
+		return is_instance_valid(_inspect) or _dragging_card != null or is_instance_valid(_map_overlay) \
+			or consumable_bar.is_menu_open()
 	add_child(_hover_note)
 
 	# Absorbed pulse on top of everything

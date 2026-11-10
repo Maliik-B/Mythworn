@@ -895,7 +895,8 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	var note := HoverNote.new()
 	note.blocked = func() -> bool:
 		var hovered := get_viewport().gui_get_hovered_control()
-		return hovered == null or not (hovered == consumable_bar or consumable_bar.is_ancestor_of(hovered))
+		return consumable_bar.is_menu_open() or hovered == null \
+			or not (hovered == consumable_bar or consumable_bar.is_ancestor_of(hovered))
 	add_child(note)
 
 	# The companion, if one travels with the player. Hidden until an event grants one.

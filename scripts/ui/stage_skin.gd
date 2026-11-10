@@ -137,6 +137,7 @@ const LOOKS := {
 		"note_edge": Color(0.55, 0.5, 0.42),
 		"note_ink": Color(0.93, 0.9, 0.85),
 		"note_dim": Color(0.7, 0.66, 0.6),
+		"note_warn": Color(0.95, 0.6, 0.5),
 	},
 	PAGE: {
 		"desk": Color("1C1A18"),
@@ -230,6 +231,7 @@ const LOOKS := {
 		"note_edge": Color("0F0E0C"),
 		"note_ink": Color("1E1B18"),
 		"note_dim": Color("5A5750"),
+		"note_warn": Color("D7301F"),
 	},
 }
 
