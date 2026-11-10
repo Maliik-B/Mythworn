@@ -9,6 +9,7 @@ class_name CharacterPool
 static func build_emo_hybrid() -> CharacterData:
 	var c := CharacterData.new()
 	c.character_name = "Emo Hybrid Caster"
+	c.work_name = "Cairn"
 	c.max_health = 80
 	c.passion_volatility = 1.0
 	c.passion_thresholds.assign([50, 18, -18, -50])

@@ -2099,6 +2099,15 @@ func _test_profile_intro() -> void:
 	_check("single-liaison send-off builds for Bram + Neve, shorter than the full intro",
 		bram.beats.size() > 0 and neve.beats.size() > 0
 		and bram.beats.size() < full.beats.size() and neve.beats.size() < full.beats.size())
+	# R2: the keeper's lines are labelled with their work-name, never "You".
+	var speakers := {}
+	var cairn := CharacterPool.build_emo_hybrid()
+	for vn in [VNPool.build_sendoff(cairn), VNPool.build_sendoff_single(cairn, &"bram"),
+			VNPool.build_sendoff_single(cairn, &"neve")]:
+		for beat in vn.beats:
+			speakers[beat.speaker] = true
+	_check("the send-off labels the keeper's lines Cairn, and nothing says You",
+		speakers.has("Cairn") and not speakers.has("You"))
 
 	# Restore fresh defaults so running this suite doesn't consume the player's intro.
 	ProfileManager.reset_seen_cutscenes()

@@ -3,6 +3,9 @@ extends Resource
 ## Defines a playable character: personalities, passion behavior, and card pools.
 
 @export var character_name: String = ""
+## The name the keeper goes by at Fable, and the speaker label on what they say in a scene.
+## Empty falls back to "You".
+@export var work_name: String = ""
 @export_multiline var description: String = ""
 @export var max_health: int = 80
 

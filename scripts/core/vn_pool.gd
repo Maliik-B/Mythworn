@@ -21,12 +21,12 @@ const C_FOLK := Color(0.72, 0.66, 0.52)        # homespun
 ## apply_liaison_gift. Shown only the first time on a save (or when the player toggles
 ## "always show intro" back on); returning runs use build_sendoff_single. The demo ships
 ## the Emo-Hybrid-reactive banter; Hotheaded-Mage reactivity is 1.0+ content.
-static func build_sendoff(_character: CharacterData) -> VNData:
+static func build_sendoff(character: CharacterData) -> VNData:
 	var vn := VNData.new()
 	vn.title = "Before Deployment"
 	vn.add_beat("", "The Fable office, before deployment. Two desks, two coworkers, the same tired morning.", C_NARRATION)
-	_add_bram_beats(vn)
-	_add_neve_beats(vn)
+	_add_bram_beats(vn, _keeper(character))
+	_add_neve_beats(vn, _keeper(character))
 	return vn
 
 
@@ -35,35 +35,42 @@ static func build_sendoff(_character: CharacterData) -> VNData:
 ## skip the Camelot briefing and the introductions and play as a regular morning dispatching
 ## chaos: a quick, familiar handover and a little understated encouragement. The caller picks
 ## the liaison (random per run) and grants that liaison's gift.
-static func build_sendoff_single(_character: CharacterData, liaison: StringName) -> VNData:
+static func build_sendoff_single(character: CharacterData, liaison: StringName) -> VNData:
 	var vn := VNData.new()
 	vn.title = "Before Deployment"
 	if liaison == &"neve":
-		_add_neve_return_beats(vn)
+		_add_neve_return_beats(vn, _keeper(character))
 	else:
-		_add_bram_return_beats(vn)
+		_add_bram_return_beats(vn, _keeper(character))
 	return vn
 
 
+## The speaker label for the played keeper: their work-name, so a line reads as theirs.
+static func _keeper(character: CharacterData) -> String:
+	if character != null and character.work_name != "":
+		return character.work_name
+	return "You"
+
+
 ## Bram — Records. Dry, tired; hands over the Camelot briefing.
-static func _add_bram_beats(vn: VNData) -> void:
+static func _add_bram_beats(vn: VNData, keeper: String) -> void:
 	vn.add_beat("", "Bram slides a folder across the Records desk without looking up.", C_NARRATION)
 	vn.add_beat("Bram", "Filled it with everything we still have on Camelot. There's a 'weapon of heroes' in there, some reference out of the realm's old stories. We think. Lore never sticks around more than a couple days.", C_BRAM)
-	vn.add_beat("You", "I know the feeling.", C_KEEPER)
+	vn.add_beat(keeper, "I know the feeling.", C_KEEPER)
 	vn.add_beat("", "Bram looks up then. Not unkindly.", C_NARRATION)
 	vn.add_beat("Bram", "Right. You would.", C_BRAM)
 	vn.add_beat("Bram", "At least yours is only the once. Mine does it on a schedule.", C_BRAM)
 
 
 ## Neve — Dispatch. Warm veteran; hands over the kit.
-static func _add_neve_beats(vn: VNData) -> void:
+static func _add_neve_beats(vn: VNData, keeper: String) -> void:
 	vn.add_beat("", "Dispatch. Neve holds the kit a second longer than she needs to.", C_NARRATION)
 	vn.add_beat("Neve", "Camelot. Political realm. Everyone smiles while they take something off you.", C_NEVE)
-	vn.add_beat("You", "You say that about every realm.", C_KEEPER)
+	vn.add_beat(keeper, "You say that about every realm.", C_KEEPER)
 	vn.add_beat("Neve", "I mean it about every realm.", C_NEVE)
 	vn.add_beat("", "She almost leaves it there.", C_NARRATION)
 	vn.add_beat("Neve", "You slept badly. You get a line between your eyes when you don't.", C_NEVE)
-	vn.add_beat("You", "It's nothing. A dream I couldn't hold onto.", C_KEEPER)
+	vn.add_beat(keeper, "It's nothing. A dream I couldn't hold onto.", C_KEEPER)
 	vn.add_beat("Neve", "Those are the worst kind.", C_NEVE)
 	vn.add_beat("", "She writes something small in the back of a battered notebook, the way other people check a watch, and hands you the rest of your supplies.", C_NARRATION)
 	vn.add_beat("Neve", "Go on. Come back in one piece. You're bad at that.", C_NEVE)
@@ -71,20 +78,20 @@ static func _add_neve_beats(vn: VNData) -> void:
 
 ## Bram, returning run: no re-briefing (you know the file), the lore-decay running gag, and a
 ## dry vote of confidence that passes for warmth out of Records.
-static func _add_bram_return_beats(vn: VNData) -> void:
+static func _add_bram_return_beats(vn: VNData, keeper: String) -> void:
 	vn.add_beat("", "The Records desk. The Camelot folder is already on the corner, squared to the edge. Bram saw you coming.", C_NARRATION)
 	vn.add_beat("Bram", "You know the file. Same realm, same weapon-of-heroes footnote, same half of it gone stale since you last read it.", C_BRAM)
-	vn.add_beat("You", "Comforting.", C_KEEPER)
+	vn.add_beat(keeper, "Comforting.", C_KEEPER)
 	vn.add_beat("Bram", "It's the work. Nothing out there holds still long enough to be worth learning properly.", C_BRAM)
 	vn.add_beat("Bram", "You keep walking back in here, though. I've started counting on it. Don't make a liar of me.", C_BRAM)
 
 
 ## Neve, returning run: she skips the speech you've both heard, reads you over the way she
 ## always does, and sends you off with the blunt affection of a veteran who's done this before.
-static func _add_neve_return_beats(vn: VNData) -> void:
+static func _add_neve_return_beats(vn: VNData, keeper: String) -> void:
 	vn.add_beat("", "Dispatch. Neve has the kit packed already. Probably had it packed since the last time.", C_NARRATION)
 	vn.add_beat("Neve", "Camelot again. I won't do the speech. You've heard the speech.", C_NEVE)
-	vn.add_beat("You", "Everyone smiles while they take something off me.", C_KEEPER)
+	vn.add_beat(keeper, "Everyone smiles while they take something off me.", C_KEEPER)
 	vn.add_beat("Neve", "See. You listen.", C_NEVE)
 	vn.add_beat("", "She looks you over, taking an inventory only she can read.", C_NARRATION)
 	vn.add_beat("Neve", "Still not sleeping. I'm not going to keep saying it.", C_NEVE)
