@@ -3473,6 +3473,21 @@ func _test_consumable_ui() -> void:
 	bar._on_use_pressed(supper)
 	_check("pressing a usable item on the map uses it",
 		map_used.size() == 1 and RunManager.current_hp == 60)
+	# R15/R23: a host refreshes the pack many times a frame (a boss's hit, a phase change). The
+	# slots are rebuilt only when what they show changes, and old ones never linger in the row.
+	RunManager.add_consumable(salve)
+	bar.refresh()
+	var shown := bar.get_child_count()
+	var first_slot := bar.get_child(bar.get_child_count() - 1)
+	for i in 7:
+		bar.refresh()
+	_check("refreshing an unchanged pack seven times in a frame rebuilds nothing",
+		bar.get_child_count() == shown and bar.get_child(bar.get_child_count() - 1) == first_slot)
+	RunManager.current_hp = 80
+	bar.refresh()
+	_check("a change in what is usable rebuilds the pack, with no old slot left in the row",
+		bar.get_child_count() == shown and bar.get_child(bar.get_child_count() - 1) != first_slot)
+	RunManager.discard_consumable(salve)
 	eng.free()
 	bar.free()
 	cbar.free()

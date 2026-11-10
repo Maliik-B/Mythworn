@@ -25,6 +25,7 @@ var engine: CombatEngine = null
 
 var _confirm: ConfirmationDialog
 var _pending_drop: ConsumableData = null
+var _shown_key := "(never built)"  # what the slots were last built from; see _state_key
 
 
 ## Builds the bar's contents and wires it to the run's pack. `combat_engine` is required in
@@ -46,11 +47,19 @@ func _exit_tree() -> void:
 		Events.consumables_changed.disconnect(refresh)
 
 
-## Rebuilds the slots from the run's pack. Hosts call this when something that changes what is
-## usable has moved (combat's HP and phase), and the pack's own signal calls it on any change.
+## Brings the slots up to date with the run's pack. Hosts call this whenever something that might
+## change what is usable has moved (combat's HP and phase), and the pack's own signal calls it on
+## any change; the slots are rebuilt only when what they would show is different.
 func refresh() -> void:
+	var key := _state_key()
+	if key == _shown_key:
+		return
+	_shown_key = key
+	# Out of the row now, not at the end of the frame: a slot still waiting to be freed counts
+	# toward the bar's width, and the bar's width toward the whole layout's.
 	for child in get_children():
 		if child != _confirm:
+			remove_child(child)
 			child.queue_free()
 	var caption := Label.new()
 	caption.text = "Pack:"
@@ -67,6 +76,15 @@ func refresh() -> void:
 			empty.add_theme_color_override("font_color", COLOR_EMPTY)
 			empty.tooltip_text = "An empty slot. You can carry two consumables, and nothing widens that."
 			add_child(empty)
+
+
+## Everything a slot shows, as one string: each held item, whether it is spent, and why it waits.
+func _state_key() -> String:
+	var parts: PackedStringArray = []
+	for item in RunManager.consumables:
+		var spent := RunManager.is_consumable_spent(item)
+		parts.append("%s|%s|%s" % [item.id, spent, _why_unusable(item, spent)])
+	return ";".join(parts)
 
 
 func _make_slot(item: ConsumableData) -> Control:
