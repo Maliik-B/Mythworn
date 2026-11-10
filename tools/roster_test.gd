@@ -86,6 +86,7 @@ func _ready() -> void:
 	await _test_map_key()
 	await _test_crossing_stage()
 	await _test_event_page()
+	await _test_shop_stall()
 	_test_scene_scripts_compile()
 	print("== %s ==\n" % ("ALL PASS" if _fails == 0 else "%d FAILURE(S)" % _fails))
 	get_tree().quit(_fails)
@@ -3579,18 +3580,23 @@ func _test_one_card_look() -> void:
 	RunManager.gold = 500
 	var shop: Control = load("res://scenes/shop/shop_scene.gd").new()
 	var held: Control = shop._create_shop_card(probe, 40)
-	_check("a shop card is CardFace's with its price above",
-		held.find_child("CardDesc", true, false) != null
-		and held.get_child(0) is Label and held.get_child(0).text == "40 gold")
-	var affordable_dim: Color = held.get_child(1).modulate
+	var ticket: Label = held.get_node_or_null("Ticket/Price")
+	_check("a shop card is CardFace's with its price on a ticket under it",
+		held.find_child("CardDesc", true, false) != null and ticket != null and ticket.text == "40 gold")
+	_check("a card the gold can buy is whole, its price in ink",
+		(held.get_meta("face") as Control).modulate.a == 1.0
+		and ticket != null and ticket.get_theme_color("font_color") == StageSkin.c("ink"))
 	held.free()
 	var poor: Control = shop._create_shop_card(probe, 900)
-	_check("a card too dear dims its face, not the price",
-		poor.get_child(1).modulate != affordable_dim and poor.get_child(0).modulate == Color.WHITE)
+	var poor_ticket: Label = poor.get_node_or_null("Ticket/Price")
+	_check("a card too dear fades into the page and its price goes red",
+		(poor.get_meta("face") as Control).modulate.a < 1.0
+		and poor_ticket != null and poor_ticket.get_theme_color("font_color") == StageSkin.c("card_rubric_attack"))
 	poor.free()
 	shop.free()
 
-	# The footer: the four actions are not inside any scroll.
+	# R12 in spirit: Leave Shop is always in reach, on the screen and in no scroll; the stall's page
+	# fits the screen and has no scroll at all.
 	var live: Control = load("res://scenes/shop/shop_scene.gd").new()
 	add_child(live)
 	await get_tree().process_frame
@@ -3606,7 +3612,12 @@ func _test_one_card_look() -> void:
 			in_scroll = true
 		up = up.get_parent()
 	_check("the shop's Leave button is found", leave != null)
-	_check("and sits in a footer outside the scroll", leave != null and not in_scroll)
+	# Its placed rect, not its laid-out one: headless, the title face reports twice its windowed
+	# height (90 for 45 at size 30), so a button sized to its words grows only here.
+	_check("and sits on the screen, outside any scroll", leave != null and not in_scroll
+		and Rect2(0, 0, 1920, 1080).encloses(Rect2(leave.global_position, leave.custom_minimum_size)))
+	_check("the shop's page fits the screen with no scroll",
+		live.find_children("*", "ScrollContainer", true, false).is_empty())
 	live.queue_free()
 
 	var map: Control = load("res://scenes/map/map_scene.gd").new()
@@ -4906,3 +4917,123 @@ func _test_relic_names() -> void:
 		flourish != null and margin != null and flourish.effect == RelicData.RelicEffect.GAIN_DEXTERITY
 		and flourish.value == 3 and flourish.description.find("Poise") != -1
 		and margin.value == 1 and margin.description.find("Poise") != -1)
+
+
+## Packet 2c: the shop as a stall. The upper shelf lays out three cards or four (the balance block
+## brings the fourth) inside its span, a sale keeps the other wares in their places and fades what
+## the gold left cannot buy, a provision bought lands in the pack on the desk, the removal grid holds
+## the whole deck, and every greeting is one line with no em dash.
+func _test_shop_stall() -> void:
+	print("-- The shop's stall --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 424242)
+	var script: GDScript = load("res://scenes/shop/shop_scene.gd")
+	var one_line := true
+	for g in script.SHOPKEEPER_GREETINGS:
+		one_line = one_line and g.find(char(0x2014)) == -1 and g.find(char(10)) == -1
+	_check("every greeting is one line with no em dash", one_line)
+	_check("the second greeting is the approved line", script.SHOPKEEPER_GREETINGS[1]
+		== "Step closer, friend. These shelves hold more than trinkets. They hold the difference between life and death.")
+
+	var card_w: float = CardFace.SIZE.x * script.CARD_SCALE
+	for count in [3, 4]:
+		var fits := true
+		var last_right := -INF
+		for i in count:
+			var left: float = script.card_centre(i, count) - card_w / 2.0
+			fits = fits and left >= script.SHELF_LEFT - 0.5 and left + card_w <= script.SHELF_LEFT + script.SHELF_SPAN + 0.5 \
+				and left - last_right >= 20.0
+			last_right = left + card_w
+		_check("%d cards fit the upper shelf, apart and inside its span" % count, fits)
+
+	RunManager.gold = 120
+	var shop: Control = script.new()
+	add_child(shop)
+	await get_tree().process_frame
+	_check("the shop opens with its three cards on the upper shelf",
+		shop.shop_cards.size() == 3 and shop.card_shelf.get_child_count() == 3)
+	_check("and two artifacts, two provisions and the removal on the lower shelf",
+		shop.slip_shelf.get_child_count() == shop.shop_relics.size() + shop.shop_consumables.size() + 1
+		and shop.slip_shelf.get_child_count() == 5)
+	var keeper_start: float = shop._keeper.region.position.x
+	var idle_by := Time.get_ticks_msec() + 400
+	while shop._keeper.region.position.x == keeper_start and Time.get_ticks_msec() < idle_by:
+		await get_tree().process_frame
+	_check("the keeper idles on his strip", shop._keeper.region.position.x != keeper_start)
+
+	# A fourth offer, as the balance block will roll: laid out on the page, none over another.
+	var extra: CardData = shop.shop_cards[0].duplicate_card()
+	shop.shop_cards.append(extra)
+	shop.card_prices[extra] = 40
+	shop._slot[extra] = 3
+	shop._card_slots = 4
+	shop._refresh_wares()
+	var on_page: bool = shop.card_shelf.get_child_count() == 4
+	var prev_right := -INF
+	for ware in shop.card_shelf.get_children():
+		var r: Rect2 = ware.get_global_rect()
+		on_page = on_page and Rect2(0, 0, 1920, 1080).encloses(r) and r.position.x > prev_right
+		prev_right = r.end.x
+	_check("four cards sit on the shelf, on the page and apart", on_page)
+
+	# A sale: the gold left is a coin short of the cheapest other ware, so every one fades.
+	var first: CardData = shop.shop_cards[0]
+	var cheapest := 1000000
+	for c in shop.shop_cards:
+		if c != first:
+			cheapest = mini(cheapest, shop.card_prices[c])
+	for r in shop.shop_relics:
+		cheapest = mini(cheapest, shop.relic_prices[r])
+	for item in shop.shop_consumables:
+		cheapest = mini(cheapest, shop.consumable_prices[item])
+	cheapest = mini(cheapest, shop._effective_remove_cost())
+	RunManager.gold = shop.card_prices[first] + cheapest - 1
+	var second_pos: Vector2 = shop.card_shelf.get_child(1).position
+	var deck_before := RunManager.current_deck.size()
+	shop._buy_card(first)
+	var all_faded := true
+	for ware in shop.card_shelf.get_children():
+		all_faded = all_faded and (ware.get_meta("face") as Control).modulate.a < 1.0
+	for ware in shop.slip_shelf.get_children():
+		all_faded = all_faded and (ware.get_node("Slip") as Control).modulate.a < 1.0
+	_check("a sale takes the card off the shelf and into the deck",
+		shop.card_shelf.get_child_count() == 3 and RunManager.current_deck.size() == deck_before + 1
+		and RunManager.gold == cheapest - 1)
+	_check("the others keep their places", shop.card_shelf.get_child(0).position == second_pos)
+	_check("and every ware the gold left cannot buy fades", all_faded)
+	_check("the gold on the desk says what is left", shop.gold_label.text == "Gold: %d" % (cheapest - 1))
+
+	# A provision bought goes into the pack on the desk.
+	RunManager.gold = 500
+	var item: ConsumableData = shop.shop_consumables[0]
+	shop._buy_consumable(item)
+	var in_pack := false
+	for b in shop.consumable_bar.find_children("*", "Button", true, false):
+		in_pack = in_pack or b.text.begins_with(item.display_name)
+	_check("a provision bought shows in the pack on the desk", RunManager.consumables.has(item) and in_pack)
+
+	# The removal: the whole deck in the grid; a click removes one, pays, and the page comes back.
+	shop._on_remove_pressed()
+	var grid: Node = shop._removal.find_child("Grid", true, false) if is_instance_valid(shop._removal) else null
+	_check("the removal grid shows the whole deck", grid != null and grid.get_child_count() == RunManager.current_deck.size())
+	var deck_n := RunManager.current_deck.size()
+	var gold_n := RunManager.gold
+	shop._on_remove_card(0)
+	_check("a removal takes one card, pays, and closes the grid",
+		RunManager.current_deck.size() == deck_n - 1 and RunManager.gold == gold_n - shop._effective_remove_cost()
+		and not is_instance_valid(shop._removal))
+	var kind: Label = shop.slip_shelf.get_node("RemoveSlip").find_child("Kind", true, false)
+	_check("and the removal's slip counts the deck again", kind.text == "Your Deck (%d cards)" % RunManager.current_deck.size())
+	shop.queue_free()
+	await get_tree().process_frame
+
+	# A title's discount is said on the desk.
+	RunManager.award_title(&"king_of_camelot")
+	RunManager.equip_title(0, &"king_of_camelot")
+	var kind_shop: Control = script.new()
+	add_child(kind_shop)
+	await get_tree().process_frame
+	var discount: Label = kind_shop.find_child("Discount", true, false)
+	_check("a title's discount is said on the desk", discount != null and discount.text.find("30% off") != -1)
+	kind_shop.queue_free()
+	RunManager.equip_title(0, &"")
+	await get_tree().process_frame

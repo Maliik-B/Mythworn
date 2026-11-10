@@ -9,8 +9,8 @@ extends Control
 ## still for the whole fight. A realm's own loss belongs on its ground and its bodies, never here,
 ## and nothing is ever written on this page or taken off it.
 
-const HEIGHT := 706.0  # the stage's bottom edge, just above the player bar's words
-const GROUND_LINE_Y := 532.0
+const HEIGHT := 706.0  # the fight's stage: its bottom edge, just above the player bar's words
+const GROUND_LINE_Y := 532.0  # and where its ground begins
 const ART_PX := 4  # the world's grid: one sprite pixel at a regular's scale
 const RULING_STEP := 36
 const RULING_MARGIN := 56
@@ -29,6 +29,11 @@ const GROUND_FLARE := 1.3  # how far past its new colour the ground runs before 
 const WEATHER_AT_LEAN := 16
 const WEATHER_AT_POLE := 46
 
+## Where this page's ground begins and where its lower edge is. The fight's by default; another
+## screen standing on the page (the shop) gives its own.
+var ground_y := GROUND_LINE_Y
+var height := HEIGHT
+
 var _ground: ColorRect = null
 var _ground_tween: Tween = null
 var _mood: ColorRect = null
@@ -44,14 +49,16 @@ const WASHES := {
 }
 
 
-func _init() -> void:
+func _init(ground_line := GROUND_LINE_Y, page_bottom := HEIGHT) -> void:
+	ground_y = ground_line
+	height = page_bottom
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_TOP_WIDE)
-	offset_bottom = HEIGHT
+	offset_bottom = height
 
 
 func _ready() -> void:
-	_add_rect(Vector2.ZERO, Vector2(1920, HEIGHT), StageSkin.c("wall"))
+	_add_rect(Vector2.ZERO, Vector2(1920, height), StageSkin.c("wall"))
 	var ruled := Control.new()
 	ruled.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ruled.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -61,10 +68,10 @@ func _ready() -> void:
 	if washes.size() == 2:
 		_add_wash(washes[0], StageSkin.c("wash_far"))
 		_add_wash(washes[1], StageSkin.c("wash_near"))
-	_ground = _add_rect(Vector2(0, GROUND_LINE_Y), Vector2(1920, HEIGHT - GROUND_LINE_Y), StageSkin.c("ground"))
-	_add_rect(Vector2(0, GROUND_LINE_Y), Vector2(1920, ART_PX), StageSkin.c("ground_line"))
-	_mood = _add_rect(Vector2.ZERO, Vector2(1920, HEIGHT), Color(0, 0, 0, 0))
-	_embers = _make_weather(StageSkin.c("ember"), GROUND_LINE_Y, Vector2(0.1, -1.0), 60.0)
+	_ground = _add_rect(Vector2(0, ground_y), Vector2(1920, height - ground_y), StageSkin.c("ground"))
+	_add_rect(Vector2(0, ground_y), Vector2(1920, ART_PX), StageSkin.c("ground_line"))
+	_mood = _add_rect(Vector2.ZERO, Vector2(1920, height), Color(0, 0, 0, 0))
+	_embers = _make_weather(StageSkin.c("ember"), ground_y, Vector2(0.1, -1.0), 60.0)
 	_frost = _make_weather(StageSkin.c("frost"), 0.0, Vector2(-0.15, 1.0), 42.0)
 	var wear := Control.new()
 	wear.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -153,7 +160,7 @@ func _make_weather(color: Color, y: float, direction: Vector2, speed: float) -> 
 ## Darkens the ground around the bodies for this long, then lets it back. They stand in front of it.
 func dim(seconds: float) -> void:
 	if not is_instance_valid(_dim):
-		_dim = _add_rect(Vector2.ZERO, Vector2(1920, HEIGHT), StageSkin.c("dim"))
+		_dim = _add_rect(Vector2.ZERO, Vector2(1920, height), StageSkin.c("dim"))
 	if _dim_tween:
 		_dim_tween.kill()
 	_dim.modulate.a = 0.0
@@ -182,7 +189,7 @@ func _add_wash(path: String, color: Color) -> void:
 	wash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	wash.modulate = color
 	wash.size = wash.texture.get_size() * ART_PX
-	wash.position = Vector2(0, GROUND_LINE_Y + ART_PX - wash.size.y)
+	wash.position = Vector2(0, ground_y + ART_PX - wash.size.y)
 	add_child(wash)
 
 
@@ -192,7 +199,7 @@ func _draw_wear(canvas: Control) -> void:
 	if color.a <= 0.0:
 		return
 	for piece in WORN_EDGE:
-		canvas.draw_rect(Rect2(piece[0], HEIGHT - piece[2], piece[1] - piece[0], piece[2]), color)
+		canvas.draw_rect(Rect2(piece[0], height - piece[2], piece[1] - piece[0], piece[2]), color)
 	for step in WORN_CORNER:
 		canvas.draw_rect(Rect2(step[0], step[1], 1920 - step[0], step[2]), color)
 
@@ -203,8 +210,8 @@ func _draw_ruling(canvas: Control) -> void:
 	if color.a <= 0.0:
 		return
 	var y := RULING_STEP
-	while y < GROUND_LINE_Y:
+	while y < ground_y:
 		canvas.draw_rect(Rect2(RULING_MARGIN, y, 1920 - 2 * RULING_MARGIN, ART_PX), color)
 		y += RULING_STEP
-	canvas.draw_rect(Rect2(RULING_MARGIN, 0, ART_PX, GROUND_LINE_Y), color)
-	canvas.draw_rect(Rect2(1920 - RULING_MARGIN - ART_PX, 0, ART_PX, GROUND_LINE_Y), color)
+	canvas.draw_rect(Rect2(RULING_MARGIN, 0, ART_PX, ground_y), color)
+	canvas.draw_rect(Rect2(1920 - RULING_MARGIN - ART_PX, 0, ART_PX, ground_y), color)
