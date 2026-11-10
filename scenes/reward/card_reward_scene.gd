@@ -7,6 +7,7 @@ extends Control
 var card_choices: Array[CardData] = []
 var card_panels: Dictionary = {} # CardData -> PanelContainer
 var gold_earned: int = 0
+var _inspect: Control
 
 
 func _ready() -> void:
@@ -97,7 +98,7 @@ void fragment() {
 	var tier = RunManager.get_passion_tier()
 	var tier_name = PassionState.tier_name(tier)
 	var passion_value := RunManager.passion.current_value if RunManager.passion else 0
-	subtitle.text = "Choose a card — Passion: %d (%s)" % [passion_value, tier_name]
+	subtitle.text = "Choose a card. Passion: %d (%s)" % [passion_value, tier_name]
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 20)
 	subtitle.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
@@ -159,174 +160,15 @@ void fragment() {
 # ============================================================
 
 func _create_card_panel(card: CardData) -> PanelContainer:
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(220, 300)
-
-	var style = StyleBoxFlat.new()
-	style.set_corner_radius_all(10)
-	style.set_border_width_all(3)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			style.bg_color = Color(0.3, 0.12, 0.1)
-			style.border_color = Color(0.9, 0.25, 0.2)
-		CardData.CardType.SKILL:
-			style.bg_color = Color(0.1, 0.14, 0.3)
-			style.border_color = Color(0.25, 0.45, 0.9)
-		CardData.CardType.POWER:
-			style.bg_color = Color(0.28, 0.24, 0.08)
-			style.border_color = Color(0.9, 0.75, 0.15)
-
-	# Upgraded card green border tint
-	if card.upgraded:
-		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
-
-	panel.add_theme_stylebox_override("panel", style)
-
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	panel.add_child(vbox)
-
-	# Energy cost in circle ornament
-	var cost_container = PanelContainer.new()
-	cost_container.custom_minimum_size = Vector2(44, 44)
-	var cost_style = StyleBoxFlat.new()
-	cost_style.set_corner_radius_all(22)
-	cost_style.bg_color = Color(0.18, 0.14, 0.06)
-	cost_style.set_border_width_all(2)
-	cost_style.border_color = Color(0.95, 0.8, 0.2)
-	cost_style.content_margin_left = 6
-	cost_style.content_margin_right = 6
-	cost_style.content_margin_top = 4
-	cost_style.content_margin_bottom = 4
-	cost_container.add_theme_stylebox_override("panel", cost_style)
-	var cost_lbl = Label.new()
-	cost_lbl.text = card.cost_label()
-	cost_lbl.add_theme_font_size_override("font_size", 26)
-	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
-	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cost_container.add_child(cost_lbl)
-	vbox.add_child(cost_container)
-
-	# Card name
-	var name_lbl = Label.new()
-	name_lbl.text = card.card_name
-	name_lbl.add_theme_font_size_override("font_size", 20)
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_lbl)
-
-	# Type + Rarity
-	var type_names = ["Attack", "Skill", "Power"]
-	var rarity_names = ["Starter", "Common", "Uncommon", "Rare"]
-	var rarity_colors = [
-		Color(0.5, 0.5, 0.5),
-		Color(0.6, 0.6, 0.6),
-		Color(0.3, 0.7, 0.9),
-		Color(0.95, 0.8, 0.2),
-	]
-	var type_lbl = Label.new()
-	type_lbl.text = "%s - %s" % [type_names[card.card_type], rarity_names[card.rarity]]
-	type_lbl.add_theme_font_size_override("font_size", 14)
-	type_lbl.add_theme_color_override("font_color", rarity_colors[card.rarity])
-	type_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(type_lbl)
-
-	# Personality tag
-	if card.personality != CardData.PersonalityType.NEUTRAL:
-		var pers_lbl = Label.new()
-		pers_lbl.text = _get_personality_label(card.personality)
-		pers_lbl.add_theme_font_size_override("font_size", 13)
-		pers_lbl.add_theme_color_override("font_color", _get_personality_color(card.personality))
-		pers_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(pers_lbl)
-
-	# Card art area
-	var art_frame = PanelContainer.new()
-	art_frame.custom_minimum_size = Vector2(0, 55)
-	var art_style = StyleBoxFlat.new()
-	art_style.set_corner_radius_all(4)
-	art_style.content_margin_top = 6
-	art_style.content_margin_bottom = 6
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			art_style.bg_color = Color(0.4, 0.1, 0.08)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.7, 0.18, 0.1, 0.5)
-		CardData.CardType.SKILL:
-			art_style.bg_color = Color(0.08, 0.15, 0.35)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.15, 0.28, 0.65, 0.5)
-		CardData.CardType.POWER:
-			art_style.bg_color = Color(0.35, 0.28, 0.06)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.65, 0.5, 0.1, 0.5)
-	art_frame.add_theme_stylebox_override("panel", art_style)
-	var icon_file = CardVisuals.icon_path(card.card_name)
-	if icon_file != "":
-		var art_icon = TextureRect.new()
-		art_icon.texture = load(icon_file)
-		art_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		art_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		art_icon.custom_minimum_size = Vector2(44, 44)
-		art_frame.add_child(art_icon)
-	else:
-		var art_lbl = Label.new()
-		match card.card_type:
-			CardData.CardType.ATTACK: art_lbl.text = "⚔"
-			CardData.CardType.SKILL: art_lbl.text = "◆"
-			CardData.CardType.POWER: art_lbl.text = "★"
-		art_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		art_lbl.add_theme_font_size_override("font_size", 28)
-		art_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.3))
-		art_frame.add_child(art_lbl)
-	vbox.add_child(art_frame)
-
-	# Spacer
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(spacer)
-
-	# Description
-	var desc_lbl = Label.new()
-	desc_lbl.text = card.get_generated_description()
-	desc_lbl.add_theme_font_size_override("font_size", 16)
-	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(desc_lbl)
-
-	# Optional flavor text — players see this when choosing rewards, so it
-	# carries the most narrative weight here.
-	if card.flavor_text != "":
-		var flavor_lbl = Label.new()
-		flavor_lbl.text = card.flavor_text
-		flavor_lbl.add_theme_font_size_override("font_size", 12)
-		flavor_lbl.add_theme_color_override("font_color", Color(0.62, 0.58, 0.52))
-		flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		vbox.add_child(flavor_lbl)
-
-	# Exhaust tag
-	if card.exhaust:
-		var ex_lbl = Label.new()
-		ex_lbl.text = "Exhaust"
-		ex_lbl.add_theme_font_size_override("font_size", 13)
-		ex_lbl.add_theme_color_override("font_color", Color(0.7, 0.4, 0.4))
-		ex_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(ex_lbl)
+	var panel := CardFace.build(card, null, CardSigil.build(card))
 
 	# Make all children pass clicks through to the panel
-	_ignore_mouse_recursive(vbox)
+	_ignore_mouse_recursive(panel.get_child(0))
 
-	# Click handler
+	# Click handler: a left click takes the card, a right click opens it enlarged.
 	panel.gui_input.connect(_on_card_input.bind(card))
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	panel.pivot_offset = Vector2(110, 150)
 
 	# Hover animation
 	panel.mouse_entered.connect(func():
@@ -341,6 +183,7 @@ func _create_card_panel(card: CardData) -> PanelContainer:
 	return panel
 
 
+
 func _ignore_mouse_recursive(control: Control) -> void:
 	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for child in control.get_children():
@@ -349,10 +192,31 @@ func _ignore_mouse_recursive(control: Control) -> void:
 
 
 func _on_card_input(event: InputEvent, card: CardData) -> void:
-	if not (event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT):
+	if not (event is InputEventMouseButton and event.pressed):
 		return
-	_pick_card(card)
+	if event.button_index == MOUSE_BUTTON_RIGHT:
+		_open_inspect(card)
+	elif event.button_index == MOUSE_BUTTON_LEFT:
+		_pick_card(card)
+
+
+## The card enlarged, with its rarity, flavor and keyword reminders; any click closes it.
+func _open_inspect(card: CardData) -> void:
+	_close_inspect()
+	_inspect = CardInspect.build(card, CardFace.build(card, null, CardSigil.build(card)), _close_inspect)
+	add_child(_inspect)
+
+
+func _close_inspect() -> void:
+	if is_instance_valid(_inspect):
+		_inspect.queue_free()
+	_inspect = null
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and is_instance_valid(_inspect):
+		_close_inspect()
+		get_viewport().set_input_as_handled()
 
 
 func _pick_card(card: CardData) -> void:
@@ -364,23 +228,6 @@ func _pick_card(card: CardData) -> void:
 func _on_skip() -> void:
 	AudioManager.play_sfx("button_click")
 	_return_to_map()
-
-
-func _get_personality_label(pers: CardData.PersonalityType) -> String:
-	if RunManager.current_character:
-		if pers == CardData.PersonalityType.PRIMARY:
-			return RunManager.current_character.primary_personality
-		if pers == CardData.PersonalityType.SECONDARY:
-			return RunManager.current_character.secondary_personality
-	return "Primary" if pers == CardData.PersonalityType.PRIMARY else "Secondary"
-
-
-func _get_personality_color(pers: CardData.PersonalityType) -> Color:
-	if pers == CardData.PersonalityType.PRIMARY:
-		return Color(0.9, 0.5, 0.2)
-	if pers == CardData.PersonalityType.SECONDARY:
-		return Color(0.4, 0.6, 0.9)
-	return Color(0.6, 0.6, 0.6)
 
 
 func _return_to_map() -> void:

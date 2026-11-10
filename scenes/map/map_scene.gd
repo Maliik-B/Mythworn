@@ -22,6 +22,10 @@ const NODE_SIZE := 50
 const QUEST_TOAST_SIZE := 44
 const QUEST_TOAST_OUTLINE := 12
 
+# The deck grid draws each card's face at this fraction of its size, so a deck fits a few rows.
+const DECK_FACE_SCALE := 0.8
+const DECK_GRID_COLUMNS := 9
+
 # UI references
 var scroll_container: ScrollContainer
 var map_canvas: Control
@@ -1299,68 +1303,30 @@ func _show_deck_popup() -> void:
 	)
 
 	var grid = GridContainer.new()
-	grid.columns = 5
+	grid.columns = DECK_GRID_COLUMNS
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)
 	content.add_child(grid)
 
 	for card in sorted_deck:
-		var panel = PanelContainer.new()
-		panel.custom_minimum_size = Vector2(180, 120)
-		var style = StyleBoxFlat.new()
-		style.set_corner_radius_all(6)
-		style.set_border_width_all(2)
-		style.content_margin_left = 8
-		style.content_margin_right = 8
-		style.content_margin_top = 6
-		style.content_margin_bottom = 6
-		match card.card_type:
-			CardData.CardType.ATTACK:
-				style.bg_color = Color(0.28, 0.1, 0.08)
-				style.border_color = Color(0.8, 0.2, 0.18)
-			CardData.CardType.SKILL:
-				style.bg_color = Color(0.08, 0.12, 0.28)
-				style.border_color = Color(0.2, 0.38, 0.8)
-			CardData.CardType.POWER:
-				style.bg_color = Color(0.28, 0.24, 0.08)
-				style.border_color = Color(0.8, 0.65, 0.15)
-		# Upgraded card green border tint
-		if card.upgraded:
-			style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
-		panel.add_theme_stylebox_override("panel", style)
+		# The face is drawn at its own size and scaled, in a holder that has the room it will fill
+		# (a container ignores a child's scale).
+		var holder := Control.new()
+		holder.custom_minimum_size = CardFace.SIZE * DECK_FACE_SCALE
+		var face := CardFace.build(card, null, CardSigil.build(card))
+		face.pivot_offset = Vector2.ZERO
+		face.scale = Vector2(DECK_FACE_SCALE, DECK_FACE_SCALE)
+		face.position = Vector2.ZERO
+		_ignore_mouse_recursive(face)
+		holder.add_child(face)
 
-		var vb = VBoxContainer.new()
-		vb.add_theme_constant_override("separation", 2)
-		panel.add_child(vb)
+		# Click a card to blow it up to full size with an upgrade toggle.
+		holder.mouse_filter = Control.MOUSE_FILTER_STOP
+		holder.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		holder.gui_input.connect(_on_deck_card_clicked.bind(card))
 
-		var name_lbl = Label.new()
-		name_lbl.text = "[%s] %s" % [card.cost_label(), card.card_name]
-		name_lbl.add_theme_font_size_override("font_size", 15)
-		name_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.4))
-		vb.add_child(name_lbl)
-
-		var type_names = ["Attack", "Skill", "Power"]
-		var rarity_names = ["Starter", "Common", "Uncommon", "Rare"]
-		var type_lbl = Label.new()
-		type_lbl.text = "%s - %s" % [type_names[card.card_type], rarity_names[card.rarity]]
-		type_lbl.add_theme_font_size_override("font_size", 11)
-		type_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
-		vb.add_child(type_lbl)
-
-		var desc_lbl = Label.new()
-		desc_lbl.text = card.get_generated_description()
-		desc_lbl.add_theme_font_size_override("font_size", 12)
-		desc_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		vb.add_child(desc_lbl)
-
-		# Click a mini-card to blow it up to full size with an upgrade toggle.
-		_ignore_mouse_recursive(vb)
-		panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		panel.gui_input.connect(_on_deck_card_clicked.bind(card))
-
-		grid.add_child(panel)
+		grid.add_child(holder)
 
 	add_child(popup_overlay)
 
@@ -1417,13 +1383,11 @@ func _show_card_detail(card: CardData, show_upgrade: bool = false) -> void:
 
 	var is_upgraded := card.upgraded
 	var display_card := card
-	var green := is_upgraded
 	if not is_upgraded and show_upgrade:
 		display_card = card.duplicate_card()
 		display_card.upgrade_card()
-		green = true
 
-	vbox.add_child(_render_full_card(display_card, green))
+	vbox.add_child(_render_full_card(display_card))
 
 	# State caption under the card.
 	var state = Label.new()
@@ -1465,99 +1429,30 @@ func _close_card_detail() -> void:
 		card_detail_overlay = null
 
 
-## Full-size, legible render of a single card for the deck detail view. Mirrors
-## the in-combat card layout (cost badge, name, type/rarity, art glyph, text,
-## flavor). `green_tint` marks an upgraded / upgrade-preview card.
-func _render_full_card(card: CardData, green_tint: bool) -> PanelContainer:
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(240, 340)
+## The deck detail view's card: the face enlarged, with the inspect notes beside it (rarity, flavor
+## and a reminder for each keyword), the way a right-click shows it elsewhere. An upgraded or
+## upgrade-previewed card carries its green edge from the face itself.
+func _render_full_card(card: CardData) -> Control:
+	var card_size: Vector2 = CardFace.SIZE * CardInspect.SCALE
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(CardInspect.GAP))
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 
-	var style = StyleBoxFlat.new()
-	style.set_corner_radius_all(10)
-	style.set_border_width_all(3)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			style.bg_color = Color(0.28, 0.1, 0.08)
-			style.border_color = Color(0.8, 0.2, 0.18)
-		CardData.CardType.SKILL:
-			style.bg_color = Color(0.08, 0.12, 0.28)
-			style.border_color = Color(0.2, 0.38, 0.8)
-		CardData.CardType.POWER:
-			style.bg_color = Color(0.28, 0.24, 0.08)
-			style.border_color = Color(0.8, 0.65, 0.15)
-	if green_tint:
-		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.55)
-	panel.add_theme_stylebox_override("panel", style)
+	var holder := Control.new()
+	holder.custom_minimum_size = card_size
+	var face := CardFace.build(card, null, CardSigil.build(card))
+	face.pivot_offset = Vector2.ZERO
+	face.scale = Vector2(CardInspect.SCALE, CardInspect.SCALE)
+	face.position = Vector2.ZERO
+	holder.add_child(face)
+	row.add_child(holder)
 
-	var vb = VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 8)
-	panel.add_child(vb)
-
-	var cost_lbl = Label.new()
-	cost_lbl.text = "%s ◆" % card.cost_label()
-	cost_lbl.add_theme_font_size_override("font_size", 22)
-	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
-	vb.add_child(cost_lbl)
-
-	var name_lbl = Label.new()
-	name_lbl.text = card.card_name
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_lbl.add_theme_font_size_override("font_size", 24)
-	name_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.4))
-	vb.add_child(name_lbl)
-
-	var type_names = ["Attack", "Skill", "Power"]
-	var rarity_names = ["Starter", "Common", "Uncommon", "Rare"]
-	var type_lbl = Label.new()
-	type_lbl.text = "%s - %s" % [type_names[card.card_type], rarity_names[card.rarity]]
-	type_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	type_lbl.add_theme_font_size_override("font_size", 13)
-	type_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
-	vb.add_child(type_lbl)
-
-	# Art glyph frame — type-colored, matching the combat placeholder language.
-	var art_frame = PanelContainer.new()
-	art_frame.custom_minimum_size = Vector2(0, 90)
-	var art_style = StyleBoxFlat.new()
-	art_style.set_corner_radius_all(6)
-	art_style.bg_color = style.bg_color.lightened(0.06)
-	art_style.set_border_width_all(1)
-	art_style.border_color = style.border_color.darkened(0.2)
-	art_frame.add_theme_stylebox_override("panel", art_style)
-	var art_lbl = Label.new()
-	match card.card_type:
-		CardData.CardType.ATTACK: art_lbl.text = "⚔"
-		CardData.CardType.SKILL: art_lbl.text = "◆"
-		CardData.CardType.POWER: art_lbl.text = "★"
-	art_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	art_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	art_lbl.add_theme_font_size_override("font_size", 40)
-	art_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.3))
-	art_frame.add_child(art_lbl)
-	vb.add_child(art_frame)
-
-	var desc_lbl = Label.new()
-	desc_lbl.text = card.get_generated_description()
-	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_lbl.add_theme_font_size_override("font_size", 16)
-	desc_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vb.add_child(desc_lbl)
-
-	if card.flavor_text != "":
-		var flavor_lbl = Label.new()
-		flavor_lbl.text = card.flavor_text
-		flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		flavor_lbl.add_theme_font_size_override("font_size", 12)
-		flavor_lbl.add_theme_color_override("font_color", Color(0.62, 0.58, 0.52))
-		flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		vb.add_child(flavor_lbl)
-
-	return panel
+	# The notes hang from the card's top edge, in a column the card's height.
+	var side := VBoxContainer.new()
+	side.custom_minimum_size = Vector2(CardInspect.NOTES_W, card_size.y)
+	side.add_child(CardInspect.notes(card))
+	row.add_child(side)
+	return row
 
 
 func _create_popup_panel(title: String) -> PanelContainer:

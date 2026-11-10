@@ -349,7 +349,7 @@ static func _build_generic_pool() -> Array[CardData]:
 	# pool's lane == lean: a Water-lane card leans + (→ PRIMARY / ≈), a Physical-lane card leans
 	# − (→ SECONDARY / ⚔). The flat-center picks (0 lean: Bracing Blow, Second Wind, the powers)
 	# stay school-less = no symbol. These cards are personality-NEUTRAL, so the symbol renders
-	# FLAT (identity only, no zone glow/coin) — see combat_scene._make_resonance_sigil.
+	# FLAT (identity only, no zone glow/coin) — see CardSigil.build.
 	for c in pool:
 		_set_school_from_lean(c)
 

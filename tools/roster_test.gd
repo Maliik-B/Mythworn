@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_consumables()
 	_test_consumable_ui()
 	_test_hover_note()
+	await _test_one_card_look()
 	_test_pets()
 	_test_master_of_game()
 	_test_map_node_looks()
@@ -3478,6 +3479,49 @@ func _test_hover_note() -> void:
 	note._input(click)
 	_check("a click on a button does not pin, so the button still gets it", not note.is_pinned())
 	host.free()
+
+
+## R8 and R12: the reward screen, the shop and the deck draw CardFace with CardSigil's coin, the
+## shop's actions sit outside its scroll, and the detail view carries the inspect notes.
+func _test_one_card_look() -> void:
+	var probe := _neutral_attack("Probe", 1, 6)
+	_check("a card with no school has no coin", CardSigil.build(probe) == null)
+	probe.school = CardData.PersonalityType.PRIMARY
+	var coin := CardSigil.build(probe)
+	_check("a card with a school wears a coin", coin != null)
+	if coin:
+		coin.free()
+	var sigil_label := CardSigil.label(CardData.PersonalityType.NEGATIVE)
+	_check("the coin names a curse's pole", sigil_label == "Curse")
+
+	var reward: Control = load("res://scenes/reward/card_reward_scene.gd").new()
+	var reward_card: Control = reward._create_card_panel(probe)
+	_check("a reward card is CardFace's", reward_card.find_child("CardDesc", true, false) != null)
+	_check("and CardFace's size", reward_card.custom_minimum_size == CardFace.SIZE)
+	reward_card.free()
+	reward.free()
+
+	RunManager.gold = 500
+	var shop: Control = load("res://scenes/shop/shop_scene.gd").new()
+	var held: Control = shop._create_shop_card(probe, 40)
+	_check("a shop card is CardFace's with its price above",
+		held.find_child("CardDesc", true, false) != null
+		and held.get_child(0) is Label and held.get_child(0).text == "40 gold")
+	var affordable_dim: Color = held.get_child(1).modulate
+	held.free()
+	var poor: Control = shop._create_shop_card(probe, 900)
+	_check("a card too dear dims its face, not the price",
+		poor.get_child(1).modulate != affordable_dim and poor.get_child(0).modulate == Color.WHITE)
+	poor.free()
+	shop.free()
+
+	var map: Control = load("res://scenes/map/map_scene.gd").new()
+	var detail: Control = map._render_full_card(probe)
+	_check("the deck's detail view is the face with the inspect notes beside it",
+		detail.find_child("CardDesc", true, false) != null and detail.get_child_count() == 2)
+	detail.free()
+	map.free()
+	RunManager.gold = 0
 
 
 ## The pack's UI logic without rendering: the bar's reasons and uses, and the full-pack prompt.

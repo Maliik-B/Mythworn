@@ -53,7 +53,7 @@ const NUMBER_GLOW := preload("res://assets/ui/card_number_glow.tres")
 
 ## A card's face. `source` is the player's stats in combat, so its numbers are what a hit will land
 ## for; null outside combat, which shows the printed numbers. `sigil` is the school coin, built by
-## the caller because the live Passion zone it reflects belongs to combat.
+## the caller with CardSigil.build, since the fight keeps hold of its halo to relight it.
 static func build(card: CardData, source: CombatantStats, sigil: Control) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = SIZE

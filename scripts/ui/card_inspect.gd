@@ -19,8 +19,8 @@ const BODY_SIZE := 20
 const FLAVOR_SIZE := 19
 
 
-## `face` is CardFace.build's panel for `card`, made by the caller because the school coin on it
-## belongs to combat. The overlay owns it from here.
+## `face` is CardFace.build's panel for `card`, made by the caller with its CardSigil coin. The
+## overlay owns it from here.
 static func build(card: CardData, face: PanelContainer, on_close: Callable) -> Control:
 	var overlay := Control.new()
 	overlay.name = "CardInspect"
@@ -38,7 +38,7 @@ static func build(card: CardData, face: PanelContainer, on_close: Callable) -> C
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(dim)
 
-	var notes := _notes(card)
+	var side_notes := notes(card)
 	var card_size: Vector2 = CardFace.SIZE * SCALE
 	var group := HBoxContainer.new()
 	group.add_theme_constant_override("separation", int(GAP))
@@ -65,13 +65,13 @@ static func build(card: CardData, face: PanelContainer, on_close: Callable) -> C
 	side.custom_minimum_size = Vector2(NOTES_W, card_size.y)
 	side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	side.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	side.add_child(notes)
+	side.add_child(side_notes)
 	group.add_child(side)
 	return overlay
 
 
 ## The side panel: the rarity always, then the flavor line and each keyword the card has.
-static func _notes(card: CardData) -> Control:
+static func notes(card: CardData) -> Control:
 	var key: String = CardFace._colour_key(card)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size.x = NOTES_W

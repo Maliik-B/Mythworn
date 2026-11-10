@@ -9,30 +9,6 @@ const CONSUMABLE_COUNT := 2
 ## Stacking cap for shop discounts from titles + future relics. See § Titles in GAME_DESIGN.md.
 const SHOP_DISCOUNT_CAP := 50
 
-# Card icon mapping (shared with combat/reward scenes)
-const _CR = "res://assets/sprites/icons/clockwork_raven/Clockwork raven - Weapons and Potions - Free pack/individual_64x64/"
-const _ITV = "res://assets/sprites/icons/in_the_void/individual/"
-const _CUS = "res://assets/sprites/icons/custom/"
-const CARD_ICONS = {
-	"Strike": _CR + "tile000.png", "Stagger": _CR + "tile025.png",
-	"Noxious Strike": _CUS + "noxious_strike.png", "Wide Arc": _CR + "tile004.png",
-	# Outpouring (Water starter) + the Water pool use the neutral card frame until Water art lands.
-	"Paired Strikes": _CUS + "twin_strike.png",
-	"Sweep": _CR + "tile011.png",
-	"Havoc": _CR + "tile041.png", "Poison Fang": _CUS + "poison_fang.png",
-	"Armor Break": _CR + "tile016.png",
-	"Execute": _CR + "tile012.png",
-	"Power Slash": _CR + "tile006.png", "Quick Jab": _CR + "tile005.png",
-	"Rampage": _CR + "tile050.png", "Devastating Blow": _CR + "tile030.png",
-	"Defend": _ITV + "shield.png", "Meditate": _CUS + "meditate.png",
-	"Bracing Blow": _ITV + "gem_blue.png", "Shield Wall": _ITV + "gauntlet.png",
-	"Dark Pact": _CUS + "dark_pact.png", "Inner Fire": _CUS + "inner_fire.png",
-	"Weaken": _ITV + "scroll_red.png", "Second Wind": _CR + "tile083.png",
-	"Phantom Guard": _CUS + "apparition.png",
-	"Brace": _ITV + "chestplate.png", "Iron Curtain": _CUS + "iron_curtain.png",
-	"Riposte": _CR + "tile009.png", "Bulwark": _ITV + "shield.png",
-}
-
 # Shopkeeper greetings — rotated randomly
 const SHOPKEEPER_GREETINGS = [
 	"Ah, a traveller! Come, browse my wares...\nEverything has a price, but nothing costs\nmore than leaving empty-handed.",
@@ -58,6 +34,7 @@ var info_label: Label
 var deck_section: VBoxContainer
 var deck_visible := false
 var _main_vbox: VBoxContainer
+var _inspect: Control
 
 
 func _ready() -> void:
@@ -208,10 +185,11 @@ void fragment() {
 
 	var scroll = ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = 300
+	scroll.custom_minimum_size.y = 340
 	_main_vbox.add_child(scroll)
 
 	card_row = HBoxContainer.new()
+	card_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # so the centring has the width to centre in
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_row.add_theme_constant_override("separation", 20)
 	scroll.add_child(card_row)
@@ -450,198 +428,43 @@ func _refresh_shop_cards() -> void:
 		card_row.add_child(panel)
 
 
-func _create_shop_card(card: CardData, price: int) -> PanelContainer:
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(190, 290)
-
-	var style = StyleBoxFlat.new()
-	style.set_corner_radius_all(10)
-	style.set_border_width_all(3)
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	style.content_margin_top = 10
-	style.content_margin_bottom = 10
-
+func _create_shop_card(card: CardData, price: int) -> Control:
 	var can_afford = RunManager.gold >= price
 
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			style.bg_color = Color(0.3, 0.12, 0.1)
-			style.border_color = Color(0.9, 0.25, 0.2)
-		CardData.CardType.SKILL:
-			style.bg_color = Color(0.1, 0.14, 0.3)
-			style.border_color = Color(0.25, 0.45, 0.9)
-		CardData.CardType.POWER:
-			style.bg_color = Color(0.28, 0.24, 0.08)
-			style.border_color = Color(0.9, 0.75, 0.15)
+	# The face is the card as the hand draws it; the price sits above it, outside the face.
+	var holder := VBoxContainer.new()
+	holder.add_theme_constant_override("separation", 6)
 
-	if card.upgraded:
-		style.border_color = style.border_color.lerp(Color(0.3, 0.9, 0.3), 0.5)
-
-	panel.add_theme_stylebox_override("panel", style)
-
-	if not can_afford:
-		panel.modulate = Color(0.5, 0.5, 0.5)
-
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 3)
-	panel.add_child(vbox)
-
-	# ── Price tag (top, prominent) ──
-	var price_row = HBoxContainer.new()
-	price_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(price_row)
-
-	var coin_lbl = Label.new()
-	coin_lbl.text = "%d gold" % price
-	coin_lbl.add_theme_font_size_override("font_size", 15)
-	coin_lbl.add_theme_color_override("font_color",
+	var price_lbl = Label.new()
+	price_lbl.text = "%d gold" % price
+	price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	price_lbl.add_theme_font_size_override("font_size", 18)
+	price_lbl.add_theme_color_override("font_color",
 		Color(0.95, 0.85, 0.3) if can_afford else Color(0.7, 0.3, 0.3))
-	price_row.add_child(coin_lbl)
+	holder.add_child(price_lbl)
 
-	# ── Energy cost ornament ──
-	var cost_container = PanelContainer.new()
-	cost_container.custom_minimum_size = Vector2(34, 34)
-	var cost_style = StyleBoxFlat.new()
-	cost_style.set_corner_radius_all(17)
-	cost_style.bg_color = Color(0.18, 0.14, 0.06)
-	cost_style.set_border_width_all(2)
-	cost_style.border_color = Color(0.95, 0.8, 0.2)
-	cost_style.content_margin_left = 4
-	cost_style.content_margin_right = 4
-	cost_style.content_margin_top = 2
-	cost_style.content_margin_bottom = 2
-	cost_container.add_theme_stylebox_override("panel", cost_style)
-	var cost_lbl = Label.new()
-	cost_lbl.text = card.cost_label()
-	cost_lbl.add_theme_font_size_override("font_size", 20)
-	cost_lbl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.3))
-	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cost_container.add_child(cost_lbl)
-	vbox.add_child(cost_container)
+	var face := CardFace.build(card, null, CardSigil.build(card))
+	if not can_afford:
+		face.modulate = Color(0.5, 0.5, 0.5)
+	holder.add_child(face)
 
-	# ── Card name ──
-	var name_lbl = Label.new()
-	name_lbl.text = card.card_name
-	name_lbl.add_theme_font_size_override("font_size", 16)
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(name_lbl)
-
-	# ── Type + Rarity ──
-	var type_names = ["Attack", "Skill", "Power"]
-	var rarity_names = ["Starter", "Common", "Uncommon", "Rare"]
-	var rarity_colors = [
-		Color(0.5, 0.5, 0.5), Color(0.55, 0.55, 0.55),
-		Color(0.3, 0.7, 0.9), Color(0.95, 0.8, 0.2),
-	]
-	var type_lbl = Label.new()
-	type_lbl.text = "%s - %s" % [type_names[card.card_type], rarity_names[card.rarity]]
-	type_lbl.add_theme_font_size_override("font_size", 11)
-	type_lbl.add_theme_color_override("font_color", rarity_colors[card.rarity])
-	type_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(type_lbl)
-
-	# ── Personality tag ──
-	if card.personality != CardData.PersonalityType.NEUTRAL:
-		var pers_lbl = Label.new()
-		pers_lbl.text = _get_personality_label(card.personality)
-		pers_lbl.add_theme_font_size_override("font_size", 11)
-		pers_lbl.add_theme_color_override("font_color", _get_personality_color(card.personality))
-		pers_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(pers_lbl)
-
-	# ── Card art frame with icon ──
-	var art_frame = PanelContainer.new()
-	art_frame.custom_minimum_size = Vector2(0, 42)
-	var art_style = StyleBoxFlat.new()
-	art_style.set_corner_radius_all(4)
-	art_style.content_margin_top = 4
-	art_style.content_margin_bottom = 4
-	match card.card_type:
-		CardData.CardType.ATTACK:
-			art_style.bg_color = Color(0.4, 0.1, 0.08)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.7, 0.18, 0.1, 0.5)
-		CardData.CardType.SKILL:
-			art_style.bg_color = Color(0.08, 0.15, 0.35)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.15, 0.28, 0.65, 0.5)
-		CardData.CardType.POWER:
-			art_style.bg_color = Color(0.35, 0.28, 0.06)
-			art_style.set_border_width_all(1)
-			art_style.border_color = Color(0.65, 0.5, 0.1, 0.5)
-	art_frame.add_theme_stylebox_override("panel", art_style)
-
-	var icon_file = CARD_ICONS.get(card.card_name, "")
-	if icon_file != "":
-		var art_icon = TextureRect.new()
-		art_icon.texture = load(icon_file)
-		art_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		art_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		art_icon.custom_minimum_size = Vector2(34, 34)
-		art_frame.add_child(art_icon)
-	else:
-		var art_lbl = Label.new()
-		match card.card_type:
-			CardData.CardType.ATTACK: art_lbl.text = "?"
-			CardData.CardType.SKILL: art_lbl.text = "?"
-			CardData.CardType.POWER: art_lbl.text = "?"
-		art_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		art_lbl.add_theme_font_size_override("font_size", 22)
-		art_lbl.add_theme_color_override("font_color", style.border_color.lightened(0.3))
-		art_frame.add_child(art_lbl)
-	vbox.add_child(art_frame)
-
-	# ── Spacer ──
-	var spacer = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(spacer)
-
-	# ── Description ──
-	var desc_lbl = Label.new()
-	desc_lbl.text = card.get_generated_description()
-	desc_lbl.add_theme_font_size_override("font_size", 13)
-	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	vbox.add_child(desc_lbl)
-
-	# ── Optional flavor text ──
-	if card.flavor_text != "":
-		var flavor_lbl = Label.new()
-		flavor_lbl.text = card.flavor_text
-		flavor_lbl.add_theme_font_size_override("font_size", 10)
-		flavor_lbl.add_theme_color_override("font_color", Color(0.6, 0.56, 0.5))
-		flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-		vbox.add_child(flavor_lbl)
-
-	# ── Exhaust tag ──
-	if card.exhaust:
-		var ex_lbl = Label.new()
-		ex_lbl.text = "Exhaust"
-		ex_lbl.add_theme_font_size_override("font_size", 11)
-		ex_lbl.add_theme_color_override("font_color", Color(0.7, 0.4, 0.4))
-		ex_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vbox.add_child(ex_lbl)
-
-	_ignore_mouse_recursive(vbox)
-
-	panel.gui_input.connect(_on_shop_card_input.bind(card))
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.pivot_offset = Vector2(95, 145)
+	_ignore_mouse_recursive(holder)
+	holder.mouse_filter = Control.MOUSE_FILTER_STOP
+	holder.gui_input.connect(_on_shop_card_input.bind(card))
 	if can_afford:
-		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		panel.mouse_entered.connect(func():
+		holder.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# The scale is the face's own (its pivot is its middle), so the price stays put.
+	holder.mouse_entered.connect(func():
+		if can_afford:
 			var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-			t.tween_property(panel, "scale", Vector2(1.06, 1.06), 0.12)
-		)
-		panel.mouse_exited.connect(func():
-			var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-			t.tween_property(panel, "scale", Vector2.ONE, 0.12)
-		)
+			t.tween_property(face, "scale", Vector2(1.06, 1.06), 0.12)
+	)
+	holder.mouse_exited.connect(func():
+		var t = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		t.tween_property(face, "scale", Vector2.ONE, 0.12)
+	)
 
-	return panel
+	return holder
 
 
 # ============================================================
@@ -649,8 +472,12 @@ func _create_shop_card(card: CardData, price: int) -> PanelContainer:
 # ============================================================
 
 func _on_shop_card_input(event: InputEvent, card: CardData) -> void:
-	if not (event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT):
+	if not (event is InputEventMouseButton and event.pressed):
+		return
+	if event.button_index == MOUSE_BUTTON_RIGHT:
+		_open_inspect(card)
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT:
 		return
 
 	var price = card_prices.get(card, 0)
@@ -666,6 +493,25 @@ func _on_shop_card_input(event: InputEvent, card: CardData) -> void:
 	AudioManager.play_sfx("shop_buy")
 	_update_gold()
 	_refresh_shop_cards()
+
+
+## The card enlarged, with its rarity, flavor and keyword reminders; any click closes it.
+func _open_inspect(card: CardData) -> void:
+	_close_inspect()
+	_inspect = CardInspect.build(card, CardFace.build(card, null, CardSigil.build(card)), _close_inspect)
+	add_child(_inspect)
+
+
+func _close_inspect() -> void:
+	if is_instance_valid(_inspect):
+		_inspect.queue_free()
+	_inspect = null
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and is_instance_valid(_inspect):
+		_close_inspect()
+		get_viewport().set_input_as_handled()
 
 
 # ============================================================
@@ -1007,27 +853,6 @@ func _on_remove_card(index: int) -> void:
 	info_label.text = "Removed %s!" % card.card_name
 	_update_gold()
 	_show_deck_for_removal()
-
-
-# ============================================================
-# PERSONALITY HELPERS
-# ============================================================
-
-func _get_personality_label(pers: CardData.PersonalityType) -> String:
-	if RunManager.current_character:
-		if pers == CardData.PersonalityType.PRIMARY:
-			return RunManager.current_character.primary_personality
-		if pers == CardData.PersonalityType.SECONDARY:
-			return RunManager.current_character.secondary_personality
-	return "Neutral"
-
-
-func _get_personality_color(pers: CardData.PersonalityType) -> Color:
-	if pers == CardData.PersonalityType.PRIMARY:
-		return Color(0.9, 0.5, 0.2)
-	if pers == CardData.PersonalityType.SECONDARY:
-		return Color(0.4, 0.6, 0.9)
-	return Color(0.6, 0.6, 0.6)
 
 
 # ============================================================
