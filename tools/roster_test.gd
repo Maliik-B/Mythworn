@@ -4084,6 +4084,27 @@ func _test_map_flourish() -> void:
 	scene._flourish._age = MapFlourish.HURRY_AFTER
 	scene._input(click)
 	_check("a click after the grace does not skip the pledge's first showing", scene._flourish != null)
+	# One move: the view climbs the map, with no zoom and no sideways pan, and every changed node
+	# changes once it has come into sight under the header.
+	var fl: MapFlourish = scene._flourish
+	var view: ScrollContainer = scene.scroll_container
+	var in_sight := true
+	for id in map.pledge_changes:
+		var y: float = scene._get_node_center(map.nodes[id]).y
+		var on_screen: float = y - fl._rest_scroll + fl._lift_at(fl._time_to_climb(fl._front_from - y))
+		in_sight = in_sight and on_screen >= 160.0 and on_screen <= view.size.y - scene.NODE_SIZE / 2.0
+	_check("each changed node changes once it is in sight, under the header", in_sight)
+	_check("the climb starts where the map rests", fl._rest_scroll == float(view.scroll_vertical))
+	_check("the climb reaches the top of the map", is_equal_approx(fl._lift_at(fl._climb_time()), fl._lift_max))
+	var climbed := false
+	var flat := true
+	var until := Time.get_ticks_msec() + 1600
+	while Time.get_ticks_msec() < until and scene._flourish != null:
+		await get_tree().process_frame
+		climbed = climbed or scene.map_canvas.position.y > 1.0
+		flat = flat and scene.map_canvas.scale == Vector2.ONE and scene.map_canvas.position.x == 0.0
+	_check("the reveal climbs the map", climbed)
+	_check("the view only climbs: no zoom, no pan", flat)
 	# The replay has been seen, so it can be hurried, and the map is left at rest however it ends.
 	scene._prime_pledge_changes()
 	for i in 3:
@@ -4125,7 +4146,22 @@ func _test_map_flourish() -> void:
 		await get_tree().process_frame
 	_check("the mark plays on returning armed", scene._flourish != null)
 	_check("the mark plays once", RunManager.first_unrevealed_quest() == &"")
-	scene._flourish.finish_now()
+	# The same climb: the line's head stays in sight as the view goes up with it.
+	var mark_view: ScrollContainer = scene.scroll_container
+	var head_seen := true
+	var inked := false
+	var mark_until := Time.get_ticks_msec() + 1200
+	while Time.get_ticks_msec() < mark_until and scene._flourish != null:
+		await get_tree().process_frame
+		var line: Line2D = scene._flourish._line_core
+		if line != null and line.points.size() > 1:
+			inked = true
+			var head_y: float = line.points[line.points.size() - 1].y - mark_view.scroll_vertical + scene.map_canvas.position.y
+			head_seen = head_seen and head_y >= 150.0 and head_y <= mark_view.size.y
+		head_seen = head_seen and scene.map_canvas.scale == Vector2.ONE
+	_check("the quest's line is inked in sight as the map climbs", inked and head_seen)
+	if scene._flourish != null:
+		scene._flourish.finish_now()
 	await get_tree().process_frame
 	_check_map_at_rest(scene, at_rest, "hurried mark")
 	_check("a hurried mark still shows its glyph", scene.node_buttons[payoff].get_meta("look") == MapNode.QUEST_MARK_LOOK)

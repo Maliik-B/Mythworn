@@ -724,7 +724,7 @@ func _process(delta: float) -> void:
 		_timer_accum -= 1.0
 		timer_label.text = RunManager.get_run_time_string()
 
-	# Pulse available nodes (paused during the changed-node flourish's camera pan, and while the key
+	# Pulse available nodes (paused while a flourish climbs the map, and while the key
 	# is pointing at a kind of node, which sets their light itself).
 	_pulse_time += delta
 	if not _pledge_anim_active and _legend_lit == "":
@@ -741,7 +741,10 @@ func _input(event: InputEvent) -> void:
 	# a node. Clicks inside the grace are dropped, as they always were during a flourish.
 	if _flourish == null or not (event is InputEventMouseButton and event.pressed):
 		return
-	if event.button_index == MOUSE_BUTTON_LEFT:
+	# The flourish moves the view itself, so the wheel waits until it is done.
+	if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		get_viewport().set_input_as_handled()
+	elif event.button_index == MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
 		if _flourish.can_hurry():
 			_flourish.finish_now()
@@ -1872,7 +1875,7 @@ func _scroll_to_player() -> void:
 # ============================================================
 
 ## Set each changed node to its PRE-change look synchronously, so there's no first-frame flash of the
-## final state, then start the flourish after layout. Each stays visible and bright until the ink
+## final state, then start the flourish after layout. Each stays visible and bright until the climb
 ## reaches it, since the change only reads if you saw what was there. Replays on an open map.
 ## `first_showing` is the reveal on the map's first open: the only time the player sees what their
 ## pledge did, so no click cuts it short. The debug replay can be hurried.
@@ -1892,29 +1895,26 @@ func _prime_pledge_changes(first_showing := false) -> void:
 	_play_pledge_changes.call_deferred(first_showing)
 
 
-## Ink spreads from where you stand and each changed node flips as the front reaches it.
+## The map climbs slowly from where you stand, and each changed node flips as it comes into view.
 func _play_pledge_changes(first_showing: bool) -> void:
-	await get_tree().process_frame  # the scroll has to have settled for the camera to frame from it
+	await get_tree().process_frame  # the scroll has to have settled for the climb to start from it
 	var map = RunManager.current_map
 	if map == null or map.pledge_changes.is_empty():
 		_finish_pledge_changes()
 		return
 	var flips: Array = []
-	var middle := Vector2.ZERO
 	for id in map.pledge_changes:
 		var btn: Button = node_buttons.get(id)
 		var node: MapNode = map.get_node(id)
 		if btn == null or node == null:
 			continue
-		var at := _get_node_center(node)
-		middle += at
-		flips.append({"btn": btn, "at": at, "swap": _pledge_swap_cb(btn, node)})
+		flips.append({"btn": btn, "at": _get_node_center(node), "swap": _pledge_swap_cb(btn, node)})
 	if flips.is_empty():
 		_finish_pledge_changes()
 		return
 	var flourish := _start_flourish()
 	flourish.hurriable = not first_showing
-	flourish.play_rewrite(_ink_origin(middle / flips.size()), flips)
+	flourish.play_rewrite(flips)
 
 
 ## Where the ink starts: your node, or before you have one, the opening node nearest the action.
@@ -1997,10 +1997,10 @@ func _prime_quest_reveal(quest_id: StringName) -> void:
 	_play_quest_reveal.call_deferred(node)
 
 
-## A gold line draws itself down the road from your node to the payoff, the glyph stamps at the end
-## of it, and the objective comes up as it lands.
+## A gold line inks itself up the road from your node to the payoff as the map climbs with it, the
+## glyph stamps at the end of it, and the objective comes up as it lands.
 func _play_quest_reveal(node: MapNode) -> void:
-	await get_tree().process_frame  # the scroll has to have settled for the camera to frame from it
+	await get_tree().process_frame  # the scroll has to have settled for the climb to start from it
 	var btn: Button = node_buttons.get(node.id)
 	if btn == null:
 		_finish_pledge_changes()
