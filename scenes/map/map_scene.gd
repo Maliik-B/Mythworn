@@ -890,6 +890,14 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	consumable_bar.item_used.connect(func(_item): _update_bottom_bar())
 	bar.add_child(consumable_bar)
 
+	# What a pack item does, in the page's panel. Only over the pack itself, so a view opened over
+	# the map never shows one through it.
+	var note := HoverNote.new()
+	note.blocked = func() -> bool:
+		var hovered := get_viewport().gui_get_hovered_control()
+		return hovered == null or not (hovered == consumable_bar or consumable_bar.is_ancestor_of(hovered))
+	add_child(note)
+
 	# The companion, if one travels with the player. Hidden until an event grants one.
 	pet_label = Label.new()
 	pet_label.add_theme_font_size_override("font_size", 18)

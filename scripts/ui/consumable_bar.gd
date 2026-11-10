@@ -4,7 +4,8 @@ extends HBoxContainer
 ## Click an item to use it, the cross beside it to drop it. Which items are usable depends on
 ## where the bar sits (a heal is fine on either, a supper is map only, an oil is combat only),
 ## and an item that cannot be used right now stays visible and disabled with the reason in its
-## tooltip, so the player sees what they are carrying and why it is waiting.
+## HoverNote panel, so the player sees what they are carrying and why it is waiting. The host
+## supplies the HoverNote.
 ##
 ## One script for both places. The map hands it nothing; combat hands it the live engine, since
 ## the combat engine owns the effects that touch a fight.
@@ -74,7 +75,8 @@ func refresh() -> void:
 			empty.text = "[empty]"
 			empty.add_theme_font_size_override("font_size", 18)
 			empty.add_theme_color_override("font_color", COLOR_EMPTY)
-			empty.tooltip_text = "An empty slot. You can carry two consumables, and nothing widens that."
+			empty.mouse_filter = Control.MOUSE_FILTER_STOP
+			HoverNote.mark(empty, "Empty slot", "You can carry two consumables, and nothing widens that.")
 			add_child(empty)
 
 
@@ -103,7 +105,7 @@ func _make_slot(item: ConsumableData) -> Control:
 	use_btn.add_theme_color_override("font_hover_color", COLOR_ITEM_HOVER)
 	use_btn.add_theme_color_override("font_disabled_color", COLOR_SPENT if spent else COLOR_DISABLED)
 	use_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	use_btn.tooltip_text = _tooltip_for(item, spent, why_not)
+	_mark_item(use_btn, item, spent, why_not)
 	use_btn.disabled = why_not != ""
 	if use_btn.disabled:
 		use_btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
@@ -117,7 +119,7 @@ func _make_slot(item: ConsumableData) -> Control:
 	drop_btn.add_theme_color_override("font_color", Color(0.6, 0.45, 0.4))
 	drop_btn.add_theme_color_override("font_hover_color", Color(0.95, 0.6, 0.5))
 	drop_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	drop_btn.tooltip_text = "Drop %s to free the slot." % item.display_name
+	HoverNote.mark(drop_btn, "Drop", "Drop %s to free the slot." % item.display_name)
 	drop_btn.pressed.connect(_on_drop_pressed.bind(item))
 	slot.add_child(drop_btn)
 	return slot
@@ -146,16 +148,13 @@ func _why_unusable(item: ConsumableData, spent: bool) -> String:
 	return ""
 
 
-func _tooltip_for(item: ConsumableData, spent: bool, why_not: String) -> String:
-	var text := item.description
-	if item.flavor != "":
-		text += "\n" + item.flavor
-	text += "\n" + item.use_context_label()
-	if why_not != "" and not spent:
-		text += "\n(" + why_not + ")"
-	elif spent:
-		text += "\n(" + why_not + ")"
-	return text
+## The item's panel: what it does, where it can be used, and why it waits if it does.
+func _mark_item(button: Control, item: ConsumableData, spent: bool, why_not: String) -> void:
+	var body := item.description
+	if why_not != "":
+		body += "\n(" + why_not + ")"
+	HoverNote.mark(button, item.display_name + (" (spent)" if spent else ""), body,
+		item.use_context_label(), item.flavor)
 
 
 func _on_use_pressed(item: ConsumableData) -> void:

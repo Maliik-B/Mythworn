@@ -133,6 +133,10 @@ const LOOKS := {
 		"pack_tint": Color(1, 1, 1),
 		"glow_mid": Color(1.0, 0.62, 0.26, 0.3),
 		"glow_core": Color(1.0, 0.72, 0.36, 0.8),
+		"note_bg": Color(0.09, 0.085, 0.078, 0.98),
+		"note_edge": Color(0.55, 0.5, 0.42),
+		"note_ink": Color(0.93, 0.9, 0.85),
+		"note_dim": Color(0.7, 0.66, 0.6),
 	},
 	PAGE: {
 		"desk": Color("1C1A18"),
@@ -222,6 +226,10 @@ const LOOKS := {
 		"pack_tint": Color(0.32, 0.3, 0.28),
 		"glow_mid": Color(0.93, 0.74, 0.42, 0.45),
 		"glow_core": Color(1.0, 0.86, 0.55, 0.9),
+		"note_bg": Color("E8DCBD"),
+		"note_edge": Color("0F0E0C"),
+		"note_ink": Color("1E1B18"),
+		"note_dim": Color("5A5750"),
 	},
 }
 

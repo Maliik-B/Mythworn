@@ -40,7 +40,7 @@ var continue_btn: Button
 var _main_container: MarginContainer
 var _shake_tween: Tween  # the one screen shake running, so a second replaces it (_screen_shake)
 var _hover_popup: PanelContainer
-var _status_pin: PanelContainer  # click-pinned status/effect description (see _show_status_pin)
+var _hover_note: HoverNote  # the one panel for statuses and powers: hover shows, a click pins
 var _last_play_ms := -100000  # when a card last played, for the double-click guard
 
 # Enemy sprite animation. Each enemy maps to a "sprite set" (one LuizMelo sheet folder),
@@ -460,21 +460,8 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
-	# Status-chip click, resolved before GUI routing. Clicking a status/effect chip pins
-	# its description (immediate, and it stays until the next click elsewhere); clicking
-	# anywhere else dismisses an open pin. Manual hit-testing (rather than the chip's
-	# gui_input) because the chips live in PASS-filtered flow containers that don't
-	# reliably deliver gui_input, and consuming the event here stops an enemy-side chip
-	# click from also targeting the enemy behind it.
-	if event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT and not _dragging_card:
-		var chip := _status_chip_at(event.global_position)
-		if chip:
-			_show_status_pin(chip, chip.get_meta("status_effect"), chip.get_meta("status_stacks"))
-			get_viewport().set_input_as_handled()
-			return
-		if _status_pin:
-			_hide_status_pin()
+	# A click on a status or power chip is HoverNote's: it pins the chip's panel and is used up
+	# there, before this runs, so it cannot also target the enemy behind the chip.
 
 	# While a card is mid-drag, own motion + release HERE (before GUI routing) so the
 	# drop always resolves. If the mouse-up falls through to _unhandled_input instead,
@@ -638,6 +625,13 @@ void fragment() {
 
 	_passion_gauge = PassionGauge.new()
 	add_child(_passion_gauge)
+
+	# What a status or a power does: one panel, on hover, pinned by a click. Nothing over the fight
+	# (the enlarged card, the map peek) or a drag in hand shows it.
+	_hover_note = HoverNote.new()
+	_hover_note.blocked = func() -> bool:
+		return is_instance_valid(_inspect) or _dragging_card != null or is_instance_valid(_map_overlay)
+	add_child(_hover_note)
 
 	# Absorbed pulse on top of everything
 	add_child(_damage_flash)
@@ -864,7 +858,7 @@ func _on_view_map() -> void:
 	if is_instance_valid(_map_overlay):
 		return
 	_hide_passion_infographic()
-	_hide_status_pin()
+	_hover_note.dismiss()
 	_map_overlay = MapPreviewOverlay.open(self)
 	_map_overlay.z_index = 100
 
@@ -2447,7 +2441,8 @@ func _make_power_chip(power: PowerData, stacks: int) -> PanelContainer:
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(lbl)
 
-	chip.tooltip_text = "%s  (Power ×%d)\n%s" % [power.power_name, stacks, power.description]
+	var title := ("%s ×%d" % [power.power_name, stacks]) if stacks > 1 else power.power_name
+	HoverNote.mark(chip, title, power.description, "Power", "", true)
 	chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	chip.mouse_entered.connect(func(): chip.modulate = Color(1.25, 1.25, 1.25))
 	chip.mouse_exited.connect(func(): chip.modulate = Color.WHITE)
@@ -2455,8 +2450,8 @@ func _make_power_chip(power: PowerData, stacks: int) -> PanelContainer:
 
 
 ## One status chip: name (+ optional glyph) and stack count, tinted green for buffs
-## and red for debuffs, with a rich tooltip (kind · stacks, what it does, how it
-## fades) and a subtle hover-highlight so it reads as inspectable.
+## and red for debuffs, described by the HoverNote (its kind, what it does, how it
+## fades) and with a subtle hover-highlight so it reads as inspectable.
 func _make_status_chip(effect: StatusEffectData, stacks: int, on_stage := false) -> PanelContainer:
 	var chip = PanelContainer.new()
 	chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -2483,83 +2478,13 @@ func _make_status_chip(effect: StatusEffectData, stacks: int, on_stage := false)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.add_child(lbl)
 
-	# Hover = the normal delayed engine tooltip (auto-hides). Click = show the same text
-	# immediately and PIN it. The click is caught by manual hit-testing in _input (the
-	# chips sit in PASS-filtered flow containers that don't reliably deliver gui_input),
-	# so we expose the effect + stacks via group membership + metadata for that lookup.
-	chip.tooltip_text = _status_desc_text(effect, stacks)
+	HoverNote.mark(chip, "%s %d" % [effect.effect_name, stacks], effect.description,
+		effect.kind_label(), effect.decay_note(), true)
 	chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	chip.add_to_group("status_chip")
-	chip.set_meta("status_effect", effect)
-	chip.set_meta("status_stacks", stacks)
 	# Subtle hover pop so it reads as individually inspectable.
 	chip.mouse_entered.connect(func(): chip.modulate = Color(1.25, 1.25, 1.25))
 	chip.mouse_exited.connect(func(): chip.modulate = Color.WHITE)
 	return chip
-
-
-## Shared rich description for a status effect: "Name (n) · kind\nwhat it does\nhow it
-## fades". Used verbatim by both the hover tooltip and the click-pinned popup.
-func _status_desc_text(effect: StatusEffectData, stacks: int) -> String:
-	return "%s  (%d) · %s\n%s\n%s" % [
-		effect.effect_name, stacks, effect.kind_label(),
-		effect.description, effect.decay_note()]
-
-
-## The topmost visible status chip under `pos` (viewport space), or null. Backs the
-## click-to-pin hit-test in _input. Chips register in the "status_chip" group.
-func _status_chip_at(pos: Vector2) -> Control:
-	for node in get_tree().get_nodes_in_group("status_chip"):
-		if node is Control and node.is_visible_in_tree() and node.get_global_rect().has_point(pos):
-			return node
-	return null
-
-
-## Click-pinned status description. Unlike the hover tooltip (delayed, auto-hiding),
-## this appears instantly on click and stays put until the player clicks elsewhere
-## (dismiss hook lives at the top of _input). Positioned just above the clicked chip.
-func _show_status_pin(anchor: Control, effect: StatusEffectData, stacks: int) -> void:
-	_hide_status_pin()
-	_status_pin = PanelContainer.new()
-	_status_pin.z_index = 60
-	_status_pin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var accent := Color(0.4, 0.75, 0.45) if effect.is_buff else Color(0.82, 0.4, 0.4)
-	var style = StyleBoxFlat.new()
-	style.set_corner_radius_all(8)
-	style.set_border_width_all(2)
-	style.border_color = accent
-	style.bg_color = Color(0.09, 0.085, 0.078, 0.98)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 9
-	style.content_margin_bottom = 9
-	_status_pin.add_theme_stylebox_override("panel", style)
-
-	var lbl = Label.new()
-	lbl.text = _status_desc_text(effect, stacks)
-	lbl.add_theme_font_size_override("font_size", 14)
-	lbl.add_theme_color_override("font_color", Color(0.93, 0.9, 0.85))
-	lbl.custom_minimum_size.x = 230
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_status_pin.add_child(lbl)
-
-	add_child(_status_pin)
-	await get_tree().process_frame
-	if not is_instance_valid(anchor) or not is_instance_valid(_status_pin):
-		_hide_status_pin()
-		return
-	var pos = anchor.global_position
-	_status_pin.global_position = Vector2(
-		clampf(pos.x - 8, 10, 1920 - _status_pin.size.x - 10),
-		maxf(10, pos.y - _status_pin.size.y - 8)
-	)
-
-
-func _hide_status_pin() -> void:
-	if _status_pin:
-		_status_pin.queue_free()
-		_status_pin = null
 
 
 func _log(msg: String) -> void:

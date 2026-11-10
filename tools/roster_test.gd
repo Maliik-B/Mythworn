@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_event_reworks()
 	_test_consumables()
 	_test_consumable_ui()
+	_test_hover_note()
 	_test_pets()
 	_test_master_of_game()
 	_test_map_node_looks()
@@ -3429,6 +3430,45 @@ func _held_courage_fight_starts_flat() -> bool:
 	held_eng.free()
 	RunManager.consumables.clear()
 	return flat
+
+
+## R6: one panel for what a thing is. Hover shows it, a click on a chip pins it until a click
+## elsewhere, a click on a button never pins, and the engine tooltip is gone from marked controls.
+func _test_hover_note() -> void:
+	var host := Control.new()
+	host.size = Vector2(1920, 1080)
+	add_child(host)
+	var note := HoverNote.new()
+	host.add_child(note)
+	var chip := PanelContainer.new()
+	chip.tooltip_text = "the old tooltip"
+	chip.position = Vector2(100, 100)
+	chip.size = Vector2(80, 30)
+	host.add_child(chip)
+	HoverNote.mark(chip, "Weak 2", "Deal 25% less attack damage.", "debuff", "Loses 1 each turn", true)
+	var button := Button.new()
+	button.position = Vector2(400, 100)
+	button.size = Vector2(80, 30)
+	host.add_child(button)
+	HoverNote.mark(button, "Traveller's Salve", "Heal 12 HP.")
+	_check("a marked control has no engine tooltip, so only one panel can show", chip.tooltip_text == "")
+	_check("the panel finds what is under the mouse", note._source_at(Vector2(120, 110)) == chip)
+	_check("and nothing where nothing is marked", note._source_at(Vector2(300, 300)) == null)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = Vector2(120, 110)
+	note._input(click)
+	_check("a click on a chip pins its panel", note.is_pinned() and note.shown_title() == "Weak 2")
+	chip.free()
+	_check("a pinned panel stays when its chip is rebuilt away", note.shown_title() == "Weak 2")
+	click.position = Vector2(300, 300)
+	note._input(click)
+	_check("a click elsewhere takes the pin down", not note.is_pinned() and note.shown_title() == "")
+	click.position = Vector2(420, 110)
+	note._input(click)
+	_check("a click on a button does not pin, so the button still gets it", not note.is_pinned())
+	host.free()
 
 
 ## The pack's UI logic without rendering: the bar's reasons and uses, and the full-pack prompt.
