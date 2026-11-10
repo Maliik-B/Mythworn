@@ -23,16 +23,19 @@ class VNBeat:
 
 ## A terminal choice. `config` (if non-null) is applied to RunManager.realm_config when
 ## chosen — the realm-shape consequence. `result_text` is an optional closing beat shown
-## after choosing, before the VN hands off to the next scene.
+## after choosing, before the VN hands off to the next scene. `detail` says what the choice
+## will change, set under its label so it can be read before it is taken.
 class VNChoice:
 	var label: String = ""
 	var result_text: String = ""
 	var config: RealmConfig = null
+	var detail: String = ""
 	func _init(p_label: String = "", p_config: RealmConfig = null,
-			p_result: String = "") -> void:
+			p_result: String = "", p_detail: String = "") -> void:
 		label = p_label
 		config = p_config
 		result_text = p_result
+		detail = p_detail
 
 var title: String = ""
 var beats: Array[VNBeat] = []
@@ -54,6 +57,7 @@ func add_setting(text: String) -> VNData:
 	return self
 
 
-func add_choice(label: String, config: RealmConfig = null, result: String = "") -> VNData:
-	choices.append(VNChoice.new(label, config, result))
+func add_choice(label: String, config: RealmConfig = null, result: String = "",
+		detail: String = "") -> VNData:
+	choices.append(VNChoice.new(label, config, result, detail))
 	return self

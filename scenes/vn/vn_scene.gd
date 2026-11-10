@@ -9,6 +9,11 @@ const HEAD_FONT_SIZE := 40
 const HEAD_COLOR := Color(0.88, 0.76, 0.48)
 const HEAD_RULE_LENGTH := 150.0
 const HEAD_FADE := 0.35
+const PANEL_HEIGHT := 260.0
+# An option's trade, set under its label in the summaries' gold, wrapped at this width.
+const DETAIL_COLOR := Color(0.9, 0.8, 0.4)
+const DETAIL_FONT_SIZE := 16
+const DETAIL_WIDTH := 1300.0
 
 var _vn: VNData
 var _next_scene: String = "res://scenes/map/map_scene.tscn"
@@ -20,7 +25,7 @@ var _speaker_label: Label
 var _text_label: RichTextLabel
 var _prompt_label: Label
 var _choices_box: VBoxContainer
-var _head: HBoxContainer
+var _head: Control
 var _head_label: Label
 
 
@@ -44,13 +49,38 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
+	# The running head over the dialogue panel, stacked up from the bottom of the screen, so a panel
+	# that grows (options with their trade set under them) pushes the head up instead of running under
+	# it. The head sits centred with a fine rule either side, hidden until a segment names its place.
+	var stack := VBoxContainer.new()
+	stack.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	stack.offset_left = 120
+	stack.offset_right = -120
+	stack.offset_top = -80
+	stack.offset_bottom = -80
+	stack.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	stack.add_theme_constant_override("separation", 14)
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(stack)
+	_head = CenterContainer.new()
+	_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_head.visible = false
+	stack.add_child(_head)
+	var head_row := HBoxContainer.new()
+	head_row.add_theme_constant_override("separation", 28)
+	head_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_head.add_child(head_row)
+	head_row.add_child(_head_rule())
+	_head_label = Label.new()
+	_head_label.add_theme_font_override("font", load(CardFace.TITLE_FONT_PATH))
+	_head_label.add_theme_font_size_override("font_size", HEAD_FONT_SIZE)
+	_head_label.add_theme_color_override("font_color", HEAD_COLOR)
+	head_row.add_child(_head_label)
+	head_row.add_child(_head_rule())
+
 	# Dialogue panel across the lower third.
 	var panel := PanelContainer.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_left = 120
-	panel.offset_right = -120
-	panel.offset_top = -340
-	panel.offset_bottom = -80
+	panel.custom_minimum_size.y = PANEL_HEIGHT
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.10, 0.09, 0.14, 0.96)
 	style.set_border_width_all(2)
@@ -58,7 +88,7 @@ func _build_ui() -> void:
 	style.set_corner_radius_all(8)
 	style.set_content_margin_all(24)
 	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
+	stack.add_child(panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 12)
@@ -87,27 +117,6 @@ func _build_ui() -> void:
 	_choices_box.add_theme_constant_override("separation", 8)
 	_choices_box.visible = false
 	vbox.add_child(_choices_box)
-
-	# The running head sits just above the panel, centred, with a fine rule either side. Hidden until
-	# a segment names its place.
-	var head_box := CenterContainer.new()
-	head_box.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	head_box.offset_top = -418
-	head_box.offset_bottom = -354
-	head_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(head_box)
-	_head = HBoxContainer.new()
-	_head.add_theme_constant_override("separation", 28)
-	_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_head.visible = false
-	head_box.add_child(_head)
-	_head.add_child(_head_rule())
-	_head_label = Label.new()
-	_head_label.add_theme_font_override("font", load(CardFace.TITLE_FONT_PATH))
-	_head_label.add_theme_font_size_override("font_size", HEAD_FONT_SIZE)
-	_head_label.add_theme_color_override("font_color", HEAD_COLOR)
-	_head.add_child(_head_label)
-	_head.add_child(_head_rule())
 
 
 func _head_rule() -> ColorRect:
@@ -180,11 +189,42 @@ func _show_choices() -> void:
 	_prompt_label.visible = false
 	for c in _vn.choices:
 		var btn := Button.new()
-		btn.text = c.label
 		btn.add_theme_font_size_override("font_size", 20)
 		btn.pressed.connect(_on_choice.bind(c))
+		if c.detail == "":
+			btn.text = c.label
+		else:
+			_set_choice_detail(btn, c)
 		_choices_box.add_child(btn)
 	_choices_box.visible = true
+
+
+## An option that says what it will change: its label, and the trade under it in the summaries'
+## gold. The button keeps the height of the two, however the trade wraps.
+func _set_choice_detail(btn: Button, c: VNData.VNChoice) -> void:
+	var col := VBoxContainer.new()
+	col.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 2)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(col)
+	var label := Label.new()
+	label.text = c.label
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 20)
+	col.add_child(label)
+	var detail := Label.new()
+	detail.text = c.detail
+	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.custom_minimum_size.x = DETAIL_WIDTH
+	detail.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	detail.add_theme_font_size_override("font_size", DETAIL_FONT_SIZE)
+	detail.add_theme_color_override("font_color", DETAIL_COLOR)
+	col.add_child(detail)
+	var fit := func(): btn.custom_minimum_size.y = col.get_combined_minimum_size().y + 20.0
+	col.minimum_size_changed.connect(fit)
+	fit.call()
 
 
 func _on_choice(choice: VNData.VNChoice) -> void:

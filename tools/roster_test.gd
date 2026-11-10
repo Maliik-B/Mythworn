@@ -68,6 +68,7 @@ func _ready() -> void:
 	_test_vn_data()
 	_test_profile_intro()
 	await _test_vn_setting_lines()
+	await _test_entry_trade()
 	_test_boss_reward()
 	await _test_frozen_skips()
 	await _test_chilled_freeze()
@@ -2150,6 +2151,41 @@ func _test_vn_setting_lines() -> void:
 	scene.queue_free()
 	await get_tree().process_frame
 	RunManager.pending_vn = null
+
+
+## R4: each pledge says what it will change under its option, in the approved words, with
+## the numbers read from its config: two more elites and 10% for the court; 8 Block, 5%, 20% and the
+## tier it lands in for the common folk. The scene sets each trade under its option.
+func _test_entry_trade() -> void:
+	var saved := RunManager.passion.current_value
+	RunManager.passion.current_value = 0
+	var entry := VNPool.build_camelot_entry()
+	var court: String = entry.choices[0].detail
+	var folk: String = entry.choices[1].detail
+	_check("the court's option says its trade",
+		court == "A harder road that pays better. Two more elites wait on it, and every enemy gets 10% stronger. In return, the court is in your favor, and the cards and relics you find are more often rare.")
+	_check("the common folk's option says its trade",
+		folk == "A gentler road with a price. The people are in your favor, the road's elites are weakened, you start every fight with 8 Block, and every enemy gets 5% weaker. In return, the shops charge 20% more, and the cards and relics you find are more often common. Your Passion also falls to Wavering.")
+	_check("the trades carry no em dash", not (court + folk).contains("—"))
+	_check("the court's elite count is the map's own",
+		MapGenerator.elites_added_for(entry.choices[0].config.elite_frequency_mult) == 2)
+	RunManager.pending_vn = entry
+	var scene: Control = load("res://scenes/vn/vn_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	await get_tree().process_frame
+	scene._show_beat(scene._vn.beats.size() - 1)
+	scene._show_choices()
+	await get_tree().process_frame
+	var shown := 0
+	for btn in scene._choices_box.get_children():
+		for label in btn.find_children("*", "Label", true, false):
+			if label.text == court or label.text == folk:
+				shown += 1
+	_check("each option shows its trade under it", shown == 2)
+	scene.queue_free()
+	await get_tree().process_frame
+	RunManager.pending_vn = null
+	RunManager.passion.current_value = saved
 
 
 func _count_elites(map: MapData) -> int:

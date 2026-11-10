@@ -127,6 +127,12 @@ const ELITE_ADD_SCALE := 5.0
 const MAX_ELITES_ADDED := 4
 
 
+## How many combat nodes a pledge's elite frequency turns into new elites, before the map's own room
+## runs out. The entry choice says this number under its option, so it is worked out in one place.
+static func elites_added_for(elite_frequency_mult: float) -> int:
+	return clampi(roundi((elite_frequency_mult - 1.0) * ELITE_ADD_SCALE), 0, MAX_ELITES_ADDED)
+
+
 ## The pledge's discrete, RECORDED effect on the map. Court (elite_frequency > 1) upgrades a
 ## few interior combat nodes to NEW elites; Folk (weaken_elites) flags the existing elites
 ## as weakened (they keep their rewards, the encounter starts them Weak + power-nerfed). Both
@@ -135,11 +141,11 @@ static func _apply_pledge_transform(map: MapData, rng: RandomNumberGenerator,
 		elite_frequency_mult: float, weaken_elites: bool) -> void:
 	map.pledge_changes = {}
 
-	var extra := roundi((elite_frequency_mult - 1.0) * ELITE_ADD_SCALE)
+	var extra := elites_added_for(elite_frequency_mult)
 	if extra > 0:
 		var candidates := _combat_nodes_for_upgrade(map)
 		RngManager.shuffle(candidates, rng)
-		var n := mini(mini(extra, MAX_ELITES_ADDED), candidates.size())
+		var n := mini(extra, candidates.size())
 		for i in n:
 			var id: int = candidates[i]
 			map.nodes[id].node_type = MapNode.NodeType.ELITE

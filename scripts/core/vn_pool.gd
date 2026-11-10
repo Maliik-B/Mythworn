@@ -116,11 +116,47 @@ static func build_camelot_entry() -> VNData:
 	vn.add_beat("", "They have been waiting for you. Word runs ahead of a dispatched keeper the way the old promise runs ahead of the sword: a hero will come, and draw Excalibur, and set it right. By the time you reach the gate, two delegations are already crossing the yard.", C_NARRATION)
 	vn.add_beat("", "From the keep, the court: velvet and guarded smiles, an offer of everything the crown can spare. From the town, the common folk: calloused hands, no smiles to spare, the same desperate plea. Both want the hero. Only one gets the first of you.", C_NARRATION)
 
-	vn.add_choice("Stand with the court.", _court_config(),
-		"The courtiers fold you into their warmth and their promises. The keep's doors open; the townsfolk's delegation melts back into the crowd. You will want for nothing here, and nothing here is free.")
-	vn.add_choice("Stand with the common folk.", _folk_config(),
-		"The townsfolk take you in among themselves, rough and grateful. Behind you, the court's smiles cool by a degree. The people will hold nothing back for you, and the crown will remember the slight.")
+	var court := _court_config()
+	var folk := _folk_config()
+	vn.add_choice("Stand with the court.", court,
+		"The courtiers fold you into their warmth and their promises. The keep's doors open; the townsfolk's delegation melts back into the crowd. You will want for nothing here, and nothing here is free.",
+		_court_trade(court))
+	vn.add_choice("Stand with the common folk.", folk,
+		"The townsfolk take you in among themselves, rough and grateful. Behind you, the court's smiles cool by a degree. The people will hold nothing back for you, and the crown will remember the slight.",
+		_folk_trade(folk))
 	return vn
+
+
+## What each pledge will change, said under its option before it is taken. The words were chosen on
+## 10 Nov; the numbers are read from the config, so a balance change carries into the line.
+static func _court_trade(c: RealmConfig) -> String:
+	var added := MapGenerator.elites_added_for(c.elite_frequency_mult)
+	return ("A harder road that pays better. %s on it, and every enemy gets %d%% stronger. In return, "
+		+ "the court is in your favor, and the cards and relics you find are more often rare.") % [
+		_more_elites(added), _percent(c.enemy_difficulty_mult)]
+
+
+static func _folk_trade(c: RealmConfig) -> String:
+	var people := RelicPool.get_relic_by_name("The People's Line")
+	var start := RunManager.passion.current_value if RunManager.passion else 0
+	var tier := PassionState.tier_name(RunManager.get_passion_tier_for_value(start + c.passion_shift))
+	return ("A gentler road with a price. The people are in your favor, the road's elites are weakened, "
+		+ "you start every fight with %d Block, and every enemy gets %d%% weaker. In return, the shops "
+		+ "charge %d%% more, and the cards and relics you find are more often common. Your Passion also "
+		+ "falls to %s.") % [people.value if people else 0, _percent(c.enemy_difficulty_mult),
+		_percent(c.shop_price_mult), tier]
+
+
+## "Two more elites wait", or "One more elite waits".
+static func _more_elites(n: int) -> String:
+	const WORDS := ["No", "One", "Two", "Three", "Four"]
+	var count: String = WORDS[n] if n < WORDS.size() else str(n)
+	return ("%s more elite waits" if n == 1 else "%s more elites wait") % count
+
+
+## A multiplier as the whole percent it moves by: 1.1 and 0.9 are both 10.
+static func _percent(mult: float) -> int:
+	return absi(roundi((mult - 1.0) * 100.0))
 
 
 ## Court: side with power. A harder, richer realm -- the pledge converts a couple of combat
