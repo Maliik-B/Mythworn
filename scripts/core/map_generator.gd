@@ -409,22 +409,17 @@ static func _place_crossing(map: MapData, rng: RandomNumberGenerator) -> void:
 	map.nodes[cands[0]].crossing_to = CROSSING_REALM
 
 
-# A crossing's far side: the edge of another realm, with no boss and one way back. The way back is
-# two steps past the arrival by the short road; the long road goes through a guardian to reach it.
-# One table, so the realm's pick can reshape it: the slots are what its content fills. A slot's
-# optional `scripted` names the authored event it opens (event_scene._build_special_event), and an
-# event slot with neither that nor a pool to draw from is a fight.
-#
-#   floor 3:         way back
-#   floor 2:                    guardian
-#   floor 1:   event            fight
-#   floor 0:         arrival
+# A crossing's far side: the edge of another realm, with no boss and one way back. One table, so it
+# can be reshaped without touching anything else. A slot's optional `scripted` names the authored
+# event it opens (event_scene._build_special_event), and an event slot with neither that nor a pool
+# to draw from is a fight. Yggdrasil's edge is a line: under the root, the door, the fight at the
+# gate, the mound (where the guardian is met, or not), and home.
 const _EDGE_LAYOUT := [
-	{"floor": 0, "column": 3, "type": MapNode.NodeType.EVENT, "next": [1, 2]},
-	{"floor": 1, "column": 2, "type": MapNode.NodeType.EVENT, "next": [4]},
-	{"floor": 1, "column": 4, "type": MapNode.NodeType.COMBAT, "next": [3]},
-	{"floor": 2, "column": 4, "type": MapNode.NodeType.ELITE, "next": [4]},
-	{"floor": 3, "column": 3, "type": MapNode.NodeType.EVENT, "next": [], "way_back": true},
+	{"floor": 0, "column": 3, "type": MapNode.NodeType.EVENT, "next": [1], "scripted": &"ygg_arrival"},
+	{"floor": 1, "column": 3, "type": MapNode.NodeType.EVENT, "next": [2], "scripted": &"ygg_door"},
+	{"floor": 2, "column": 3, "type": MapNode.NodeType.COMBAT, "next": [3]},
+	{"floor": 3, "column": 3, "type": MapNode.NodeType.EVENT, "next": [4], "scripted": &"ygg_mound"},
+	{"floor": 4, "column": 3, "type": MapNode.NodeType.EVENT, "next": [], "way_back": true},
 ]
 
 

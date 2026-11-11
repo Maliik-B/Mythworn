@@ -34,6 +34,7 @@ enum EffectType {
 	HEAL_ON_ENEMY_DEATH,    # value = HP healed each time an enemy dies, resolved in combat
 	REST_TAKES_BOTH,        # value > 0 = a rest site grants both its choices, not one
 	FIRST_CARD_RETURNS,     # value > 0 = the first card played each combat returns to hand
+	FIRST_BLOCK_KEPT,       # value = % of the first Block gained each fight a strip cannot take
 }
 
 

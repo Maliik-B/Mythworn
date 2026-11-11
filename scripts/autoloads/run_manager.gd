@@ -93,6 +93,10 @@ var _home_config: RealmConfig = null
 # The trip just made: {from, to, node_id, floor, nodes_walked}. Empty if none this run. What a later
 # "it moved on" beat reads on the way back; nothing does yet.
 var last_crossing: Dictionary = {}
+# What each realm remembers of how the player dealt with it this run: realm id -> what it remembers
+# (the mound on Yggdrasil's edge: &"oath_ring_force", &"oath_ring_gift" or &"oath_ring_word"). What
+# the realm's next act opens on. Run state, never on the profile.
+var realm_memory: Dictionary = {}
 
 # --- Titles ---
 # All title ids the player has earned this run (whether equipped or not).
@@ -256,6 +260,7 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 		current_realm_id = _home_realm_id
 	_clear_crossing()
 	last_crossing = {}
+	realm_memory = {}
 	pending_enemies.clear()
 	pending_gold_reward = 0
 	pending_relic_reward = false
@@ -372,6 +377,16 @@ func add_relic(relic: RelicData) -> void:
 	if relic.trigger == RelicData.RelicTrigger.ON_PICKUP:
 		_apply_pickup_relic(relic)
 	Events.relic_acquired.emit(relic)
+
+
+## Gives up a carried relic, by name. Returns false if it was not carried. What a pickup relic already
+## gave stays given.
+func remove_relic(relic_name: String) -> bool:
+	for i in relics.size():
+		if relics[i].relic_name == relic_name:
+			relics.remove_at(i)
+			return true
+	return false
 
 
 func has_relic(relic_name: String) -> bool:
@@ -602,6 +617,11 @@ func has_visited_realm(realm_id: StringName) -> bool:
 
 
 # --- The crossing ---
+
+## Records how the player dealt with the realm they stand in.
+func remember_in_realm(what: StringName) -> void:
+	realm_memory[current_realm_id] = what
+
 
 ## True while the player is on the far side of a crossing.
 func is_abroad() -> bool:

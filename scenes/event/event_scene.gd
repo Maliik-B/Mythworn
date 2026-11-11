@@ -106,9 +106,124 @@ func _build_special_event(id: StringName) -> EventData:
 			return EventPool._the_tourney()
 		&"reliquary":
 			return EventPool._reliquary()
+		# Yggdrasil's edge, seated by MapGenerator._EDGE_LAYOUT.
+		&"ygg_arrival":
+			return _build_ygg_arrival_event()
+		&"ygg_door":
+			return _build_ygg_door_event()
+		&"ygg_mound":
+			return _build_ygg_mound_event()
+		&"ygg_mound_broken":
+			return _build_ygg_mound_after("The Mound Broken", "The ring is out of the mound. The dead are "
+				+ "left disturbed, and the hall's folk will remember you as the one who broke it.")
+		&"ygg_mound_given":
+			return _build_ygg_mound_after("The Gift Left", "The gift stays on the stone, and the ring comes out.")
 		_:
 			push_warning("Unknown special event id: %s" % id)
 			return EventPool.get_random_event(RngManager.event_rng)
+
+
+# Yggdrasil's edge: a hall under the root, a debt, and three ways to pay it. Every line here is a
+# draft for review, taken from the realm's proposal wherever it has the words. Nobody in this realm
+# knows anything of another's trouble, and no line names how the keeper got here.
+
+func _build_ygg_arrival_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Hall Under the Root"
+	e.description = ("A root the size of a hall. Clay-white bark going patchy over grey, snow driving "
+		+ "flat, a sun like the moon with the aurora behind it, and the golden cord staked out across "
+		+ "the snow and vanishing.\n\nThe long hall's roofline under the root, snow on the turf, the "
+		+ "door open on red hangings and painted pillars, and one shield hung by the door with the "
+		+ "empty hook beside it where the second should hang.\n\nThe folk are whole and leaving. "
+		+ "Nobody sent for you.")
+	var go = EventData.EventChoice.new()
+	go.text = "Go to the door."
+	go.result_text = "You are a stranger at the door in the snow."
+	e.choices.append(go)
+	return e
+
+
+func _build_ygg_door_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Door"
+	e.description = ("Seat, fire and food are set before you without a question.\n\nThe hangings are "
+		+ "losing their red, the long fire is low, turf shows sky over the benches, and a moon goes "
+		+ "backwards round the wall-panelling.\n\nThe widow waits until you have eaten, then names "
+		+ "the ring. The high seat stands empty by her word. The hall's oath-ring went into the mound "
+		+ "on her husband's arm, and no oath holds without the ring, so no seat can be taken, no man "
+		+ "bound, no guest sworn.\n\nA guest owes the hall one deed before leaving by the door. Bring "
+		+ "the ring out of the mound. Her own men cannot: the barrow-dweller rises against his own "
+		+ "blood and his own oath-men, and a guest is neither.")
+	var go = EventData.EventChoice.new()
+	go.text = "Go to the mound."
+	go.result_text = "A þurs has sat down in the gateway since the snow, and the hall's men will not go near it."
+	e.choices.append(go)
+	return e
+
+
+## Gift costs: placeholders for the balance pass.
+const YGG_GIFT_GOLD := 60
+const YGG_GIFT_HP := 10
+
+
+func _build_ygg_mound_event() -> EventData:
+	var e = EventData.new()
+	e.event_name = "The Mound"
+	e.description = ("The barrow in the snow, the stone over its door, and the three ways open to a "
+		+ "stranger: break it, leave a gift on it, or turn back and swear.\n\nThe dead keep to their "
+		+ "mounds and take what is left on them.")
+
+	var force = EventData.EventChoice.new()
+	force.text = "Break in and take the ring."
+	force.starts_combat = &"haugbui_force"
+	force.remembered = &"oath_ring_force"
+	e.choices.append(force)
+
+	var gold = EventData.EventChoice.new()
+	gold.text = "Leave a gift on it: gold. (Lose %d Gold)" % YGG_GIFT_GOLD
+	gold.gold_change = -YGG_GIFT_GOLD
+	gold.starts_combat = &"haugbui_gift"
+	gold.remembered = &"oath_ring_gift"
+	e.choices.append(gold)
+
+	var health = EventData.EventChoice.new()
+	health.text = "Leave a gift on it: a measure of your health. (Lose %d HP)" % YGG_GIFT_HP
+	health.hp_change = -YGG_GIFT_HP
+	health.starts_combat = &"haugbui_gift"
+	health.remembered = &"oath_ring_gift"
+	e.choices.append(health)
+
+	# The relic on offer is the last one picked up, so the option can name what it costs.
+	if not RunManager.relics.is_empty():
+		var kept: RelicData = RunManager.relics.back()
+		var relic = EventData.EventChoice.new()
+		relic.text = "Leave a gift on it: %s." % kept.relic_name
+		relic.spends_relic = StringName(kept.relic_name)
+		relic.starts_combat = &"haugbui_gift"
+		relic.remembered = &"oath_ring_gift"
+		e.choices.append(relic)
+
+	var word = EventData.EventChoice.new()
+	word.text = "Take nothing from the dead. Turn back and swear."
+	word.result_text = ("You go back and swear the guest's oath on your own blade at the empty seat. "
+		+ "The widow accepts it. The hall gets a sworn guest instead of its ring, and the seat stays empty.")
+	word.awarded_title_id = &"guest_of_the_hall"
+	word.remembered = &"oath_ring_word"
+	e.choices.append(word)
+	return e
+
+
+## What follows the guardian, by force or by gift: the ring, and the debt paid.
+func _build_ygg_mound_after(title: String, description: String) -> EventData:
+	var e = EventData.new()
+	e.event_name = title
+	e.description = description
+	var take = EventData.EventChoice.new()
+	take.text = "Take the ring."
+	take.result_text = "The debt is paid, and you leave by the door."
+	take.granted_relic_id = &"The Oath-Ring"
+	e.choices.append(take)
+	return e
 
 
 func _build_sword_in_stone_event() -> EventData:
@@ -862,6 +977,13 @@ func _on_choice_selected(index: int) -> void:
 		# here for the same reason: the launch skips _apply_effects.
 		if choice.spends_consumable != &"":
 			RunManager.spend_consumable_by_id(choice.spends_consumable)
+		# So is a gift left before a fight, and what the realm remembers of it.
+		if choice.gold_change < 0:
+			RunManager.gold = maxi(0, RunManager.gold + choice.gold_change)
+		if choice.spends_relic != &"":
+			RunManager.remove_relic(choice.spends_relic)
+		if choice.remembered != &"":
+			RunManager.remember_in_realm(choice.remembered)
 		# The page goes with the fight to the stage it returns to, ending on the choice that started it.
 		_take_choice(choice)
 		_start_event_combat(choice.starts_combat)
@@ -1043,6 +1165,10 @@ func _start_event_combat(key: StringName) -> void:
 			RunManager.pending_event_combat = true
 			RunManager.pending_special_event = &"reliquary_won"
 			SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
+		&"haugbui_force":
+			_start_haugbui_fight(false)
+		&"haugbui_gift":
+			_start_haugbui_fight(true)
 		&"barrow_warden":
 			RunManager.pending_enemies.clear()
 			for enemy in EnemyPool.get_barrow_warden():
@@ -1056,6 +1182,19 @@ func _start_event_combat(key: StringName) -> void:
 		_:
 			push_warning("Unknown event combat key: %s" % key)
 			_show_done()
+
+
+## The guardian at the mound: the full fight by force, a short and weakened one by gift.
+func _start_haugbui_fight(by_gift: bool) -> void:
+	RunManager.pending_enemies.clear()
+	for enemy in EnemyPool.get_haugbui(by_gift):
+		RunManager.pending_enemies.append(enemy)
+	RunManager.pending_gold_reward = 0
+	RunManager.pending_relic_reward = false
+	RunManager.pending_relic_is_boss = false
+	RunManager.pending_event_combat = true
+	RunManager.pending_special_event = &"ygg_mound_given" if by_gift else &"ygg_mound_broken"
+	SceneTransition.change_scene("res://scenes/combat/combat_scene.tscn")
 
 
 # ============================================================
@@ -1124,6 +1263,9 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 		RunManager.spend_consumable_by_id(choice.spends_consumable)
 	if choice.grants_pet != &"":
 		RunManager.set_pet(choice.grants_pet)
+
+	if choice.remembered != &"":
+		RunManager.remember_in_realm(choice.remembered)
 
 	# A forgotten relic woken at a record site: the one it had takes the dormant form's place.
 	if choice.wakes_relic != &"":

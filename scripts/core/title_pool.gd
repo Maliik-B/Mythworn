@@ -6,6 +6,7 @@ class_name TitlePool
 const HERALDIC_ACCENT: Color = Color(0.78, 0.18, 0.18)    # Camelot red
 const NEUTRAL_ACCENT: Color = Color(0.85, 0.78, 0.55)     # Parchment
 const PEOPLES_ACCENT: Color = Color(0.82, 0.68, 0.32)     # Harvest gold (the common folk)
+const RUNIC_ACCENT: Color = Color(0.42, 0.55, 0.78)       # Yggdrasil's cold blue, as its sky has it
 
 
 # --- Public API ---
@@ -23,6 +24,7 @@ static func get_all_titles() -> Array[TitleData]:
 	titles.append(_build_the_compassionate())
 	titles.append(_build_the_unfading())
 	titles.append(_build_peoples_champion())
+	titles.append(_build_guest_of_the_hall())
 	return titles
 
 
@@ -142,6 +144,36 @@ static func _build_swords_bearer() -> TitleData:
 	t.returning_value = 2
 
 	t.passive_effect = TitleData.EffectType.DAMAGE_BONUS_FLAT
+	t.passive_scales_with_tier = true
+	return t
+
+
+# --- Yggdrasil Realm Titles ---
+
+## Earned at the mound on Yggdrasil's edge by paying the debt with your own word: a lighter version of
+## what the ring does. Its text is a draft for review, and its values are placeholders.
+static func _build_guest_of_the_hall() -> TitleData:
+	var t := TitleData.new()
+	t.title_id = &"guest_of_the_hall"
+	t.category = TitleData.Category.REALM
+	t.origin_realm_id = &"yggdrasil"
+	t.visual_style = RealmData.VisualStyle.RUNIC
+	t.accent_color = RUNIC_ACCENT
+
+	t.original_name = "Guest of the Hall"
+	t.original_description = ("You swore the guest's oath at the empty seat. Half of the first Block you "
+		+ "gain each fight cannot be stripped.")
+	t.original_value = 50
+
+	t.degraded_name = "A Guest Abroad"
+	t.degraded_description = "The hall is a long way off. A quarter of the first Block you gain each fight cannot be stripped."
+	t.degraded_value = 25
+
+	t.returning_name = "A Guest Returned"
+	t.returning_description = "You stand again under the root. Half of the first Block you gain each fight cannot be stripped."
+	t.returning_value = 50
+
+	t.passive_effect = TitleData.EffectType.FIRST_BLOCK_KEPT
 	t.passive_scales_with_tier = true
 	return t
 

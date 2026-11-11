@@ -5,7 +5,8 @@ extends Node
 ##
 ## It prints the run's floor, realm, route and quest state before, during and after, then checks the
 ## home realm came back as it was left and that an armed quest still pays off on the far side of the
-## trip. Exit code is the number of failed checks. Judge by the last line.
+## trip. It pays the mound's debt each of the three ways, on three runs. Exit code is the number of
+## failed checks. Judge by the last line.
 
 const MAP := "res://scenes/map/map_scene.tscn"
 const COMBAT := "res://scenes/combat/combat_scene.tscn"
@@ -79,8 +80,8 @@ func _walk() -> void:
 	_print_state("DURING, landed on the far side")
 	_print_legend(scene)
 	_check("the far map is another map, with about 5 nodes", far != map and far.nodes.size() == 5)
-	_check("the far map is Yggdrasil's skin on the stand-in route", RunManager.current_realm_id == &"yggdrasil"
-		and RunManager.realm_config.route_id == RealmRoutes.STANDIN_EDGE)
+	_check("the far map is Yggdrasil's, on its first config", RunManager.current_realm_id == &"yggdrasil"
+		and RunManager.realm_config.route_id == RealmRoutes.BASE)
 	_check("the far map counts its depth from just past the crossing",
 		far.floor_base == map.get_node(seat).floor_num + 1)
 	_check("a hop is not a visit", RunManager.visited_realm_ids.size() == 1
@@ -90,11 +91,18 @@ func _walk() -> void:
 	_check("the quest item still has somewhere to go", not RunManager.is_consumable_spent(
 		RunManager.get_consumable_by_id(&"poisoned_chalice")))
 
-	print("-- the long road, past the guardian --")
-	for id: int in [0, 2, 3]:
-		scene = await _step(scene, id)
-		_print_state("DURING, after far node %d" % id)
+	print("-- the edge, paying the debt by force --")
+	scene = await _far_event(scene, 0, 0)
+	_print_state("DURING, after the arrival")
+	scene = await _far_event(scene, 1, 0)
+	_print_state("DURING, after the door")
+	scene = await _step(scene, 2)
+	_print_state("DURING, after the gate")
+	scene = await _mound_fight(scene, 3, 0)
+	_print_state("DURING, after the mound")
 	_check("no boss on the far map", not _has_type(far, MapNode.NodeType.BOSS))
+	_check("by force, the ring came out", RunManager.has_relic("The Oath-Ring"))
+	_check("the realm remembers it was by force", RunManager.realm_memory.get(&"yggdrasil") == &"oath_ring_force")
 
 	print("-- the way back --")
 	var way_back := _way_back(far)
@@ -115,7 +123,7 @@ func _walk() -> void:
 	_check("the crossing cannot be taken twice", seat not in map.get_available_next_ids())
 	_check("the trip is on record for the beat to come", RunManager.last_crossing.get("from") == &"camelot"
 		and RunManager.last_crossing.get("to") == &"yggdrasil" and RunManager.last_crossing.get("node_id") == seat
-		and RunManager.last_crossing.get("nodes_walked") == 4)
+		and RunManager.last_crossing.get("nodes_walked") == 5)
 
 	print("-- on to the armed quest --")
 	var road: Array = _route_between(map, seat, payoff)
@@ -131,39 +139,111 @@ func _walk() -> void:
 		scene.scene_file_path == "res://scenes/event/event_scene.tscn" and scene.event != null
 		and scene.event.event_name == scene._build_raider_ambush_event().event_name)
 	_print_state("END")
-	await _short_road()
+	await _by_gift()
+	await _by_word()
 
 
-## A second trip: the short road, with a queued skip in hand that must not swallow the way back, or
-## the player would stand on a node with nothing after it.
-func _short_road() -> void:
-	print("-- a second run: the short road, a skip queued at the way back --")
+## A second run: the debt paid by a gift, with a queued skip in hand at the way back, which must not
+## swallow it or the player would stand on a node with nothing after it.
+func _by_gift() -> void:
+	print("-- a second run: the debt paid by a gift, a skip queued at the way back --")
+	var scene := await _land_on_the_edge()
+	var map: MapData = RunManager.home_map()
+	scene = await _far_event(scene, 0, 0)
+	scene = await _far_event(scene, 1, 0)
+	scene = await _step(scene, 2)
+	var gold_then := RunManager.gold
+	scene = await _mound_fight(scene, 3, 1)
+	_print_state("DURING, after the mound")
+	_check("the gift cost its gold", RunManager.gold == gold_then - _gift_gold())
+	_check("by gift, the ring came out", RunManager.has_relic("The Oath-Ring"))
+	_check("the realm remembers it was by gift", RunManager.realm_memory.get(&"yggdrasil") == &"oath_ring_gift")
+	RunManager.pending_skip_node = true
+	scene = await _click(scene, _way_back(RunManager.current_map))
+	scene = await _next_scene(scene)
+	await _settle(scene)
+	_print_state("AFTER the gift")
+	_check("the way back was taken, skip or no skip", not RunManager.is_abroad() and RunManager.current_map == map)
+	_check("the skip is still in hand for the next node at home", RunManager.pending_skip_node)
+
+
+## A third run: the debt paid by your own word, with no fight at the mound.
+func _by_word() -> void:
+	print("-- a third run: the debt paid by your own word --")
+	var scene := await _land_on_the_edge()
+	var map: MapData = RunManager.home_map()
+	scene = await _far_event(scene, 0, 0)
+	scene = await _far_event(scene, 1, 0)
+	scene = await _step(scene, 2)
+	scene = await _far_event(scene, 3, -1)
+	_print_state("DURING, after the mound")
+	_check("by your word, no ring and the title", not RunManager.has_relic("The Oath-Ring")
+		and RunManager.earned_title_ids.has(&"guest_of_the_hall"))
+	_check("the realm remembers it was by your word", RunManager.realm_memory.get(&"yggdrasil") == &"oath_ring_word")
+	scene = await _click(scene, _way_back(RunManager.current_map))
+	scene = await _next_scene(scene)
+	await _settle(scene)
+	_print_state("AFTER the word")
+	_check("the way back was taken", not RunManager.is_abroad() and RunManager.current_map == map)
+
+
+## What the gold gift costs, read from the event so the number lives in one place.
+func _gift_gold() -> int:
+	return load("res://scenes/event/event_scene.gd").YGG_GIFT_GOLD
+
+
+## A fresh run set down one step short of the crossing, then through it. The road there is the first
+## run's to walk; here it is taken as read.
+func _land_on_the_edge() -> Node:
 	var found := _find_run()
 	var map: MapData = RunManager.current_map
 	var seat: int = found["seat"]
+	RunManager.gold = 200
+	for id in map.nodes:
+		if map.nodes[id].next_nodes.has(seat):
+			map.move_to(id)
+			break
 	get_tree().change_scene_to_file(MAP)
 	var scene := await _next_scene(get_tree().current_scene)
 	await _settle(scene)
-	for id in _route_to(map, seat):
-		if id == seat:
-			break
-		scene = await _step(scene, id)
 	scene = await _click(scene, seat)
 	scene = await _next_scene(scene)
 	await _settle(scene)
-	for id: int in [0, 1]:
-		scene = await _step(scene, id)
-	var far: MapData = RunManager.current_map
-	_check("the short road's event slot was a fight, on a route with no events",
-		far.get_node(1).node_type == MapNode.NodeType.COMBAT)
-	RunManager.pending_skip_node = true
-	scene = await _click(scene, _way_back(far))
-	scene = await _next_scene(scene)
-	await _settle(scene)
-	_print_state("AFTER the short road")
-	_check("the way back was taken, skip or no skip", not RunManager.is_abroad() and RunManager.current_map == map)
-	_check("the skip is still in hand for the next node at home", RunManager.pending_skip_node)
-	_check("two far nodes and the way back were walked", RunManager.last_crossing.get("nodes_walked") == 3)
+	return scene
+
+
+## Clicks a far map's event node, takes a choice (negative counts from the last) and goes back to the map.
+func _far_event(scene: Node, id: int, choice: int) -> Node:
+	await _click(scene, id)
+	var event := await _next_scene(scene)
+	return await _choose_and_leave(event, choice)
+
+
+func _choose_and_leave(event: Node, choice: int) -> Node:
+	var index: int = choice if choice >= 0 else event.event.choices.size() + choice
+	print("    %s: %s" % [event.event.event_name, event.event.choices[index].text])
+	event._on_choice_selected(index)
+	await get_tree().process_frame
+	event._on_leave()
+	var map := await _next_scene(event)
+	await _settle(map)
+	return map
+
+
+## The mound, by a way that starts the guardian: the choice, the fight, the beat after it, the ring.
+func _mound_fight(scene: Node, id: int, choice: int) -> Node:
+	await _click(scene, id)
+	var event := await _next_scene(scene)
+	print("    %s: %s" % [event.event.event_name, event.event.choices[choice].text])
+	var opening: String = event.event.description
+	var taken: String = event.event.choices[choice].text
+	event._on_choice_selected(choice)
+	var fight := await _next_scene(event)
+	var after := await _leave(fight)
+	var told: Array = after._parts.map(func(p): return p.get("text", ""))
+	_check("the mound's page came across the fight, ending on the choice that started it",
+		told.find(opening) >= 0 and told.find(taken) > told.find(opening))
+	return await _choose_and_leave(after, 0)
 
 
 ## Starts a run and builds its map as map_scene would, trying seeds until the raider payoff is ahead
@@ -327,10 +407,19 @@ func _print_state(label: String) -> void:
 		RunManager.is_abroad(), RunManager.home_realm_id()])
 	print("  map of %d nodes, %s, next %s" % [map.nodes.size(), floor_text, str(map.get_available_next_ids())])
 	print("  quests %s" % str(RunManager.active_quests))
-	print("  visited %s, title %s, pack %s, standing %s, hp %d, gold %d" % [str(RunManager.visited_realm_ids),
-		TitleData.Tier.keys()[RunManager.get_title_tier(&"swords_bearer")],
-		str(RunManager.consumables.map(func(c): return String(c.id))), str(RunManager.realm_standing),
-		RunManager.current_hp, RunManager.gold])
+	print("  visited %s, titles %s, pack %s, standing %s, hp %d, gold %d" % [str(RunManager.visited_realm_ids),
+		_title_words(), str(RunManager.consumables.map(func(c): return String(c.id))),
+		str(RunManager.realm_standing), RunManager.current_hp, RunManager.gold])
+	print("  relics %s, the realm remembers %s" % [str(RunManager.get_owned_relic_names()), str(RunManager.realm_memory)])
+
+
+## Each earned title as it reads right now, with its tier.
+func _title_words() -> String:
+	var words: PackedStringArray = []
+	for id in RunManager.earned_title_ids:
+		var tier := RunManager.get_title_tier(id)
+		words.append("%s (%s)" % [TitlePool.get_title(id).get_name_for_tier(tier), TitleData.Tier.keys()[tier]])
+	return ", ".join(words)
 
 
 ## The margin key, an entry a row: its glyph, then its name (none for a crossing).

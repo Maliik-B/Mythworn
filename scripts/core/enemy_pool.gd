@@ -76,13 +76,12 @@ const _TABLES := {
 		},
 	},
 	&"yggdrasil": {
-		# The realm's first config, on the realm's affairs. Empty until the pick lands.
-		RealmRoutes.BASE: {},
-		# STAND-IN, reached only through the crossing: Camelot's own enemies, no boss. Replace with
-		# the real edge and delete this row (see RealmRoutes.STANDIN_EDGE).
-		RealmRoutes.STANDIN_EDGE: {
-			"combat": _COMBAT_POOL,
-			"elites": _CAMELOT_ELITES,
+		# The realm's first config: the hall under the root. So far it is only the edge, a fight at
+		# the gate and no boss, and its guardian is met through the mound's event (get_haugbui). The
+		# wolves are the second fight the realm's proposal keeps in hand, built and not seated: give
+		# them a row here and a slot in MapGenerator._EDGE_LAYOUT if one is wanted.
+		RealmRoutes.BASE: {
+			"combat": [["thurs_gateway", 1.0]],
 		},
 	},
 	&"journey_to_the_west": {
@@ -232,6 +231,11 @@ static func _compose(key: String, mult: float) -> Array[EnemyData]:
 		"rotting_shade":
 			result.append(rotting_knight(mult))
 			result.append(realm_shade(mult))
+		"thurs_gateway":
+			result.append(thurs(mult))
+		"wolves_farmyard":
+			result.append(wolf(mult))
+			result.append(wolf(mult))
 		_:
 			result.append(corrupted_knight(mult))
 	return result
@@ -746,6 +750,81 @@ static func the_barrow_warden(mult := 1.0) -> EnemyData:
 	# lasts long enough for Barrow Chill -> Hoarder's Wrath to actually cycle -- otherwise a
 	# burst deck ends it before the heavy lands and the "strong, earned treasure" read is lost.
 	return _enemy("The Barrow-Warden", _scale(82, mult), moves)
+
+
+# ============================================================
+# YGGDRASIL'S EDGE: the hall under the root
+# ============================================================
+# Every number here is a placeholder for the balance pass, and every name is a draft for review
+# (the review list is kept outside the repo). Nobody on this page is greyed or hollowed: this
+# realm's losses are places, and its creatures stay whole.
+
+## STAND-IN sprites, one slot each: a bought sheet goes into combat_scene's SPRITE_SETS and the line
+## here points at it. Nothing else names them.
+const _EDGE_SPRITES := {
+	"thurs": "worm",
+	"wolf": "goblin",
+	"haugbui": "wizard2",
+}
+
+## How far the gift takes the haugbúi down: a short, weakened fight.
+const HAUGBUI_GIFT_POWER := 0.6
+const HAUGBUI_GIFT_WEAK := 2
+
+
+## A þurs sat down in the gateway since the snow: a big body that guards and guards, then lets its
+## weight go. The rule it keeps is unwritten yet, so nothing here plays one.
+static func thurs(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Sits in the Gateway", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(10, mult))], 1.4),
+		_move("Weight Let Go", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(14, mult))], 2.0, 1),
+	]
+	return _edge_enemy("Þurs", "thurs", _scale(84, mult), moves)
+
+
+## Wolves at the farmyard's edge, in a pair. Built for a second fight on the road to the mound.
+static func wolf(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Snap", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(6, mult))], 2.0),
+		_move("Circle", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(5, mult))], 1.0),
+	]
+	return _edge_enemy("Wolf", "wolf", _scale(26, mult), moves)
+
+
+## The barrow-dweller, at the mound. He does not speak, so he has no lines.
+static func haugbui(mult := 1.0) -> EnemyData:
+	var moves: Array[EnemyMove] = [
+		_move("Heavy Hand", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(12, mult))], 2.0),
+		_move("Keeps His Mound", EnemyMove.IntentType.DEFEND,
+			[_block(_scale(12, mult))], 1.2),
+		_move("Rises", EnemyMove.IntentType.BUFF,
+			[_self_status(StatusEffects.STRENGTH, 2)], 0.8, 3),
+		_move("Old Weight", EnemyMove.IntentType.ATTACK,
+			[_dmg(_scale(20, mult))], 1.4, 2),
+	]
+	return _edge_enemy("The Haugbúi", "haugbui", _scale(110, mult), moves)
+
+
+## The fight at the mound. Scaled by act only, like the other event fights. By force he is the full
+## fight; by gift, a short and weakened one.
+static func get_haugbui(by_gift := false) -> Array[EnemyData]:
+	var result: Array[EnemyData] = []
+	var guardian := haugbui(_act_mult() * (HAUGBUI_GIFT_POWER if by_gift else 1.0))
+	if by_gift:
+		guardian.starting_statuses.append([StatusEffects.WEAK, HAUGBUI_GIFT_WEAK])
+	result.append(guardian)
+	return result
+
+
+static func _edge_enemy(enemy_name: String, sprite_slot: String, hp: int, moves: Array[EnemyMove]) -> EnemyData:
+	var e := _enemy(enemy_name, hp, moves)
+	e.sprite_set = _EDGE_SPRITES[sprite_slot]
+	return e
 
 
 # ============================================================

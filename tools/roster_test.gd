@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_map_node_looks()
 	_test_card_face_words()
 	_test_crossing()
+	_test_yggdrasil_edge()
 	_test_forgotten_relics()
 	_test_relic_names()
 	_test_liaison_relics()
@@ -760,10 +761,10 @@ func _test_realm_routes() -> void:
 
 	var saved_realm := RunManager.current_realm_id
 	var saved_config := RunManager.realm_config
-	RunManager.current_realm_id = &"yggdrasil"
+	RunManager.current_realm_id = &"journey_to_the_west"
 	RunManager.realm_config = RealmConfig.new()
 	print("  (the ERROR lines that follow are empty tables refusing, on purpose)")
-	_check("Yggdrasil's first config serves no regular fight, Camelot's or anyone's",
+	_check("an empty realm serves no regular fight, Camelot's or anyone's",
 		EnemyPool.get_combat_encounter(4).is_empty())
 	_check("nor an elite", EnemyPool.get_elite_encounter().is_empty())
 	_check("nor a boss, and it names none", EnemyPool.get_boss().is_empty() and EnemyPool.boss_name(1) == "")
@@ -782,7 +783,7 @@ func _test_realm_routes() -> void:
 		if realm.implemented:
 			_check("implemented realm %s has regulars, elites, a boss and events" % realm.realm_id, ready_to_ship)
 		elif not ready_to_ship:
-			print("  PENDING %s has an empty table, awaiting its picks" % realm.realm_id)
+			print("  PENDING %s is not a whole realm yet: its table is empty or only an edge" % realm.realm_id)
 
 
 func _test_realm_config() -> void:
@@ -4149,23 +4150,25 @@ func _test_crossing() -> void:
 	_check("stepping through lands on the far map", RunManager.cross_to(&"yggdrasil") and RunManager.is_abroad())
 	var far: MapData = RunManager.current_map
 	_check("the realm and route are the far side's, with the home map kept",
-		RunManager.current_realm_id == &"yggdrasil" and RunManager.realm_config.route_id == RealmRoutes.STANDIN_EDGE
+		RunManager.current_realm_id == &"yggdrasil" and RunManager.realm_config.route_id == RealmRoutes.BASE
 		and RunManager.home_realm_id() == &"camelot" and RunManager.home_map() == map)
 	_check("building the far map drew nothing from the run's map stream", RngManager.map_rng.state == map_rng_then)
-	var kinds := {}
 	var way_back := -1
+	var kinds := {}
 	for id in far.nodes:
-		kinds[far.nodes[id].node_type] = true
 		if far.nodes[id].crossing_to != &"":
 			way_back = id
+		else:
+			kinds[far.nodes[id].node_type] = true
 	_check("it has about 5 nodes, no boss, no rest and no shop", far.nodes.size() == 5
 		and not kinds.has(MapNode.NodeType.BOSS) and not kinds.has(MapNode.NodeType.REST) and not kinds.has(MapNode.NodeType.SHOP))
 	_check("one way back, leading home", way_back != -1 and far.nodes[way_back].crossing_to == &"camelot")
 	var from_landing := MapGenerator._reachable_from(far, far.starting_node_ids[0])
-	_check("every road reaches the way back and no node is a dead end", from_landing.size() == 4
+	_check("the road reaches the way back and no node is a dead end", from_landing.size() == 4
 		and from_landing.has(way_back) and _dead_ends(far) == [way_back])
-	_check("with no events on the route, the arrival and the event slot are fights",
-		far.nodes[0].node_type == MapNode.NodeType.COMBAT and far.nodes[1].node_type == MapNode.NodeType.COMBAT)
+	_check("the arrival, the door and the mound are the authored events, and the gate is a fight",
+		far.nodes[0].scripted_event_id == &"ygg_arrival" and far.nodes[1].scripted_event_id == &"ygg_door"
+		and far.nodes[2].node_type == MapNode.NodeType.COMBAT and far.nodes[3].scripted_event_id == &"ygg_mound")
 	var far_look: Dictionary = far.nodes[way_back].look()
 	var slotted := MapGenerator.generate_edge(RandomNumberGenerator.new(), &"camelot", 9, false,
 		[{"floor": 0, "column": 3, "type": MapNode.NodeType.EVENT, "next": [], "scripted": &"master_of_game"}])
@@ -4179,11 +4182,12 @@ func _test_crossing() -> void:
 	# --- What the far side serves ---
 	var depth: int = far.act_floor(far.nodes[0])
 	_check("a far fight counts from just past the crossing", depth == map.nodes[seat].floor_num + 1)
-	var stand_in := EnemyPool.get_combat_encounter(depth)
-	_check("the stand-in table serves a fight", not stand_in.is_empty())
-	_check("and an elite for the guardian's slot", not EnemyPool.get_elite_encounter().is_empty())
-	_check("and no boss, naming none", EnemyPool.get_boss().is_empty() and EnemyPool.boss_name(1) == "")
-	_check("and no event", not EventPool.has_events(RunManager.current_realm_id, RunManager.realm_config.route_id))
+	var gate := EnemyPool.get_combat_encounter(depth)
+	_check("the fight at the gate is the þurs, and never Camelot's", gate.size() == 1 and gate[0].enemy_name == "Þurs")
+	_check("the route has no elite and no boss, and names none", EnemyPool.get_elite_encounter().is_empty()
+		and EnemyPool.get_boss().is_empty() and EnemyPool.boss_name(1) == "")
+	_check("and no random event: everything out here is authored",
+		not EventPool.has_events(RunManager.current_realm_id, RunManager.realm_config.route_id))
 	_check("the home realm's encounter memory is untouched by the far fights",
 		EnemyPool._last_keys["camelot/base"] == last_key_then and EnemyPool._elite_bags["camelot/base"] == bag_then)
 	_check("a beat pinned at home neither fires nor counts abroad",
@@ -4207,7 +4211,7 @@ func _test_crossing() -> void:
 		and RunManager.get_realm_standing(&"yggdrasil") == 0)
 
 	# --- The way back ---
-	for id in [0, 2, 3]:
+	for id in [0, 1, 2, 3]:
 		far.move_to(id)
 	far.move_to(way_back)
 	_check("the way back returns", RunManager.return_from_crossing() and not RunManager.is_abroad())
@@ -4224,7 +4228,7 @@ func _test_crossing() -> void:
 	_check("the trip is recorded for the beat to come", RunManager.last_crossing.get("from") == &"camelot"
 		and RunManager.last_crossing.get("to") == &"yggdrasil" and RunManager.last_crossing.get("node_id") == seat
 		and RunManager.last_crossing.get("floor") == map.nodes[seat].floor_num
-		and RunManager.last_crossing.get("nodes_walked") == 4)
+		and RunManager.last_crossing.get("nodes_walked") == 5)
 
 	# --- A run that ends abroad ---
 	RunManager.cross_to(&"yggdrasil")
@@ -4240,6 +4244,88 @@ func _test_crossing() -> void:
 	RunManager.earned_title_ids.clear()
 	RunManager.active_title_slots.assign([&"", &""])
 	RunManager.relics.clear()
+
+
+## The first config's edge: the hall under the root, a debt, and three ways to pay it.
+func _test_yggdrasil_edge() -> void:
+	print("-- Yggdrasil's edge --")
+	_reset_consumable_state()
+	RunManager.relics.clear()
+	RunManager.realm_memory = {}
+	var sets: Dictionary = load("res://scenes/combat/combat_scene.gd").SPRITE_SETS
+	for e in [EnemyPool.thurs(), EnemyPool.wolf(), EnemyPool.haugbui()]:
+		_check("%s stands on a real sprite slot, with moves" % e.enemy_name, sets.has(e.sprite_set) and not e.moves.is_empty())
+	_check("the wolves are a pair, built for a second fight", EnemyPool._compose("wolves_farmyard", 1.0).size() == 2)
+	var full := EnemyPool.get_haugbui()[0]
+	var given := EnemyPool.get_haugbui(true)[0]
+	_check("by gift he is the same man, shorter and Weak",
+		given.enemy_name == full.enemy_name and given.max_health < full.max_health
+		and given.starting_statuses.size() == 1 and given.starting_statuses[0][0] == StatusEffects.WEAK)
+
+	var scene = load("res://scenes/event/event_scene.gd").new()
+	var mound: EventData = scene._build_special_event(&"ygg_mound")
+	_check("with no relic to leave, the mound offers force, two gifts and your word", mound.choices.size() == 4)
+	RunManager.relics.append(RelicPool.get_relic_by_name("Neve's Kit"))
+	mound = scene._build_special_event(&"ygg_mound")
+	_check("carrying one, it names that relic as a gift", mound.choices.size() == 5
+		and mound.choices[3].spends_relic == &"Neve's Kit" and mound.choices[3].text.contains("Neve's Kit"))
+	_check("force and every gift start the guardian", mound.choices[0].starts_combat == &"haugbui_force"
+		and mound.choices[1].starts_combat == &"haugbui_gift" and mound.choices[2].starts_combat == &"haugbui_gift"
+		and mound.choices[3].starts_combat == &"haugbui_gift")
+	var word: EventData.EventChoice = mound.choices[4]
+	_check("your own word starts no fight and grants the title", word.starts_combat == &"" and word.awarded_title_id == &"guest_of_the_hall")
+	_check("the realm remembers each way apart", mound.choices[0].remembered == &"oath_ring_force"
+		and mound.choices[1].remembered == &"oath_ring_gift" and word.remembered == &"oath_ring_word")
+	_check("force and gift both end in the ring",
+		scene._build_special_event(&"ygg_mound_broken").choices[0].granted_relic_id == &"The Oath-Ring"
+		and scene._build_special_event(&"ygg_mound_given").choices[0].granted_relic_id == &"The Oath-Ring"
+		and RelicPool.get_relic_by_name("The Oath-Ring") != null)
+	_check("a relic left behind is gone", RunManager.remove_relic("Neve's Kit") and not RunManager.has_relic("Neve's Kit")
+		and not RunManager.remove_relic("Neve's Kit"))
+	RunManager.current_realm_id = &"yggdrasil"
+	RunManager.remember_in_realm(&"oath_ring_word")
+	_check("what is remembered belongs to the realm it happened in", RunManager.realm_memory.get(&"yggdrasil") == &"oath_ring_word")
+	RunManager.current_realm_id = &"camelot"
+
+	# No line out here may name the way the keeper came. Names of the realm's own, no one's rot.
+	var lines: PackedStringArray = []
+	for id in [&"ygg_arrival", &"ygg_door", &"ygg_mound", &"ygg_mound_broken", &"ygg_mound_given"]:
+		var ev: EventData = scene._build_special_event(id)
+		lines.append_array([ev.event_name, ev.description])
+		for c in ev.choices:
+			lines.append_array([c.text, c.result_text])
+	var loose := 0
+	for line in lines:
+		var low: String = line.to_lower()
+		for word_out in ["crossing", "portal", "chaos", "thin place", "rift", "camelot", "fable", "keeper"]:
+			if low.contains(word_out):
+				loose += 1
+	_check("no line out here names the way in, or anywhere else (%d lines)" % lines.size(), loose == 0)
+	scene.free()
+
+	# --- What the ring does ---
+	var eng := CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [_dummy_attacker()])
+	eng.apply_block(eng.player_stats, 8)
+	eng.apply_block(eng.player_stats, 5)
+	eng.strip_block(eng.player_stats)
+	_check("without the ring a strip takes all of it", eng.player_stats.block == 0)
+	eng.free()
+	RunManager.relics.append(RelicPool.get_relic_by_name("The Oath-Ring"))
+	eng = CombatEngine.new()
+	add_child(eng)
+	eng.start_combat([], 50, 50, [_dummy_attacker()])
+	eng.apply_block(eng.player_stats, 8)
+	eng.apply_block(eng.player_stats, 5)
+	eng.strip_block(eng.player_stats)
+	_check("with the ring a strip leaves the first Block gained", eng.player_stats.block == 8)
+	eng.strip_block(eng.player_stats)
+	_check("and a second strip takes no more", eng.player_stats.block == 8)
+	eng.free()
+	RunManager.relics.clear()
+	RunManager.realm_memory = {}
+	_reset_consumable_state()
 
 
 func _map_has_seat(map: MapData) -> bool:

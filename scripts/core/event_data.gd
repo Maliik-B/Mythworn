@@ -123,6 +123,12 @@ class EventChoice extends RefCounted:
 	## such option per dormant relic the keeper carries, and none when none is carried, so the site
 	## does the telling. It costs nothing but the event's other options.
 	var wakes_relic: StringName = &""
+	## If non-empty, taking this choice gives up the carried relic of this name (the gift left on a
+	## mound). What a pickup relic already gave stays given.
+	var spends_relic: StringName = &""
+	## If non-empty, the realm remembers this choice for the rest of the run
+	## (RunManager.remember_in_realm), so a later beat can open on how it went.
+	var remembered: StringName = &""
 	## If non-empty, this choice plays a staged moment over the event scene before its result reads:
 	## &"excalibur_take" or &"excalibur_leave". A choice that wakes a relic stages itself (AltarPiece)
 	## and needs no tag. Presentation only: every effect and word on the choice is unchanged.

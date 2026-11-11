@@ -26,6 +26,10 @@ const CHILL_FREEZE_THRESHOLD := 10
 var phase: Phase = Phase.PLAYER_TURN_START
 var energy: int = MAX_ENERGY
 var turn_number: int = 0
+# The player's first Block this fight, while it still stands (The Oath-Ring, Guest of the Hall): 0
+# before it is gained and after the Block next falls. Gained only once a fight.
+var _first_block := 0
+var _first_block_gained := false
 var player_stats: CombatantStats
 var enemies: Array[EnemyCombatState] = []
 var piles: PileManager
@@ -347,6 +351,7 @@ func start_player_turn() -> void:
 	# never did anything; the reset used to run on turn one as well, and those relics were dead.
 	if turn_number > 1:
 		player_stats.reset_block()
+		_first_block = 0
 	tick_start_of_turn(player_stats)
 
 	if player_stats.is_dead():
@@ -825,17 +830,31 @@ func deal_damage(target: CombatantStats, base_amount: int,
 func apply_block(target: CombatantStats, amount: int) -> void:
 	var actual = amount + target.get_status_stacks(StatusEffects.DEXTERITY)
 	target.gain_block(actual)
+	if target == player_stats and not _first_block_gained and actual > 0:
+		_first_block_gained = true
+		_first_block = actual
 	Events.block_gained.emit(target, actual)
 
 
 ## Takes every point of a combatant's Block away (the hawk's Bind). Sent down the block signal as
 ## a negative gain, so the bar and the log read it as the guard going.
 func strip_block(target: CombatantStats) -> void:
-	if target.block <= 0:
+	var kept := _block_kept_from_strip(target)
+	if target.block <= kept:
 		return
-	var lost := target.block
-	target.reset_block()
+	var lost: int = target.block - kept
+	target.block = kept
 	Events.block_gained.emit(target, -lost)
+
+
+## How much of a combatant's Block a strip cannot take: of the player's first Block this fight, while
+## it stands, all of it with The Oath-Ring and a share of it under Guest of the Hall.
+func _block_kept_from_strip(target: CombatantStats) -> int:
+	if target != player_stats:
+		return 0
+	var share: int = 100 if RunManager.has_relic("The Oath-Ring") \
+		else RunManager.get_title_passive_total(TitleData.EffectType.FIRST_BLOCK_KEPT)
+	return mini(target.block, _first_block * share / 100)
 
 
 ## A flat HP loss a combatant inflicts on itself (a DamageEffect with apply_to_source: the

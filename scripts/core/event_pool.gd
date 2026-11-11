@@ -51,9 +51,9 @@ static func pool_for(realm_id: StringName, config_id: StringName) -> Array[Event
 	match RealmRoutes.key(realm_id, config_id):
 		"camelot/base":
 			pool = _camelot_pool()
-		# Yggdrasil's first config, on the realm's affairs, and Journey to the West: empty until
-		# their picks land. The stand-in edge has no events: its event slot is a fight.
-		"yggdrasil/base", "yggdrasil/standin_edge", "journey_to_the_west/base":
+		# Yggdrasil's first config has no random draw: everything on its edge is authored and seated
+		# (MapGenerator._EDGE_LAYOUT, event_scene). Journey to the West is empty until its picks land.
+		"yggdrasil/base", "journey_to_the_west/base":
 			pass
 		_:
 			push_error("EventPool: no such route '%s'." % RealmRoutes.key(realm_id, config_id))

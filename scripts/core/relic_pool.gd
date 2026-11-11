@@ -142,6 +142,12 @@ static func _build_quest_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_PICKUP,
 		RelicData.RelicEffect.NONE, 0))
 
+	# -- Brought out of the mound on Yggdrasil's edge, by force or by gift.
+	pool.append(_relic("The Oath-Ring",
+		"The hall's oath-ring, out of the mound. The first Block you gain each fight cannot be stripped.",
+		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_PICKUP,
+		RelicData.RelicEffect.NONE, 0))
+
 	# -- Fable liaison send-off gifts (A2). Granted at run start by apply_liaison_gift;
 	#    quest-only so they never appear in shops or reward rolls. Bram leans info, Neve
 	#    leans supplies. Modest, permanent-run relics; tune magnitudes in balance work.
