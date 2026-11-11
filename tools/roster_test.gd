@@ -57,9 +57,13 @@ func _ready() -> void:
 	_test_master_of_game()
 	_test_map_node_looks()
 	_test_card_face_words()
+	_test_crossing_switch()
+	# The crossing is off in the game until the door's design says how it shows; its tests turn it on.
+	MapGenerator.crossing_enabled = true
 	_test_crossing()
 	_test_yggdrasil_edge()
 	_test_title_round_trip()
+	MapGenerator.crossing_enabled = false
 	_test_forgotten_relics()
 	_test_relic_names()
 	_test_liaison_relics()
@@ -4092,6 +4096,33 @@ func _test_master_of_game() -> void:
 ## ward and the scabbard's guard; and a record site is seated late in every act.
 ## The node painter, the map peek and the legend all read MapNode.look(), so what it returns is
 ## what the player can see. A payoff must be indistinguishable until armed.
+## The crossing's switch is off by default, and while it is off no map seats one, so no seed rolls a
+## crossing in the game. The map is the same map either way, the seat aside.
+func _test_crossing_switch() -> void:
+	print("-- The crossing's switch --")
+	_check("the crossing is switched off", not MapGenerator.crossing_enabled)
+	var none_seated := true
+	var same_map := true
+	for s in range(20):
+		var off_rng := RandomNumberGenerator.new()
+		off_rng.seed = 900 + s
+		var off_map := MapGenerator.generate(off_rng, &"camelot", 1)
+		none_seated = none_seated and not _map_has_seat(off_map)
+		MapGenerator.crossing_enabled = true
+		var on_rng := RandomNumberGenerator.new()
+		on_rng.seed = 900 + s
+		var on_map := MapGenerator.generate(on_rng, &"camelot", 1)
+		MapGenerator.crossing_enabled = false
+		same_map = same_map and off_rng.state == on_rng.state and off_map.nodes.size() == on_map.nodes.size()
+		for id in off_map.nodes:
+			var a: MapNode = off_map.nodes[id]
+			var b: MapNode = on_map.nodes[id]
+			same_map = same_map and a.node_type == b.node_type and a.next_nodes == b.next_nodes \
+				and a.scripted_event_id == b.scripted_event_id and a.quest_payoff_id == b.quest_payoff_id
+	_check("with it off, no Camelot first map seats a crossing (20 seeds)", none_seated)
+	_check("and each map is the one the switch on would roll, the seat aside", same_map)
+
+
 ## The crossing: one node on Camelot's first map, a far map of about five nodes, and a way back that
 ## puts everything where it was. tools/crossing_walk walks the same road through the real scenes.
 func _test_crossing() -> void:

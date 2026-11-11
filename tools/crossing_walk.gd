@@ -30,12 +30,15 @@ func _ready() -> void:
 	AudioManager.enabled = false
 	Engine.time_scale = TIME_SCALE
 	Engine.max_fps = MAX_FPS
+	# The crossing is switched off in the game; the walk is the one place it is meant to be on.
+	MapGenerator.crossing_enabled = true
 	await get_tree().process_frame
 	# Out from under change_scene, which would otherwise free this node with the first scene change.
 	get_tree().current_scene = null
 	print("\n== Crossing walk ==")
 	await _walk()
 	print("== %s ==\n" % ("WALK OK" if _fails == 0 else "%d FAILED" % _fails))
+	MapGenerator.crossing_enabled = false
 	Engine.time_scale = 1.0
 	get_tree().quit(_fails)
 

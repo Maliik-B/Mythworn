@@ -119,8 +119,8 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 	_apply_jitter(map, rng)
 
 	# Phase 9: the crossing. Last, and on a stream of its own, so seating it moves nothing: not the
-	# pledge's picks, not any later draw on `rng`.
-	if realm_id == &"camelot" and act == 1:
+	# pledge's picks, not any later draw on `rng`. Only while the switch is on.
+	if crossing_enabled and realm_id == &"camelot" and act == 1:
 		_place_crossing(map, rng)
 
 	return map
@@ -394,6 +394,12 @@ const CROSSING_SEAT_KINDS := [
 const CROSSING_REALM := &"yggdrasil"
 const CROSSING_MIN_FLOOR := 8
 const CROSSING_MAX_FLOOR := 10
+
+## The crossing's switch. Off until the door's design says how the crossing shows: with it off no map
+## seats one, and a seed rolls the same map, shops and run it rolled before the crossing was built. A
+## static and not a constant only so the tools that walk the crossing (roster_test, crossing_walk, the
+## linter's map survey) can turn it on for their own run; nothing in the game sets it.
+static var crossing_enabled := false
 
 
 static func _place_crossing(map: MapData, rng: RandomNumberGenerator) -> void:

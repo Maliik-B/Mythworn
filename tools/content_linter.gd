@@ -397,10 +397,13 @@ func _all_enemies() -> Array:
 	return out
 
 
-## Generates act-1 Camelot maps and records where the seated nodes landed.
+## Generates act-1 Camelot maps and records where the seated nodes landed. The crossing is switched
+## off in the game; the survey turns it on, so the seat is still held to its rule for when it is on.
 func _map_survey() -> Dictionary:
 	var survey := {"count": 0, "raider_pairs_ok": 0, "huntsman_ok": 0, "record_ok": 0, "crossing_ok": 0,
 		"seated_ids": [], "doubled": 0, "bad": []}
+	var switch_was: bool = MapGenerator.crossing_enabled
+	MapGenerator.crossing_enabled = true
 	for s in MAP_SEEDS:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 1000 + s
@@ -452,6 +455,7 @@ func _map_survey() -> Dictionary:
 			survey["crossing_ok"] += 1
 		else:
 			survey["bad"].append("seed %d: not exactly one crossing, on its floors, on a free node" % (1000 + s))
+	MapGenerator.crossing_enabled = switch_was
 	return survey
 
 
