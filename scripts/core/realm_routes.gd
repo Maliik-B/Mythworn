@@ -10,6 +10,11 @@ class_name RealmRoutes
 ## A realm's first config.
 const BASE := &"base"
 
+## The realm a crossing opens on -> the config its far side runs on.
+const CROSSING_CONFIGS := {
+	&"yggdrasil": BASE,
+}
+
 
 ## The key both pools match on.
 static func key(realm_id: StringName, config_id: StringName) -> String:

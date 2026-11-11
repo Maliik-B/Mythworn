@@ -28,6 +28,10 @@ var quest_payoff_id: StringName = &""
 # is on the map, so a run can route to it. The Master of Game (the huntsman selling his lord's
 # animals) is seated once a map by MapGenerator._place_master_of_game. &"" = an ordinary node.
 var scripted_event_id: StringName = &""
+# A crossing: stepping on this node leaves the map for the realm named here or, on a far map, goes
+# back to it. Seated by MapGenerator._place_crossing on top of an ordinary node whose node_type stays
+# as it was, so anything that reads the map's shape sees the same map. &"" = not a crossing.
+var crossing_to: StringName = &""
 # Purely-cosmetic sub-cell offsets (in fractions of a cell) so the rendered graph
 # looks organically placed instead of a rigid lattice. Set by MapGenerator; the
 # grid column/floor still drive connectivity, balance, and layout — jitter never
@@ -56,6 +60,15 @@ const TYPE_LOOKS := {
 	NodeType.BOSS: {"glyph": "★", "name": "Boss", "color": Color(0.95, 0.15, 0.15),
 		"order": 100, "font": 32, "landmark": true, "loud": [0.15, 0.35, 0.0, 0.5]},
 }
+# A crossing has no name in the game, so it is flagged `unnamed`: the legend shows its glyph alone and
+# the linter lets it off. It wears the weather of the realm it opens on, never one look across realms.
+# Keyed by that realm. Placeholder glyphs until the crossing's presentation lands.
+const CROSSING_LOOKS := {
+	&"yggdrasil": {"glyph": "❄", "name": "", "unnamed": true, "color": Color(0.8, 0.9, 1.0),
+		"order": 95, "font": 26, "landmark": true},
+	&"camelot": {"glyph": "☀", "name": "", "unnamed": true, "color": Color(0.99, 0.83, 0.42),
+		"order": 95, "font": 26, "landmark": true},
+}
 # Drained: the elite is still there, with the fight gone out of it.
 const WEAKENED_ELITE_LOOK := {"glyph": "☠", "name": "Weakened Elite", "color": Color(0.5, 0.56, 0.62), "order": 25}
 # Seated scripted events, meant to be found and routed to, so each shows what it is.
@@ -73,6 +86,8 @@ const QUEST_MARK_LOOK := {"glyph": "◎", "name": "Quest", "color": Color(1.0, 0
 
 ## What this node shows. `quest_armed` is the caller's, since arming lives in RunManager.
 func look(quest_armed: bool = false) -> Dictionary:
+	if CROSSING_LOOKS.has(crossing_to):
+		return CROSSING_LOOKS[crossing_to]
 	if quest_armed and quest_payoff_id != &"":
 		return QUEST_MARK_LOOK
 	if SCRIPTED_LOOKS.has(scripted_event_id):

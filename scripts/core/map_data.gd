@@ -10,6 +10,9 @@ var starting_node_ids: Array[int] = []
 # node id -> change kind (&"elite_added" = a combat node the Court pledge upgraded to elite;
 # &"weakened" = an elite the Folk pledge weakened). Empty on a neutral / no-pledge map.
 var pledge_changes: Dictionary = {}
+# The floors under this map's first row. 0 on a realm's own map. A crossing's far map carries the
+# depth it was entered at, so a fight out there scales like a fight that deep into the act.
+var floor_base: int = 0
 
 
 func get_node(id: int) -> MapNode:
@@ -60,6 +63,11 @@ func move_to(node_id: int) -> void:
 	var node = get_node(node_id)
 	if node:
 		node.visited = true
+
+
+## How deep into the act a node on this map counts, for encounter scaling and gold.
+func act_floor(node: MapNode) -> int:
+	return floor_base + node.floor_num
 
 
 func get_nodes_on_floor(floor_num: int) -> Array[MapNode]:

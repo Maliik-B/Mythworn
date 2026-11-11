@@ -118,6 +118,11 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 	# Phase 8: cosmetic placement jitter — organic look, never touches connectivity
 	_apply_jitter(map, rng)
 
+	# Phase 9: the crossing. Last, and on a stream of its own, so seating it moves nothing: not the
+	# pledge's picks, not any later draw on `rng`.
+	if realm_id == &"camelot" and act == 1:
+		_place_crossing(map, rng)
+
 	return map
 
 
@@ -374,6 +379,81 @@ static func _place_record_site(map: MapData, rng: RandomNumberGenerator) -> void
 	node.scripted_event_id = RECORD_SITE_IDS[rng.randi_range(0, RECORD_SITE_IDS.size() - 1)]
 
 
+# The crossing: a node that leads out of the realm and back. Seated once on the first map of a run,
+# late enough that the player has a deck to take with them, and shown from the start, so it is there
+# to be planned around. One jump and back only for now. It takes an ordinary node nothing else has
+# claimed, never the only node on its floor, so stepping through is always a choice of route.
+const CROSSING_REALM := &"yggdrasil"
+const CROSSING_MIN_FLOOR := 8
+const CROSSING_MAX_FLOOR := 10
+
+
+static func _place_crossing(map: MapData, rng: RandomNumberGenerator) -> void:
+	var cands: Array[int] = []
+	for id in map.nodes:
+		var n: MapNode = map.nodes[id]
+		if n.floor_num < CROSSING_MIN_FLOOR or n.floor_num > CROSSING_MAX_FLOOR:
+			continue
+		if _is_reserved_node(map, n):
+			continue
+		if n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT:
+			continue
+		if map.get_nodes_on_floor(n.floor_num).size() < 2:
+			continue
+		cands.append(id)
+	if cands.is_empty():
+		return
+	var fork := RandomNumberGenerator.new()
+	fork.seed = hash(str(rng.seed) + "crossing")
+	RngManager.shuffle(cands, fork)
+	map.nodes[cands[0]].crossing_to = CROSSING_REALM
+
+
+# A crossing's far side: the edge of another realm, with no boss and one way back. The way back is
+# two steps past the arrival by the short road; the long road goes through a guardian to reach it.
+# One table, so the realm's pick can reshape it: the slots are what its content fills.
+#
+#   floor 3:         way back
+#   floor 2:                    guardian
+#   floor 1:   event            fight
+#   floor 0:         arrival
+const _EDGE_LAYOUT := [
+	{"floor": 0, "column": 3, "type": MapNode.NodeType.EVENT, "next": [1, 2]},
+	{"floor": 1, "column": 2, "type": MapNode.NodeType.EVENT, "next": [4]},
+	{"floor": 1, "column": 4, "type": MapNode.NodeType.COMBAT, "next": [3]},
+	{"floor": 2, "column": 4, "type": MapNode.NodeType.ELITE, "next": [4]},
+	{"floor": 3, "column": 3, "type": MapNode.NodeType.EVENT, "next": [], "way_back": true},
+]
+
+
+## Builds the far map. `home_realm` is where its way back leads; `floor_base` is the depth the player
+## came from, which the far map's fights scale to. With no events to draw (`has_events` false), an
+## event slot is a fight.
+static func generate_edge(rng: RandomNumberGenerator, home_realm: StringName, floor_base: int,
+		has_events: bool) -> MapData:
+	var map := MapData.new()
+	map.floor_base = floor_base
+	var top := 0
+	for i in _EDGE_LAYOUT.size():
+		var slot: Dictionary = _EDGE_LAYOUT[i]
+		var node := MapNode.new()
+		node.id = i
+		node.floor_num = slot["floor"]
+		node.column = slot["column"]
+		node.node_type = slot["type"]
+		node.next_nodes.assign(slot["next"])
+		if slot.get("way_back", false):
+			node.crossing_to = home_realm
+		elif node.node_type == MapNode.NodeType.EVENT and not has_events:
+			node.node_type = MapNode.NodeType.COMBAT
+		map.nodes[i] = node
+		top = maxi(top, node.floor_num)
+	map.floor_count = top + 1
+	map.starting_node_ids.append(0)
+	_apply_jitter(map, rng)
+	return map
+
+
 # A treasure cache a random Campfire exposes mid-run. Unlike the raider payoff (seated at
 # gen with a known giver), the Campfire can fire anywhere, so its payoff is chosen at the
 # moment of investigation from the nodes still AHEAD of where the player is standing. This
@@ -448,6 +528,8 @@ static func _is_reserved_node(map: MapData, n: MapNode) -> bool:
 	if n.floor_num == 0 or n.floor_num >= map.floor_count - 2:
 		return true
 	if n.quest_giver_id != &"" or n.quest_payoff_id != &"" or n.scripted_event_id != &"":
+		return true
+	if n.crossing_to != &"":
 		return true
 	return false
 

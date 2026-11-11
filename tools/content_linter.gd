@@ -399,7 +399,7 @@ func _all_enemies() -> Array:
 
 ## Generates act-1 Camelot maps and records where the seated nodes landed.
 func _map_survey() -> Dictionary:
-	var survey := {"count": 0, "raider_pairs_ok": 0, "huntsman_ok": 0, "record_ok": 0,
+	var survey := {"count": 0, "raider_pairs_ok": 0, "huntsman_ok": 0, "record_ok": 0, "crossing_ok": 0,
 		"seated_ids": [], "doubled": 0, "bad": []}
 	for s in MAP_SEEDS:
 		var rng := RandomNumberGenerator.new()
@@ -410,8 +410,11 @@ func _map_survey() -> Dictionary:
 		var payoff := -1
 		var hunt := -1
 		var rec := -1
+		var crossings: Array[MapNode] = []
 		for id in map.nodes:
 			var n: MapNode = map.nodes[id]
+			if n.crossing_to != &"":
+				crossings.append(n)
 			if n.quest_giver_id == MapGenerator.QUEST_ID:
 				giver = id
 			if n.quest_payoff_id == MapGenerator.QUEST_ID:
@@ -442,6 +445,13 @@ func _map_survey() -> Dictionary:
 			survey["record_ok"] += 1
 		else:
 			survey["bad"].append("seed %d: no record site seated late" % (1000 + s))
+		if crossings.size() == 1 and crossings[0].floor_num >= MapGenerator.CROSSING_MIN_FLOOR \
+				and crossings[0].floor_num <= MapGenerator.CROSSING_MAX_FLOOR \
+				and crossings[0].quest_giver_id == &"" and crossings[0].quest_payoff_id == &"" \
+				and crossings[0].scripted_event_id == &"":
+			survey["crossing_ok"] += 1
+		else:
+			survey["bad"].append("seed %d: not exactly one crossing, on its floors, on a free node" % (1000 + s))
 	return survey
 
 
@@ -460,6 +470,11 @@ func _node_looks(survey: Dictionary) -> Array:
 			scripted.append(id)
 	for id in scripted:
 		out.append(_look_record("scripted %s" % id, MapNode.SCRIPTED_LOOKS.get(StringName(id), {})))
+	# Each realm a crossing opens on, and the realm its way back leads home to.
+	var crossing_ends: Array = RealmRoutes.CROSSING_CONFIGS.keys()
+	crossing_ends.append(&"camelot")
+	for id in crossing_ends:
+		out.append(_look_record("crossing to %s" % id, MapNode.CROSSING_LOOKS.get(id, {})))
 	out.append(_look_record("weakened elite", MapNode.WEAKENED_ELITE_LOOK))
 	out.append(_look_record("quest mark", MapNode.QUEST_MARK_LOOK))
 	return out
@@ -467,7 +482,7 @@ func _node_looks(survey: Dictionary) -> Array:
 
 func _look_record(key: String, look: Dictionary) -> Dictionary:
 	return {"key": key, "name": String(look.get("name", "")), "glyph": String(look.get("glyph", "")),
-		"has_order": look.has("order"), "has_color": look.has("color")}
+		"has_order": look.has("order"), "has_color": look.has("color"), "unnamed": look.get("unnamed", false)}
 
 
 func _authored_strings(events: Array, relics: Array, cons: Dictionary, pets: Dictionary) -> Array:
@@ -747,8 +762,10 @@ func _rule_node_looks(w: Dictionary) -> Array:
 	var out: Array = []
 	var seen := {}
 	for r in w["node_looks"]:
+		# Only a kind that says so may go without a name (a crossing); it still needs its glyph.
 		if r["name"].strip_edges() == "":
-			out.append("%s has no name" % r["key"])
+			if not r.get("unnamed", false):
+				out.append("%s has no name" % r["key"])
 		elif seen.has(r["name"]):
 			out.append("%s shares the name '%s' with %s, and the legend would merge them" % [r["key"], r["name"], seen[r["name"]]])
 		else:

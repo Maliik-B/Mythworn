@@ -75,12 +75,24 @@ var run_stats: Dictionary = {}
 # current_realm is a StringName id; resolve via RealmRegistry.get_realm()
 var current_realm_id: StringName = &"camelot"
 # Tracks which realms have been visited this run (in entry order).
-# Used by the Realm Selection screen to exclude already-visited realms.
+# Used by the Realm Selection screen to exclude already-visited realms. A trip across a crossing
+# does not count: it is not a realm the player was sent to, and it must not close one off.
 var visited_realm_ids: Array[StringName] = []
 # The current realm's run-shape config (difficulty / economy / map knobs), set by the
 # realm-entry VN choice (Camelot: court vs common folk). Neutral by default; reset at run
 # start and re-set on entering each realm. See RealmConfig + docs/REALM_CAMELOT.md.
 var realm_config := RealmConfig.new()
+
+# --- The crossing ---
+# Across a crossing current_realm_id, current_map and realm_config all belong to the far side, so
+# the map, the pools and the skin need no special case. These hold the home realm's, as they were
+# left, for the way back. &"" / null = at home. Never on the profile.
+var _home_realm_id: StringName = &""
+var _home_map: MapData = null
+var _home_config: RealmConfig = null
+# The trip just made: {from, to, node_id, floor, nodes_walked}. Empty if none this run. What a later
+# "it moved on" beat reads on the way back; nothing does yet.
+var last_crossing: Dictionary = {}
 
 # --- Titles ---
 # All title ids the player has earned this run (whether equipped or not).
@@ -239,6 +251,11 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	run_active = true
 	current_map = null
 	realm_config = RealmConfig.new()  # neutral until the realm-entry VN sets it
+	# A run that ended across a crossing starts the next one from home, with no border to cross.
+	if is_abroad():
+		current_realm_id = _home_realm_id
+	_clear_crossing()
+	last_crossing = {}
 	pending_enemies.clear()
 	pending_gold_reward = 0
 	pending_relic_reward = false
@@ -321,6 +338,9 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 ## signature) event node is entered, so a story beat can be guaranteed on the player's Nth
 ## event while the rest stay random. General: any ordinal in scripted_event_schedule works.
 func next_ordinary_event_script() -> StringName:
+	# A pinned beat belongs to the realm it was pinned for. Abroad nothing fires and nothing counts.
+	if is_abroad():
+		return &""
 	ordinary_event_count += 1
 	return scripted_event_schedule.get(ordinary_event_count, &"")
 
@@ -581,6 +601,80 @@ func has_visited_realm(realm_id: StringName) -> bool:
 	return visited_realm_ids.has(realm_id)
 
 
+# --- The crossing ---
+
+## True while the player is on the far side of a crossing.
+func is_abroad() -> bool:
+	return _home_realm_id != &""
+
+
+## The realm the player belongs to: where they stand or, abroad, the realm they stepped out of.
+func home_realm_id() -> StringName:
+	return _home_realm_id if is_abroad() else current_realm_id
+
+
+## The home realm's map: the one being walked or, abroad, the one waiting.
+func home_map() -> MapData:
+	return _home_map if is_abroad() else current_map
+
+
+## Steps through a crossing from the current node: the far map, realm and config take over, and the
+## home ones are kept as they are. This goes round set_current_realm on purpose, because a trip with
+## a way back is not leaving: no entry in visited_realm_ids, no title tier change, nothing expires at
+## the border. One jump only for now, so a second is refused. Returns false if it could not cross.
+func cross_to(realm_id: StringName) -> bool:
+	if is_abroad():
+		push_error("cross_to: already across a crossing; a second jump is not built.")
+		return false
+	if current_map == null or not RealmRoutes.CROSSING_CONFIGS.has(realm_id):
+		push_error("cross_to: no far side for realm '%s'." % realm_id)
+		return false
+	var node := current_map.get_node(current_map.current_node_id)
+	if node == null:
+		push_error("cross_to: the player is not on a node.")
+		return false
+	var config := RealmConfig.new()
+	config.route_id = RealmRoutes.CROSSING_CONFIGS[realm_id]
+	# A stream of its own, so walking the far map moves nothing on the home realm's.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(str(RngManager.run_seed) + "edge" + String(realm_id))
+	var far_map := MapGenerator.generate_edge(rng, current_realm_id, node.floor_num + 1,
+		EventPool.has_events(realm_id, config.route_id))
+	last_crossing = {"from": current_realm_id, "to": realm_id, "node_id": node.id,
+		"floor": node.floor_num, "nodes_walked": 0}
+	_home_realm_id = current_realm_id
+	_home_map = current_map
+	_home_config = realm_config
+	current_realm_id = realm_id
+	current_map = far_map
+	realm_config = config
+	return true
+
+
+## Takes the way back: the home realm's map, position, config and realm return exactly as they were
+## left. Returns false if the player is not abroad.
+func return_from_crossing() -> bool:
+	if not is_abroad():
+		push_error("return_from_crossing: not across a crossing.")
+		return false
+	var walked := 0
+	for id in current_map.nodes:
+		if current_map.nodes[id].visited:
+			walked += 1
+	last_crossing["nodes_walked"] = walked
+	current_realm_id = _home_realm_id
+	current_map = _home_map
+	realm_config = _home_config
+	_clear_crossing()
+	return true
+
+
+func _clear_crossing() -> void:
+	_home_realm_id = &""
+	_home_map = null
+	_home_config = null
+
+
 # --- Realm configuration (A2) ---
 
 ## Install a realm-shape config (from the realm-entry VN choice: Camelot court vs common
@@ -724,7 +818,7 @@ func use_consumable_on_map(item: ConsumableData) -> bool:
 			heal(item.value)
 			change_passion(-item.value2)
 		ConsumableData.Effect.STANDING_SHIFT:
-			change_realm_standing(current_realm_id, item.value)
+			change_realm_standing(home_realm_id(), item.value)
 		_:
 			return false
 	discard_consumable(item)
@@ -738,9 +832,10 @@ func is_consumable_spent(item: ConsumableData) -> bool:
 		return false
 	if is_quest_completed(item.quest_id) or not is_quest_active(item.quest_id):
 		return true
-	if current_map == null:
+	var map := home_map()
+	if map == null:
 		return false
-	return not MapGenerator.quest_payoff_ahead(current_map, item.quest_id)
+	return not MapGenerator.quest_payoff_ahead(map, item.quest_id)
 
 
 ## Internal: a realm-exclusive item leaves the pack when the player crosses into a different
@@ -819,7 +914,8 @@ func get_title_tier(title_id: StringName) -> TitleData.Tier:
 	var data := TitlePool.get_title(title_id)
 	if not data or data.category == TitleData.Category.PERSONALITY:
 		return TitleData.Tier.ORIGINAL
-	if current_realm_id == data.origin_realm_id:
+	# A trip across a crossing is not leaving: abroad, a title reads as it did at home.
+	if home_realm_id() == data.origin_realm_id:
 		# We're in the origin realm. If we've returned and reclaimed, back to Original.
 		# If we've returned but not reclaimed, Returning. Otherwise (still on original visit), Original.
 		var has_returned: bool = _title_has_returned.get(title_id, false)

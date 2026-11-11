@@ -102,7 +102,7 @@ func _ready() -> void:
 	# Returning to the map having just armed a questline: reveal the now-armed payoff node
 	# once. (Mutually exclusive with the pledge flourish, which only plays on a fresh map.) At
 	# most one questline is pending a reveal per return -- arming always happens inside an event.
-	elif RunManager.first_unrevealed_quest() != &"":
+	elif not RunManager.is_abroad() and RunManager.first_unrevealed_quest() != &"":
 		_prime_quest_reveal(RunManager.first_unrevealed_quest())
 	AudioManager.play_music("map")
 
@@ -265,7 +265,7 @@ func _refresh_legend() -> void:
 	var shown := {}
 	for id in node_buttons:
 		var look: Dictionary = node_buttons[id].get_meta("look")
-		shown[look["name"]] = look
+		shown[look["glyph"] + look["name"]] = look
 	var looks: Array = shown.values()
 	looks.sort_custom(func(a, b): return a["order"] < b["order"])
 	# Out of the column before freeing, so a rebuild never leaves a row standing to the frame's end.
@@ -273,10 +273,12 @@ func _refresh_legend() -> void:
 		_legend_key.remove_child(child)
 		child.queue_free()
 	for look in looks:
+		# A kind is its glyph and name together, so a nameless look (a crossing) is still a kind of
+		# its own: a glyph with no word beside it.
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		row.mouse_filter = Control.MOUSE_FILTER_STOP
-		row.mouse_entered.connect(_light_legend.bind(look["name"]))
+		row.mouse_entered.connect(_light_legend.bind(look["glyph"] + look["name"]))
 		row.mouse_exited.connect(_light_legend.bind(""))
 		var glyph := Label.new()
 		glyph.text = look["glyph"]
@@ -294,24 +296,25 @@ func _refresh_legend() -> void:
 	_legend_plate.visible = not looks.is_empty()
 
 
-## Points the map at one kind of node: every node wearing that look gets a ring and full light, and
-## the rest step back. "" gives the nodes back their states. Held off while a flourish repaints.
-func _light_legend(look_name: String) -> void:
-	if look_name == _legend_lit or (_pledge_anim_active and look_name != ""):
+## Points the map at one kind of node (its look's glyph and name): every node wearing that look gets
+## a ring and full light, and the rest step back. "" gives the nodes back their states. Held off
+## while a flourish repaints.
+func _light_legend(look_key: String) -> void:
+	if look_key == _legend_lit or (_pledge_anim_active and look_key != ""):
 		return
 	for ring in _legend_rings:
 		if is_instance_valid(ring):
 			ring.get_parent().remove_child(ring)
 			ring.queue_free()
 	_legend_rings.clear()
-	_legend_lit = look_name
-	if look_name == "":
+	_legend_lit = look_key
+	if look_key == "":
 		_update_node_states()
 		return
 	for id in node_buttons:
 		var btn: Button = node_buttons[id]
 		var look: Dictionary = btn.get_meta("look")
-		if look["name"] != look_name:
+		if look["glyph"] + look["name"] != look_key:
 			btn.modulate.a = LEGEND_DIM
 			continue
 		btn.modulate = Color.WHITE
@@ -1668,6 +1671,9 @@ func _create_node_button(node: MapNode) -> Button:
 	# can be given its name back. Named, so a keeper carrying one can route to it.
 	elif node.scripted_event_id in MapGenerator.RECORD_SITE_IDS:
 		btn.tooltip_text = RECORD_SITE_TOOLTIPS.get(node.scripted_event_id, "A place that keeps records")
+	# A crossing has no name, so it has nothing to say either.
+	if node.crossing_to != &"":
+		btn.tooltip_text = ""
 
 	btn.pressed.connect(_on_node_clicked.bind(node))
 	btn.mouse_entered.connect(_on_node_hover.bind(node))
@@ -1761,6 +1767,9 @@ func _on_node_clicked(node: MapNode) -> void:
 
 func _on_node_hover(node: MapNode) -> void:
 	var floor_str = "Floor %d" % (node.floor_num + 1)
+	if node.crossing_to != &"":
+		info_label.text = floor_str
+		return
 	match node.node_type:
 		MapNode.NodeType.ELITE:
 			info_label.text = "Elite Combat: %s (Relic reward)" % floor_str
@@ -1783,10 +1792,16 @@ func _enter_node(node: MapNode) -> void:
 
 	# A queued "skip the next node" (the Tourney's walk-on shortcut): step onto this node to
 	# advance position, but pass over its content and leave its children available. Consumed
-	# once, and never on the boss -- the act still has to be finished.
-	if RunManager.pending_skip_node and node.node_type != MapNode.NodeType.BOSS:
+	# once, and never on the boss -- the act still has to be finished -- nor on a far map's way
+	# back, which has no children to leave available.
+	var way_back := RunManager.is_abroad() and node.crossing_to != &""
+	if RunManager.pending_skip_node and node.node_type != MapNode.NodeType.BOSS and not way_back:
 		RunManager.pending_skip_node = false
 		info_label.text = "You took the shortcut, skipping ahead."
+		return
+
+	if node.crossing_to != &"":
+		_take_crossing(node, way_back)
 		return
 
 	# Armed questline payoff: route to the quest's ambush instead of this node's normal type.
@@ -1796,14 +1811,16 @@ func _enter_node(node: MapNode) -> void:
 		SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		return
 
+	# On a realm's own map this is the node's floor; on a far map, how deep into the act it counts.
+	var act_floor: int = RunManager.current_map.act_floor(node)
 	match node.node_type:
 		MapNode.NodeType.COMBAT:
-			_start_combat(_combat_encounter(node.floor_num), 16 + node.floor_num * 2)
+			_start_combat(_combat_encounter(act_floor), 16 + act_floor * 2)
 		MapNode.NodeType.ELITE:
-			_start_combat(_elite_encounter(node.weakened), 34 + node.floor_num * 2, true, false)
+			_start_combat(_elite_encounter(node.weakened), 34 + act_floor * 2, true, false)
 		MapNode.NodeType.BOSS:
 			RunManager.pending_act_complete = true
-			_start_combat(_boss_encounter(), 50 + node.floor_num * 2, true, true)
+			_start_combat(_boss_encounter(), 50 + act_floor * 2, true, true)
 		MapNode.NodeType.REST:
 			SceneTransition.change_scene("res://scenes/rest/rest_scene.tscn")
 		MapNode.NodeType.MYSTERY:
@@ -1819,7 +1836,7 @@ func _enter_node(node: MapNode) -> void:
 				RunManager.pending_special_event = node.scripted_event_id
 			elif not EventPool.has_events(RunManager.current_realm_id, RunManager.realm_config.route_id):
 				# A route with no events yet: the node is a fight instead of an empty scene.
-				_start_combat(_combat_encounter(node.floor_num), 16 + node.floor_num * 2)
+				_start_combat(_combat_encounter(act_floor), 16 + act_floor * 2)
 				return
 			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		MapNode.NodeType.SWORD_IN_STONE:
@@ -1828,6 +1845,14 @@ func _enter_node(node: MapNode) -> void:
 			# the Sword-in-the-Stone content instead of pulling from EventPool.
 			RunManager.pending_special_event = &"sword_in_stone"
 			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
+
+
+## Steps through a crossing, or takes a far map's way back. The map scene reloads onto whichever map
+## RunManager now holds, so the far side's skin, nodes and legend come from the same path as home's.
+func _take_crossing(node: MapNode, way_back: bool) -> void:
+	var crossed := RunManager.return_from_crossing() if way_back else RunManager.cross_to(node.crossing_to)
+	if crossed:
+		SceneTransition.change_scene("res://scenes/map/map_scene.tscn")
 
 
 func _start_combat(enemies: Array[EnemyData], gold_reward: int = 0,

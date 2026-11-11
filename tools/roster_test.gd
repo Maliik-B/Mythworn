@@ -4105,6 +4105,12 @@ func _test_map_node_looks() -> void:
 	_check("a weakened elite has its own drained look", elite.look() == MapNode.WEAKENED_ELITE_LOOK)
 	for id in MapGenerator.RECORD_SITE_IDS:
 		_check("record site %s has a look" % id, MapNode.SCRIPTED_LOOKS.has(id))
+	var crossing := MapNode.new()
+	crossing.node_type = MapNode.NodeType.COMBAT
+	crossing.crossing_to = MapGenerator.CROSSING_REALM
+	_check("a crossing wears the realm it opens on over the node it sits on, and has no name",
+		crossing.look() == MapNode.CROSSING_LOOKS[MapGenerator.CROSSING_REALM]
+		and crossing.look()["name"] == "" and crossing.look()["unnamed"] and crossing.look()["landmark"])
 
 
 ## The map's flourishes are presentation: however one ends, the map is left at rest, showing what the
