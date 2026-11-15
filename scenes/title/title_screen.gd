@@ -65,7 +65,7 @@ func _build_ui() -> void:
 
 	# Tagline
 	var tagline = Label.new()
-	tagline.text = "A realm being forgotten. Keep what is left."
+	tagline.text = "A realm being forgotten. Preserve what is left."
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tagline.add_theme_font_size_override("font_size", 16)
 	tagline.add_theme_color_override("font_color", Color(0.5, 0.48, 0.42))
