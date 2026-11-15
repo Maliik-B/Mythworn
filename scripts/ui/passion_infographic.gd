@@ -249,7 +249,7 @@ func _populate_cards(tier: int) -> void:
 		pole_name = "%s (Secondary)" % _ctx.sec
 	var suffix := ("  +%d%% damage" % roundi((mult - 1.0) * 100.0)) if mult > 1.0 else ""
 	var pin_tag := "  📌" if tier == _pinned_tier else ""
-	_right_title.text = "%s — %s cards%s%s" % [PassionState.tier_name(tier), pole_name, suffix, pin_tag]
+	_right_title.text = "%s: %s cards%s%s" % [PassionState.tier_name(tier), pole_name, suffix, pin_tag]
 
 	var deck: Array = RunManager.current_deck if RunManager.current_deck else []
 	var found := false
@@ -321,7 +321,7 @@ static func _make_zone_row(ctx: Dictionary, t: int) -> PanelContainer:
 	var effects := {
 		PassionState.Tier.BLAZING: "%s +%d%%   ·   %s −%d%%" % [prim, ext_pct, sec, ext_pct],
 		PassionState.Tier.INSPIRED: "%s +%d%%   ·   %s −%d%%  (leaning)" % [prim, lean_pct, sec, lean_pct],
-		PassionState.Tier.STEADY: "balanced — the generalist's pool (no zone modifier)",
+		PassionState.Tier.STEADY: "balanced: the generalist's pool (no zone modifier)",
 		PassionState.Tier.WAVERING: "%s +%d%%   ·   %s −%d%%  (leaning)" % [sec, lean_pct, prim, lean_pct],
 		PassionState.Tier.HOLLOW: "%s +%d%%   ·   %s −%d%%" % [sec, ext_pct, prim, ext_pct],
 	}

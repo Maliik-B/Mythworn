@@ -111,7 +111,7 @@ void fragment() {
 	# don't consume the rest: manage titles and peek at the map. Banners and the
 	# map view can both be used freely, then you still get to Rest or Smith.
 	var free_caption = Label.new()
-	free_caption.text = "Free — these don't use your rest"
+	free_caption.text = "Free: these don't use your rest"
 	free_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	free_caption.add_theme_font_size_override("font_size", 14)
 	free_caption.add_theme_color_override("font_color", Color(0.55, 0.6, 0.55))
@@ -613,7 +613,7 @@ func _build_swap_slot_card(slot: int) -> PanelContainer:
 		style.border_color = Color(0.25, 0.22, 0.3)
 		panel.add_theme_stylebox_override("panel", style)
 		var empty = Label.new()
-		empty.text = "— empty —"
+		empty.text = "Empty"
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty.add_theme_font_size_override("font_size", 18)
 		empty.add_theme_color_override("font_color", Color(0.35, 0.35, 0.4))

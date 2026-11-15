@@ -71,7 +71,7 @@ func _build() -> void:
 	vbox.add_child(header)
 
 	var subtitle := Label.new()
-	subtitle.text = "What you already carry — plan your purchases around it."
+	subtitle.text = "What you already carry. Plan your purchases around it."
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 13)
 	subtitle.add_theme_color_override("font_color", Color(0.6, 0.58, 0.55))
@@ -108,7 +108,7 @@ func _build() -> void:
 func _build_relics_section(parent: VBoxContainer) -> void:
 	_section_header(parent, "Relics (%d)" % RunManager.relics.size(), Color(0.7, 0.55, 0.9))
 	if RunManager.relics.is_empty():
-		_empty_note(parent, "No relics yet — one from these shelves would be your first.")
+		_empty_note(parent, "No relics yet. One from these shelves would be your first.")
 		return
 
 	var grid := GridContainer.new()

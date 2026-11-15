@@ -39,6 +39,6 @@ func decay_note() -> String:
 		Decay.TURN_TICK:
 			return "Loses 1 each turn"
 		Decay.TEMPORARY:
-			return "Temporary — expires after it triggers"
+			return "Expires after it triggers"
 		_:
 			return "Persists for the rest of combat"
