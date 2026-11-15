@@ -181,7 +181,10 @@ static func _measure(key: String, font: Font, glyph: String, font_size: int, box
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color", "font_focus_color"]:
 		probe.add_theme_color_override(state, Color.WHITE)
 	viewport.add_child(probe)
-	loop.root.add_child(viewport)
+	# Deferred, since the splash primes from its _ready while the root is still adding it, and the root
+	# refuses a child then: the probe would never draw and every glyph would read as centred. It still
+	# joins the tree before the frame is drawn.
+	loop.root.add_child.call_deferred(viewport)
 	_measuring += 1
 	await loop.process_frame
 	await loop.process_frame
