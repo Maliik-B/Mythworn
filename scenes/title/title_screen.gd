@@ -42,7 +42,7 @@ func _build_ui() -> void:
 
 	# Title
 	var title = Label.new()
-	title.text = "FABLE"
+	title.text = "MYTHWORN"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 96)
 	title.add_theme_color_override("font_color", Color(0.95, 0.82, 0.4))
@@ -51,7 +51,7 @@ func _build_ui() -> void:
 
 	# Subtitle
 	var subtitle = Label.new()
-	subtitle.text = "A Narrative Deckbuilder"
+	subtitle.text = "A Narrative Roguelike Deckbuilder"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 24)
 	subtitle.add_theme_color_override("font_color", Color(0.65, 0.6, 0.5))
@@ -65,7 +65,7 @@ func _build_ui() -> void:
 
 	# Tagline
 	var tagline = Label.new()
-	tagline.text = "Every choice writes a page. Every battle turns one."
+	tagline.text = "A realm being forgotten. Keep what is left."
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tagline.add_theme_font_size_override("font_size", 16)
 	tagline.add_theme_color_override("font_color", Color(0.5, 0.48, 0.42))
@@ -79,7 +79,7 @@ func _build_ui() -> void:
 
 	# Start button
 	var start_btn = Button.new()
-	start_btn.text = "Begin Your Fable"
+	start_btn.text = "Begin"
 	start_btn.custom_minimum_size = Vector2(320, 70)
 	start_btn.add_theme_font_size_override("font_size", 24)
 	start_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER

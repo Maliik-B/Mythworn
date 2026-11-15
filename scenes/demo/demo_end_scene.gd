@@ -227,7 +227,7 @@ func _add_stat_line(parent: VBoxContainer, label: String, value: String, color: 
 
 func _build_wishlist(vbox: VBoxContainer) -> void:
 	var header = Label.new()
-	header.text = "Wishlist Fable on Steam"
+	header.text = "Wishlist Mythworn on Steam"
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	header.add_theme_font_size_override("font_size", 24)
 	header.add_theme_color_override("font_color", Color(0.95, 0.82, 0.4))

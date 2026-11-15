@@ -53,7 +53,7 @@ func _build_ui() -> void:
 
 	# Title
 	var title = Label.new()
-	title.text = "FABLE"
+	title.text = "MYTHWORN"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 72)
 	title.add_theme_color_override("font_color", Color(0.95, 0.82, 0.4))
@@ -61,7 +61,7 @@ func _build_ui() -> void:
 
 	# Subtitle
 	var subtitle = Label.new()
-	subtitle.text = "A Portfolio Production"
+	subtitle.text = "Oddseed Games"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 18)
 	subtitle.add_theme_color_override("font_color", Color(0.45, 0.4, 0.55))
