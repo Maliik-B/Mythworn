@@ -26,7 +26,7 @@ extends Resource
 ## HP restored whenever the player lands a crowd-control status (Weak or Frozen) on an
 ## enemy. The glass-Water pole's non-block answer to attrition: playing your control cards
 ## mends you, so you recover by STILLING the enemy rather than by armoring up. Auto-gates
-## by pole — a Physical build applies Vulnerable/Strength, not Weak/Frozen, so it never
+## by pole: a Physical build applies Vulnerable/Strength, not Weak/Frozen, so it never
 ## triggers. 0 for characters without the trait.
 @export var control_heal: int = 0
 

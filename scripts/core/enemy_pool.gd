@@ -46,14 +46,14 @@ const _COMBAT_POOL := [
 	["knight_squire", 0.9],       # Strength snowball + Vulnerable-on-you setup
 	["acolyte_shade", 0.9],       # Weak + curse pollution (annoyance/attrition)
 	["manatarms_solo", 0.6],      # a lone clean bruiser
-	["two_squires", 0.7],         # double glass harasser — stacking Vulnerable, low HP
+	["two_squires", 0.7],         # double glass harasser: stacking Vulnerable, low HP
 	# New Oct-2026 compositions (content-furnishing pass): the three new regulars give the
 	# pool a ranged-pierce threat, an escalation engine, and the first Poison body.
 	["pikeman_solo", 0.6],    # the pierce teacher, lone -- block isn't the whole answer
 	["pikeman_knight", 1.0],  # pierce + a bruiser body: split your defense
 	["herald_knight", 0.9],       # banner escalation + bruiser (gated out of the early act)
 	["rotting_solo", 0.7],        # the poison teacher, lone
-	["rotting_shade", 0.9],       # poison + curse pollution — layered attrition
+	["rotting_shade", 0.9],       # poison + curse pollution, layered attrition
 ]
 
 ## Camelot's four elites. Order matters: the bag is shuffled from this list, so changing it moves
@@ -154,7 +154,7 @@ static func _act_mult() -> float:
 
 
 static func _pick_encounter_key(floor_num: int, rows: Array, last_key: String) -> String:
-	# Gate the attrition pairing (Golem + Conspirator) out of the early act — the
+	# Gate the attrition pairing (Golem + Conspirator) out of the early act: the
 	# sim showed it costs ~half your HP on a fresh deck. It appears once decks ramp.
 	var pool := []
 	for entry in rows:
@@ -249,9 +249,9 @@ static var _elite_bags: Dictionary = {}
 
 
 ## One elite for an elite node. The four test different axes: Champion (adaptability /
-## HP-band phases), False Prophet (the Passion crucible), Iron Verdict (retaliation —
+## HP-band phases), False Prophet (the Passion crucible), Iron Verdict (retaliation:
 ## punishes chip/multi-hit, rewards big single hits), Hollow Prelate (a throughput / DPS
-## check — out-damage its heal+shield). difficulty_mult is the A2 hook.
+## check: out-damage its heal+shield). difficulty_mult is the A2 hook.
 static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData]:
 	var result: Array[EnemyData] = []
 	var row := _row_with("elites")
@@ -277,7 +277,7 @@ static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData
 	return result
 
 
-## Clears per-run encounter memory — the elite shuffle-bags and the last-combat keys — so
+## Clears per-run encounter memory, the elite shuffle-bags and the last-combat keys, so
 ## a fresh run's elites don't repeat and it doesn't inherit the prior run's anti-repeat
 ## state. Called from RunManager.start_run.
 static func reset_encounter_state() -> void:
@@ -373,7 +373,7 @@ static func court_conspirator(mult := 1.0) -> EnemyData:
 			[_passion(-4), _status(StatusEffects.WEAK, 1)], 2.2, 3),
 		# The coordinator: he's usually fought alongside a bruiser (Knight/Golem), and
 		# Rally the Court hands Strength to the whole group (himself included). Makes him
-		# a priority kill — leave him up and the pairing snowballs. Cooldown paces it.
+		# a priority kill: leave him up and the pairing snowballs. Cooldown paces it.
 		_move("Rally the Court", EnemyMove.IntentType.BUFF,
 			[_ally_status(StatusEffects.STRENGTH, 1)], 1.1, 2),
 	]
@@ -417,11 +417,11 @@ static func realm_shade(mult := 1.0) -> EnemyData:
 	return _enemy("Realm Shade", _scale(34, mult), moves)
 
 
-## Man-at-Arms (Med HP). A plain, honest bruiser — steady sustained damage, an
+## Man-at-Arms (Med HP). A plain, honest bruiser, steady sustained damage, an
 ## occasional shield-up, and a telegraphed overhead on a 2-turn rhythm. No status
 ## gimmick: he's the clean new hallway BODY that pairs with the debuff/support enemies
 ## for fresh compositions (added Sep 2026 to thicken the thin roster, #18). The damage
-## race — block his rhythm or out-pace him.
+## race: block his rhythm or out-pace him.
 ## The same man twice in one fight, whole and hollow: the shipped Man-at-Arms, same numbers and same
 ## sheet, one with the colour gone. Not in any encounter table, so no seed moves.
 static func whole_and_hollow(mult := 1.0) -> Array[EnemyData]:
@@ -439,7 +439,7 @@ static func man_at_arms(mult := 1.0) -> EnemyData:
 			[_dmg(_scale(9, mult))], 2.0),
 		_move("Raise Shield", EnemyMove.IntentType.DEFEND,
 			[_block(_scale(8, mult))], 1.0),
-		# The telegraphed heavy — the block-now beat. Cooldown paces it as a rhythm.
+		# The telegraphed heavy: the block-now beat. Cooldown paces it as a rhythm.
 		_move("Overhead Chop", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(14, mult))], 1.4, 2),
 	]
@@ -448,10 +448,10 @@ static func man_at_arms(mult := 1.0) -> EnemyData:
 
 ## Masterless Squire (Low HP). A squire whose knight is gone, reckless because no one is
 ## holding him to anything. A fast, fragile harasser whose signature Expose Weakness
-## puts VULNERABLE on the PLAYER — so his own follow-ups (and any bruiser he's paired
+## puts VULNERABLE on the PLAYER, so his own follow-ups (and any bruiser he's paired
 ## with) hit much harder. The priority-kill puzzle made about damage instead of Passion:
 ## drop him before the Vulnerable stacks turn a partner's hit into a spike (added Sep 2026,
-## #18). Glass — a couple of good hits end him, so the tension is whether you can spare them.
+## #18). Glass: a couple of good hits end him, so the tension is whether you can spare them.
 static func corrupted_squire(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
 		_move("Harry", EnemyMove.IntentType.ATTACK,
@@ -459,15 +459,15 @@ static func corrupted_squire(mult := 1.0) -> EnemyData:
 		# Sets Vulnerable on YOU. Cooldown so it can't chain you into a permanent 1.5x.
 		_move("Expose Weakness", EnemyMove.IntentType.DEBUFF,
 			[_status(StatusEffects.VULNERABLE, 1)], 1.4, 2),
-		# The payoff hit — bigger, and nastier if you let the Vulnerable land first.
+		# The payoff hit: bigger, and nastier if you let the Vulnerable land first.
 		_move("Reckless Charge", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(11, mult))], 1.1, 2),
 	]
 	return _enemy("Masterless Squire", _scale(24, mult), moves)
 
 
-## Prophet's Acolyte (Med HP). A low-damage cultist — one of the False Prophet's
-## followers — whose signature Sap Will lays WEAK on the player, blunting your offense.
+## Prophet's Acolyte (Med HP). A low-damage cultist, one of the False Prophet's
+## followers, whose signature Sap Will lays WEAK on the player, blunting your offense.
 ## The "your damage is throttled" threat: it rewards decks that can still push through
 ## (Water trades its own control, Physical leans on its raw floor), and punishes a
 ## fragile all-in. Chips and shields itself otherwise (added Sep 2026, #18). Ties the
@@ -512,7 +512,7 @@ static func corrupted_pikeman(mult := 1.0) -> EnemyData:
 ## Hollow Herald (Low HP). The escalation engine: it raises a blank standard (nothing on
 ## it, and they rally to it anyway) that hands
 ## Strength to the WHOLE group every turn it stands, so a paired bruiser's damage climbs the
-## longer the Herald lives. That makes it the priority kill — unlike the Court Conspirator's
+## longer the Herald lives. That makes it the priority kill, unlike the Court Conspirator's
 ## occasional one-shot rally, the Herald's banner compounds each turn. Fragile on its own;
 ## the threat is entirely what it does to its companions, so drop it first.
 static func hollow_herald(mult := 1.0) -> EnemyData:
@@ -585,7 +585,7 @@ static func champion_of_the_usurper(mult := 1.0) -> EnemyData:
 static func false_prophet(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
 		# ESCALATING PULL (design pass Sep 2026): both preaching moves build a stack of
-		# Zealotry, and PassionCenterEffect multiplies its pull by the Prophet's Zealotry —
+		# Zealotry, and PassionCenterEffect multiplies its pull by the Prophet's Zealotry,
 		# so the longer it lives, the harder it strips your pole (a race to silence it),
 		# rather than a flat tanky pull. Base pull also bumped (0.22/0.14 → 0.26/0.18) to bite
 		# against the tighter ±60 cap. Harness-calibration target (tools/combat_harness).
@@ -606,12 +606,12 @@ static func false_prophet(mult := 1.0) -> EnemyData:
 ## executioner-knight who begins ARMED with Enraged (strikes back per hit) and escalates
 ## it with Retribution, while turtling behind heavy block. Chip / multi-hit decks bleed
 ## themselves out on him; the counterplay is fewer, bigger hits landed when his guard is
-## down — so he pulls toward the Physical/secondary pole the way the Prophet pulls toward
+## down, so he pulls toward the Physical/secondary pole the way the Prophet pulls toward
 ## center. Enraged ignores block and fires per hit (see combat_engine.deal_damage), so it
 ## specifically punishes the multi-hit Water build. Numbers are a harness-calibration target.
 static func iron_verdict(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
-		# Filler pressure so stalling him out isn't free — you have to engage, and
+		# Filler pressure so stalling him out isn't free; you have to engage, and
 		# engaging is what the retaliation punishes.
 		_move("Backhand", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(9, mult))], 1.6),
@@ -623,7 +623,7 @@ static func iron_verdict(mult := 1.0) -> EnemyData:
 		# Cooldown so it ramps as a rhythm (2 -> 3 -> 4 ...) rather than spiking.
 		_move("Retribution", EnemyMove.IntentType.BUFF,
 			[_self_status(StatusEffects.ENRAGED, 1)], 1.0, 2),
-		# The telegraphed heavy — the strike-around / block-now moment.
+		# The telegraphed heavy: the strike-around / block-now moment.
 		_move("Cleaving Sentence", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(17, mult))], 1.3, 2),
 	]
@@ -635,7 +635,7 @@ static func iron_verdict(mult := 1.0) -> EnemyData:
 
 ## The Hollow Prelate (High HP). The throughput / DPS-check elite: a corrupted high cleric
 ## who mends himself and turtles behind heavy shields, so chip and slow control bleed out
-## against his sustain. The counterplay is raw throughput — out-damage the heal+block or the
+## against his sustain. The counterplay is raw throughput: out-damage the heal+block or the
 ## fight drags forever. A fresh axis vs the other three (Champion = adaptability, False
 ## Prophet = Passion, Iron Verdict = retaliation); no new combat tech, just heal + block +
 ## a Weak so stalling him isn't free. Ties the roster's rotting faith (Acolyte / False
@@ -644,12 +644,12 @@ static func the_hollow_prelate(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
 		_move("Chastening Blow", EnemyMove.IntentType.ATTACK,
 			[_dmg(_scale(12, mult))], 1.8),
-		# The shield wall — hitting into this wastes throughput you need for the heal race.
+		# The shield wall: hitting into this wastes throughput you need for the heal race.
 		_move("Sanctuary", EnemyMove.IntentType.DEFEND,
 			[_block(_scale(16, mult))], 1.3),
 		# The sustain that makes it a DPS check. Cooldown paces it so the heal undoes a
 		# round of chip rather than every hit. Self-heal does nothing at full HP, so it
-		# only bites once you've wounded him — the race is whether your damage outpaces it.
+		# only bites once you've wounded him; the race is whether your damage outpaces it.
 		_move("Draw on the Font", EnemyMove.IntentType.BUFF,
 			[_self_heal(_scale(14, mult))], 1.4, 2),
 		# Throttles your offense so stalling the heal race isn't free (echoes the Acolyte's
@@ -661,7 +661,7 @@ static func the_hollow_prelate(mult := 1.0) -> EnemyData:
 
 
 # ============================================================
-# CAMELOT QUESTLINE — THE RAIDERS (beast/bandit payoff fight)
+# CAMELOT QUESTLINE: THE RAIDERS (beast/bandit payoff fight)
 # ============================================================
 
 ## The Boar (High HP, the anchor). A bandit war-chief the countryside nicknamed for the way
@@ -698,7 +698,7 @@ static func weald_raider(mult := 1.0) -> EnemyData:
 
 
 # ============================================================
-# CAMELOT EVENT FIGHT — The Reliquary's chapel beast
+# CAMELOT EVENT FIGHT: The Reliquary's chapel beast
 # ============================================================
 
 ## The Shattered Choir (mini-boss). What reforms off the reliquary's walls when you refuse to
@@ -725,7 +725,7 @@ static func the_shattered_choir(mult := 1.0) -> EnemyData:
 
 
 # ============================================================
-# CAMELOT EVENT FIGHT — The Campfire cache's barrow-warden
+# CAMELOT EVENT FIGHT: The Campfire cache's barrow-warden
 # ============================================================
 
 ## The Barrow-Warden (solo, elite-weight). A knight laid in an old grave-mound with his hoard,
@@ -828,7 +828,7 @@ static func _edge_enemy(enemy_name: String, sprite_slot: String, hp: int, moves:
 
 
 # ============================================================
-# CAMELOT QUEST FIGHT — The Beast at the Stone (the Sword in the Stone's guardian)
+# CAMELOT QUEST FIGHT: The Beast at the Stone (the Sword in the Stone's guardian)
 # ============================================================
 
 ## The guardian in the run's act scaling, for the Sword in the Stone event's fight.
@@ -903,7 +903,7 @@ static func sword_guardian(mult := 1.0) -> EnemyData:
 
 
 # ============================================================
-# CAMELOT ACT-1 BOSS — Sir Caedmon, the Hollow Champion
+# CAMELOT ACT-1 BOSS: Sir Caedmon, the Hollow Champion
 # ============================================================
 
 ## Camelot's greatest champion, returned from the great evil as its weapon: a mirror
@@ -938,14 +938,14 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# Two 72-HP bars (144 total, ~the original 140). #24 lesson (harness-driven): the old
 	# fight was 2-round burst for ~no damage taken, but inflating his HP/damage just turned
 	# him into a 9-turn attrition meatgrinder (~67 HP-lost at 170) that also wiped the
-	# low-HP run-arrival decks — WRONG fix. The RIGHT fix is purely the guaranteed
+	# low-HP run-arrival decks. WRONG fix. The RIGHT fix is purely the guaranteed
 	# transition cost below: you literally cannot reach + fell bar 2 without eating the
 	# lash + Enraged retaliation, no matter how fast you burst. So his raw stats stay ~as
 	# they were (a fair boss for a normal deck) and only the burst gets taxed.
 	# phase-0 HP + moves seed the base fields so single-phase code paths still read sane.
 	# Harness-calibration target (docs/BALANCE_SNAPSHOTS.md).
 	var e := _enemy("Sir Caedmon", _scale(78, mult), phase1)
-	# .assign() (not `=`) for the typed Array[int]/Array[String] exports — a raw literal
+	# .assign() (not `=`) for the typed Array[int]/Array[String] exports: a raw literal
 	# is an untyped Array and debug builds break on the assignment (see docs pitfalls).
 	e.phase_hps.assign([_scale(78, mult), _scale(78, mult)])
 	e.phase_movesets = [phase1, phase2]
@@ -957,7 +957,7 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# burst. Enraged (per-hit retaliation) is now the RIGHT tool, not the wrong one: the
 	# redesigned Water pole wins through multi-hit torrents (Maelstrom / Riptide / Ripple /
 	# Overflow), so per-hit retaliation punishes exactly the burst that used to trivialize
-	# him — thematically, the puppet flailing at everything within reach.
+	# him: thematically, the puppet flailing at everything within reach.
 	# Lash 16→18 (content pass #3): the recenter lever alongside Onslaught 7×3→6×3. The
 	# Onslaught softening alone overshot (harness 76%→86%); this pace-independent +2 trims
 	# it back to the ~82% target midpoint without touching the per-turn phase-2 numbers.
@@ -1066,7 +1066,7 @@ static func _self_status(effect: StatusEffectData, stacks: int) -> StatusApplyEf
 	return e
 
 
-## Buffs every living enemy (self + allies) — support moves like the Conspirator's rally.
+## Buffs every living enemy (self + allies): support moves like the Conspirator's rally.
 static func _ally_status(effect: StatusEffectData, stacks: int) -> StatusApplyEffect:
 	var e := StatusApplyEffect.new()
 	e.status_effect = effect

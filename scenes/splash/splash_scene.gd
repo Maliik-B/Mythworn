@@ -1,5 +1,5 @@
 extends Control
-## Splash screen — brief branding display before the title screen.
+## Splash screen: brief branding display before the title screen.
 
 var _particles: Array[ColorRect] = []
 var _time := 0.0

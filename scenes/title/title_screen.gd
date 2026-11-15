@@ -1,5 +1,5 @@
 extends Control
-## Title screen — first thing the player sees.
+## Title screen: first thing the player sees.
 
 var _particles: Array[ColorRect] = []
 var _time := 0.0

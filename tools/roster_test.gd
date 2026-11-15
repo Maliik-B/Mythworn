@@ -361,7 +361,7 @@ func _test_water_rework() -> void:
 
 	# Orthogonality guard: Water is glass CONTROL, so NO Water card may apply Vulnerable
 	# to an enemy (Vulnerable is exclusively Physical's big-hit enabler now). Buff-self
-	# statuses don't count — this only bans debuffing the target with Vulnerable.
+	# statuses don't count: this only bans debuffing the target with Vulnerable.
 	var water_vuln := false
 	for c in prim:
 		for e in c.effects:
@@ -371,7 +371,7 @@ func _test_water_rework() -> void:
 	_check("no Water card applies Vulnerable (Vuln is Physical's alone)", not water_vuln)
 
 
-## Content pass #2 — the pole multi-hit wave. Verifies the two new multi-hit identities
+## Content pass #2: the pole multi-hit wave. Verifies the two new multi-hit identities
 ## stay ORTHOGONAL: Water's Cascade is a high-count (y≥3) multi that rides Overflow, never
 ## Strength; Physical's Twin Strike is a low-count (2-hit) multi that RIDES Strength; and
 ## Whetstone is the pool Strength engine that feeds it.
@@ -459,7 +459,7 @@ func _test_control_heal() -> void:
 
 ## The three new Sep-2026 regulars (#18 roster thickening): each exists with its
 ## signature move, and the two debuff signatures actually apply to the PLAYER (Squire's
-## Vulnerable, Acolyte's Weak) — the new "throttle you" threats.
+## Vulnerable, Acolyte's Weak), the new "throttle you" threats.
 func _test_new_regulars() -> void:
 	var maa := EnemyPool.man_at_arms()
 	_check("Man-at-Arms exists with Overhead Chop",
@@ -615,7 +615,7 @@ func _test_xcost_maelstrom() -> void:
 
 
 ## The swing gear (Q2): Wellspring surges Passion + each turn (uncommon after the #22
-## rarity nerf), Leaden Vow settles it − each turn — one relic per pole so a build-around
+## rarity nerf), Leaden Vow settles it − each turn, one relic per pole so a build-around
 ## player can commit fast in either direction.
 func _test_swing_relics() -> void:
 	var well := RelicPool.get_relic_by_name("Wellspring of Resolve")
@@ -630,7 +630,7 @@ func _test_swing_relics() -> void:
 
 
 ## The False Prophet's escalating pull (design pass Sep 2026): it builds Zealotry each
-## sermon, and PassionCenterEffect multiplies its pull by the source's Zealotry — so a
+## sermon, and PassionCenterEffect multiplies its pull by the source's Zealotry, so a
 ## longer fight strips your pole harder (race to silence it).
 func _test_prophet_escalation() -> void:
 	var prophet := EnemyPool.false_prophet()
@@ -679,7 +679,7 @@ func _test_starter_deck() -> void:
 	_check("strongest single-target starter attack is Physical",
 		strongest != null and strongest.personality == CardData.PersonalityType.SECONDARY)
 
-	# Physical Vulnerable enabler (Sunder) — the big-hit setup.
+	# Physical Vulnerable enabler (Sunder): the big-hit setup.
 	var sunder: CardData = by_name.get("Sunder")
 	var sunder_vuln := false
 	if sunder:
@@ -718,7 +718,7 @@ func _test_starter_deck() -> void:
 
 
 ## Map readability: the generated graph must be planar (no two edges cross) after the
-## _remove_edge_crossings straightening pass. Checks grid columns over many seeds — the
+## _remove_edge_crossings straightening pass. Checks grid columns over many seeds: the
 ## cosmetic jitter is too small to reorder columns, so grid-planarity == drawn-planarity.
 func _test_map_planarity() -> void:
 	var crossed := 0
@@ -728,7 +728,7 @@ func _test_map_planarity() -> void:
 		var map := MapGenerator.generate(rng, &"camelot", 1)
 		if _map_has_crossing(map):
 			crossed += 1
-	_check("map is planar — no crossing edges over 30 seeds", crossed == 0)
+	_check("map is planar: no crossing edges over 30 seeds", crossed == 0)
 
 
 ## True if any two edges on a floor-pair cross. Edges (c1→c2) and (c3→c4) cross iff their
@@ -749,7 +749,7 @@ func _map_has_crossing(map: MapData) -> bool:
 	return false
 
 
-## The A2 realm-config system: neutral by default, and the wired knobs flow through —
+## The A2 realm-config system: neutral by default, and the wired knobs flow through:
 ## enemy difficulty scales encounter HP, and elite frequency biases the map's elite count
 ## (without breaking planarity). reward_rarity / map_boon are fielded but not yet wired.
 ## Content is looked up by (realm, config). Camelot's row serves what it always has. A row with
@@ -2014,7 +2014,7 @@ func _test_event_scheduling() -> void:
 
 
 ## The VN plumbing (A2): VNData builds with chainable beats + choices, and a choice's
-## RealmConfig is what vn_scene applies to the run — the realm-entry consequence.
+## RealmConfig is what vn_scene applies to the run: the realm-entry consequence.
 func _test_vn_data() -> void:
 	var cfg := RealmConfig.new()
 	cfg.enemy_difficulty_mult = 1.3
@@ -2223,7 +2223,7 @@ func _test_entry_trade() -> void:
 		court == "A harder road that pays better. Two more elites wait on it, and every enemy gets 10% stronger. In return, the court is in your favor, and the cards and relics you find are more often rare.")
 	_check("the common folk's option says its trade",
 		folk == "A gentler road with a price. The people are in your favor, the road's elites are weakened, you start every fight with 8 Block, and every enemy gets 5% weaker. In return, the shops charge 20% more, and the cards and relics you find are more often common. Your Passion also falls to Wavering.")
-	_check("the trades carry no em dash", not (court + folk).contains("—"))
+	_check("the trades carry no em dash", not (court + folk).contains(String.chr(0x2014)))
 	_check("the court's elite count is the map's own",
 		MapGenerator.elites_added_for(entry.choices[0].config.elite_frequency_mult) == 2)
 	RunManager.pending_vn = entry
@@ -2268,7 +2268,7 @@ func _forward_reachable(map: MapData, start_id: int) -> Dictionary:
 
 
 ## Boss card reward: must offer a full 3, include at least one RARE, and never a
-## common/starter (uncommon-or-better) — the "3 commons off a boss" fix.
+## common/starter (uncommon-or-better): the "3 commons off a boss" fix.
 func _test_boss_reward() -> void:
 	var ch := RunManager.current_character
 	ch.primary_cards = CardPool.build_emo_primary_pool()
@@ -2305,7 +2305,7 @@ func _test_frozen_skips() -> void:
 
 
 ## Chilled (Cairn's signature Water DoT): a freeze-gauge DoT that resolves at the afflicted's
-## turn-END — flat chip + either a melt (below threshold) or a convert-to-Frozen (at threshold,
+## turn-END: flat chip + either a melt (below threshold) or a convert-to-Frozen (at threshold,
 ## spending all the chill). Enemy turns run with instant=true so the pacing timers are skipped.
 func _test_chilled_freeze() -> void:
 	_check("Chilled status is registered", StatusEffects.CHILLED != null)
@@ -2364,7 +2364,7 @@ func _test_chilled_freeze() -> void:
 		and not fen.stats.has_status(StatusEffects.STUN))
 	feng.free()
 
-	# Poison still ticks in its own lane (start-of-turn), independent of Chilled — a combatant
+	# Poison still ticks in its own lane (start-of-turn), independent of Chilled; a combatant
 	# can carry both at once. (The HP-per-tick bleed itself is covered in _test_content_enemies.)
 	var peng := CombatEngine.new()
 	add_child(peng)
@@ -2378,7 +2378,7 @@ func _test_chilled_freeze() -> void:
 	peng.free()
 
 
-## A minimal enemy whose only move is a guaranteed 20-damage attack — so a skipped
+## A minimal enemy whose only move is a guaranteed 20-damage attack, so a skipped
 ## turn is unambiguous (any hit would show as lost player HP).
 ## The Beast at the Stone: two bars; the drill in phase 1; phase 2 converting down its own
 ## bar (the combo sheds a hit per band and is gone at the bottom); Breaking Blow costs him.
@@ -5077,7 +5077,7 @@ func _test_forgotten_relics() -> void:
 				and d.description.find("worn smooth") == -1 \
 				and d.description.find("no one here can read") == -1:
 			tells = false
-		if d.wake_line == "" or d.short_name == "" or d.wake_line.find("—") != -1:
+		if d.wake_line == "" or d.short_name == "" or d.wake_line.find(String.chr(0x2014)) != -1:
 			lines = false
 		if w.effect2 == RelicData.RelicEffect.NONE and w.value2 <= 0:
 			second = false

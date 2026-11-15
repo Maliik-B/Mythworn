@@ -59,7 +59,7 @@ func _ready() -> void:
 	_bar_first_lifebar = caedmon.phase_hps[0] if caedmon.phase_hps.size() > 0 else caedmon.max_health
 	Events.card_played.connect(_on_card_played)
 	print("\n===============================================================")
-	print(" Fable gamebreak hunt — REAL engine, seed %d, bar: one turn > %d (Caedmon's first bar)" % [
+	print(" Fable gamebreak hunt: REAL engine, seed %d, bar: one turn > %d (Caedmon's first bar)" % [
 		_seed_base, _bar_first_lifebar])
 	print("===============================================================")
 	if _only.is_empty() or _only.has("candidates"):
@@ -194,7 +194,7 @@ func _row(n: int, name: String, number: String, verdict: String, note: String) -
 # ============================================================
 
 func _candidates() -> void:
-	print("\n(1) THE SHEET'S CANDIDATES — each built by hand on the real engine")
+	print("\n(1) THE SHEET'S CANDIDATES: each built by hand on the real engine")
 	print("     #   candidate                          number                       verdict      note")
 	var emo_p := CardPool.build_emo_primary_pool()
 	var generic := CardPool._build_generic_pool()
@@ -490,7 +490,7 @@ func _all_moves(en: EnemyData) -> Array:
 # ============================================================
 
 func _per_card() -> void:
-	print("\n(2) PER-CARD CEILINGS — damage on the real engine into an immortal wall")
+	print("\n(2) PER-CARD CEILINGS: damage on the real engine into an immortal wall")
 	var pools := {
 		"emo primary": CardPool.build_emo_primary_pool(), "emo secondary": CardPool.build_emo_secondary_pool(),
 		"generic": CardPool._build_generic_pool(), "memory": CardPool.build_memory_cards(),
@@ -532,7 +532,7 @@ func _per_card() -> void:
 # ============================================================
 
 func _search() -> void:
-	print("\n(3) THE SEARCH — seeded hill-climb, %d restarts x %d steps per objective, real engine, wall" % [
+	print("\n(3) THE SEARCH: seeded hill-climb, %d restarts x %d steps per objective, real engine, wall" % [
 		_restarts, _iters])
 	var space := _search_space()
 	for objective in ["burst", "sustain"]:
@@ -755,7 +755,7 @@ func _note_loop(what: String, b: Dictionary) -> void:
 # ============================================================
 
 func _loops_report() -> void:
-	print("\n(4) LOOP AND INFINITE DETECTION — over every build the search tried")
+	print("\n(4) LOOP AND INFINITE DETECTION: over every build the search tried")
 	print("  thresholds: more than %d cards in one turn, or more than %d energy left at the end of one" % [
 		LOOP_CARDS, ENERGY_HOARD])
 	if _loop_flags.is_empty():

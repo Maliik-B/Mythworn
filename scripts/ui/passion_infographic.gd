@@ -4,13 +4,13 @@ extends Control
 ##   • HOVER the combat Passion readout → a quick OVERVIEW: the five tiers, what each
 ##     does, and where you stand.
 ##   • CLICK it (or use the deck screen's "Passion Zones" button) → the full PAGE:
-##     HOVER a zone to preview its cards on the right, or CLICK a zone to PIN it — the
+##     HOVER a zone to preview its cards on the right, or CLICK a zone to PIN it; the
 ##     right pane then stays on that zone until you click another. Cards render as full
 ##     cards (art and all) with the zone's damage change shown.
 ##
 ## Reads run-persistent state (RunManager.passion + current_deck). The zone modifier:
 ## extremes ±25% on/off-type; the mid-leans (Inspired/Wavering) a graduated ±12%; the
-## dispassionate center (Steady) is flat — that's the generalist pool.
+## dispassionate center (Steady) is flat: that's the generalist pool.
 
 const TIER_ORDER := [
 	PassionState.Tier.BLAZING, PassionState.Tier.INSPIRED, PassionState.Tier.STEADY,
@@ -75,7 +75,7 @@ static func _make_ctx() -> Dictionary:
 
 
 # ============================================================
-# OVERVIEW — combat hover (static, non-interactive)
+# OVERVIEW: combat hover (static, non-interactive)
 # ============================================================
 
 static func build_overview_panel() -> PanelContainer:
@@ -102,7 +102,7 @@ static func build_overview_panel() -> PanelContainer:
 
 
 # ============================================================
-# FULL PAGE — click / deck-screen button (instance, holds the pin)
+# FULL PAGE: click / deck-screen button (instance, holds the pin)
 # ============================================================
 
 ## Opens the full page centered on a dim backdrop. The instance IS the overlay so it
@@ -221,7 +221,7 @@ func _leave_zone() -> void:
 	_restyle_rows(-1)
 
 
-## Brightens the hovered row most, the pinned row a little, others normal — so it's
+## Brightens the hovered row most, the pinned row a little, others normal, so it's
 ## clear both where the cursor is and which zone is locked in.
 func _restyle_rows(hovered: int) -> void:
 	for t in _rows:

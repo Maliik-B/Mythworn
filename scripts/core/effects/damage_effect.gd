@@ -5,7 +5,7 @@ extends CardEffect
 @export var hits: int = 1 # For multi-hit attacks
 ## X-scaled: the hit count is X (the energy an X-cost card spent this cast) instead of
 ## `hits`. The engine supplies X via current_x(); pairs with CardData.x_cost. A torrent
-## that strikes once per energy — synergises with Overflow and Vulnerable.
+## that strikes once per energy, synergises with Overflow and Vulnerable.
 @export var x_scaled: bool = false
 ## Piercing: this many points of the hit bypass the target's block and land straight
 ## on HP; the rest soaks block normally. Per hit, so a multi-hit pierce is rare by
@@ -79,7 +79,7 @@ func apply(source, target, battle_state) -> void:
 	# The flag is spent by the card that cashed it, once, after all its hits.
 	if bonus_on:
 		battle_state.spend_flag(bonus_flag)
-	# On-kill energy refund — checked once after all hits so a multi-hit doesn't
+	# On-kill energy refund: checked once after all hits so a multi-hit doesn't
 	# double-count. The heavy blow that fells a foe gives its tempo back.
 	if energy_on_kill > 0 and target and target.is_dead() \
 			and battle_state and battle_state.has_method("change_energy"):
@@ -113,8 +113,8 @@ func get_description() -> String:
 
 
 ## Returns description with combat modifiers shown as base [modified]. Includes the
-## target's Vulnerable (×1.5) when a target is supplied — e.g. while dragging the card
-## onto an enemy — so the bracket shows the real number, composing with Strength/Weak.
+## target's Vulnerable (×1.5) when a target is supplied, e.g. while dragging the card
+## onto an enemy, so the bracket shows the real number, composing with Strength/Weak.
 func get_modified_description(source: CombatantStats, target: CombatantStats = null,
 		zone_mult: float = 1.0) -> String:
 	var modified := modified_value(source, target, zone_mult)
@@ -138,7 +138,7 @@ func modified_value(source: CombatantStats, target: CombatantStats = null, zone_
 			modified = int(modified * 0.75)
 	# Passion zone multiplier, folded in at the SAME point CombatEngine.deal_damage applies
 	# it (after Strength/Weak, before Vulnerable) so the bracket equals the real hit. Without
-	# this the preview showed the pre-zone number while a "[Zone Bonus]" tag claimed +25% —
+	# this the preview showed the pre-zone number while a "[Zone Bonus]" tag claimed +25%,
 	# under-reporting damage at a committed extreme.
 	if zone_mult != 1.0:
 		modified = int(modified * zone_mult)

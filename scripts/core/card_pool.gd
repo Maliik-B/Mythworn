@@ -62,7 +62,7 @@ static func get_boss_reward_choices(rng: RandomNumberGenerator, count: int = 3) 
 	var pool := _build_boss_pool()
 	var picked: Array[CardData] = []
 
-	# 1) A guaranteed rare — the headline reward.
+	# 1) A guaranteed rare, the headline reward.
 	_pick_of_rarity(pool, picked, CardData.CardRarity.RARE, rng)
 
 	# 2) The rest: uncommon-or-better, leaning rare. Fall back gracefully if a rarity
@@ -232,10 +232,10 @@ static func _build_character_pool(templates: Array[CardData]) -> Array[CardData]
 	return pool
 
 
-## Generic card pool — personality-neutral cards available to all characters. NEUTRAL
+## Generic card pool: personality-neutral cards available to all characters. NEUTRAL
 ## personality (never zone-modified), but each carries a small Passion LEAN toward the pole
 ## whose lane it fits (card-rewards "passion treatment", Sep 2026), so drafting/playing a
-## generic commits you instead of pinning you to dead-center — the same rule as the starter
+## generic commits you instead of pinning you to dead-center, the same rule as the starter
 ## backbone, just a bit heavier (±2) since these are deliberate draft picks:
 ##   • big single hits / aggressive chip / Vulnerable setup → −Passion (Physical's lane)
 ##   • AoE / multi≥3 / DoT / Weak-control / block-utility → +Passion (Water's lane)
@@ -247,9 +247,9 @@ static func _build_generic_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
 	# -- COMMON ATTACKS --
-	# Paired Strikes: buffed 3x2 -> 4x2 (#9 — it was a dead pick at 6 for 1). The
+	# Paired Strikes: buffed 3x2 -> 4x2 (#9: it was a dead pick at 6 for 1). The
 	# single-target 2-hit chip that scales cleanly with Vulnerable. (#16 card-tier: the
-	# "flexible weak-1" common — see Bracing Blow for the dmg-OR-block twin.) Leans −2
+	# "flexible weak-1" common: see Bracing Blow for the dmg-OR-block twin.) Leans −2
 	# (single-target multi is Physical's lane, and Strength rewards the 2 hits).
 	pool.append(_card("Paired Strikes", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
@@ -263,7 +263,7 @@ static func _build_generic_pool() -> Array[CardData]:
 
 	# -- COMMON SKILLS --
 	# #16 card-intensity tiers: Bracing Blow and Shield Wall are the deliberate
-	# "weak-1 / weak-2" pair. Bracing Blow is the FLEXIBLE one — 5 dmg + 5 block fits
+	# "weak-1 / weak-2" pair. Bracing Blow is the FLEXIBLE one: 5 dmg + 5 block fits
 	# either an offense or a defense turn, so it's never dead but never spikes. It stays
 	# Passion-NEUTRAL (0) on purpose: it's the one true generalist, the flat-center pick.
 	# Shield Wall is the COMMITTED block → leans +2 (block-utility is glass-Water's floor).
@@ -282,7 +282,7 @@ static func _build_generic_pool() -> Array[CardData]:
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
 		[_damage(15), _passion(-2)]))
 
-	# Poisoned Fang: the generic damage-DoT. Poison is now Chilled's clear opposite — raw
+	# Poisoned Fang: the generic damage-DoT. Poison is now Chilled's clear opposite, raw
 	# front-loaded bleed that fades (dmg = stacks, −1/turn), not Water's freeze gauge. A big
 	# 6-stack hit bites hardest the turn it lands and tapers, rewarding racing the fight. NEUTRAL
 	# Passion lean (no push): the old +2 came from the dead "poison = Water" rationale; poison no
@@ -322,7 +322,7 @@ static func _build_generic_pool() -> Array[CardData]:
 
 	# -- RARE SKILLS --
 	# Exhausts: a one-shot burst of tempo (net +2 energy, +2 cards) that leaves the
-	# deck rather than recurring every reshuffle — so future 0-cost/curse cards can't
+	# deck rather than recurring every reshuffle, so future 0-cost/curse cards can't
 	# loop it into an engine.
 	pool.append(_card("Second Wind", 0, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.RARE,
@@ -341,7 +341,7 @@ static func _build_generic_pool() -> Array[CardData]:
 	# Conviction: rewards holding a pole with tempo (energy at the extremes).
 	pool.append(_power_card("Conviction", 1, CardData.CardRarity.UNCOMMON,
 		Powers.CONVICTION, "Certainty, once found, pays for itself."))
-	# Whiplash: rewards swinging the meter — cross a tier, draw a card.
+	# Whiplash: rewards swinging the meter: cross a tier, draw a card.
 	pool.append(_power_card("Whiplash", 1, CardData.CardRarity.UNCOMMON,
 		Powers.WHIPLASH, "Every lurch of feeling puts something new in hand."))
 
@@ -349,7 +349,7 @@ static func _build_generic_pool() -> Array[CardData]:
 	# pool's lane == lean: a Water-lane card leans + (→ PRIMARY / ≈), a Physical-lane card leans
 	# − (→ SECONDARY / ⚔). The flat-center picks (0 lean: Bracing Blow, Second Wind, the powers)
 	# stay school-less = no symbol. These cards are personality-NEUTRAL, so the symbol renders
-	# FLAT (identity only, no zone glow/coin) — see CardSigil.build.
+	# FLAT (identity only, no zone glow/coin); see CardSigil.build.
 	for c in pool:
 		_set_school_from_lean(c)
 
@@ -376,9 +376,9 @@ static func build_card(id: StringName) -> CardData:
 	return null
 
 
-## Inner Fire — StS "Anger"-style passion engine: free to play, stokes Passion,
+## Inner Fire, StS "Anger"-style passion engine: free to play, stokes Passion,
 ## and drops a fresh copy of itself into the discard pile. The self-replication
-## is the cost — it clogs the deck as it ramps you toward your zone. The copy is
+## is the cost: it clogs the deck as it ramps you toward your zone. The copy is
 ## built by id rather than cloned from the card being played, so it is always the
 ## base card: an upgraded Inner Fire+ still adds a plain Inner Fire.
 static func _inner_fire() -> CardData:
@@ -394,13 +394,13 @@ static func _inner_fire() -> CardData:
 
 
 # ============================================================
-# EMO HYBRID CASTER — PRIMARY (WATER) POOL
+# EMO HYBRID CASTER: PRIMARY (WATER) POOL
 # High-risk / high-reward SWING: DoT, chill-control, evasion, X-cost torrents
 # ============================================================
 
-## Emo Hybrid's Water pool — the high-variance SWING pole (design pass Sep 2026,
+## Emo Hybrid's Water pool, the high-variance SWING pole (design pass Sep 2026,
 ## "full re-identity split"). Water is glass: it NEVER grants plain Block or Poise
-## (that is the Physical pole's home now) — its survival tools are evasion (Intangible),
+## (that is the Physical pole's home now); its survival tools are evasion (Intangible),
 ## control (Weak / Freeze / Vulnerable), and racing the enemy down with poison and
 ## scaling torrents. So committing to Water is a real choice with a real ceiling and a
 ## real floor, not a re-skin of the Physical toolkit. Per the affinity rubric every card
@@ -411,7 +411,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
 	# -- COMMON --
-	# The clean on-ramp attack: pure offense, no defensive rider (the Water tell — a
+	# The clean on-ramp attack: pure offense, no defensive rider (the Water tell: a
 	# Physical attack of this size would carry Block).
 	var tidal := _pcard("Tidal Strike", 1, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.COMMON,
@@ -427,7 +427,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	ripple.flavor_text = "One motion outward, and the whole room feels it."
 	pool.append(ripple)
 
-	# Creeping Tide is the Chilled SEED — the common that opens Cairn's signature freeze line.
+	# Creeping Tide is the Chilled SEED, the common that opens Cairn's signature freeze line.
 	# Water's skill slot isn't a wall; it lays Chilled, the freeze-gauge DoT that chips a little
 	# each turn and locks the enemy out once it builds. Distinct from Poison (raw ramp damage):
 	# this is the control lane. Reaching the freeze wants more than one application a turn, so it
@@ -454,10 +454,10 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	undertow.flavor_text = "The pull is quiet. By the time they feel it, they're already tired."
 	pool.append(undertow)
 
-	# Slip the Tide (was Soulstep — no "soul" angle fits Cairn) replaces the old Riverstep
-	# (which granted Poise — block-adjacent, i.e. Physical's turf). Water's defensive answer is
+	# Slip the Tide (was Soulstep: no "soul" angle fits Cairn) replaces the old Riverstep
+	# (which granted Poise: block-adjacent, i.e. Physical's turf). Water's defensive answer is
 	# EVASION, not armor: one turn where every hit is reduced to 1, then it's gone. Exhausts, so
-	# it's a one-shot panic read, not a repeatable wall — the high-variance identity in a card.
+	# it's a one-shot panic read, not a repeatable wall, the high-variance identity in a card.
 	var slip := _pcard("Slip the Tide", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.PRIMARY,
@@ -465,7 +465,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	slip.flavor_text = "For a breath I'm not quite there. The blow passes through the ache."
 	pool.append(slip)
 
-	# Cascade — Water's signature y≥3 multi-hit (content pass #2). Strikes three times, so
+	# Cascade: Water's signature y≥3 multi-hit (content pass #2). Strikes three times, so
 	# it's the natural home for the Overflow power (Blazing → an extra strike per stack) and
 	# scales with per-hit reach rather than one big number. Distinct from Physical's 2-hit:
 	# Water's multi is higher-count and rides Overflow, never Strength (Water has no Strength).
@@ -480,8 +480,8 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	# -- RARE --
 	# Deep Freeze is Water's control climax: skip their turn (Frozen) now + soften the turn
 	# after (Weak), and lay a chunk of Chilled so the freeze-gauge is already well along when
-	# the instant Frozen thaws — the chill can re-lock them. Its old Vulnerable rider was the
-	# ONE Vulnerable leak on the Water pole — swapped to Weak (content pass #2) so Vulnerable is
+	# the instant Frozen thaws; the chill can re-lock them. Its old Vulnerable rider was the
+	# ONE Vulnerable leak on the Water pole; swapped to Weak (content pass #2) so Vulnerable is
 	# exclusively Physical's enabler and the poles' debuff kits stay orthogonal (Water controls,
 	# Physical exposes).
 	var deep_freeze := _pcard("Deep Freeze", 2, CardData.CardType.SKILL,
@@ -493,7 +493,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	pool.append(deep_freeze)
 
 	# Maelstrom is now the X-cost torrent (#21): dump all your energy, strike once per
-	# point. The all-in Water finisher — scales with tempo, snowballs with Vulnerable, and
+	# point. The all-in Water finisher, scales with tempo, snowballs with Vulnerable, and
 	# gains an extra strike per stack of Overflow while Blazing.
 	var maelstrom := _pcard("Maelstrom", 0, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.RARE,
@@ -504,7 +504,7 @@ static func build_emo_primary_pool() -> Array[CardData]:
 	pool.append(maelstrom)
 
 	# -- POWER (Water) --
-	# Overflow: the Blazing payoff for a multi-hit torrent build — while Blazing, every
+	# Overflow: the Blazing payoff for a multi-hit torrent build: while Blazing, every
 	# multi-hit attack strikes an extra time.
 	pool.append(_power_card("Overflow", 1, CardData.CardRarity.UNCOMMON,
 		Powers.OVERFLOW, "The water doesn't stop at once. It never did.",
@@ -514,14 +514,14 @@ static func build_emo_primary_pool() -> Array[CardData]:
 
 
 # ============================================================
-# EMO HYBRID CASTER — SECONDARY (PHYSICAL) POOL
+# EMO HYBRID CASTER: SECONDARY (PHYSICAL) POOL
 # The steady FLOOR: block, reliable single-hit damage, Strength
 # ============================================================
 
-## Physical pole — the low-variance FLOOR, and now the SOLE home of Block/defense and
+## Physical pole: the low-variance FLOOR, and now the SOLE home of Block/defense and
 ## reliable single-hit damage (design pass Sep 2026, "full re-identity split"). It is
 ## deliberately ORTHOGONAL to Water: no control statuses (Weak/Vulnerable/Freeze), no
-## poison, no multi-hit torrents — just armor, dependable strikes, and self-Strength.
+## poison, no multi-hit torrents, just armor, dependable strikes, and self-Strength.
 ## You are never naked and never spiky; you trade Water's ceiling for a floor. Every
 ## card pushes Passion − toward Hollow (its payoff tier). Magnitudes mirror the Water
 ## pool's scale and are the harness's calibration baseline.
@@ -545,7 +545,7 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		[_damage(4), _passion(-3)]))
 
 	# -- UNCOMMON --
-	# Rampage is now a single reliable heavy (was a 7x2 multi-hit — multi-hit is Water's
+	# Rampage is now a single reliable heavy (was a 7x2 multi-hit: multi-hit is Water's
 	# torrent identity now). Physical's mid-cost attack is just a dependable big number.
 	var rampage := _pcard("Rampage", 2, CardData.CardType.ATTACK,
 		CardData.TargetType.SINGLE_ENEMY, CardData.CardRarity.UNCOMMON,
@@ -564,7 +564,7 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		CardData.PersonalityType.SECONDARY,
 		[_block(6), _status_self(StatusEffects.STRENGTH, 1), _passion(-3)]))
 
-	# Twin Strike — Physical's Strength-riding 2-hit (content pass #2). Two hits means every
+	# Twin Strike: Physical's Strength-riding 2-hit (content pass #2). Two hits means every
 	# stack of Strength is counted TWICE, so the pole's Strength ramp (Whetstone / Riposte /
 	# the starter's Tempered Strike) pays off harder here than on a single big hit. This is
 	# the deliberate ORTHOGONAL counterpart to Water's Cascade: Physical's multi is low-count
@@ -576,11 +576,11 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 	twin.flavor_text = "First opens the wound. The next deepens it."
 	pool.append(twin)
 
-	# Whetstone — the Physical pool's dedicated Strength engine (content pass #2). Before this
+	# Whetstone: the Physical pool's dedicated Strength engine (content pass #2). Before this
 	# pass only Riposte built Strength in the pool; the pole needed a clean source so "big
 	# singles + a 2-hit that RIDES Strength" actually has Strength to ride. Persists for the
 	# combat (Strength doesn't decay), so it's the setup that makes Twin Strike and the heavy
-	# singles snowball over a fight — the Physical ramp fantasy.
+	# singles snowball over a fight, the Physical ramp fantasy.
 	var whetstone := _pcard("Whetstone", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.UNCOMMON,
 		CardData.PersonalityType.SECONDARY,
@@ -600,7 +600,7 @@ static func build_emo_secondary_pool() -> Array[CardData]:
 		[_block(20), _draw(1), _passion(-4)]))
 
 	# -- POWER (Physical) --
-	# Grounded: the Hollow payoff for a defensive wall build — while Hollow, gain block
+	# Grounded: the Hollow payoff for a defensive wall build: while Hollow, gain block
 	# at the start of each turn.
 	pool.append(_power_card("Grounded", 1, CardData.CardRarity.UNCOMMON,
 		Powers.GROUNDED, "I plant myself where the blow will fall, and wait.",
@@ -744,7 +744,7 @@ static func _ddraw(amount: int, decay: int) -> DrawEffect:
 
 
 # ============================================================
-# MEMORY ("REMEMBRANCE") CARDS — Emo Hybrid (Cairn)
+# MEMORY ("REMEMBRANCE") CARDS: Emo Hybrid (Cairn)
 # A league of their own: character-specific, overloaded, and sourced ONLY from memory
 # events, boss fights, and a shop relic (never the normal reward pool). Each answers an
 # enemy's intent a different way -- survive it, strike through it, or out-resource it.
@@ -976,7 +976,7 @@ static func _strip_block() -> StripBlockEffect:
 
 ## The Excalibur signature card. Constructed fresh each combat by CombatEngine
 ## when the player holds Excalibur in Sword mode. Never enters the player's
-## persistent deck and never appears in reward pools or shops — its existence
+## persistent deck and never appears in reward pools or shops; its existence
 ## is bound to the relic's mode toggle.
 static func build_excalibur_card() -> CardData:
 	var c = CardData.new()

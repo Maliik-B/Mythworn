@@ -1,6 +1,6 @@
 class_name HealEffect
 extends CardEffect
-## Heals the player for the given value — or, when apply_to_source is set, the
+## Heals the player for the given value, or, when apply_to_source is set, the
 ## combatant performing the effect (an enemy mending itself).
 
 ## True = heal the source combatant through the engine (the Hollow Prelate's self-

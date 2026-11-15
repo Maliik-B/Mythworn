@@ -16,7 +16,7 @@ enum PersonalityType { PRIMARY, SECONDARY, NEUTRAL, NEGATIVE }
 @export var rarity: CardRarity = CardRarity.COMMON
 @export var target_type: TargetType = TargetType.SINGLE_ENEMY
 @export var personality: PersonalityType = PersonalityType.NEUTRAL
-## The card's SCHOOL — which pole's SYMBOL it wears (≈ Water / ⚔ Physical), independent of
+## The card's SCHOOL: which pole's SYMBOL it wears (≈ Water / ⚔ Physical), independent of
 ## `personality` (which drives the zone). For a committed pole card this equals its
 ## personality. For a NEUTRAL card that fits a pole's style but is passion-neutral for zone
 ## purposes, set this to the fitting pole so it still wears a symbol. NEUTRAL here = no symbol.

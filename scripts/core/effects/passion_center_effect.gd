@@ -12,7 +12,7 @@ extends CardEffect
 ## fraction, not an amount.
 @export var strength: float = 0.3
 
-## Each stack of the SOURCE's Zealotry multiplies the pull by this much — the Prophet's
+## Each stack of the SOURCE's Zealotry multiplies the pull by this much, the Prophet's
 ## escalation. Capped below 1.0 so a single pull can never fully wipe your pole.
 const ZEAL_SCALE := 0.12
 const MAX_PULL := 0.85

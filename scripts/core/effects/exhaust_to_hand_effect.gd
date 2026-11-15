@@ -1,7 +1,7 @@
 class_name ExhaustToHandEffect
 extends CardEffect
 ## Returns N random cards from the exhaust pile back to the player's hand.
-## Used by Emo Hybrid's "Recall" — magic that surfaces fragments of what was lost.
+## Used by Emo Hybrid's "Recall", magic that surfaces fragments of what was lost.
 ##
 ## If the exhaust pile is empty or has fewer cards than `value`, returns as
 ## many as are available. Selection is deterministic via RngManager.deck_rng

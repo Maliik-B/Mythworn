@@ -1,5 +1,5 @@
 extends CanvasLayer
-## Pause menu autoload — ESC to toggle from any gameplay scene.
+## Pause menu autoload: ESC to toggle from any gameplay scene.
 ## Includes inline settings (volume sliders, fullscreen, screen shake).
 ## Process mode is ALWAYS so it works while the tree is paused.
 
@@ -356,7 +356,7 @@ func _set_bus_volume(bus_name: String, linear_value: float) -> void:
 
 
 # ============================================================
-# Signal callbacks — main buttons
+# Signal callbacks: main buttons
 # ============================================================
 
 func _on_resume() -> void:
@@ -429,7 +429,7 @@ func _hide_settings() -> void:
 
 
 # ============================================================
-# Signal callbacks — settings
+# Signal callbacks: settings
 # ============================================================
 
 func _on_music_volume_changed(value: float) -> void:

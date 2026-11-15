@@ -112,7 +112,7 @@ static func render_full(card: CardData, dmg_mult: float = 1.0, green_tint: bool 
 	type_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 	vb.add_child(type_lbl)
 
-	# Art frame — real icon where we have one, else the type glyph.
+	# Art frame: real icon where we have one, else the type glyph.
 	var art_frame := PanelContainer.new()
 	art_frame.custom_minimum_size = Vector2(0, 74)
 	var art_style := StyleBoxFlat.new()
@@ -150,7 +150,7 @@ static func render_full(card: CardData, dmg_mult: float = 1.0, green_tint: bool 
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vb.add_child(desc)
 
-	# Zone readout — only when this tier actually changes the card's damage.
+	# Zone readout: only when this tier actually changes the card's damage.
 	if dmg_mult != 1.0:
 		var base := _first_damage(card)
 		if base > 0:

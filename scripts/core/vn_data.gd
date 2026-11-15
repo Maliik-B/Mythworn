@@ -22,7 +22,7 @@ class VNBeat:
 		speaker_color = p_color
 
 ## A terminal choice. `config` (if non-null) is applied to RunManager.realm_config when
-## chosen — the realm-shape consequence. `result_text` is an optional closing beat shown
+## chosen: the realm-shape consequence. `result_text` is an optional closing beat shown
 ## after choosing, before the VN hands off to the next scene. `detail` says what the choice
 ## will change, set under its label so it can be read before it is taken.
 class VNChoice:

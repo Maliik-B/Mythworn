@@ -17,7 +17,7 @@ const HAND_SIZE := 5
 const MAX_ENERGY := 3
 
 ## Chilled (Cairn's signature Water DoT) tuning. CHILL_CHIP is the FLAT end-of-turn damage
-## (not per-stack — the stacks are a freeze gauge, not a damage scale). Once stacks reach
+## (not per-stack: the stacks are a freeze gauge, not a damage scale). Once stacks reach
 ## CHILL_FREEZE_THRESHOLD the chill converts to Frozen and is spent. Starting values; tune
 ## against tools/combat_harness alongside the per-card Chilled numbers in card_pool.
 const CHILL_CHIP := 2
@@ -49,7 +49,7 @@ var _blooded_edge_pending: int = 0
 ## The Compassionate title: a one-per-combat clutch mend. _clutch_heal holds the HP to restore
 ## (0 unless the title is equipped), _clutch_used flags that this combat's save has fired. The
 ## first player damage that drops them below half HP triggers it, resolved BEFORE the lethal
-## check — and since HP floors at 0, it also pulls the player back from an otherwise-killing blow.
+## check, and since HP floors at 0, it also pulls the player back from an otherwise-killing blow.
 var _clutch_heal: int = 0
 var _clutch_used: bool = false
 
@@ -141,7 +141,7 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	player_stats = CombatantStats.new(player_hp, player_max_hp)
 
 	# Excalibur (Sword mode) injects its signature card into the draw pile for
-	# this combat only — the persistent deck stays clean. Toggling to Sight
+	# this combat only: the persistent deck stays clean. Toggling to Sight
 	# between combats removes the card from future combats automatically.
 	var effective_deck: Array[CardData] = deck.duplicate()
 	if RunManager.has_excalibur() and RunManager.excalibur_mode == RunManager.ExcaliburMode.SWORD:
@@ -311,7 +311,7 @@ func _exit_tree() -> void:
 ## Compute and emit the Be the King result on a crown-stakes win. Stores the
 ## raw score + tier on RunManager so the crown / abdication scene can read
 ## them for the narrative reveal, and folds the score into kings_reputation
-## if the player is already crowned (Act 2+ rolls only — the Act 1 roll sets
+## if the player is already crowned (Act 2+ rolls only; the Act 1 roll sets
 ## philosophy_strength_tier separately when the crown is actually taken).
 func _resolve_be_the_king() -> void:
 	if not _btk_active:
@@ -329,7 +329,7 @@ func _resolve_be_the_king() -> void:
 	RunManager.last_btk_tier = result["tier"]
 	Events.be_the_king_scored.emit(result["score"], result["tier"])
 	# Already-crowned players feed the rolling reputation dial. Pre-crown
-	# (Act 1) players have nothing to update yet — the score waits for the
+	# (Act 1) players have nothing to update yet; the score waits for the
 	# crown decision scene to read it.
 	if RunManager.is_crowned():
 		RunManager.update_kings_reputation(result["score"])
@@ -410,7 +410,7 @@ func spend_flag(flag: StringName) -> void:
 
 
 ## The Thurible relic: swings the player's Passion toward the pole chosen on the map screen
-## at the start of each player turn — +_thurible_swing toward Blazing, or -_thurible_swing
+## at the start of each player turn: +_thurible_swing toward Blazing, or -_thurible_swing
 ## toward Hollow. Read directly (NONE effect) because a fixed GAIN_PASSION value can't flip
 ## sign per-fight; the sign comes from RunManager.thurible_mode, toggled between combats.
 func _apply_thurible_turn_start() -> void:
@@ -496,7 +496,7 @@ func _apply_title_turn_start_effects() -> void:
 
 
 ## Character POWERS fire here each turn (StS-style), dispatched by power id.
-## Detachment: cool Passion toward center and steel into stacking Strength — trading
+## Detachment: cool Passion toward center and steel into stacking Strength, trading
 ## your zone spike for raw, growing force (the center-as-a-build identity).
 func _process_powers() -> void:
 	var tier := RunManager.get_passion_tier()
@@ -684,7 +684,7 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 	# Track current card for zone penalty in deal_damage
 	_current_card = card
 
-	# Resolve effects — route to correct targets based on card targeting
+	# Resolve effects: route to correct targets based on card targeting
 	for effect in card.get_active_effects():
 		match card.target_type:
 			CardData.TargetType.SELF, CardData.TargetType.NONE:
@@ -701,7 +701,7 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 	Events.card_played.emit(card, target)
 
 	if card.card_type == CardData.CardType.POWER:
-		# Powers vanish into their persistent effect — they don't return to any pile
+		# Powers vanish into their persistent effect; they don't return to any pile
 		# this combat (StS behavior). The GainPowerEffect has already applied them.
 		pass
 	elif card.trick:
@@ -768,7 +768,7 @@ func deal_damage(target: CombatantStats, base_amount: int,
 
 	# Zone modifier: at a committed extreme, the dominant personality's cards hit
 	# harder (+25%) and the off-type suffers (-25%). Only for player cards, never
-	# enemies or neutrals. The dispassionate middle is flat — no bonus, no penalty.
+	# enemies or neutrals. The dispassionate middle is flat: no bonus, no penalty.
 	if _current_card and source == player_stats:
 		amount = _apply_zone_modifier(amount, _current_card.personality)
 
@@ -810,14 +810,14 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	_on_damage_dealt(target, actual)
 
 	# Momentum: each hit the player lands on an enemy builds the ramp for the REST of this turn.
-	# Added after the hit resolves, so the first hit is +0 and each subsequent hit climbs — a
+	# Added after the hit resolves, so the first hit is +0 and each subsequent hit climbs, a
 	# multi-hit card ramps mid-combo. Gated to the player striking an enemy; reset each turn.
 	if _momentum_per_hit > 0 and source == player_stats and target != player_stats:
 		_momentum += _momentum_per_hit
 		_emit_damage_ramp()
 
 	# Enraged: a struck combatant strikes its attacker back for its Enraged stacks.
-	# Ignores block (a raw lash) and fires per hit, so multi-hit bursts cost more — the
+	# Ignores block (a raw lash) and fires per hit, so multi-hit bursts cost more, the
 	# anti-burst pressure for Caedmon's compelled phase. Guarded so it can't chain (the
 	# attacker isn't the one Enraged) or fire on a fully-blocked chip.
 	if actual > 0 and source != null and source != target \
@@ -940,7 +940,7 @@ func apply_status_effect(target: CombatantStats, effect: StatusEffectData,
 ## The Emo Hybrid's innate attrition answer (CharacterData.control_heal): landing a
 ## crowd-control status (Weak or Frozen) on an ENEMY mends the player. Gated to enemy
 ## targets so an enemy Weakening the player never heals them, and to Water's control
-## statuses so a Physical build (Vulnerable/Strength) never triggers it — the sustain
+## statuses so a Physical build (Vulnerable/Strength) never triggers it; the sustain
 ## auto-follows the glass build that needs it. Fires per application, so Deep Freeze
 ## (Frozen + Weak) mends twice.
 func _try_control_heal(target: CombatantStats, effect: StatusEffectData) -> void:
@@ -983,7 +983,7 @@ func tick_end_of_turn(stats: CombatantStats) -> void:
 
 
 ## Chilled (Cairn's signature Water DoT) resolves at the END of the afflicted's turn:
-## a small FLAT chip, then EITHER a freeze (when the chill has built to the threshold —
+## a small FLAT chip, then EITHER a freeze (when the chill has built to the threshold,
 ## spending all of it, so it reads as a freeze gauge rather than a damage scale) OR a
 ## one-stack melt. Call this just before tick_end_of_turn for whoever's turn is ending so
 ## the chip honours Intangible (still present pre-decay), matching the Poison tick. Applying
@@ -1022,7 +1022,7 @@ func _on_damage_dealt(target: CombatantStats, amount: int) -> void:
 		Events.player_damaged.emit(amount, target.current_hp)
 		# The Compassionate (title): the first blow each combat that drops the player below half
 		# HP triggers a clutch mend. Resolved BEFORE the lethal check, and HP floors at 0, so it
-		# also catches an otherwise-killing blow — the player is left standing at _clutch_heal HP.
+		# also catches an otherwise-killing blow; the player is left standing at _clutch_heal HP.
 		# Healed inline (not via heal_combatant, whose dead-guard would refuse a 0-HP revive).
 		if _clutch_heal > 0 and not _clutch_used and target.current_hp < target.max_hp / 2:
 			_clutch_used = true
@@ -1046,7 +1046,7 @@ func _on_damage_dealt(target: CombatantStats, amount: int) -> void:
 				Events.enemy_damaged.emit(enemy, amount, target.current_hp)
 				if target.is_dead():
 					# Multi-phase bosses transition to the next lifebar instead of
-					# dying, so overkill on one phase doesn't spill into the next —
+					# dying, so overkill on one phase doesn't spill into the next;
 					# you can't burst him past a phase. Only the final phase dies.
 					if enemy.can_advance_phase():
 						var line := enemy.advance_phase()
@@ -1134,7 +1134,7 @@ func _apply_relic_slot(effect: RelicData.RelicEffect, value: int) -> void:
 
 ## Damage multipliers for the passion zone. Committing to an extreme powers up your
 ## dominant personality's cards and weakens the other; the mid-lean tiers (Inspired /
-## Wavering) apply HALF that swing — a graduated on-the-way bonus/penalty — and the
+## Wavering) apply HALF that swing, a graduated on-the-way bonus/penalty, and the
 ## dispassionate center (Steady) is flat. Neutrals are never affected.
 const ZONE_EXTREME_BONUS := 1.25
 const ZONE_EXTREME_PENALTY := 0.75
@@ -1163,7 +1163,7 @@ static func zone_multiplier(personality: CardData.PersonalityType) -> float:
 		PassionState.Tier.WAVERING:
 			primary_favored = false
 			lean = true
-		_:  # STEADY — flat
+		_:  # STEADY: flat
 			return 1.0
 	var on_type := (personality == CardData.PersonalityType.PRIMARY) == primary_favored
 	if on_type:

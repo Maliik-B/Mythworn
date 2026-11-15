@@ -23,7 +23,7 @@ static func _static_init() -> void:
 		StatusEffectData.StackType.INTENSITY, StatusEffectData.Decay.PERSISTS)
 	POISON = _make("Poison", "At start of turn, lose HP equal to stacks. Reduce by 1.", false,
 		StatusEffectData.StackType.INTENSITY, StatusEffectData.Decay.TURN_TICK)
-	# Displayed as "Poise" — a temporary composure that grants bonus block and fades
+	# Displayed as "Poise": a temporary composure that grants bonus block and fades
 	# by 1 each turn (see tick_end_of_turn). The internal var stays DEXTERITY so the
 	# block-boost plumbing (apply_block) and every card/relic that grants it are unchanged.
 	DEXTERITY = _make("Poise", "Gain additional block equal to stacks. Loses 1 each turn.", true,
@@ -35,7 +35,7 @@ static func _static_init() -> void:
 	STUN = _make("Frozen", "Skips their next turn.", false,
 		StatusEffectData.StackType.DURATION, StatusEffectData.Decay.TEMPORARY)
 	# Chilled: Cairn's signature Water DoT. The stack count is a FREEZE GAUGE, not a damage
-	# scale — at the end of its turn it takes a small FLAT chip and either freezes (at the
+	# scale: at the end of its turn it takes a small FLAT chip and either freezes (at the
 	# threshold, spending all the chill) or melts by 1. PERSISTS so the generic end-of-turn
 	# decay never touches it; resolve_chilled() is the one place it ticks (avoids double-decay).
 	CHILLED = _make("Chilled", "At the end of its turn: takes 2 damage and loses 1 Chilled. At 10, it freezes (skips a turn) and the chill is spent.", false,
@@ -46,7 +46,7 @@ static func _static_init() -> void:
 		StatusEffectData.StackType.INTENSITY, StatusEffectData.Decay.PERSISTS)
 	# Zealotry: the False Prophet's escalating fervor. Persists + stacks each turn it preaches;
 	# its center-pull grows with the stacks (see PassionCenterEffect), so the longer it lives
-	# the harder it strips your Passion — a race to silence it.
+	# the harder it strips your Passion, a race to silence it.
 	ZEALOTRY = _make("Zealotry", "Each stack strengthens this enemy's Passion pull toward center.", true,
 		StatusEffectData.StackType.INTENSITY, StatusEffectData.Decay.PERSISTS)
 

@@ -6,7 +6,7 @@ extends Control
 # 200 (was 130): the 7 grid columns now span ~1410px of the 1920 base width (~73%,
 # centred by _map_x_offset) instead of ~990px (~52%), so the graph fills the board
 # instead of clustering in a narrow centre band with the sides empty (backlog #2).
-# Purely a render-spacing change — grid columns/connections/planarity are untouched,
+# Purely a render-spacing change; grid columns/connections/planarity are untouched,
 # and it stays within the viewport so horizontal scroll (disabled) is never needed.
 const NODE_SPACING_X := 200
 const NODE_SPACING_Y := 90
@@ -114,7 +114,7 @@ func _ready() -> void:
 
 
 func _on_title_state_changed_locally(_a = null, _b = null, _c = null) -> void:
-	# Variadic shim — the two signals have different signatures.
+	# Variadic shim: the two signals have different signatures.
 	_update_bottom_bar()
 
 
@@ -127,7 +127,7 @@ func _build_floating_header(realm_name: String, realm_tagline: String,
 	const HEADER_HEIGHT := 160
 	const SIGIL_SIZE := 140
 
-	# Outer container — anchored to the top, no input capture.
+	# Outer container: anchored to the top, no input capture.
 	var header = Control.new()
 	header.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	header.offset_bottom = HEADER_HEIGHT
@@ -135,7 +135,7 @@ func _build_floating_header(realm_name: String, realm_tagline: String,
 	add_child(header)
 	_header = header
 
-	# Gradient backdrop — opaque at top, transparent at bottom.
+	# Gradient backdrop: opaque at top, transparent at bottom.
 	var grad = ColorRect.new()
 	grad.set_anchors_preset(Control.PRESET_FULL_RECT)
 	grad.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -157,7 +157,7 @@ void fragment() {
 	mat.set_shader_parameter("base", Vector4(header_base.r, header_base.g, header_base.b, 1.0))
 	header.add_child(grad)
 
-	# Realm sigil — corner badge in the top-left. Only rendered if the realm
+	# Realm sigil: corner badge in the top-left. Only rendered if the realm
 	# has authored sigil art; absent for stub realms.
 	if sigil_path != "" and ResourceLoader.exists(sigil_path):
 		var sigil_tex: Texture2D = load(sigil_path)
@@ -334,7 +334,7 @@ func _light_legend(look_key: String) -> void:
 
 
 ## Renders a sky body (moon, aurora) in the upper portion of the screen.
-## Sits between the realm motif and the drift particles in the layer stack —
+## Sits between the realm motif and the drift particles in the layer stack,
 ## visible behind the map nodes but in front of the base bg.
 func _add_sky_body(kind: int, _accent: Color) -> void:
 	if kind == RealmData.SkyBody.NONE:
@@ -362,7 +362,7 @@ func _add_sky_body(kind: int, _accent: Color) -> void:
 		add_child(moon)
 		return
 
-	# AURORA — shader-driven animated bands
+	# AURORA: shader-driven animated bands
 	var sky = ColorRect.new()
 	sky.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	sky.offset_bottom = 540
@@ -372,7 +372,7 @@ func _add_sky_body(kind: int, _accent: Color) -> void:
 
 	match kind:
 		RealmData.SkyBody.AURORA:
-			# Wavy color bands across the upper sky — two bands of customizable
+			# Wavy color bands across the upper sky, two bands of customizable
 			# color so we can shift them per act (peaceful green/ice for
 			# Act 1, deeper for Act 2, blood-red for Act 3).
 			shader.code = """
@@ -400,7 +400,7 @@ void fragment() {
 			return
 
 	mat.shader = shader
-	# AURORA — apply per-act color shift
+	# AURORA: apply per-act color shift
 	if kind == RealmData.SkyBody.AURORA and realm:
 		var aurora_lower = realm.get_aurora_lower_for_act(act)
 		var aurora_upper = realm.get_aurora_upper_for_act(act)
@@ -428,9 +428,9 @@ func _make_moon_texture(radius_px: int) -> Texture2D:
 			var dx := x - cx
 			var dy := y - cy
 			var d := sqrt(dx * dx + dy * dy)
-			# Core disc — soft round edge
+			# Core disc: soft round edge
 			var disc_t := clampf((core_r * 1.15 - d) / (core_r * 0.30), 0.0, 1.0)
-			# Halo — wide soft falloff
+			# Halo: wide soft falloff
 			var halo_t := clampf((halo_r - d) / (halo_r * 0.55), 0.0, 1.0)
 			halo_t = halo_t * halo_t  # ease toward edge
 			var a := maxf(disc_t * 0.95, halo_t * 0.22)
@@ -440,7 +440,7 @@ func _make_moon_texture(radius_px: int) -> Texture2D:
 
 
 ## Adds ambient drift particles matching the realm's atmosphere.
-## Two layered emitters per realm for depth — small fast "far" particles and
+## Two layered emitters per realm for depth, small fast "far" particles and
 ## larger slow "near" particles. Sits above the horizon, below the map nodes.
 func _add_drift_particles(kind: int, _accent: Color) -> void:
 	if kind == RealmData.DriftKind.NONE:
@@ -448,12 +448,12 @@ func _add_drift_particles(kind: int, _accent: Color) -> void:
 
 	# Tunables per drift kind. (color, alpha, size_min, size_max, count_near,
 	# count_far, vel_y_near, vel_y_far, vel_x_jitter, lifetime)
-	# Counts and sizes increased after first pass — particles need to read as
+	# Counts and sizes increased after first pass: particles need to read as
 	# ambient atmosphere, not isolated stars.
 	var spec: Dictionary
 	match kind:
 		RealmData.DriftKind.DUST:
-			# Warm dawn/dusk fireflies drifting slowly upward — sparse, glowing, and
+			# Warm dawn/dusk fireflies drifting slowly upward, sparse, glowing, and
 			# twinkling, for that golden-hour-with-fireflies feeling. Fewer + bigger +
 			# brighter than dust so each reads as a distinct point of light.
 			spec = {
@@ -468,7 +468,7 @@ func _add_drift_particles(kind: int, _accent: Color) -> void:
 				"twinkle": true,
 			}
 		RealmData.DriftKind.SNOW:
-			# Pale snowflakes falling slowly — cold mountain air
+			# Pale snowflakes falling slowly, cold mountain air
 			# Smaller max size than v1 so they read as distant snowfall rather
 			# than huge bokeh blobs.
 			spec = {
@@ -482,7 +482,7 @@ func _add_drift_particles(kind: int, _accent: Color) -> void:
 				"shape": "circle",
 			}
 		RealmData.DriftKind.MIST:
-			# Pale jade cloud wisps drifting horizontally — mountain mist
+			# Pale jade cloud wisps drifting horizontally, mountain mist
 			spec = {
 				"color": Color(0.82, 0.92, 0.85),
 				"alpha": 0.35,
@@ -494,7 +494,7 @@ func _add_drift_particles(kind: int, _accent: Color) -> void:
 				"shape": "wisp",
 			}
 		RealmData.DriftKind.LANTERN:
-			# Warm red-orange lantern lights drifting slowly upward — a sense
+			# Warm red-orange lantern lights drifting slowly upward, a sense
 			# of nearby festival or pilgrims carrying lights. Pairs with MIST.
 			spec = {
 				"color": Color(0.95, 0.55, 0.30),
@@ -507,7 +507,7 @@ func _add_drift_particles(kind: int, _accent: Color) -> void:
 				"shape": "circle",
 			}
 		RealmData.DriftKind.SPIRIT_WISP:
-			# Pale icy-blue spirit-wisps drifting slowly upward — Norse
+			# Pale icy-blue spirit-wisps drifting slowly upward, Norse
 			# will-o'-the-wisp / ancestor-light. Pairs with SNOW.
 			spec = {
 				"color": Color(0.75, 0.90, 1.0),
@@ -522,7 +522,7 @@ func _add_drift_particles(kind: int, _accent: Color) -> void:
 		_:
 			return
 
-	# Two layers for parallax depth — far (small, faint, slower) then near (larger, brighter)
+	# Two layers for parallax depth, far (small, faint, slower) then near (larger, brighter)
 	add_child(_make_drift_emitter(spec, false))
 	add_child(_make_drift_emitter(spec, true))
 
@@ -531,7 +531,7 @@ func _add_drift_particles(kind: int, _accent: Color) -> void:
 ## Positioned at viewport center so the EMISSION_SHAPE_BOX covers the whole screen.
 func _make_drift_emitter(spec: Dictionary, near: bool) -> GPUParticles2D:
 	var emitter = GPUParticles2D.new()
-	# GPUParticles2D is a Node2D, not a Control — use position, not anchors.
+	# GPUParticles2D is a Node2D, not a Control, use position, not anchors.
 	# Place the emitter at the viewport center so the emission box (extents
 	# 960x540) covers the full 1920x1080 viewport.
 	emitter.position = Vector2(960, 540)
@@ -541,7 +541,7 @@ func _make_drift_emitter(spec: Dictionary, near: bool) -> GPUParticles2D:
 	emitter.visibility_rect = Rect2(-960, -540, 1920, 1080)  # local space; emitter is at viewport center
 
 	var mat = ParticleProcessMaterial.new()
-	# Emit randomly across the full viewport — emission box in LOCAL space,
+	# Emit randomly across the full viewport, emission box in LOCAL space,
 	# centered on the emitter position.
 	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	mat.emission_box_extents = Vector3(960, 540, 0)
@@ -591,7 +591,7 @@ func _make_drift_emitter(spec: Dictionary, near: bool) -> GPUParticles2D:
 
 	emitter.process_material = mat
 	emitter.texture = _make_drift_texture(spec)
-	# Don't capture mouse — ambient layer only
+	# Don't capture mouse: ambient layer only
 	# (GPUParticles2D doesn't take input by default, but if wrapped in CanvasItem this matters)
 	return emitter
 
@@ -612,7 +612,7 @@ func _make_drift_texture(spec: Dictionary) -> Texture2D:
 			var dx := (x - cx) / max_r
 			var dy := (y - cy) / max_r
 			if spec.get("shape", "circle") == "wisp":
-				# Stretch horizontally — squash y in the distance calc
+				# Stretch horizontally: squash y in the distance calc
 				dy *= 2.5
 			var d := sqrt(dx * dx + dy * dy)
 			if d > 1.0:
@@ -629,7 +629,7 @@ func _add_realm_motif(style: int, accent: Color) -> void:
 	var shader_code: String = ""
 	match style:
 		RealmData.VisualStyle.HERALDIC:
-			# Faint diagonal chevron bands — knightly heraldry. Kept subtle and cleared
+			# Faint diagonal chevron bands, knightly heraldry. Kept subtle and cleared
 			# from the top so it never competes with the legend / act title, and tinted
 			# gold (below) rather than the loud red act accent.
 			shader_code = """
@@ -645,7 +645,7 @@ void fragment() {
 }
 """
 		RealmData.VisualStyle.RUNIC:
-			# Faint runic rings — much more subtle than v1 so they don't compete
+			# Faint runic rings: much more subtle than v1 so they don't compete
 			# with the actual map nodes (which are also circles). Larger cell
 			# size = fewer rings overall, and lower alpha so they read as
 			# subtle background texture rather than UI elements.
@@ -676,7 +676,7 @@ void fragment() {
 }
 """
 		_:
-			# NEUTRAL or unknown — no motif. Leaving the layer absent keeps
+			# NEUTRAL or unknown: no motif. Leaving the layer absent keeps
 			# the cost at zero and the look clean.
 			return
 
@@ -694,7 +694,7 @@ void fragment() {
 	add_child(motif)
 
 
-## A warm dawn glow rising from the horizon — "the coming of day." Sits behind the
+## A warm dawn glow rising from the horizon, "the coming of day." Sits behind the
 ## castle silhouette so the skyline is backlit, and warms toward the right where the
 ## light source sits. Gives the map a golden-hour dawn/dusk mood.
 func _add_dawn_glow(accent: Color) -> void:
@@ -768,7 +768,7 @@ func _unhandled_input(event: InputEvent) -> void:
 # ============================================================
 
 func _build_ui() -> void:
-	# Pull realm theming if available — fall back to neutral palette if not.
+	# Pull realm theming if available; fall back to neutral palette if not.
 	# Accent is act-aware so the realm sky shifts as the run progresses (Act 1
 	# warm dusk → Act 2 deeper night → Act 3 corrupted/dramatic).
 	var realm: RealmData = RunManager.get_current_realm()
@@ -782,7 +782,7 @@ func _build_ui() -> void:
 		realm_name = realm.display_name
 		realm_tagline = realm.theme_description
 
-	# Base background — neutral dark mixed lightly with the realm accent.
+	# Base background: neutral dark mixed lightly with the realm accent.
 	# Subtle enough that gameplay nodes stay readable, distinct enough that
 	# you know which realm you're in at a glance.
 	var bg = ColorRect.new()
@@ -790,18 +790,18 @@ func _build_ui() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	# Realm motif overlay — drawn by a shader so it scales cleanly and needs
+	# Realm motif overlay: drawn by a shader so it scales cleanly and needs
 	# no image assets. Patterns differ per visual style.
 	_add_realm_motif(visual_style, accent)
 	# Camelot leans into a dawn/dusk mood: a warm glow rising behind the skyline.
 	if visual_style == RealmData.VisualStyle.HERALDIC:
 		_add_dawn_glow(accent)
 
-	# Horizon silhouette — wide painted-in-Cairo strip anchored to the bottom
+	# Horizon silhouette: wide painted-in-Cairo strip anchored to the bottom
 	# of the screen. Gives the map real depth (castle skyline / mountain peaks
 	# receding into haze) instead of just flat tinted color.
 	# The horizon spans 500px from the bottom, so the silhouette occupies the
-	# lower third of the viewport — enough to read as a landscape, low enough
+	# lower third of the viewport, enough to read as a landscape, low enough
 	# that the map nodes mostly sit ABOVE it rather than overlapping.
 	# Stretches to viewport width to avoid black bars.
 	if realm and realm.horizon_path != "" and ResourceLoader.exists(realm.horizon_path):
@@ -820,13 +820,13 @@ func _build_ui() -> void:
 			horizon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			add_child(horizon)
 
-	# Sky body — moon, aurora, etc. Painted in the upper portion of the
+	# Sky body: moon, aurora, etc. Painted in the upper portion of the
 	# screen, behind everything else atmospheric. Sits between the motif and
 	# the drift particles for layered depth.
 	if realm:
 		_add_sky_body(realm.sky_body, accent)
 
-	# Particle drift — ambient motion for the realm (dust, snow, mist, etc.).
+	# Particle drift: ambient motion for the realm (dust, snow, mist, etc.).
 	# Primary layer, then optional secondary (e.g., lanterns pairing with mist).
 	# Sits above the horizon but below the map nodes, low opacity so it
 	# doesn't compete for attention.
@@ -835,7 +835,7 @@ func _build_ui() -> void:
 		if realm.secondary_drift_kind != RealmData.DriftKind.NONE:
 			_add_drift_particles(realm.secondary_drift_kind, accent)
 
-	# Vignette — tinted with a darker version of the realm accent so the edges
+	# Vignette: tinted with a darker version of the realm accent so the edges
 	# read as "of this place" rather than generic black.
 	var vignette = ColorRect.new()
 	vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -857,12 +857,12 @@ void fragment() {
 	mat.set_shader_parameter("tint", Vector4(vignette_tint.r, vignette_tint.g, vignette_tint.b, 1.0))
 	add_child(vignette)
 
-	# Bottom bar — anchored to the bottom of the screen. Built first so we know
+	# Bottom bar: anchored to the bottom of the screen. Built first so we know
 	# how much vertical space to reserve for the scroll area above it.
 	const BOTTOM_BAR_HEIGHT := 50
 	_build_bottom_bar_anchored(BOTTOM_BAR_HEIGHT)
 
-	# Map scroll area — anchored to fill the whole screen except the bottom bar.
+	# Map scroll area: anchored to fill the whole screen except the bottom bar.
 	# The header floats on TOP of this with a fade-out gradient so map nodes
 	# can scroll all the way to the top of the screen, passing under the header
 	# rather than being cut off by it.
@@ -890,7 +890,7 @@ void fragment() {
 	map_canvas.size = canvas_size
 	canvas_holder.add_child(map_canvas)
 
-	# Floating header overlay — sits above the scroll area at the top of the
+	# Floating header overlay: sits above the scroll area at the top of the
 	# screen with a vertical fade-out gradient. Text is solid at the top, the
 	# bottom edge of the header fades into transparency so map nodes scrolling
 	# behind it remain partially visible. Mouse input passes through so the
@@ -900,7 +900,7 @@ void fragment() {
 	_build_legend_key()
 
 
-## Anchored variant — attaches the bottom bar to the bottom edge of the screen
+## Anchored variant: attaches the bottom bar to the bottom edge of the screen
 ## directly rather than to a parent VBox. Used by the new floating-header layout.
 func _build_bottom_bar_anchored(height: int) -> void:
 	var panel = PanelContainer.new()
@@ -910,7 +910,7 @@ func _build_bottom_bar_anchored(height: int) -> void:
 	_populate_bottom_bar(panel)
 
 
-## Legacy entry point — kept for any callers that still hand in a VBox parent.
+## Legacy entry point: kept for any callers that still hand in a VBox parent.
 func _build_bottom_bar(parent: VBoxContainer) -> void:
 	var panel = PanelContainer.new()
 	parent.add_child(panel)
@@ -998,7 +998,7 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	pet_label.visible = false
 	bar.add_child(pet_label)
 
-	# Excalibur mode toggle — only shown when the player holds Excalibur.
+	# Excalibur mode toggle: only shown when the player holds Excalibur.
 	# Gold styling matches the Sword in the Stone node color so it reads as
 	# "this is the Camelot quest reward you're managing."
 	excalibur_btn = Button.new()
@@ -1011,7 +1011,7 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	excalibur_btn.visible = false
 	bar.add_child(excalibur_btn)
 
-	# The Thurible mode toggle — only shown when the player holds The Thurible (the Reliquary
+	# The Thurible mode toggle, only shown when the player holds The Thurible (the Reliquary
 	# censer). Smoky-violet styling (incense, not Excalibur's quest-gold) so the two per-fight
 	# toggles read as distinct things to manage between fights.
 	thurible_btn = Button.new()
@@ -1371,7 +1371,7 @@ func _show_deck_popup() -> void:
 	stats_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	content.add_child(stats_lbl)
 
-	# Passion zones — see which of these cards your current Passion is buffing.
+	# Passion zones: see which of these cards your current Passion is buffing.
 	var passion_btn = Button.new()
 	passion_btn.text = "⚡ Passion Zones"
 	passion_btn.custom_minimum_size = Vector2(220, 40)
@@ -1840,7 +1840,7 @@ func _enter_node(node: MapNode) -> void:
 				return
 			SceneTransition.change_scene("res://scenes/event/event_scene.tscn")
 		MapNode.NodeType.SWORD_IN_STONE:
-			# Reuse the event scene with a flag — Excalibur is a one-shot event
+			# Reuse the event scene with a flag: Excalibur is a one-shot event
 			# routed through a special path. event_scene reads the flag and renders
 			# the Sword-in-the-Stone content instead of pulling from EventPool.
 			RunManager.pending_special_event = &"sword_in_stone"
@@ -1991,7 +1991,7 @@ func _pledge_swap_cb(btn: Button, node: MapNode) -> Callable:
 
 
 # ============================================================
-# QUESTLINE PAYOFF REVEAL (arm flourish — one node, mid-run)
+# QUESTLINE PAYOFF REVEAL (arm flourish, one node, mid-run)
 # ============================================================
 
 ## True if `node` is the payoff for a questline the player has armed. Drives its glyph,

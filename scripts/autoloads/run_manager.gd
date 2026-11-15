@@ -36,7 +36,7 @@ var pending_special_event: StringName = &""
 var event_story: Dictionary = {}
 ## Count of ORDINARY (random-pool) event nodes entered this run. Quest/signature events
 ## route through pending_special_event before the scene change, so they never reach the
-## random branch and never advance this count — it tracks only the player's "Nth event".
+## random branch and never advance this count; it tracks only the player's "Nth event".
 var ordinary_event_count: int = 0
 ## Pins a scripted story beat to a given ordinary-event ordinal: {ordinal:int -> event id}.
 ## Lets a beat play on, say, the player's 2nd event (Cass's intro) while the rest stay
@@ -124,7 +124,7 @@ var _title_active_charges: Dictionary[StringName, int] = {}
 
 # --- Excalibur dual-mode ---
 # Sword (0) adds the Excalibur power card to the player's draw pile at start of
-# each combat. Sight (1) is passive — reveals enemy intents one turn ahead.
+# each combat. Sight (1) is passive: reveals enemy intents one turn ahead.
 # Defaults to Sword. The toggle is only meaningful when the player holds the
 # Excalibur relic; if they don't, this value is ignored.
 enum ExcaliburMode { SWORD, SIGHT }
@@ -132,7 +132,7 @@ var excalibur_mode: int = ExcaliburMode.SWORD
 
 # --- The Thurible (Reliquary censer relic) ---
 # A per-fight toggle: each fight the player picks which pole the censer swings their
-# Passion toward — Blazing (+) or Hollow (-). Combat reads the mode at the start of each
+# Passion toward, Blazing (+) or Hollow (-). Combat reads the mode at the start of each
 # player turn and pushes Passion by the relic's value in that direction. Defaults to
 # Blazing. Only meaningful while the player holds The Thurible; otherwise ignored.
 enum ThuribleMode { BLAZING, HOLLOW }
@@ -144,11 +144,11 @@ var thurible_mode: int = ThuribleMode.BLAZING
 # together_subchoice values (only set if philosophy_id == &"together"):
 #   &"wealth", &"wisdom", &"faith"
 # philosophy_strength_tier is the BTK tier rolled at the Act 1 boss (0-3),
-# snapshotted at crown-taking and immutable for the rest of the run — this
+# snapshotted at crown-taking and immutable for the rest of the run; this
 # is the "moment in time" that sets modifier magnitude for the chosen path.
 # kings_reputation is a separate 0-1 running dial fed by subsequent boss rolls
 # (weighted recent: new = 0.4 * old + 0.6 * latest). It's the score the realm
-# uses at narrative beats — true ending checks, king's-roll events — and is
+# uses at narrative beats, true ending checks, king's-roll events, and is
 # NOT used to set modifier magnitude.
 # last_btk_score is the score from the most recent boss fight, preserved for
 # narrative display in the post-fight crown / abdication scenes before it's
@@ -528,7 +528,7 @@ func passion_center() -> int:
 	return 0
 
 
-## Absolute distance of current Passion from the dispassionate center — how far committed
+## Absolute distance of current Passion from the dispassionate center, how far committed
 ## to EITHER pole. The memory card "Everything I Carried Out" scales its damage with this:
 ## the harder I feel, the heavier the blow lands.
 func passion_distance_from_center() -> int:
@@ -557,7 +557,7 @@ func pull_passion_toward(target: int, magnitude: int) -> void:
 
 ## Multiplicatively pulls Passion toward 0 by `strength` (0..1 fraction, volatility-
 ## scaled): keeps (1 - strength) of the current value. Self-scaling on the signed
-## axis — hard when you're committed to a pole, gentle near center, and it can never
+## axis: hard when you're committed to a pole, gentle near center, and it can never
 ## overshoot 0. The False Prophet's "strip your conviction" tool.
 func pull_passion_to_center(strength: float) -> void:
 	if not (passion and current_character):
@@ -705,7 +705,7 @@ func _clear_crossing() -> void:
 ## Install a realm-shape config (from the realm-entry VN choice: Camelot court vs common
 ## folk). Sets the run's realm_config, queues its map_boon for the next map open, applies
 ## its one-shot passion_shift, and emits realm_configured so UI/codex can react. This is
-## the single apply path — vn_scene calls it when a choice carries a config, and the
+## the single apply path: vn_scene calls it when a choice carries a config, and the
 ## mid-run Court Intrigue / Peasant's Plea events retune through it too.
 func apply_realm_config(config: RealmConfig) -> void:
 	if config == null:
@@ -739,7 +739,7 @@ func consume_map_boon() -> void:
 			push_warning("consume_map_boon: unknown boon id '%s'" % boon)
 
 
-## Grant a Fable liaison's run-start gift (the send-off boon — separate from realm_config).
+## Grant a Fable liaison's run-start gift (the send-off boon, separate from realm_config).
 ## Bram (Records) leans info, Neve (Dispatch) leans supplies; each is a bespoke quest-pool
 ## relic so it never appears in shops or reward rolls. See docs/REALM_CAMELOT.md § Run-start.
 func apply_liaison_gift(liaison: StringName) -> void:
@@ -1110,7 +1110,7 @@ func is_crowned() -> bool:
 ## Locks in the philosophy choice + Act 1 BTK tier as the modifier magnitude.
 ## together_sub is required when philosophy == &"together"; ignored otherwise.
 ## Subsequent calls (Phase 2 doesn't expose any, but defensive) leave the
-## strength tier alone — Act 1 is immutable.
+## strength tier alone: Act 1 is immutable.
 func set_philosophy(id: StringName, strength_tier: int,
 		together_sub: StringName = &"") -> void:
 	philosophy_id = id
@@ -1120,7 +1120,7 @@ func set_philosophy(id: StringName, strength_tier: int,
 
 
 ## Fold a fresh BTK score into kings_reputation using the weighted-recent blend.
-## Called for boss fights AFTER the Act 1 crown — the Act 1 roll itself sets
+## Called for boss fights AFTER the Act 1 crown; the Act 1 roll itself sets
 ## philosophy_strength_tier and is NOT mixed into reputation (it's the locked
 ## moment in time). Emits kings_reputation_updated on every call.
 func update_kings_reputation(latest_score: float) -> void:

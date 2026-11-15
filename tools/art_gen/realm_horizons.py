@@ -2,7 +2,7 @@
 
 Produces 1920x320 horizontal-strip PNGs with transparent background, used as
 the map's distant-horizon parallax layer. The silhouette gives the map real
-depth — instead of a flat color, the player sees realm-iconic shapes
+depth: instead of a flat color, the player sees realm-iconic shapes
 receding into haze at the bottom of the screen.
 
 Sits BELOW the realm motif overlay in the map's layer stack but ABOVE the
@@ -54,7 +54,7 @@ def _atmospheric_fade(ctx: cairo.Context, fill: tuple[float, float, float],
 
 
 # ---------------------------------------------------------------------------
-# Camelot — distant castle skyline
+# Camelot: distant castle skyline
 # ---------------------------------------------------------------------------
 
 CAMELOT_SILHOUETTE = (0.10, 0.06, 0.06)
@@ -64,7 +64,7 @@ CAMELOT_HAZE = (0.38, 0.14, 0.12)
 def generate_camelot(out_path: str) -> str:
     surface, ctx = _new_surface()
 
-    # Far background — atmospheric haze gradient, slight warm dusk tint
+    # Far background: atmospheric haze gradient, slight warm dusk tint
     _atmospheric_fade(ctx, CAMELOT_HAZE, alpha_top=0.0, alpha_bottom=0.18)
 
     # ----- Distant city silhouette (back layer, slightly hazed) -----
@@ -141,7 +141,7 @@ def generate_camelot(out_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Yggdrasil — jagged mountains with distant world-tree silhouette
+# Yggdrasil: jagged mountains with distant world-tree silhouette
 # ---------------------------------------------------------------------------
 
 YGGDRASIL_SILHOUETTE = (0.10, 0.14, 0.22)
@@ -171,11 +171,11 @@ def generate_yggdrasil(out_path: str) -> str:
     ctx.close_path()
     ctx.fill()
 
-    # World-tree silhouette removed for V1 — at horizon-strip resolution it
+    # World-tree silhouette removed for V1: at horizon-strip resolution it
     # reads as a glitch shape rather than a tree. Better to let the mountains
     # carry the realm identity at this scale.
 
-    # ----- Standing-stone monolith — Norse focal element nestled in the peaks -----
+    # ----- Standing-stone monolith: Norse focal element nestled in the peaks -----
     # A solitary tall rectangular stone with two small "arms" near the top
     # suggesting carved runes. Sits between the far and mid mountain layers.
     stone_x = WIDTH * 0.34
@@ -183,14 +183,14 @@ def generate_yggdrasil(out_path: str) -> str:
     stone_h = 175
     stone_w = 30
     ctx.set_source_rgba(*YGGDRASIL_SILHOUETTE, 0.78)
-    # Main slab — slightly trapezoidal (wider at bottom)
+    # Main slab: slightly trapezoidal (wider at bottom)
     ctx.move_to(stone_x - stone_w * 0.5, stone_base - stone_h)
     ctx.line_to(stone_x + stone_w * 0.5, stone_base - stone_h)
     ctx.line_to(stone_x + stone_w * 0.7, stone_base)
     ctx.line_to(stone_x - stone_w * 0.7, stone_base)
     ctx.close_path()
     ctx.fill()
-    # Top "arms" — slight notches at the top corners suggesting a megalith
+    # Top "arms": slight notches at the top corners suggesting a megalith
     arm_w = stone_w * 0.45
     arm_h = stone_h * 0.10
     ctx.rectangle(stone_x - stone_w * 0.5 - arm_w, stone_base - stone_h,
@@ -199,7 +199,7 @@ def generate_yggdrasil(out_path: str) -> str:
     ctx.rectangle(stone_x + stone_w * 0.5, stone_base - stone_h,
                   arm_w, arm_h)
     ctx.fill()
-    # Faint rune-carving on the front — a single vertical line + cross-bar
+    # Faint rune-carving on the front, a single vertical line + cross-bar
     ctx.set_source_rgba(0.55, 0.78, 0.95, 0.40)
     ctx.set_line_width(2.0)
     ctx.move_to(stone_x, stone_base - stone_h * 0.85)
@@ -218,7 +218,7 @@ def generate_yggdrasil(out_path: str) -> str:
     while x < WIDTH + 30:
         peak_w = rng.randint(120, 240)
         peak_h = rng.randint(70, 170)
-        # Asymmetric peak — taller on one side
+        # Asymmetric peak: taller on one side
         ctx.line_to(x + peak_w * 0.4, base_y - peak_h)
         ctx.line_to(x + peak_w, base_y)
         x += peak_w * 0.7  # overlap
@@ -241,7 +241,7 @@ def generate_yggdrasil(out_path: str) -> str:
         peak_h = rng2.randint(70, 170)
         summit_x = x + peak_w * 0.4
         summit_y = base_y - peak_h
-        # Tiny V at the summit — left edge to apex to right edge
+        # Tiny V at the summit, left edge to apex to right edge
         ctx.move_to(summit_x - peak_w * 0.06, summit_y + peak_h * 0.12)
         ctx.line_to(summit_x, summit_y)
         ctx.line_to(summit_x + peak_w * 0.06, summit_y + peak_h * 0.12)
@@ -253,7 +253,7 @@ def generate_yggdrasil(out_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Journey to the West — layered misty mountain peaks
+# Journey to the West: layered misty mountain peaks
 # ---------------------------------------------------------------------------
 
 # Less-saturated silhouette so it reads as "blue-green mountain" rather than
@@ -273,11 +273,11 @@ def _jttw_peak_path(ctx: cairo.Context, x: float, peak_w: float, peak_h: float,
     """
     summit_x = x + peak_w * (0.5 + lean)
     summit_y = base_y - peak_h
-    # Left flank — slight inward curve toward the summit
+    # Left flank: slight inward curve toward the summit
     ctx.curve_to(x + peak_w * 0.15, base_y - peak_h * 0.30,
                  x + peak_w * (0.30 + lean * 0.6), base_y - peak_h * 0.75,
                  summit_x, summit_y)
-    # Right flank — slight inward curve from the summit
+    # Right flank: slight inward curve from the summit
     ctx.curve_to(x + peak_w * (0.70 + lean * 0.6), base_y - peak_h * 0.75,
                  x + peak_w * 0.85, base_y - peak_h * 0.30,
                  x + peak_w, base_y)
@@ -285,11 +285,11 @@ def _jttw_peak_path(ctx: cairo.Context, x: float, peak_w: float, peak_h: float,
 
 def _draw_distant_pagoda(ctx: cairo.Context, cx: float, base_y: float,
                           height: float, alpha: float) -> None:
-    """Small distant pagoda silhouette — 3 tiered roofs with a thin spire.
+    """Small distant pagoda silhouette, 3 tiered roofs with a thin spire.
     Used as a focal element in the JttW horizon, nestled among the peaks.
     """
     ctx.set_source_rgba(*JTTW_SILHOUETTE, alpha)
-    # Stacked roofs (3 tiers) — each narrower than the one below
+    # Stacked roofs (3 tiers), each narrower than the one below
     tier_w_base = height * 0.45
     y = base_y
     for i in range(3):
@@ -300,7 +300,7 @@ def _draw_distant_pagoda(ctx: cairo.Context, cx: float, base_y: float,
         # Body
         ctx.rectangle(cx - tier_w / 2, y - tier_body_h, tier_w, tier_body_h)
         ctx.fill()
-        # Roof — trapezoid with overhang
+        # Roof: trapezoid with overhang
         ctx.move_to(cx - tier_w / 2 - overhang, y - tier_body_h)
         ctx.line_to(cx + tier_w / 2 + overhang, y - tier_body_h)
         ctx.line_to(cx + tier_w / 2 * 0.85, y - tier_body_h - tier_roof_h)
@@ -335,9 +335,9 @@ def generate_jttw(out_path: str) -> str:
     # ----- Three layers of misty peaks at decreasing distance -----
     for layer_idx, (alpha, base_ratio, peak_h_range, peak_w_range,
                      lonely_h_mult, draw_lonely) in enumerate([
-        (0.30, 0.70, (110, 200), (160, 280), 1.20, False),  # Far — short and stubby
-        (0.58, 0.84, (160, 260), (140, 240), 1.30, True),   # Mid — focal "lonely peaks" here
-        (0.88, 0.97, (190, 300), (130, 220), 1.55, True),   # Near — tallest focal peaks
+        (0.30, 0.70, (110, 200), (160, 280), 1.20, False),  # Far: short and stubby
+        (0.58, 0.84, (160, 260), (140, 240), 1.30, True),   # Mid: focal "lonely peaks" here
+        (0.88, 0.97, (190, 300), (130, 220), 1.55, True),   # Near: tallest focal peaks
     ]):
         ctx.set_source_rgba(*JTTW_SILHOUETTE, alpha)
         base_y = HEIGHT * base_ratio
@@ -371,7 +371,7 @@ def generate_jttw(out_path: str) -> str:
             _draw_distant_pagoda(ctx, WIDTH * 0.30, HEIGHT * 0.78, 110, 0.50)
             _draw_distant_pagoda(ctx, WIDTH * 0.72, HEIGHT * 0.78, 95, 0.45)
 
-        # Mist band between this layer and the next — pale jade haze
+        # Mist band between this layer and the next, pale jade haze
         if layer_idx < 2:
             mist = cairo.LinearGradient(0, base_y - 30, 0, base_y + 50)
             mist.add_color_stop_rgba(0.0, 0.78, 0.90, 0.84, 0.0)

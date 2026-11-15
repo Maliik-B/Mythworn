@@ -3,7 +3,7 @@ extends CanvasLayer
 ## Pops in from the top of the screen with the title's flavor and accent color,
 ## holds while the player reads, dismisses on click or after a timeout.
 ##
-## Stays out of the way of gameplay — sits on a high layer above scene content
+## Stays out of the way of gameplay: sits on a high layer above scene content
 ## but below SceneTransition's fade. Multiple titles earned in quick succession
 ## queue up rather than overlapping.
 
@@ -96,7 +96,7 @@ func _present_card(title_id: StringName) -> void:
 	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(vbox)
 
-	# Badge — "TITLE EARNED" in accent color
+	# Badge: "TITLE EARNED" in accent color
 	var badge = Label.new()
 	badge.text = "✦ TITLE EARNED"
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -104,7 +104,7 @@ func _present_card(title_id: StringName) -> void:
 	badge.add_theme_color_override("font_color", data.accent_color)
 	vbox.add_child(badge)
 
-	# Title name (Original tier name — players see the title's "true" name when earning)
+	# Title name (Original tier name: players see the title's "true" name when earning)
 	var name_lbl = Label.new()
 	name_lbl.text = data.original_name
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -112,7 +112,7 @@ func _present_card(title_id: StringName) -> void:
 	name_lbl.add_theme_color_override("font_color", Color(0.95, 0.92, 0.85))
 	vbox.add_child(name_lbl)
 
-	# Description (Original tier flavor) — hidden until hover.
+	# Description (Original tier flavor), hidden until hover.
 	var desc_lbl = Label.new()
 	desc_lbl.text = data.original_description
 	desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -156,7 +156,7 @@ func _present_card(title_id: StringName) -> void:
 
 	# Auto-dismiss timer reads `_live_card` instead of capturing `card`. When
 	# the player manually dismisses, `_live_card` is cleared, so the timer
-	# safely no-ops on fire — avoiding Godot's "freed lambda capture" warning
+	# safely no-ops on fire, avoiding Godot's "freed lambda capture" warning
 	# and the older bind-typed-arg conversion error.
 	_current_dismiss_timer = get_tree().create_timer(HOLD_TIMEOUT)
 	_current_dismiss_timer.timeout.connect(_on_auto_dismiss_timeout)

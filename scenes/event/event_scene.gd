@@ -753,7 +753,7 @@ void fragment() {
 	main_vbox.add_child(info_label)
 	_update_info()
 
-	# Unobtrusive read-only map peek — stays available through the whole event and
+	# Unobtrusive read-only map peek, stays available through the whole event and
 	# never consumes it.
 	var map_row = HBoxContainer.new()
 	map_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1119,7 +1119,7 @@ func _grant_consumable(id: StringName) -> bool:
 ## Launches a scripted event fight. The Sword-in-the-Stone guardian is the Beast at the
 ## Stone (a champion who went to face Caedmon and came back hollowed).
 ## Combat victory routes back to the "beast unmade" beat via pending_event_combat +
-## pending_special_event; the player gets no normal reward — Excalibur IS the reward.
+## pending_special_event; the player gets no normal reward: Excalibur IS the reward.
 func _start_event_combat(key: StringName) -> void:
 	match key:
 		&"sword_guardian":
@@ -1206,7 +1206,7 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 		if choice.hp_change > 0:
 			RunManager.heal(choice.hp_change)
 		else:
-			# Apply damage directly without triggering run end — we handle death in the UI
+			# Apply damage directly without triggering run end; we handle death in the UI
 			RunManager.current_hp = max(0, RunManager.current_hp - (-choice.hp_change))
 
 	if choice.max_hp_change != 0:
@@ -1377,7 +1377,7 @@ func _show_card_reward(school: StringName = &"") -> void:
 
 	# The 3 reward cards always fit, so center them across the full width. (A
 	# ScrollContainer here pinned the row to the left, since it sizes its child to
-	# content rather than stretching it — a CenterContainer that fills the width
+	# content rather than stretching it, a CenterContainer that fills the width
 	# centers the row to match the header above.)
 	var center = CenterContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL

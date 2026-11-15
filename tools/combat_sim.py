@@ -1,5 +1,5 @@
 """
-Fable combat balance simulator (Python) — fast analytical sweep.
+Fable combat balance simulator (Python): fast analytical sweep.
 
 A re-implementation of Fable's combat rules for quick number sweeps, kept in rough
 agreement with the AUTHORITATIVE in-engine GDScript harness (tools/combat_harness.tscn).
@@ -31,7 +31,7 @@ import random
 import statistics
 
 # ----------------------------------------------------------------------------
-# ASSUMPTIONS (the levers that most affect the output — challenge these first)
+# ASSUMPTIONS (the levers that most affect the output; challenge these first)
 # ----------------------------------------------------------------------------
 PLAYER_MAX_HP = 80
 ENERGY = 3
@@ -150,7 +150,7 @@ def deal_damage(target, base, source=None, zone=1.0):
 
 
 # ----------------------------------------------------------------------------
-# ENEMY DEFINITIONS  (the numbers we are balancing — mirror scripts/core/enemy_pool.gd)
+# ENEMY DEFINITIONS  (the numbers we are balancing; mirror scripts/core/enemy_pool.gd)
 # effect tuples: ("dmg", n) | ("dmg_x", n, hits) | ("block", n) | ("str", n) |
 #   ("weak", n) | ("vuln", n) | ("poison", n) | ("passion", n) | ("passion_center", frac) |
 #   ("self_enraged", n) | ("ally_str", n)
@@ -211,7 +211,7 @@ ENEMIES = {
     ]),
     "The False Prophet": dict(hp=110, moves=[
         # The Passion crucible: an ESCALATING multiplicative pull. Both preaching moves build
-        # Zealotry, which multiplies the pull (see apply_enemy_effects) — race to silence it.
+        # Zealotry, which multiplies the pull (see apply_enemy_effects), race to silence it.
         M("False Sermon", 2.6, [("passion_center", 0.26), ("weak", 1), ("self_zealotry", 1)], cd=2),
         M("Doubt", 2.4, [("passion_center", 0.18), ("self_zealotry", 1)]),
         M("Condemn", 1.1, [("dmg", 10), ("vuln", 1)]),
@@ -340,10 +340,10 @@ def C(name, cost, kind, effects, pers=NEUTRAL, exhaust=False, x_cost=False):
                 exhaust=exhaust, x_cost=x_cost)
 
 
-# Starter (CharacterPool.emo_starting_deck) — 11 cards: leaned neutral backbone (Strike -1 x2,
-# Defend +1 x2) + a self-scaling core per pole (Water: Outpouring/Riptide/Ebb — multi-hit x
-# control; Physical: Measured Blow/Tempered Strike/Sunder/Guard — the Strength ramp + Vuln
-# enabler). See GAME_DESIGN "Starting deck — iteration log".
+# Starter (CharacterPool.emo_starting_deck), 11 cards: leaned neutral backbone (Strike -1 x2,
+# Defend +1 x2) + a self-scaling core per pole (Water: Outpouring/Riptide/Ebb: multi-hit x
+# control; Physical: Measured Blow/Tempered Strike/Sunder/Guard, the Strength ramp + Vuln
+# enabler). See GAME_DESIGN "Starting deck: iteration log".
 STRIKE   = C("Strike", 1, "atk", [("dmg", 6), ("self_passion", -1)])
 DEFEND   = C("Defend", 1, "blk", [("block", 5), ("self_passion", 1)])
 OUTPOUR  = C("Outpouring", 1, "atk", [("dmg", 7), ("self_passion", 3)], PRIMARY)
@@ -354,18 +354,18 @@ TEMPERED = C("Tempered Strike", 1, "atk", [("dmg", 5), ("self_str", 1), ("self_p
 SUNDER   = C("Sunder", 1, "atk", [("dmg", 5), ("vuln", 1), ("self_passion", -3)], SECONDARY)
 GUARD    = C("Guard", 1, "blk", [("block", 8), ("self_passion", -3)], SECONDARY)
 
-# Water (Primary) pool — glass swing, NO block. Mirrors build_emo_primary_pool.
+# Water (Primary) pool: glass swing, NO block. Mirrors build_emo_primary_pool.
 TIDAL     = C("Tidal Strike", 1, "atk", [("dmg", 9), ("self_passion", 4)], PRIMARY)
 CHILLBRAND= C("Chillbrand", 1, "atk", [("dmg", 6), ("weak", 2), ("self_passion", 4)], PRIMARY)
 UNDERTOW  = C("Undertow", 1, "skl", [("weak", 2), ("str_target", -2), ("self_passion", 4)], PRIMARY)
 DEEPFREEZE= C("Deep Freeze", 2, "skl", [("stun", 1), ("weak", 2), ("self_passion", 6)], PRIMARY)  # content pass #2: Vuln->Weak (Vuln is Physical's alone)
 MAELSTROM = C("Maelstrom", 0, "atk", [("dmg_x_energy", 5), ("self_passion", 6)], PRIMARY, x_cost=True)
-# Cascade (content pass #2): Water's y>=3 single-target multi — the Overflow home. Rides
+# Cascade (content pass #2): Water's y>=3 single-target multi, the Overflow home. Rides
 # extra hits, never Strength (Water has no Strength), keeping it orthogonal to Twin Strike.
 CASCADE   = C("Cascade", 1, "atk", [("dmg_x", 4, 3), ("self_passion", 4)], PRIMARY)
 # (Soulstep / Creeping Tide exist in the pool but aren't in the harness mid-deck.)
 
-# Physical (Secondary) pool — the block/steady floor. Mirrors build_emo_secondary_pool.
+# Physical (Secondary) pool: the block/steady floor. Mirrors build_emo_secondary_pool.
 POWERSLSH = C("Power Slash", 1, "atk", [("dmg", 7), ("block", 3), ("self_passion", -3)], SECONDARY)
 RAMPAGE   = C("Rampage", 2, "atk", [("dmg", 14), ("self_passion", -4)], SECONDARY)
 BRACE     = C("Brace", 1, "blk", [("block", 9), ("self_passion", -3)], SECONDARY)
@@ -738,7 +738,7 @@ def pbar(label, r):
 
 
 if __name__ == "__main__":
-    print(f"\nFable combat sim (Python) — {TRIALS} trials, player {PLAYER_MAX_HP} HP / {ENERGY} energy")
+    print(f"\nFable combat sim (Python): {TRIALS} trials, player {PLAYER_MAX_HP} HP / {ENERGY} energy")
     print("Signed Passion -100..+100 (Blazing >= +50). Rough companion to the GDScript harness.\n")
 
     print("REGULAR ENCOUNTERS (fresh Water starter deck):")
@@ -762,11 +762,11 @@ if __name__ == "__main__":
     pbar("Water build  (target +50)", run(mid_deck(), ["Training Wall"], 0, True, 50))
     pbar("Physical build (target -50)", run(physical_deck(), ["Training Wall"], 0, True, -50))
 
-    print("\nFALSE PROPHET — the Passion crucible (mid deck, start Blazing +50):")
+    print("\nFALSE PROPHET: the Passion crucible (mid deck, start Blazing +50):")
     pbar("ignores Passion", run(mid_deck(), ["The False Prophet"], 50, False, 50))
     pbar("holds pole (Water)", run(mid_deck(), ["The False Prophet"], 50, True, 50))
 
-    print("\nBOSS — Sir Caedmon (realistic: boss deck + Excalibur + Iron Quill + Guardian's Sigil):")
+    print("\nBOSS: Sir Caedmon (realistic: boss deck + Excalibur + Iron Quill + Guardian's Sigil):")
     for sp, name in [(50, "Blazing +50"), (18, "Inspired +18"), (-30, "Wavering -30")]:
         r = run(boss_deck() + [EXCALIBUR], ["Sir Caedmon"], sp, True, 50,
                 start_str=1, turn_block=5)

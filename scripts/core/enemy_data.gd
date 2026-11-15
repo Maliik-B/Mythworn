@@ -27,7 +27,7 @@ var starting_statuses: Array = []
 var phase_movesets: Array = []            # Array[Array[EnemyMove]], one per phase
 @export var phase_lines: Array[String] = []  # spoken on ENTERING phase i (i>=1 = transitions)
 ## On ENTERING phase i, the engine applies these one-time transition effects (index by
-## phase). They make reaching a phase a guaranteed, pace-independent cost — the boss's
+## phase). They make reaching a phase a guaranteed, pace-independent cost, the boss's
 ## anti-burst pressure: an unavoidable lash at the player, a Strength gain, and Enraged
 ## (retaliation) so bursting the next bar down still hurts.
 @export var phase_enter_damage: Array[int] = []        # unavoidable HP hit on the player

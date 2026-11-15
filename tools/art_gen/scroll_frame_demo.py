@@ -88,7 +88,7 @@ def draw_scroll_frame(ctx: cairo.Context, w: int, h: int, palette: dict) -> None
 
 def draw_atmospheric_scene(ctx: cairo.Context, w: int, h: int, palette: dict,
                             scene_h_ratio: float = 0.55) -> None:
-    """Inner scene — drawn into the top portion of the parchment, leaving the
+    """Inner scene: drawn into the top portion of the parchment, leaving the
     bottom band for text. `scene_h_ratio` controls how much vertical space the
     scene takes relative to the parchment height (default 55%).
     """

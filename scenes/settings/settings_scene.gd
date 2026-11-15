@@ -1,5 +1,5 @@
 extends Control
-## Settings screen — adjust audio, display, and gameplay options. All four options
+## Settings screen: adjust audio, display, and gameplay options. All four options
 ## read from and write through ProfileManager, so they persist across launches and the
 ## screen-shake toggle actually gates combat's shake (previously it only print()'d).
 
@@ -77,7 +77,7 @@ func _build_ui() -> void:
 	_shake_check = _add_toggle_row(content, "Screen Shake", ProfileManager.screen_shake)
 	_shake_check.toggled.connect(_on_shake_toggled)
 
-	# Always Show Intro — the Fable send-off introduction plays once per save by
+	# Always Show Intro: the Fable send-off introduction plays once per save by
 	# default, then a single liaison per run. On keeps the full two-liaison intro every run.
 	_intro_check = _add_toggle_row(content, "Always Show Intro", ProfileManager.always_show_intro)
 	_intro_check.toggled.connect(_on_intro_toggled)
@@ -184,7 +184,7 @@ func _add_toggle_row(parent: VBoxContainer, label_text: String, initial_value: b
 
 
 # ============================================================
-# Signal callbacks — all route through ProfileManager (apply live + persist)
+# Signal callbacks: all route through ProfileManager (apply live + persist)
 # ============================================================
 
 func _on_music_volume_changed(value: float) -> void:

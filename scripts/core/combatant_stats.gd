@@ -1,13 +1,13 @@
 class_name CombatantStats
 extends RefCounted
-## Runtime combat stats for a player or enemy. Pure data — no signals.
+## Runtime combat stats for a player or enemy. Pure data: no signals.
 ## The CombatEngine handles events and side effects.
 
 var current_hp: int
 var max_hp: int
 var block: int = 0
 var statuses: Dictionary = {} # StatusEffectData -> int (stacks)
-# Character powers — persistent, character-defining effects granted by POWER cards
+# Character powers: persistent, character-defining effects granted by POWER cards
 # (StS-style). Kept separate from statuses so they read as "who I am this fight"
 # rather than transient combat state, and get their own slot on the battle bar.
 var powers: Dictionary = {} # PowerData -> int (stacks)

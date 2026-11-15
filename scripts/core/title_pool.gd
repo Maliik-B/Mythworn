@@ -1,6 +1,6 @@
 class_name TitlePool
 ## Builds and returns the canonical TitleData instances for V1.
-## Awarding logic (which title to grant after which event) lives elsewhere —
+## Awarding logic (which title to grant after which event) lives elsewhere;
 ## this class is a content registry, not a decision system.
 
 const HERALDIC_ACCENT: Color = Color(0.78, 0.18, 0.18)    # Camelot red

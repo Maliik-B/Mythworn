@@ -1,7 +1,7 @@
 extends Control
 ## Renders a VNData segment: dialogue beats advanced by click/Enter, then an optional
 ## choice set whose consequence (a RealmConfig) applies before handing off to the next
-## scene. Content-agnostic plumbing — the realm-entry VN and the Fable send-off both feed
+## scene. Content-agnostic plumbing: the realm-entry VN and the Fable send-off both feed
 ## it a VNData via RunManager.pending_vn. See VNData + docs/GAME_DESIGN.md § Realms.
 
 # The running head: a setting beat's place and time, set above the panel in the card title's face.
@@ -228,7 +228,7 @@ func _set_choice_detail(btn: Button, c: VNData.VNChoice) -> void:
 
 
 func _on_choice(choice: VNData.VNChoice) -> void:
-	# Apply the realm-shape consequence (if any) — this is how the realm-entry VN sets the
+	# Apply the realm-shape consequence (if any); this is how the realm-entry VN sets the
 	# run's realm state before the map opens. apply_realm_config also queues the map_boon,
 	# applies any passion_shift, and emits realm_configured.
 	if choice.config != null:

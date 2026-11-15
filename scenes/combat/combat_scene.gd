@@ -478,7 +478,7 @@ func _input(event: InputEvent) -> void:
 
 	# While a card is mid-drag, own motion + release HERE (before GUI routing) so the
 	# drop always resolves. If the mouse-up falls through to _unhandled_input instead,
-	# any card/enemy Control under the cursor can swallow it — leaving _dragging_card
+	# any card/enemy Control under the cursor can swallow it, leaving _dragging_card
 	# set and soft-locking the turn (every card bails on `if _dragging_card`). See #7.
 	if not (_dragging_card and _drag_panel):
 		return
@@ -655,7 +655,7 @@ func _build_top_bar() -> HBoxContainer:
 	var bar = HBoxContainer.new()
 	bar.custom_minimum_size.y = 36.0
 
-	# Map peek — glance at your route / what's ahead without leaving combat. Sits at
+	# Map peek: glance at your route / what's ahead without leaving combat. Sits at
 	# the far left (map-in-the-corner), set apart from the pile counts on the right.
 	var map_btn = _make_pile_button(StageSkin.c("pile_map"))
 	map_btn.text = "Map ▸"
@@ -744,7 +744,7 @@ func _build_player_bar() -> PanelContainer:
 	bar.add_theme_constant_override("separation", 40)
 	panel.add_child(bar)
 
-	# Character POWERS slot — anchored at the left (character) end, ahead of the
+	# Character POWERS slot: anchored at the left (character) end, ahead of the
 	# resource stats, and visually distinct (gold) from the status chips. Persistent
 	# powers read as "who I am this fight." Hidden until a POWER is active. The two chip
 	# sides share the spare width equally, so the stats hold the bar's centre and a chip
@@ -1420,7 +1420,7 @@ func _add_flavor_label(parent: Control, card: CardData) -> void:
 	flavor_lbl.add_theme_color_override("font_color", Color(0.62, 0.58, 0.52))
 	flavor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	flavor_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	# Subtle italic via font (no proper italic font in the project — letterspacing
+	# Subtle italic via font (no proper italic font in the project, letterspacing
 	# substitutes as a soft visual cue without requiring a new font asset).
 	flavor_lbl.add_theme_constant_override("outline_size", 0)
 	parent.add_child(flavor_lbl)
@@ -1487,7 +1487,7 @@ func _on_card_input(event: InputEvent, card: CardData) -> void:
 		CardData.TargetType.SINGLE_ENEMY:
 			var living := _living_enemies()
 			if living.size() == 1:
-				# Only one possible target — no need to aim. Play it straight away.
+				# Only one possible target; no need to aim. Play it straight away.
 				_play_selected_card(living[0].stats)
 			else:
 				# Multiple targets: drag onto one; right-click cancels.
@@ -1517,7 +1517,7 @@ func _play_selected_card(target: CombatantStats) -> void:
 						target_pos = _body_rect(epanel).get_center()
 					break
 		else:
-			# AoE — fly to center of enemy area
+			# AoE: fly to center of enemy area
 			target_pos = enemy_container.global_position + enemy_container.size / 2.0
 
 		# Reparent card for animation
@@ -1877,7 +1877,7 @@ func _create_enemy_panel(enemy: EnemyCombatState) -> PanelContainer:
 	intent_lbl.add_theme_constant_override("outline_size", 2)
 	intent_row.add_child(intent_lbl)
 
-	# Sight mode peek — only rendered when player has Excalibur in Sight mode.
+	# Sight mode peek: only rendered when player has Excalibur in Sight mode.
 	# Sits below the current intent in a dimmer color: "Then: <move>". Rich text, so a
 	# Defend move can carry the same shield inline.
 	var next_intent_lbl = RichTextLabel.new()
@@ -1920,7 +1920,7 @@ func _on_enemy_input(event: InputEvent, enemy: EnemyCombatState) -> void:
 		_play_selected_card(enemy.stats)
 
 
-## True if an enemy move pushes the player's Passion — a flat PassionEffect (Whisper,
+## True if an enemy move pushes the player's Passion, a flat PassionEffect (Whisper,
 ## Hollowing Gaze) or the Prophet's multiplicative PassionCenterEffect. Drives the
 ## dedicated passion intent glyph so identity attacks read differently from HP/stat ones.
 func _intent_affects_passion(move: EnemyMove) -> bool:
@@ -1980,7 +1980,7 @@ func _stage_glyph(icon: String) -> String:
 
 ## Short single-line summary of an EnemyMove for the Sight-mode "Then:" preview, written into
 ## `lbl`. A Defend move takes the Defend card's shield and its Block, as the current intent does.
-## Strips the modifier-aware bracket form used in current-intent rendering —
+## Strips the modifier-aware bracket form used in current-intent rendering:
 ## the next move hasn't resolved yet, so showing modified values is misleading.
 func _show_intent_preview(lbl: RichTextLabel, move: EnemyMove) -> void:
 	var icon := "•"
@@ -2067,7 +2067,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 	if not panel:
 		return
 	# A dead enemy's panel belongs to _animate_enemy_death (fade + shrink + remove).
-	# Never touch it here — otherwise each refresh resets its modulate/HP bar and the
+	# Never touch it here; otherwise each refresh resets its modulate/HP bar and the
 	# corpse flickers back to life or churns size as more cards are played.
 	if enemy.stats.is_dead():
 		return
@@ -2180,7 +2180,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 			intent_lbl.tooltip_text = ""
 		intent_name_lbl.tooltip_text = intent_lbl.tooltip_text
 		# A self-heal intent (the Hollow Prelate) carries no status, so the BUFF branch
-		# leaves the readout blank — fill in the heal here so it's telegraphed.
+		# leaves the readout blank; fill in the heal here so it's telegraphed.
 		for heal_eff in enemy.current_intent.effects:
 			if heal_eff is HealEffect and heal_eff.apply_to_source:
 				value_str = " Heal %d" % heal_eff.value
@@ -2193,7 +2193,7 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 				if debuff_eff is StatusApplyEffect and not debuff_eff.apply_to_source:
 					value_str += " %s" % debuff_eff.status_effect.effect_name
 					break
-		# Passion pressure is its own threat category — an attack on your identity, not
+		# Passion pressure is its own threat category, an attack on your identity, not
 		# your HP or your stats. Override the generic (usually DEBUFF) readout with a
 		# distinct spark glyph + the Passion readout's own colour, so the eye goes to that stat.
 		if _intent_affects_passion(enemy.current_intent):
@@ -2352,7 +2352,7 @@ func _populate_power_chips(container: Node, stats: CombatantStats) -> void:
 
 func _make_power_chip(power: PowerData, stacks: int) -> PanelContainer:
 	var chip = PanelContainer.new()
-	var accent := Color(0.92, 0.78, 0.38)  # heraldic gold — the "power" color
+	var accent := Color(0.92, 0.78, 0.38)  # heraldic gold: the "power" color
 	var style = StyleBoxFlat.new()
 	style.set_corner_radius_all(6)
 	style.set_border_width_all(2)
@@ -2527,7 +2527,7 @@ func _body_rect(epanel: Control) -> Rect2:
 	return stand.get_global_rect()
 
 
-## Floats the move name up beside the enemy's head and fades it — the visible "X uses Y" beat.
+## Floats the move name up beside the enemy's head and fades it, the visible "X uses Y" beat.
 func _float_move_callout(epanel: Control, text: String) -> void:
 	var lbl = Label.new()
 	lbl.text = text
@@ -2553,7 +2553,7 @@ func _float_move_callout(epanel: Control, text: String) -> void:
 
 func _on_player_damaged(amount: int, new_hp: int) -> void:
 	if amount <= 0:
-		# The attack was fully absorbed by block — no HP lost. Give a soft "absorbed"
+		# The attack was fully absorbed by block; no HP lost. Give a soft "absorbed"
 		# cue (blue, no screen shake) instead of any red cue.
 		_log("[color=aqua]Absorbed.[/color]")
 		_flash_absorb_overlay()
@@ -2570,7 +2570,7 @@ func _on_player_damaged(amount: int, new_hp: int) -> void:
 
 
 ## The control-heal passive (or any heal) fired. Green log + bar refresh so the player
-## sees they recovered by stilling the enemy. No screen shake — recovery, not a hit.
+## sees they recovered by stilling the enemy. No screen shake: recovery, not a hit.
 func _on_player_healed(amount: int, new_hp: int) -> void:
 	if amount <= 0:
 		return
@@ -2656,7 +2656,7 @@ func _on_enemy_died(enemy) -> void:
 	# Play the death strip under the fade-out _animate_enemy_death runs on the panel.
 	_enemy_play(enemy, "death")
 	# Boss death beat: a final line as the enemy falls (e.g. Caedmon, freed from the
-	# compulsion — the Act-2 Puppeteer tease). Float it BEFORE _animate_enemy_death erases
+	# compulsion: the Act-2 Puppeteer tease). Float it BEFORE _animate_enemy_death erases
 	# the panel from enemy_nodes; the combat log keeps a permanent copy either way.
 	var final_line: String = enemy.enemy_data.death_line
 	if final_line != "":
@@ -3208,7 +3208,7 @@ func _show_continue_button(text: String, callback: Callable) -> void:
 
 func _on_continue_pressed() -> void:
 	# A fight launched from an event (the Sword guardian, the raider ambush) skips the
-	# normal reward — victory routes back to event_scene, which reads pending_special_event
+	# normal reward: victory routes back to event_scene, which reads pending_special_event
 	# for the follow-up beat that grants the quest reward.
 	if RunManager.pending_event_combat:
 		RunManager.pending_event_combat = false

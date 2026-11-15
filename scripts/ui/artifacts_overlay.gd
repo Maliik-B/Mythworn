@@ -1,6 +1,6 @@
 class_name ArtifactsOverlay
 extends Control
-## Read-only review of the artifacts the player already carries — relics and titles —
+## Read-only review of the artifacts the player already carries, relics and titles,
 ## so they can plan shop purchases around what they own (no duplicate relics, spot
 ## synergies, see which titles are working). Openable from any scene; it never mutates
 ## state and, unlike the rest scene's titles overlay, carries no equip/unequip controls.
@@ -21,12 +21,12 @@ static func open(host: Node) -> ArtifactsOverlay:
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	# Fill the viewport immediately: anchor-based full-rect sizing only resolves on the
-	# next layout pass, and until then the overlay is a zero-size box in the corner —
+	# next layout pass, and until then the overlay is a zero-size box in the corner,
 	# which would confine the dim backdrop and the centered panel there too.
 	size = get_viewport_rect().size
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Dim backdrop — clicking it closes the review.
+	# Dim backdrop: clicking it closes the review.
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.72)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)

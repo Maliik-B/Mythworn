@@ -130,7 +130,7 @@ static func _woken(relic_name: String, woken_from: StringName, desc: String,
 	return r
 
 
-## Quest-only relics — granted by specific narrative events, NEVER appear in
+## Quest-only relics: granted by specific narrative events, NEVER appear in
 ## shop wares or post-combat rewards. Excalibur is the central example: it
 ## comes from the Sword in the Stone node and has dual-mode behavior managed
 ## by RunManager + CombatEngine + map UI rather than the generic relic effect
@@ -210,10 +210,10 @@ static func _build_quest_pool() -> Array[RelicData]:
 # knowledge and foresight (undercut the enemy, draw ahead, call in debts); Neve, from
 # Dispatch, deals in the well-packed kit (patch up, pack heavier, stand the blow). Like the
 # quest pool these live outside _build_pool, so they can never surface in shops or post-combat
-# reward rolls — only EventChoice.grants_liaison_relic draws from them, via
+# reward rolls: only EventChoice.grants_liaison_relic draws from them, via
 # get_liaison_relic_choices. get_relic_by_name scans them so a granted id still resolves.
 
-## Bram's Records relics — scholarly foresight: you read up on the road and arrive knowing
+## Bram's Records relics, scholarly foresight: you read up on the road and arrive knowing
 ## where it's soft, a step ahead, with the accounts in hand.
 static func _build_bram_pool() -> Array[RelicData]:
 	var pool: Array[RelicData] = []
@@ -236,7 +236,7 @@ static func _build_bram_pool() -> Array[RelicData]:
 	return pool
 
 
-## Neve's Dispatch relics — a pure survival kit: nothing to swing, everything to keep you
+## Neve's Dispatch relics, a pure survival kit: nothing to swing, everything to keep you
 ## standing (patch up between fights, bleed health back during them, stand the first blow,
 ## steady the hands). Keeping people alive in a trade that chews them up is the whole of her
 ## work, and it shows in what she packs.
@@ -435,14 +435,14 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.DRAW_CARDS, 2))
 
-	# (Spring Charm retired Oct 2026 — its flat +3 Passion at combat start was superseded by the
+	# (Spring Charm retired Oct 2026: its flat +3 Passion at combat start was superseded by the
 	# steerable per-turn pole relics. The Thurible is the flexible Passion-swing reward now.)
 
 	# -- Swing gear (design pass Sep 2026): dedicated relics that swing Passion HARDER,
 	# so a build-around player commits to a pole in ~1 fight instead of the base ~2,
 	# while the plain deck's ramp is unchanged. One per direction so BOTH poles get gear.
 	# Wellspring also folds in #22: it was a Rare +1/turn that lost to Gilt Spurs'
-	# +1 Strength/turn — now Uncommon and +2/turn, a real Blazing accelerant.
+	# +1 Strength/turn: now Uncommon and +2/turn, a real Blazing accelerant.
 	pool.append(_relic("Wellspring of Resolve", "Ink that wells up faster than the pen can use it. Gain 2 Passion at the start of each turn (surges you toward Blazing).",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
 		RelicData.RelicEffect.GAIN_PASSION, 2))

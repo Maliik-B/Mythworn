@@ -1,5 +1,5 @@
 extends Control
-## Character selection screen — choose your character before starting a run.
+## Character selection screen: choose your character before starting a run.
 
 var _particles: Array[ColorRect] = []
 var _time := 0.0

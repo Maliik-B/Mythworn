@@ -1,7 +1,7 @@
 class_name PileManager
 extends RefCounted
 ## Manages the four card piles during combat: draw, hand, discard, exhaust.
-## Pure data operations — no signals. The CombatEngine handles events.
+## Pure data operations: no signals. The CombatEngine handles events.
 
 var draw_pile: Array[CardData] = []
 var hand: Array[CardData] = []

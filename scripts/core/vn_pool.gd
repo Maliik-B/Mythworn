@@ -16,7 +16,7 @@ const C_COURT := Color(0.86, 0.74, 0.40)       # gilt
 const C_FOLK := Color(0.72, 0.66, 0.52)        # homespun
 
 
-## The full Fable send-off — the FIRST-run introduction, both liaisons in one scene.
+## The full Fable send-off, the FIRST-run introduction, both liaisons in one scene.
 ## Dialogue only (no choice); the liaison gifts are granted separately by
 ## apply_liaison_gift. Shown only the first time on a save (or when the player toggles
 ## "always show intro" back on); returning runs use build_sendoff_single. The demo ships
@@ -53,7 +53,7 @@ static func _keeper(character: CharacterData) -> String:
 	return "You"
 
 
-## Bram — Records. Dry, tired; hands over the Camelot briefing.
+## Bram: Records. Dry, tired; hands over the Camelot briefing.
 static func _add_bram_beats(vn: VNData, keeper: String) -> void:
 	vn.add_beat("", "Bram slides a folder across the Records desk without looking up.", C_NARRATION)
 	vn.add_beat("Bram", "Filled it with everything we still have on Camelot. There's a 'weapon of heroes' in there, some reference out of the realm's old stories. We think. Lore never sticks around more than a couple days.", C_BRAM)
@@ -63,7 +63,7 @@ static func _add_bram_beats(vn: VNData, keeper: String) -> void:
 	vn.add_beat("Bram", "At least yours is only the once. Mine does it on a schedule.", C_BRAM)
 
 
-## Neve — Dispatch. Warm veteran; hands over the kit.
+## Neve: Dispatch. Warm veteran; hands over the kit.
 static func _add_neve_beats(vn: VNData, keeper: String) -> void:
 	vn.add_setting("Dispatch")
 	vn.add_beat("", "Neve holds the kit a second longer than she needs to.", C_NARRATION)
@@ -102,7 +102,7 @@ static func _add_neve_return_beats(vn: VNData, keeper: String) -> void:
 	vn.add_beat("Neve", "Go on, you know the way out. Come back the same number of pieces you left in.", C_NEVE)
 
 
-## The Camelot realm-entry — "A Realm Divided": arrival at a realm in crisis, then the
+## The Camelot realm-entry, "A Realm Divided": arrival at a realm in crisis, then the
 ## court-vs-common-folk allegiance choice that SHAPES the run (each choice carries a
 ## RealmConfig applied via RunManager.apply_realm_config BEFORE the map generates, so it
 ## reshapes the map's composition, not just retunes it). ~3 scroll panels + the choice.

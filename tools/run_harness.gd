@@ -1,5 +1,5 @@
 extends Node
-## Run-layer balance harness — the whole-run companion to combat_harness.
+## Run-layer balance harness: the whole-run companion to combat_harness.
 ##
 ## Walks a representative Act-1 node sequence with the REAL systems: EnemyPool encounters, the
 ## shared HarnessCombat policy over the real CombatEngine, CardPool reward drafting, EventPool and
@@ -26,7 +26,7 @@ extends Node
 ##   --title=ID         wear this title from floor 1
 ##   --sweep=pets|forgotten|titles   a paired batch per variant on the same seeds, as differences
 ##
-## MODEL of a Water-committing player (the shared planning policy) — sets bands; playtest finalizes.
+## MODEL of a Water-committing player (the shared planning policy); sets bands; playtest finalizes.
 
 const MAX_TURNS := 60
 const COMMIT_TARGET := 50
@@ -81,7 +81,7 @@ func _ready() -> void:
 	AudioManager.enabled = false
 	_read_args()
 	print("\n===============================================================")
-	print(" Fable RUN harness — %d runs, real Act-1 walk (%d nodes)" % [_runs, LAYOUT.size()])
+	print(" Fable RUN harness: %d runs, real Act-1 walk (%d nodes)" % [_runs, LAYOUT.size()])
 	print(" realm config: shipped   seeds: %d..%d%s   companion: %s%s%s" % [
 		_seed_base, _seed_base + _runs - 1,
 		"   (daily seed %d)" % _daily_seed if _daily_seed > 0 else "", _pet_mode,
@@ -391,7 +391,7 @@ func _event_enemies(key: StringName) -> Array[EnemyData]:
 
 
 ## A relic reward after an elite/boss (the real reward flow offers 3; we take the
-## first offered = average luck, not best-case, so sustain isn't over-modelled) —
+## first offered = average luck, not best-case, so sustain isn't over-modelled),
 ## skipping only a relic that would fight the modeled build's pole (see below).
 func _award_relic(is_boss: bool) -> void:
 	var owned := RunManager.get_owned_relic_names()
@@ -410,7 +410,7 @@ func _award_relic(is_boss: bool) -> void:
 
 ## True if a relic swings Passion the WRONG way for the modeled Water-commit build (an
 ## ON_TURN_START −Passion relic like Leaden Vow). A real Water player would never draft
-## it, so the model shouldn't either — otherwise the swing gear pollutes the passion arc.
+## it, so the model shouldn't either; otherwise the swing gear pollutes the passion arc.
 func _relic_against_commit(r: RelicData) -> bool:
 	return r.trigger == RelicData.RelicTrigger.ON_TURN_START \
 		and r.effect == RelicData.RelicEffect.GAIN_PASSION \
@@ -713,7 +713,7 @@ func _card_score(c: CardData) -> int:
 	return s
 
 
-## True if a card grants any Block — the survival floor a committed Water drafter still
+## True if a card grants any Block, the survival floor a committed Water drafter still
 ## reaches for (Shield Wall / Phantom Guard / Bracing Blow), since the Water pole itself
 ## no longer carries block.
 func _grants_block(c: CardData) -> bool:
@@ -785,7 +785,7 @@ func _report(a: Dictionary) -> void:
 			float(tot) / maxf(1.0, lost.size()), lost[mini(lost.size() - 1, int(0.9 * lost.size()))],
 			float(fs["passion"]) / fs["n"]])
 
-	print("\nPASSION ARC (the playtest's main gripe — did it move?):")
+	print("\nPASSION ARC (the playtest's main gripe: did it move?):")
 	print("  distinct tiers visited / run: %.1f of 5" % (float(a["tiers"]) / n))
 	print("  swing per run: avg low %.0f  ->  avg high %.0f" % [
 		float(a["min_p"]) / n, float(a["max_p"]) / n])

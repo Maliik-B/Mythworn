@@ -28,7 +28,7 @@ func _init(data: EnemyData) -> void:
 	stats = CombatantStats.new(hp)
 
 
-## The move list for the current phase — the per-phase set for a multi-phase boss,
+## The move list for the current phase, the per-phase set for a multi-phase boss,
 ## or the flat `moves` for a single-phase enemy.
 func _active_moves() -> Array:
 	if enemy_data.phase_movesets.size() > phase_index:
@@ -42,7 +42,7 @@ func can_advance_phase() -> bool:
 
 
 ## Transition to the next phase: refill to its own lifebar, drop block, clear statuses
-## (a fresh state — resets both player debuffs and the boss's own escalation), reset
+## (a fresh state: resets both player debuffs and the boss's own escalation), reset
 ## the move cadence, and reroll intent. Returns the line to speak on entering, if any.
 func advance_phase() -> String:
 	phase_index += 1
@@ -62,7 +62,7 @@ func advance_phase() -> String:
 
 ## Advances intent by one turn. On the first call (next_intent is null) it rolls
 ## both current and next fresh. Afterwards it slides the pre-rolled next into
-## current — but only if that prediction is still legal, since a boss can cross an
+## current, but only if that prediction is still legal, since a boss can cross an
 ## HP phase threshold between turns and invalidate a move that was fine last turn.
 ## When the prediction no longer fits, we roll fresh (Sight mode's forecast can
 ## "miss" right at a phase break, which reads as the enemy changing tactics).

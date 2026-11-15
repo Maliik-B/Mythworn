@@ -601,7 +601,7 @@ static func _the_tiltyard() -> EventData:
 
 
 ## Camelot within-realm lore event (the "good-feeling pass" step 2). A village bled
-## dry by the crown's tithe begs relief — leaning into the court-vs-folk axis the "A
+## dry by the crown's tithe begs relief, leaning into the court-vs-folk axis the "A
 ## Realm Divided" pledge sets up. Helping is the keeper letting his guard down, so it
 ## moves Passion toward Water (+); the cold, crown-serving choice hardens him (-).
 ## Arthurian flavor. (Flavor is medieval/Camelot; the demo

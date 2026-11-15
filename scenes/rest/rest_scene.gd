@@ -79,7 +79,7 @@ void fragment() {
 	main_vbox.add_child(info_label)
 	_update_info()
 
-	# The two rest actions — one of these ends the rest.
+	# The two rest actions: one of these ends the rest.
 	choice_container = HBoxContainer.new()
 	choice_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	choice_container.add_theme_constant_override("separation", 40)
@@ -465,7 +465,7 @@ func _ignore_mouse_recursive(control: Control) -> void:
 # BANNERS (Title Swap)
 # ============================================================
 
-## Open the title-swap modal. Doesn't end the rest — the player can still heal
+## Open the title-swap modal. Doesn't end the rest; the player can still heal
 ## or upgrade after managing their titles. Modal reuses styling from the map's
 ## titles popup but adds interactive equip/unequip buttons per card.
 func _on_banners() -> void:
@@ -726,7 +726,7 @@ func _on_equip_to_slot(id: StringName, slot: int) -> void:
 func _refresh_titles_overlay() -> void:
 	if not titles_overlay:
 		return
-	# Rebuild in place — find the content VBox by tag traversal
+	# Rebuild in place: find the content VBox by tag traversal
 	# Simpler: tear down and reopen.
 	_close_titles_overlay()
 	_build_titles_overlay()

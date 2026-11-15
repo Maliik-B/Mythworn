@@ -4,7 +4,7 @@ extends Resource
 
 enum DurationType { TURN_BASED, PERMANENT, COMBAT_ONLY, REALM }
 enum StackType { INTENSITY, DURATION, NONE }
-## How the effect leaves play — surfaced in the status chip's tooltip so the player
+## How the effect leaves play, surfaced in the status chip's tooltip so the player
 ## knows whether it will fade on its own. PERSISTS: stays all combat (Strength).
 ## TURN_TICK: loses a stack each turn (Vulnerable, Poison, Poise). TEMPORARY: a
 ## one-shot duration that expires after firing (Frozen).

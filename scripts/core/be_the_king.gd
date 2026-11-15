@@ -1,6 +1,6 @@
 class_name BeTheKing
 extends RefCounted
-## Be the King — Camelot's post-boss performance dial.
+## Be the King: Camelot's post-boss performance dial.
 ##
 ## Scores a crown-stakes boss fight on a 0-1 scale, then quantizes to one of
 ## four tiers. The tier sets the magnitude of the governing philosophy's
@@ -15,7 +15,7 @@ extends RefCounted
 ##   - Two scoring tracks (HP retention vs. speed) are combined with max(),
 ##     so block-tank and burst archetypes both have a path to Triumphant.
 ##
-## Pure logic — no engine references. CombatEngine snapshots the inputs and
+## Pure logic: no engine references. CombatEngine snapshots the inputs and
 ## calls score_fight() on combat_won when the fight is crown-stakes.
 
 enum Tier { BATTERED, SCRAPPY, DECISIVE, TRIUMPHANT }
@@ -49,7 +49,7 @@ const SPEED_FLOOR := 4
 const SPEED_CEILING := 12
 const SPEED_MIN := 0.4
 # Bonus added to the better of (HP score, speed score) when no passion tier
-# change occurred during the fight — rewards holding identity under pressure.
+# change occurred during the fight: rewards holding identity under pressure.
 const PASSION_STABILITY_BONUS := 0.1
 
 # Score thresholds for tier quantization. Read top-down: first match wins.
@@ -75,7 +75,7 @@ static func score_fight(start_hp: int, end_hp: int, max_hp: int, turns: int,
 		passion_tier_changed: bool) -> Dictionary:
 	var hp_score := _hp_score(start_hp, end_hp, max_hp)
 	var speed_score := _speed_score(turns)
-	# max() of the two tracks — reward whichever the player optimized for.
+	# max() of the two tracks: reward whichever the player optimized for.
 	var base_score: float = maxf(hp_score, speed_score)
 	if not passion_tier_changed:
 		base_score += PASSION_STABILITY_BONUS
@@ -108,7 +108,7 @@ static func phrase_for_tier(tier: int) -> String:
 # --- Internal scoring tracks ---
 
 static func _hp_score(start_hp: int, end_hp: int, max_hp: int) -> float:
-	# Normalize against starting HP, not max — a player who entered the boss
+	# Normalize against starting HP, not max: a player who entered the boss
 	# at 30% shouldn't be penalized for arriving wounded. The fight is scored
 	# on its own terms.
 	if start_hp <= 0:

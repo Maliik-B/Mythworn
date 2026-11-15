@@ -889,7 +889,7 @@ func _rule_card_names(w: Dictionary) -> Array:
 func _rule_em_dash(w: Dictionary) -> Array:
 	var out: Array = []
 	for pair in w["strings"]:
-		if String(pair[1]).contains("—"):
+		if String(pair[1]).contains(String.chr(0x2014)):
 			out.append("%s carries an em dash" % pair[0])
 	return out
 
@@ -955,7 +955,7 @@ func _self_test(w: Dictionary) -> void:
 		["card names are unique across the pools that share a name space", func(x):
 			x["card_names"]["generic"].append(x["card_names"]["emo_primary"][0])],
 		["authored text has no em dash", func(x):
-			x["strings"].append(["seed", "a line — with a dash"])],
+			x["strings"].append(["seed", "a line %s with a dash" % String.chr(0x2014)])],
 	]
 	for case in cases:
 		var rule: String = case[0]

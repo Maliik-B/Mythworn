@@ -2,7 +2,7 @@ class_name MapPreviewOverlay
 extends Control
 ## Read-only, scrollable preview of the current act's map. Openable from any
 ## non-map scene (rest / shop / event) so the player can glance at their route
-## and what's ahead without leaving — it never mutates map state or navigates.
+## and what's ahead without leaving: it never mutates map state or navigates.
 ##
 ## Reuses the persistent map in RunManager.current_map and MapNode's static
 ## type helpers, but renders its own compact, non-interactive node graph so it
@@ -37,7 +37,7 @@ func _build() -> void:
 	size = get_viewport_rect().size
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Dim backdrop — clicking it closes the preview.
+	# Dim backdrop: clicking it closes the preview.
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.72)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -118,7 +118,7 @@ func _build() -> void:
 
 
 func _node_center(node: MapNode, floor_count: int) -> Vector2:
-	# Floor 0 at the bottom, boss at the top — mirrors the real map's orientation,
+	# Floor 0 at the bottom, boss at the top, mirrors the real map's orientation,
 	# including the generator's cosmetic x/y jitter so the preview matches.
 	var x := MARGIN + (node.column + node.x_jitter) * SPACING_X + NODE / 2.0
 	var y := MARGIN + (floor_count - 1 - node.floor_num + node.y_jitter) * SPACING_Y + NODE / 2.0
@@ -204,7 +204,7 @@ func _make_dot(node: MapNode, is_current: bool, is_available: bool) -> Control:
 	var landmark: bool = look.get("landmark", false)
 
 	if is_current:
-		# Where the player stands — bright fill + thick pale-gold ring + ◈ badge.
+		# Where the player stands: bright fill + thick pale-gold ring + ◈ badge.
 		style.bg_color = color.darkened(0.15)
 		style.set_border_width_all(5)
 		style.border_color = Color(1.0, 0.92, 0.55)
@@ -215,7 +215,7 @@ func _make_dot(node: MapNode, is_current: bool, is_available: bool) -> Control:
 		style.bg_color = color.darkened(0.7)
 		style.border_color = color.darkened(0.2)
 	elif not landmark:
-		# Out-of-reach future node — dim it (landmarks stay vivid below).
+		# Out-of-reach future node: dim it (landmarks stay vivid below).
 		style.bg_color = color.darkened(0.65)
 		style.border_color = color.darkened(0.35)
 

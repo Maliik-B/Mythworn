@@ -8,7 +8,7 @@ enum Tier { HOLLOW, WAVERING, STEADY, INSPIRED, BLAZING }
 
 # Capped at ±60 (design pass Sep 2026), not ±100: with tiers at ±50, "at your pole" is a
 # tight 50–60 band you SIT at rather than an open slider, so every Passion mechanic (the
-# Prophet's pull, swing relics, card costs) has a defined 0-to-max to work against — and a
+# Prophet's pull, swing relics, card costs) has a defined 0-to-max to work against, and a
 # multiplicative center-pull from +60 can actually drop you a tier, which it couldn't from +100.
 @export var current_value: int = 0
 @export var min_value: int = -60

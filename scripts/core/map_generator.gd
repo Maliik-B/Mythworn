@@ -7,7 +7,7 @@ const MAP_WIDTH := 7
 const PATH_COUNT := 6
 
 
-## Generate a map. `realm_id` and `act` are optional — when provided, realm-specific
+## Generate a map. `realm_id` and `act` are optional: when provided, realm-specific
 ## post-processing places signature nodes (e.g. Camelot's Sword in the Stone at the
 ## center of Act 1). Default behavior preserves the original generic map.
 static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
@@ -42,7 +42,7 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 
 				col = next_col
 
-	# Phase 1b: straighten any X-crossings so no two edges cross when drawn — the
+	# Phase 1b: straighten any X-crossings so no two edges cross when drawn, the
 	# independent path-walks routinely produce them, and crossed lines misread as
 	# "which node does this connect to?" Purely a connection rewrite; connectivity holds.
 	_remove_edge_crossings(connections)
@@ -103,7 +103,7 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 		if map.nodes[id].floor_num == 0:
 			map.starting_node_ids.append(id)
 
-	# Phase 6: Assign node types — always NEUTRAL now. The realm-entry pledge shapes the
+	# Phase 6: Assign node types: always NEUTRAL now. The realm-entry pledge shapes the
 	# map via a recorded transform (Phase 7b) instead of an invisible generation weight, so
 	# the map can show exactly which nodes the choice changed.
 	_assign_types(map, rng, 1.0)
@@ -115,7 +115,7 @@ static func generate(rng: RandomNumberGenerator, realm_id: StringName = &"",
 	# record them on map.pledge_changes for the "watch your choice reshape these" animation.
 	_apply_pledge_transform(map, rng, elite_frequency_mult, weaken_elites)
 
-	# Phase 8: cosmetic placement jitter — organic look, never touches connectivity
+	# Phase 8: cosmetic placement jitter, organic look, never touches connectivity
 	_apply_jitter(map, rng)
 
 	# Phase 9: the crossing. Last, and on a stream of its own, so seating it moves nothing: not the
@@ -199,7 +199,7 @@ static func _apply_jitter(map: MapData, rng: RandomNumberGenerator) -> void:
 ## Removes X-crossings from the grid connections so the drawn graph is planar (no two
 ## edges cross). All edges span adjacent floors with |Δcol| ≤ 1, so the ONLY way two
 ## edges cross is the "X": (f,c)→(f+1,c+1) together with (f,c+1)→(f+1,c). We straighten
-## both — swap their targets to go straight up — which deletes the crossing while keeping
+## both, swap their targets to go straight up, which deletes the crossing while keeping
 ## every source's exit and every target's feeder (connectivity preserved). Straightening
 ## can only remove crossings, never create them, so a few passes reach a crossing-free
 ## fixpoint. The cosmetic jitter (±0.22 col) is far too small to reorder columns, so a
@@ -231,7 +231,7 @@ static func _remove_edge_crossings(connections: Dictionary) -> void:
 
 ## Realm-specific central quest nodes. Currently: Camelot Act 1 gets the Sword in
 ## the Stone at the center floor's middle column. We replace the nearest existing
-## node — paths that happen to go through the center hit it, others bypass it.
+## node: paths that happen to go through the center hit it, others bypass it.
 ## This matches the design intent that pathing to the central quest is itself the
 ## decision, not a forced detour.
 static func _apply_realm_specifics(map: MapData, realm_id: StringName, act: int,
@@ -583,7 +583,7 @@ const MIN_SHOPS_TOTAL := 2      # at least this many shops exist somewhere on th
 ## is filled by region-weighted rolls constrained so no two of the same special
 ## (Elite/Rest/Shop) sit back-to-back on a path and min-floor rules hold. A pair of
 ## guarantee passes then cap elites-per-path and ensure a reachable shop (incl. a
-## back-half gold sink) exists — without forcing one onto every route.
+## back-half gold sink) exists, without forcing one onto every route.
 static func _assign_types(map: MapData, rng: RandomNumberGenerator,
 		elite_frequency_mult: float = 1.0) -> void:
 	var last := map.floor_count - 1
@@ -720,7 +720,7 @@ static func _enforce_elite_cap(map: MapData) -> void:
 
 
 ## Ensures a shop is reachable (and a back-half one exists as a late gold sink),
-## without forcing a shop onto every route — routing to one is the decision.
+## without forcing a shop onto every route: routing to one is the decision.
 static func _ensure_shop_access(map: MapData, rng: RandomNumberGenerator) -> void:
 	var shop_count := 0
 	var back_half := false

@@ -34,7 +34,7 @@ var scripted_event_id: StringName = &""
 var crossing_to: StringName = &""
 # Purely-cosmetic sub-cell offsets (in fractions of a cell) so the rendered graph
 # looks organically placed instead of a rigid lattice. Set by MapGenerator; the
-# grid column/floor still drive connectivity, balance, and layout — jitter never
+# grid column/floor still drive connectivity, balance, and layout; jitter never
 # changes which nodes exist or connect.
 var x_jitter: float = 0.0
 var y_jitter: float = 0.0

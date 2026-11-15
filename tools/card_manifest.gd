@@ -1,7 +1,7 @@
 extends Control
-## CARD MANIFEST — an interactive QA view of every card face. The Passion TOGGLE at the top drives
+## CARD MANIFEST: an interactive QA view of every card face. The Passion TOGGLE at the top drives
 ## the live zone, so you can watch each school sigil empower / grey and the halo coin EBB in/out on
-## a threshold crossing — the real combat behaviour (it reuses combat_scene._create_card_panel and
+## a threshold crossing: the real combat behaviour (it reuses combat_scene._create_card_panel and
 ## _fade_coin_transitions, so what you see == what combat shows, with no drift). Cards are pulled
 ## straight from the pools, so new cards appear automatically as content grows.
 ##
@@ -12,7 +12,7 @@ const CombatScene = preload("res://scenes/combat/combat_scene.gd")
 const COLUMNS := 6
 const PNG_PATH := "D:/Applications/Fable/screenshots/card_manifest.png"
 
-# Passion presets for the toggle — one value comfortably inside each tier.
+# Passion presets for the toggle, one value comfortably inside each tier.
 const TIERS := [[-55, "HOLLOW"], [-30, "WAVERING"], [0, "STEADY"], [30, "INSPIRED"], [55, "BLAZING"]]
 
 var _render_host: Control            # bare combat_scene, reused only for its card render
@@ -45,7 +45,7 @@ func _ready() -> void:
 	add_child(root)
 
 	var title := Label.new()
-	title.text = "CARD MANIFEST   —   toggle Passion to watch the school sigils empower/grey and the halo coin EBB in/out (the real combat behaviour)"
+	title.text = "CARD MANIFEST: toggle Passion to watch the school sigils empower/grey and the halo coin EBB in/out (the real combat behaviour)"
 	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
 	root.add_child(title)

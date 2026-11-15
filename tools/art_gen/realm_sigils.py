@@ -1,6 +1,6 @@
 """Realm sigil generator.
 
-Produces 512x512 stylized emblem PNGs for each realm — used as corner badges
+Produces 512x512 stylized emblem PNGs for each realm, used as corner badges
 on the map header. PyCairo throughout for clean curves and AA edges.
 
 Usage: python realm_sigils.py [camelot|yggdrasil|jttw|all]
@@ -42,7 +42,7 @@ JTTW_PALETTE = {
     "pagoda_body_hi": (0.72, 0.28, 0.24),
     "pagoda_roof": (0.20, 0.10, 0.10),
     "pagoda_roof_hi": (0.35, 0.18, 0.16),
-    # Pale jade-tinted mist for cloud forms — light enough to read as cloud,
+    # Pale jade-tinted mist for cloud forms, light enough to read as cloud,
     # tinted enough to stay in the realm's palette.
     "cloud": (0.78, 0.88, 0.82),
     "cloud_hi": (0.96, 0.98, 0.94),
@@ -101,7 +101,7 @@ def _shield_path(ctx: cairo.Context, cx: float, cy: float,
 
 
 def _crown_path(ctx: cairo.Context, cx: float, cy: float, w: float, h: float) -> None:
-    """Simple stylized crown — flat band with three points (tall center, two flanking)."""
+    """Simple stylized crown: flat band with three points (tall center, two flanking)."""
     half_w = w / 2.0
     base_y = cy + h * 0.40
     band_top = cy + h * 0.10
@@ -122,7 +122,7 @@ def _crown_path(ctx: cairo.Context, cx: float, cy: float, w: float, h: float) ->
 
 def _draw_cross_greek(ctx: cairo.Context, cx: float, cy: float, size: float,
                        fill: tuple[float, float, float]) -> None:
-    """Clean Greek cross — equal arms, straight edges, slight inset at intersection.
+    """Clean Greek cross: equal arms, straight edges, slight inset at intersection.
 
     `size` is the half-length of each arm (so total cross spans 2*size).
     """
@@ -156,7 +156,7 @@ def _draw_fleur_de_lis(ctx: cairo.Context, cx: float, cy: float, size: float,
     """
     s = size
 
-    # Central petal — pointed almond shape
+    # Central petal: pointed almond shape
     ctx.move_to(cx, cy - s)                                 # top point
     ctx.curve_to(cx + s * 0.18, cy - s * 0.65,
                  cx + s * 0.18, cy - s * 0.15,
@@ -168,7 +168,7 @@ def _draw_fleur_de_lis(ctx: cairo.Context, cx: float, cy: float, size: float,
     ctx.set_source_rgb(*fill)
     ctx.fill()
 
-    # Side petals — curling outward and downward
+    # Side petals: curling outward and downward
     for sign in (-1, 1):
         ctx.move_to(cx, cy - s * 0.30)                       # tucked against center top
         ctx.curve_to(cx + sign * s * 0.10, cy - s * 0.45,
@@ -184,7 +184,7 @@ def _draw_fleur_de_lis(ctx: cairo.Context, cx: float, cy: float, size: float,
         ctx.set_source_rgb(*fill)
         ctx.fill()
 
-    # Lower stem — sweeps below the binding band
+    # Lower stem: sweeps below the binding band
     ctx.move_to(cx - s * 0.14, cy + s * 0.20)
     ctx.line_to(cx + s * 0.14, cy + s * 0.20)
     ctx.curve_to(cx + s * 0.10, cy + s * 0.60,
@@ -197,7 +197,7 @@ def _draw_fleur_de_lis(ctx: cairo.Context, cx: float, cy: float, size: float,
     ctx.set_source_rgb(*fill)
     ctx.fill()
 
-    # Binding band across the middle — slightly darker for separation
+    # Binding band across the middle, slightly darker for separation
     band_y = cy + s * 0.20
     band_h = s * 0.18
     ctx.rectangle(cx - s * 0.80, band_y - band_h / 2.0, s * 1.60, band_h)
@@ -222,7 +222,7 @@ def generate_camelot(out_path: str, emblem: str = "cross") -> str:
     ctx = cairo.Context(surface)
     p = CAMELOT_PALETTE
 
-    # Subtle dark circular background — gentler than v1 so it reads as halo, not disc
+    # Subtle dark circular background, gentler than v1 so it reads as halo, not disc
     bg_grad = cairo.RadialGradient(SIZE / 2, SIZE / 2, SIZE * 0.05,
                                     SIZE / 2, SIZE / 2, SIZE * 0.55)
     bg_grad.add_color_stop_rgba(0.0, *p["bg_outer"], 0.0)
@@ -294,7 +294,7 @@ def generate_camelot(out_path: str, emblem: str = "cross") -> str:
     ctx.set_source(face_grad)
     ctx.fill_preserve()
 
-    # Shield gold border — thick outer + thin inner line for depth
+    # Shield gold border: thick outer + thin inner line for depth
     ctx.set_source_rgb(*p["shield_border"])
     ctx.set_line_width(10)
     ctx.stroke()
@@ -303,7 +303,7 @@ def generate_camelot(out_path: str, emblem: str = "cross") -> str:
     ctx.set_line_width(3)
     ctx.stroke()
 
-    # Inner border line — ink, just inside the gold
+    # Inner border line: ink, just inside the gold
     _shield_path(ctx, shield_cx, shield_cy, shield_w * 0.94, shield_h * 0.94)
     ctx.set_source_rgba(*p["ink"], 0.45)
     ctx.set_line_width(1.5)
@@ -335,7 +335,7 @@ def generate_camelot(out_path: str, emblem: str = "cross") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Yggdrasil — World Tree inside a runic circle
+# Yggdrasil: World Tree inside a runic circle
 # ---------------------------------------------------------------------------
 
 def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
@@ -344,7 +344,7 @@ def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
 
     Previous iteration had 8 small rune marks that vanished at corner-badge
     size. This version uses 4 large bold runes (Algiz, Othala, sun-cross,
-    bind-rune) — recognizable as runes even when scaled to 110px.
+    bind-rune): recognizable as runes even when scaled to 110px.
     """
     # Outer fill ring
     ctx.arc(cx, cy, r_outer, 0, 2 * math.pi)
@@ -354,12 +354,12 @@ def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
     ctx.arc(cx, cy, r_inner, 0, 2 * math.pi)
     ctx.set_source_rgb(*p["ring_inner"])
     ctx.fill()
-    # Inner disc — darker so the tree pops
+    # Inner disc: darker so the tree pops
     ctx.arc(cx, cy, r_inner * 0.94, 0, 2 * math.pi)
     ctx.set_source_rgb(0.05, 0.08, 0.15)
     ctx.fill()
 
-    # Ring highlight stripe along the outer ring's upper edge — suggests
+    # Ring highlight stripe along the outer ring's upper edge, suggests
     # carved depth catching distant aurora light.
     ctx.set_source_rgba(*p["ring_hi"], 0.55)
     ctx.set_line_width(3.0)
@@ -374,7 +374,7 @@ def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
     rune_r = r_outer * 0.86
     rune_size = r_outer * 0.13
 
-    # NORTH: Algiz ᛉ — vertical bar with two angled branches at top (life/protection)
+    # NORTH: Algiz ᛉ, vertical bar with two angled branches at top (life/protection)
     nx, ny = cx, cy - rune_r
     s = rune_size
     ctx.move_to(nx, ny + s)
@@ -387,7 +387,7 @@ def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
     ctx.line_to(nx + s * 0.7, ny - s * 0.95)
     ctx.stroke()
 
-    # EAST: Sun-cross — circle with cross inside (also reads as a clean glyph)
+    # EAST: Sun-cross, circle with cross inside (also reads as a clean glyph)
     ex, ey = cx + rune_r, cy
     ctx.arc(ex, ey, s * 0.75, 0, 2 * math.pi)
     ctx.stroke()
@@ -398,7 +398,7 @@ def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
     ctx.line_to(ex, ey + s * 0.75)
     ctx.stroke()
 
-    # SOUTH: Othala ᛟ — closed diamond on top with two short angled legs
+    # SOUTH: Othala ᛟ, closed diamond on top with two short angled legs
     # splaying outward from the bottom point (heritage / homeland)
     sx, sy = cx, cy + rune_r
     # Diamond outline (closed shape)
@@ -416,7 +416,7 @@ def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
     ctx.line_to(sx - s * 0.70, sy + s * 0.85)
     ctx.stroke()
 
-    # WEST: Tiwaz ᛏ — clean vertical bar with two diagonal arms from the top,
+    # WEST: Tiwaz ᛏ, clean vertical bar with two diagonal arms from the top,
     # forming an arrow pointing up. (Norse rune of strength/sacrifice.)
     wx, wy = cx - rune_r, cy
     # Vertical bar
@@ -434,14 +434,14 @@ def _draw_runic_ring(ctx: cairo.Context, cx: float, cy: float, r_outer: float,
 
 def _draw_world_tree(ctx: cairo.Context, cx: float, cy: float, height: float,
                       p: dict) -> None:
-    """Vertical world tree — bold silhouette designed to survive corner-badge
+    """Vertical world tree: bold silhouette designed to survive corner-badge
     scaling. Thick trunk, 3 large branches up, 3 large roots down. Glowing
     leaf orbs at branch tips. Previous version had 7 thin branches with tiny
     leaves that vanished at small sizes; this version uses fewer but bolder
     elements.
     """
     half_h = height / 2.0
-    trunk_w = height * 0.14  # was 0.08 — much thicker now
+    trunk_w = height * 0.14  # was 0.08, much thicker now
     trunk_top = cy - half_h * 0.45
     trunk_bottom = cy + half_h * 0.20
 
@@ -454,7 +454,7 @@ def _draw_world_tree(ctx: cairo.Context, cx: float, cy: float, height: float,
     ctx.close_path()
     ctx.fill()
 
-    # Trunk highlight — narrow stripe on the left side suggesting light
+    # Trunk highlight: narrow stripe on the left side suggesting light
     ctx.set_source_rgb(*p["trunk_hi"])
     ctx.move_to(cx - trunk_w * 0.40, trunk_top + 6)
     ctx.line_to(cx - trunk_w * 0.20, trunk_top + 6)
@@ -463,34 +463,34 @@ def _draw_world_tree(ctx: cairo.Context, cx: float, cy: float, height: float,
     ctx.close_path()
     ctx.fill()
 
-    # ----- Three bold branches up — left, center-tall, right -----
+    # ----- Three bold branches up: left, center-tall, right -----
     ctx.set_source_rgb(*p["branch"])
-    ctx.set_line_width(height * 0.045)  # very thick — survives downscaling
+    ctx.set_line_width(height * 0.045)  # very thick: survives downscaling
     ctx.set_line_cap(cairo.LINE_CAP_ROUND)
 
     # Anchor where branches sprout (near the top of the trunk)
     sprout_y = trunk_top + 8
 
-    # Left branch — curves up and out
+    # Left branch: curves up and out
     ctx.move_to(cx, sprout_y)
     ctx.curve_to(cx - height * 0.10, sprout_y - height * 0.05,
                  cx - height * 0.22, sprout_y - height * 0.18,
                  cx - height * 0.30, sprout_y - height * 0.32)
     ctx.stroke()
 
-    # Right branch — mirror
+    # Right branch: mirror
     ctx.move_to(cx, sprout_y)
     ctx.curve_to(cx + height * 0.10, sprout_y - height * 0.05,
                  cx + height * 0.22, sprout_y - height * 0.18,
                  cx + height * 0.30, sprout_y - height * 0.32)
     ctx.stroke()
 
-    # Center branch — tall straight up
+    # Center branch: tall straight up
     ctx.move_to(cx, sprout_y)
     ctx.line_to(cx, sprout_y - height * 0.40)
     ctx.stroke()
 
-    # ----- Glowing leaf orbs at branch tips — large, with halos -----
+    # ----- Glowing leaf orbs at branch tips: large, with halos -----
     tips = [
         (cx - height * 0.30, sprout_y - height * 0.32),
         (cx + height * 0.30, sprout_y - height * 0.32),
@@ -518,21 +518,21 @@ def _draw_world_tree(ctx: cairo.Context, cx: float, cy: float, height: float,
     ctx.set_source_rgb(*p["branch"])
     ctx.set_line_width(height * 0.040)
 
-    # Left root — curves down and out
+    # Left root: curves down and out
     ctx.move_to(cx, trunk_bottom)
     ctx.curve_to(cx - height * 0.08, trunk_bottom + height * 0.05,
                  cx - height * 0.20, trunk_bottom + height * 0.12,
                  cx - height * 0.28, trunk_bottom + height * 0.20)
     ctx.stroke()
 
-    # Right root — mirror
+    # Right root: mirror
     ctx.move_to(cx, trunk_bottom)
     ctx.curve_to(cx + height * 0.08, trunk_bottom + height * 0.05,
                  cx + height * 0.20, trunk_bottom + height * 0.12,
                  cx + height * 0.28, trunk_bottom + height * 0.20)
     ctx.stroke()
 
-    # Center root — straight down
+    # Center root: straight down
     ctx.move_to(cx, trunk_bottom)
     ctx.line_to(cx, trunk_bottom + height * 0.22)
     ctx.stroke()
@@ -563,13 +563,13 @@ def generate_yggdrasil(out_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Journey to the West — Pagoda with cloud frame
+# Journey to the West: Pagoda with cloud frame
 # ---------------------------------------------------------------------------
 
 def _draw_cloud_form(ctx: cairo.Context, cx: float, cy: float, scale: float,
                       fill: tuple[float, float, float],
                       hi: tuple[float, float, float]) -> None:
-    """Stylized East-Asian ruyi cloud — elongated horizontal scroll with curling
+    """Stylized East-Asian ruyi cloud, elongated horizontal scroll with curling
     tail ends. Drawn as a flowing band with spiral tips rather than stacked
     bubbles, closer to classical Chinese cloud iconography.
 
@@ -585,7 +585,7 @@ def _draw_cloud_form(ctx: cairo.Context, cx: float, cy: float, scale: float,
     # along a softer bottom curve.
     ctx.set_source_rgb(*fill)
 
-    # Left spiral curl — eye-shape at the left tip
+    # Left spiral curl: eye-shape at the left tip
     cl_x, cl_y = cx - 1.05 * s, cy
     ctx.arc(cl_x, cl_y, 0.28 * s, 0, 2 * math.pi)
     ctx.fill()
@@ -594,7 +594,7 @@ def _draw_cloud_form(ctx: cairo.Context, cx: float, cy: float, scale: float,
     ctx.arc(cr_x, cr_y, 0.28 * s, 0, 2 * math.pi)
     ctx.fill()
 
-    # Main horizontal body — a thick lozenge connecting the two curls
+    # Main horizontal body: a thick lozenge connecting the two curls
     ctx.move_to(cl_x, cl_y - 0.18 * s)
     # Top edge: gentle rise to a small crest in the middle, then dip
     ctx.curve_to(cx - 0.55 * s, cy - 0.45 * s,
@@ -605,7 +605,7 @@ def _draw_cloud_form(ctx: cairo.Context, cx: float, cy: float, scale: float,
                  cr_x, cr_y - 0.18 * s)
     # Right side of right curl (already drawn via arc), to bottom of right curl
     ctx.line_to(cr_x, cr_y + 0.18 * s)
-    # Bottom edge — soft scallop returning leftward
+    # Bottom edge: soft scallop returning leftward
     ctx.curve_to(cx + 0.75 * s, cy + 0.35 * s,
                  cx + 0.25 * s, cy + 0.30 * s,
                  cx - 0.05 * s, cy + 0.20 * s)
@@ -615,7 +615,7 @@ def _draw_cloud_form(ctx: cairo.Context, cx: float, cy: float, scale: float,
     ctx.close_path()
     ctx.fill()
 
-    # Inner curl marks on each tip — gives them a "scroll spiral" feel
+    # Inner curl marks on each tip, gives them a "scroll spiral" feel
     ctx.set_source_rgba(*hi, 0.55)
     ctx.set_line_width(max(1.5, s * 0.04))
     for spiral_x, spiral_y, sign in [(cl_x, cl_y, -1), (cr_x, cr_y, 1)]:
@@ -624,7 +624,7 @@ def _draw_cloud_form(ctx: cairo.Context, cx: float, cy: float, scale: float,
                 math.pi * 1.9 if sign < 0 else math.pi * 0.9)
         ctx.stroke()
 
-    # Top-edge highlight rim — bright stripe tracing the top of the wisp
+    # Top-edge highlight rim: bright stripe tracing the top of the wisp
     ctx.set_source_rgba(*hi, 0.70)
     ctx.set_line_width(max(1.8, s * 0.05))
     ctx.move_to(cl_x, cl_y - 0.18 * s)
@@ -664,14 +664,14 @@ def _draw_pagoda(ctx: cairo.Context, cx: float, cy: float, height: float,
         ctx.rectangle(body_x, y - body_h, body_w, body_h)
         ctx.stroke()
 
-        # Doorway / window — small darker rectangle in the middle
+        # Doorway / window: small darker rectangle in the middle
         door_w = body_w * 0.20
         door_h = body_h * 0.50
         ctx.rectangle(cx - door_w / 2.0, y - door_h - body_h * 0.10, door_w, door_h)
         ctx.set_source_rgb(0.10, 0.06, 0.06)
         ctx.fill()
 
-        # Roof — curving pagoda roof. Drawn as a polygon with upward-curving ends.
+        # Roof: curving pagoda roof. Drawn as a polygon with upward-curving ends.
         roof_top_y = y - body_h - roof_h
         roof_left = cx - body_w / 2.0 - overhang
         roof_right = cx + body_w / 2.0 + overhang
@@ -695,7 +695,7 @@ def _draw_pagoda(ctx: cairo.Context, cx: float, cy: float, height: float,
         # Advance up to the next tier
         y -= body_h + roof_h
 
-    # Crowning spire — a slender pointed shape on top
+    # Crowning spire: a slender pointed shape on top
     spire_base = y
     spire_top = y - height * 0.12
     ctx.move_to(cx - 5, spire_base)
@@ -724,17 +724,17 @@ def generate_jttw(out_path: str) -> str:
     ctx.paint()
 
     cx = SIZE / 2.0
-    # BACKGROUND clouds — drifting in the upper half, behind the pagoda.
+    # BACKGROUND clouds: drifting in the upper half, behind the pagoda.
     # Drawn first so the pagoda overlaps them naturally.
     _draw_cloud_form(ctx, cx - SIZE * 0.30, SIZE * 0.28, SIZE * 0.12,
                       p["cloud_dark"], p["cloud_hi"])
     _draw_cloud_form(ctx, cx + SIZE * 0.30, SIZE * 0.36, SIZE * 0.11,
                       p["cloud_dark"], p["cloud_hi"])
 
-    # Pagoda — base near the bottom-third, rises through center
+    # Pagoda: base near the bottom-third, rises through center
     _draw_pagoda(ctx, cx, SIZE * 0.82, height=SIZE * 0.85, p=p)
 
-    # FOREGROUND cloud — a single wisp drifting across the pagoda's mid-height,
+    # FOREGROUND cloud: a single wisp drifting across the pagoda's mid-height,
     # to suggest the pagoda is among the clouds rather than on a hillside.
     _draw_cloud_form(ctx, cx + SIZE * 0.18, SIZE * 0.55, SIZE * 0.10,
                       p["cloud"], p["cloud_hi"])

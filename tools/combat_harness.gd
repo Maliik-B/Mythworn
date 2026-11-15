@@ -1,5 +1,5 @@
 extends Node
-## Instrumented combat balance harness — the drift-proof companion to combat_sim.py.
+## Instrumented combat balance harness, the drift-proof companion to combat_sim.py.
 ##
 ## Unlike the Python model, this drives the REAL CombatEngine over the REAL EnemyPool
 ## and CardPool with the shared "decent player" policy (tools/harness_combat.gd), so its
@@ -49,12 +49,12 @@ func _ready() -> void:
 	# guard the only other hang path.)
 	get_tree().create_timer(FAILSAFE_QUIT_SECONDS).timeout.connect(
 		func() -> void:
-			push_error("combat_harness failsafe timeout — forcing quit")
+			push_error("combat_harness failsafe timeout: forcing quit")
 			get_tree().quit(1))
 
 	_read_args()
 	print("\n===============================================================")
-	print(" Fable combat harness — REAL engine, %d trials/scenario" % _trials)
+	print(" Fable combat harness: REAL engine, %d trials/scenario" % _trials)
 	print(" player %d HP / %d energy   Passion axis -100..+100 (Blazing >= +50)" % [
 		80, CombatEngine.MAX_ENERGY])
 	print(" realm config: %s   trial seeds: %d..%d%s" % [CONFIG, _seed_base, _seed_base + _trials - 1,
@@ -167,23 +167,23 @@ func _report_regulars() -> void:
 
 
 func _report_elite() -> void:
-	print("\nELITE — Champion of the Usurper (mid deck):")
+	print("\nELITE: Champion of the Usurper (mid deck):")
 	_bar("Champion", _run(_mid_deck(), ["champion"], 0, true))
 
 
 func _report_guardian() -> void:
-	print("\nQUEST FIGHT — The Beast at the Stone (the Sword in the Stone, mid deck):")
+	print("\nQUEST FIGHT: The Beast at the Stone (the Sword in the Stone, mid deck):")
 	_bar("Beast at the Stone", _run(_mid_deck(), ["guardian"], 0, true))
 
 
 func _report_barrow_warden() -> void:
-	print("\nEVENT FIGHT — The Barrow-Warden (Campfire treasure, optional):")
+	print("\nEVENT FIGHT: The Barrow-Warden (Campfire treasure, optional):")
 	_bar("fresh deck", _run(_fresh_deck(), ["barrow"], 0, false))
 	_bar("mid deck", _run(_mid_deck(), ["barrow"], 0, false))
 
 
 func _report_prophet() -> void:
-	print("\nELITE — The False Prophet (mid deck) — the Passion-pull crucible:")
+	print("\nELITE: The False Prophet (mid deck), the Passion-pull crucible:")
 	print("  Does a Water build HOLD its pole against the multiplicative center-pull?")
 	# Start already committed (Blazing). Compare a player who ignores Passion
 	# vs one who spends a Water card each turn to hold the pole.
@@ -191,7 +191,7 @@ func _report_prophet() -> void:
 	var commit := _run(_mid_deck(), ["prophet"], 50, true)
 	_prophet_bar("ignores Passion", ignore)
 	_prophet_bar("holds pole (Water)", commit)
-	# Ramp probe: start dispassionate (0), commit — how fast to Blazing, and does it stick?
+	# Ramp probe: start dispassionate (0), commit: how fast to Blazing, and does it stick?
 	var ramp := _run(_mid_deck(), ["prophet"], 0, true)
 	print("  ramp from 0 (commit): avg turns-to-Blazing %s, end-Passion %.1f (%s)" % [
 		_ttb_str(ramp), ramp["passion_mean"], _tier_name(ramp["passion_mean"])])
@@ -201,9 +201,9 @@ func _report_prophet() -> void:
 ## sink to Hollow (-). Both start dispassionate (0) vs a durable Champion and commit.
 func _report_poles() -> void:
 	# vs a durable training wall (not the Champion) so the fight lasts long enough for
-	# the ~10-turn ramp to actually reach the pole — otherwise a ~7-turn fight ends
+	# the ~10-turn ramp to actually reach the pole; otherwise a ~7-turn fight ends
 	# mid-climb and under-reads reachability.
-	print("\nPASSION POLES — can a committed build reach BOTH extremes? (vs a durable wall, from 0)")
+	print("\nPASSION POLES: can a committed build reach BOTH extremes? (vs a durable wall, from 0)")
 	var water := _run(_mid_deck(), ["wall"], 0, true, 50)
 	var phys := _run(_physical_deck(), ["wall"], 0, true, -50)
 	_pole_bar("Water build  (target +50)", water)
@@ -217,7 +217,7 @@ func _pole_bar(label: String, r: Dictionary) -> void:
 
 
 func _report_boss() -> void:
-	print("\nBOSS — Sir Caedmon. 'realistic' = boss deck (2 upgrades) + Excalibur + 2 relics:")
+	print("\nBOSS: Sir Caedmon. 'realistic' = boss deck (2 upgrades) + Excalibur + 2 relics:")
 	for row in [
 		["Blazing, bare mid deck", _mid_deck(), 50, false],
 		["Blazing, realistic", _boss_deck(), 50, true],
@@ -235,12 +235,12 @@ func _report_boss() -> void:
 ## engine) + Twin Strike (Strength-riding 2-hit) alongside Sunder's Vulnerable and block.
 ## The Water boss number (82.3%) was tuned against a Water build; this checks the pole we
 ## just beefed survives Caedmon's Enraged transition too. Physical has block (Guardian's
-## Sigil helps) and Iron Quill's +1 Strength feeds the ride — a fair "realistic" loadout.
+## Sigil helps) and Iron Quill's +1 Strength feeds the ride, a fair "realistic" loadout.
 func _report_physical() -> void:
-	print("\n=== PHYSICAL POLE — content pass #2 (committed Hollow build) ===")
-	print("ELITE — Champion of the Usurper (physical mid deck):")
+	print("\n=== PHYSICAL POLE: content pass #2 (committed Hollow build) ===")
+	print("ELITE: Champion of the Usurper (physical mid deck):")
 	_bar("Champion (Physical)", _run(_physical_mid_deck(), ["champion"], -50, true, -50))
-	print("\nBOSS — Sir Caedmon vs a committed PHYSICAL build (Whetstone/Twin Strike/Sunder + block):")
+	print("\nBOSS: Sir Caedmon vs a committed PHYSICAL build (Whetstone/Twin Strike/Sunder + block):")
 	for row in [
 		["Hollow, bare mid deck", _physical_mid_deck(), -50, false],
 		["Hollow, realistic", _physical_boss_deck(), -50, true],
@@ -259,7 +259,7 @@ func _report_physical() -> void:
 ## win-rate jumping from a real risk to a near-certainty; a healthy sustain relic just shaves a
 ## chunk off the damage taken.
 func _report_regen_check() -> void:
-	print("\n=== IRON RATIONS REGEN CHECK — does +2 HP/turn stack too high with the control-heal? ===")
+	print("\n=== IRON RATIONS REGEN CHECK: does +2 HP/turn stack too high with the control-heal? ===")
 	print("  Water build (control-heal active). Identical fights, with vs without Iron Rations held.")
 	# Boss, realistic loadout (already has Excalibur + 2 relics); Iron Rations is the 3rd.
 	var boss_base := _run(_boss_deck(), ["caedmon"], 50, true, COMMIT_TARGET, true)
@@ -605,7 +605,7 @@ func _wall() -> EnemyData:
 	return e
 
 
-## The real Emo Hybrid starting deck — single source of truth in CharacterPool, so
+## The real Emo Hybrid starting deck: single source of truth in CharacterPool, so
 ## the harness always balances the deck the game actually ships.
 func _fresh_deck() -> Array[CardData]:
 	return CharacterPool.emo_starting_deck()
@@ -617,11 +617,11 @@ func _mid_deck() -> Array[CardData]:
 	var d := _fresh_deck()
 	var prim := CardPool.build_emo_primary_pool()
 	var sec := CardPool.build_emo_secondary_pool()
-	# Water-leaning spread post-redesign (Riverstep/Poise is gone — the pole no longer
+	# Water-leaning spread post-redesign (Riverstep/Poise is gone: the pole no longer
 	# borrows Physical's turf). Undertow exercises the debuff/soak lane; Maelstrom is now
 	# the X-cost torrent so it also exercises the new X path; Cascade (content pass #2) is
 	# the y≥3 multi a committed Water player would draft, so the boss is tuned against it.
-	# Creeping Tide is the common Chilled SEED — included so the harness exercises the full
+	# Creeping Tide is the common Chilled SEED, included so the harness exercises the full
 	# freeze line (Creeping Tide + the Cascade/Deep Freeze riders stacking toward a freeze).
 	for name in ["Tidal Strike", "Chillbrand", "Maelstrom", "Undertow", "Deep Freeze", "Cascade",
 			"Creeping Tide"]:

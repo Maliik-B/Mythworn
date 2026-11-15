@@ -79,7 +79,7 @@ void fragment() {
 
 
 ## The between-acts beat. A keeper's place in a realm is a loan: when the work is done,
-## a double steps into your outline and F.A.B.L.E. holds you at the Waystation boundary —
+## a double steps into your outline and F.A.B.L.E. holds you at the Waystation boundary,
 ## an interval it can't control, which is why the realm has moved on when you return. The
 ## opening vignette reflects the Act-1 Camelot crown outcome (took / refused / abdicated),
 ## keyed off the earned title since philosophy_id isn't set until Reign Phase 2. Later

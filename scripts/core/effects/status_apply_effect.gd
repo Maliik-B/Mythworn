@@ -24,7 +24,7 @@ func get_description() -> String:
 	if not status_effect:
 		return ""
 	# Negative stacks read as a reduction ("Reduce 2 Strength") rather than the
-	# awkward "Apply -2 Strength" — used by debuffs that soak enemy Strength.
+	# awkward "Apply -2 Strength", used by debuffs that soak enemy Strength.
 	if value < 0:
 		return "Reduce %d %s." % [-value, status_effect.effect_name]
 	if apply_to_allies:

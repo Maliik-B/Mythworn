@@ -7,7 +7,7 @@ extends RefCounted
 ## navigate it. See docs/GAME_DESIGN.md § Realms and docs/REALM_CAMELOT.md.
 ##
 ## NOTE: the Fable liaison "gift" (Bram's briefing / Neve's supplies) is a SEPARATE
-## run-start boon, not one of these knobs — see RunManager's pending-gift handling.
+## run-start boon, not one of these knobs; see RunManager's pending-gift handling.
 
 ## The config half of the (realm, config) key the content pools look up (RealmRoutes). It picks the
 ## content; every knob below only tunes it, which is why Camelot's two pledges share one route.
@@ -31,7 +31,7 @@ var elite_frequency_mult: float = 1.0
 var elite_weaken: bool = false
 
 ## Reward rarity bias: > 1 shifts card/relic reward rolls toward higher rarities.
-## FIELDED — wired at the reward-draft consumption point in a later A2 increment.
+## FIELDED: wired at the reward-draft consumption point in a later A2 increment.
 var reward_rarity_mult: float = 1.0
 
 ## A one-time run-start realm boon keyed by id (empty = none), resolved when the realm

@@ -69,7 +69,7 @@ static func build(card: CardData) -> Control:
 	lbl.material = StageSkin.no_purple()
 
 	if zm > 1.0:
-		# FAVORED — an empowered glyph, styled the SAME at the lean and extreme tiers: the halo
+		# FAVORED: an empowered glyph, styled the SAME at the lean and extreme tiers: the halo
 		# COIN (below, pole cards only) is what marks the deep +25%, so the glyph itself doesn't
 		# have to carry the lean/extreme distinction.
 		lbl.add_theme_font_size_override("font_size", 28)

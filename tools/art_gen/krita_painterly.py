@@ -1,9 +1,9 @@
-"""Krita painterly post-process — runs INSIDE Krita's Scripter.
+"""Krita painterly post-process: runs INSIDE Krita's Scripter.
 
 IMPORTANT: known limit of Krita's Python API
 =============================================
 Krita's Python scripting CANNOT paint brush strokes, invoke drawing tools,
-or simulate stylus input. The API is filter-only — we can apply filters
+or simulate stylus input. The API is filter-only; we can apply filters
 (oilpaint, blur, edge detection, etc.) to existing pixels but not "paint
 watercolor" the way a human with a stylus would. The actual brush engine
 is for human input; the scriptable surface is the same kind of surface
@@ -17,7 +17,7 @@ What this means for our experiment:
 - Krita's best painterly filters (watercolor, pencil drawing) live in the
   G'MIC plugin, which is GUI-dialog-driven and hard to script
 
-If these results are compelling, great. If they're not — that's our cue
+If these results are compelling, great. If they're not, that's our cue
 that procedural painterly is genuinely capped where the OpenCV test
 suggested, and commissioned art is the right next move for narrative scenes.
 
@@ -35,10 +35,10 @@ How to run this:
 5. Press the "Run" button (green play icon).
 
 6. Outputs land in art_drafts/ next to the source:
-     scroll_camelot_krita_oilpaint.png      — Oilify filter, light settings
-     scroll_camelot_krita_oilpaint_heavy.png — Oilify with heavier settings
-     scroll_camelot_krita_edge.png          — Edge detection (more graphic)
-     scroll_camelot_krita_blur+oil.png      — Soft blur then oilify
+     scroll_camelot_krita_oilpaint.png: Oilify filter, light settings
+     scroll_camelot_krita_oilpaint_heavy.png: Oilify with heavier settings
+     scroll_camelot_krita_edge.png: Edge detection (more graphic)
+     scroll_camelot_krita_blur+oil.png: Soft blur then oilify
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ OUT_DIR = os.path.join(PROJECT_ROOT, "art_drafts")
 
 def _open_fresh(path: str):
     """Open the source image in a new Krita document each time so we always
-    start from a clean state — no compounding filter applications.
+    start from a clean state: no compounding filter applications.
     """
     app = Krita.instance()
     doc = app.openDocument(path)

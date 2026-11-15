@@ -24,16 +24,16 @@ func _register_realms() -> void:
 	camelot.horizon_path = "res://assets/sprites/realms/horizon_camelot.png"
 	camelot.drift_kind = RealmData.DriftKind.DUST
 	camelot.sky_body = RealmData.SkyBody.MOON
-	# Warm dusk moon — pale gold with a touch of pink, fitting Camelot's
+	# Warm dusk moon: pale gold with a touch of pink, fitting Camelot's
 	# heraldic dusk vibe rather than a cold night-sky moon.
 	camelot.sky_body_color = Color(0.96, 0.78, 0.55, 1.0)
 	# Per-act mood shift: peaceful noble Camelot slides into strife. Red is earned by
 	# Act 3, matching the narrative descent (and how the other realms open peaceful).
 	# Accent drives bg tint, vignette, motif, and header color.
 	camelot.accent_by_act = [
-		Color(0.80, 0.60, 0.28),  # Act 1: warm gold dusk — peaceful, noble Camelot
-		Color(0.62, 0.28, 0.18),  # Act 2: amber into crimson — rising strife
-		Color(0.70, 0.14, 0.16),  # Act 3: blood-red — corruption/strife earned
+		Color(0.80, 0.60, 0.28),  # Act 1: warm gold dusk, peaceful, noble Camelot
+		Color(0.62, 0.28, 0.18),  # Act 2: amber into crimson, rising strife
+		Color(0.70, 0.14, 0.16),  # Act 3: blood-red, corruption/strife earned
 	]
 	camelot.sky_body_color_by_act = [
 		Color(0.96, 0.78, 0.55, 1.0),  # Act 1: warm gold dusk moon
