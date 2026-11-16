@@ -6,7 +6,7 @@ class_name PetPool
 ## stops a five-turn stockpile?" is that it wants a moment and the deck cycle hands over one every
 ## four turns. Each pet's deck comes from one reliable identity, the way the animal hunts, not
 ## from a verb list: the hound is the pack, the hawk is the stoop, the ferret is the warren.
-## Every number here is PROVISIONAL (part 3b of the demo road); the harness models pets in part 4.
+## Every number here is PROVISIONAL; the harness models pets.
 
 
 ## Returns the pet with this id, or null for an unknown id (and for &"", meaning none).

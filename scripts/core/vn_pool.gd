@@ -1,5 +1,5 @@
 class_name VNPool
-## Authored VN content for the demo run-start flow (A2). Two segments, chained by the
+## Authored VN content for the demo run-start flow. Two segments, chained by the
 ## run-start sequencer (character_select): the Fable send-off, then the Camelot realm-entry.
 ##
 ##   character_select -> build_sendoff() -> build_camelot_entry() -> map
@@ -107,7 +107,7 @@ static func _add_neve_return_beats(vn: VNData, keeper: String) -> void:
 ## RealmConfig applied via RunManager.apply_realm_config BEFORE the map generates, so it
 ## reshapes the map's composition, not just retunes it). ~3 scroll panels + the choice.
 ## This is the one big realm-shaping decision; the smaller within-act event layer (e.g. the
-## standalone Peasant's Plea lore event) is separate. See docs/REALM_CAMELOT.md.
+## standalone Peasant's Plea lore event) is separate.
 static func build_camelot_entry() -> VNData:
 	var vn := VNData.new()
 	vn.title = "A Realm Divided"
@@ -159,10 +159,10 @@ static func _percent(mult: float) -> int:
 	return absi(roundi((mult - 1.0) * 100.0))
 
 
-## Court: side with power. A harder, richer realm -- the pledge converts a couple of combat
+## Court: side with power. A harder, richer realm: the pledge converts a couple of combat
 ## nodes into NEW elites (more risk, more reward), enemies hit a touch harder, loot is
-## richer; shops stay at their normal price. Starting values per the REALM_CAMELOT table;
-## tune vs the combat harness.
+## richer; shops stay at their normal price. Starting values are tuned against
+## the combat harness.
 static func _court_config() -> RealmConfig:
 	var c := RealmConfig.new()
 	c.enemy_difficulty_mult = 1.1
@@ -174,13 +174,13 @@ static func _court_config() -> RealmConfig:
 	return c
 
 
-## Common folk: side with the people. An easier realm -- the people WEAKEN the realm's
+## Common folk: side with the people. An easier realm: the people WEAKEN the realm's
 ## elites in place (you keep their rewards, but those fights start the enemies Weak + power-
-## nerfed) plus a militia map_boon -- but the slighted court raises shop prices all act, and
+## nerfed) plus a militia map_boon; but the slighted court raises shop prices all act, and
 ## loot is a touch plainer. Also shoves Passion into tier-1 Physical (the grounded, people's-
 ## champion stance pulls the keeper toward his physical self): from the Steady start (0) a
 ## -34 shift lands mid-Wavering, the first Physical tier below center (Emo Hybrid thresholds
-## [50,18,-18,-50]; volatility 1.0). Starting values per the REALM_CAMELOT table; tune vs
+## [50,18,-18,-50]; volatility 1.0). Starting values are tuned against
 ## the combat harness.
 static func _folk_config() -> RealmConfig:
 	var c := RealmConfig.new()

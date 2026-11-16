@@ -17,7 +17,7 @@ var weakened: bool = false
 # Cross-map questlines (the raider hunt; a Campfire-revealed treasure cache). A GIVER node
 # looks like an ordinary event node but routes to the quest's plea when entered; accepting it
 # ARMS the payoff. A PAYOFF node is INDISTINGUISHABLE from the ordinary node it sits on until
-# armed -- on arm its glyph reveals and entering it routes to the quest's payoff instead of its
+# armed: on arm its glyph reveals and entering it routes to the quest's payoff instead of its
 # original node type. Both hold the same quest id (&"" = not a quest node). The raider pair is
 # seated at gen (MapGenerator._place_raider_questline); the Campfire cache tags its payoff at
 # runtime (event_scene._arm_campfire_treasure picks a node downstream of the fire).

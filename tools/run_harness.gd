@@ -16,7 +16,7 @@ extends Node
 ## forgotten relic or a title add to a run, measured as the difference against the SAME seeds.
 ##
 ## Run headless (arguments after `--`):
-##   godot --headless --path D:\Applications\Fable res://tools/run_harness.tscn --quit-after 100000
+##   godot --headless --path . res://tools/run_harness.tscn --quit-after 100000
 ##   --daily            seeds from today's UTC date (YYYYMMDD x 1000): the same for everyone that day
 ##   --seed=N           base seed by hand (default 0, comparable with the snapshots)
 ##   --runs=N           runs per batch (default 100)
@@ -81,7 +81,7 @@ func _ready() -> void:
 	AudioManager.enabled = false
 	_read_args()
 	print("\n===============================================================")
-	print(" Fable RUN harness: %d runs, real Act-1 walk (%d nodes)" % [_runs, LAYOUT.size()])
+	print(" Mythworn RUN harness: %d runs, real Act-1 walk (%d nodes)" % [_runs, LAYOUT.size()])
 	print(" realm config: shipped   seeds: %d..%d%s   companion: %s%s%s" % [
 		_seed_base, _seed_base + _runs - 1,
 		"   (daily seed %d)" % _daily_seed if _daily_seed > 0 else "", _pet_mode,

@@ -13,7 +13,7 @@ func _ready() -> void:
 	# already means a boss was beaten (pending_act_complete) and the crown decision is
 	# resolved, so the outcome is final. The demo-end scene owns the Act-1 Camelot wrap-up
 	# (including the people's-champion award below). Acts 2-3 + the final-victory path are
-	# untouched -- they need current_act >= 2 / >= MAX_ACTS, which never matches this guard.
+	# untouched; they need current_act >= 2 / >= MAX_ACTS, which never matches this guard.
 	if RunManager.current_act == 1 and RunManager.current_realm_id == &"camelot":
 		SceneTransition.change_scene("res://scenes/demo/demo_end_scene.tscn")
 		return
@@ -115,7 +115,7 @@ func _waystation_text() -> String:
 					+ "is already easing into the chamber, into the crown, into the reign. It will "
 					+ "wear your face better than you did.")
 		elif champ and had_crown_offer:
-			# Refused the crown having held the people's line -- their champion, not their king.
+			# Refused the crown having held the people's line: their champion, not their king.
 			vignette = ("You will not take it, and you say so where they can all hear. For a "
 				+ "moment the court doesn't understand, and the people do. You were never going to "
 				+ "be their king. You were only ever going to be theirs, and they line the road out "

@@ -171,7 +171,7 @@ def generate_yggdrasil(out_path: str) -> str:
     ctx.close_path()
     ctx.fill()
 
-    # World-tree silhouette removed for V1: at horizon-strip resolution it
+    # World-tree silhouette removed: at horizon-strip resolution it
     # reads as a glitch shape rather than a tree. Better to let the mountains
     # carry the realm identity at this scale.
 

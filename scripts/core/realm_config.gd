@@ -2,9 +2,9 @@ class_name RealmConfig
 extends RefCounted
 ## Per-run realm-shape knobs, set by the realm-entry VN choice (Camelot Act 1: court vs
 ## common folk) and read at the consumption points before/during map navigation. Neutral
-## by default, so a run with no realm config plays exactly as before. This is the A2
+## by default, so a run with no realm config plays exactly as before. This is the
 ## "realm configuration" system: the VN determines the STATE of the realm before you
-## navigate it. See docs/GAME_DESIGN.md § Realms and docs/REALM_CAMELOT.md.
+## navigate it.
 ##
 ## NOTE: the Fable liaison "gift" (Bram's briefing / Neve's supplies) is a SEPARATE
 ## run-start boon, not one of these knobs; see RunManager's pending-gift handling.
@@ -31,7 +31,7 @@ var elite_frequency_mult: float = 1.0
 var elite_weaken: bool = false
 
 ## Reward rarity bias: > 1 shifts card/relic reward rolls toward higher rarities.
-## FIELDED: wired at the reward-draft consumption point in a later A2 increment.
+## Read where card and relic rewards are rolled (CardPool and RelicPool).
 var reward_rarity_mult: float = 1.0
 
 ## A one-time run-start realm boon keyed by id (empty = none), resolved when the realm
@@ -39,8 +39,8 @@ var reward_rarity_mult: float = 1.0
 var map_boon: StringName = &""
 
 ## A one-shot Passion delta applied the moment this config is installed
-## (RunManager.apply_realm_config). Zero for the neutral + Court/Folk entry configs;
-## the mid-run Peasant's Plea event uses it to move Passion when it retunes the realm.
+## (RunManager.apply_realm_config). Zero for the neutral and Court entry configs;
+## the Folk pledge and the mid-run Peasant's Plea event use it to move Passion.
 var passion_shift: int = 0
 
 ## The realm's court<->folk standing the pledge plants you at (RunManager.realm_standing):

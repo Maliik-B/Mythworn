@@ -379,12 +379,11 @@ func _on_select_character() -> void:
 	_begin_run_intro(character)
 
 
-## Run-start sequencer (A2): pick the send-off, grant its gift(s), then queue the two VN
-## segments -- send-off, then Camelot realm-entry -- which hand off to the map when done.
+## Run-start sequencer: pick the send-off, grant its gift(s), then queue the two VN
+## segments (send-off, then Camelot realm-entry), which hand off to the map when done.
 ## The full two-liaison introduction plays only the first time on a save (or when the
 ## player has toggled "always show intro" back on, via ProfileManager); returning runs
-## show one liaison at random, with just that liaison's gift. See docs/REALM_CAMELOT.md
-## § Run-start.
+## show one liaison at random, with just that liaison's gift.
 func _begin_run_intro(character: CharacterData) -> void:
 	if ProfileManager.should_show_full_intro():
 		# First play (or toggled on): the full introduction + both send-off gifts.

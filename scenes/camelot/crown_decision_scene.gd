@@ -159,7 +159,7 @@ func _on_take_crown() -> void:
 func _on_refuse_crown() -> void:
 	AudioManager.play_sfx("button_click")
 	# Refusing the crown having held the people's line makes you THEIR champion specifically;
-	# otherwise it's the generic advisor path (Camelot's Champion) from REALM_CAMELOT.md.
+	# otherwise it's the generic advisor path (Camelot's Champion).
 	# In Phase 2 the generic path becomes a sub-decision (Wander / Advise / Leave).
 	if RunManager.is_peoples_champion():
 		RunManager.award_title(&"peoples_champion")

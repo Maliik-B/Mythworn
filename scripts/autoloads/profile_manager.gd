@@ -2,7 +2,7 @@ extends Node
 ## Persistent player profile / preferences, stored outside any single run and
 ## backed by user://profile.cfg (ConfigFile). Holds small cross-session flags:
 ## the settings toggles the player expects to stick, and the set of one-time
-## cutscenes already seen -- so the run-start intro plays the full two-liaison
+## cutscenes already seen, so the run-start intro plays the full two-liaison
 ## greeting only the first time on a save, then a single liaison per run.
 ##
 ## Structured to extend: the future cutscene-replay system reads the same
@@ -16,7 +16,7 @@ const SAVE_PATH := "user://profile.cfg"
 const SECTION_CUTSCENES := "cutscenes"
 const SECTION_SETTINGS := "settings"
 
-## The Fable send-off introduction (the two-liaison double greeting) -- the one
+## The Fable send-off introduction (the two-liaison double greeting), the one
 ## one-time cutscene the demo tracks. Later sequences add more ids alongside it.
 const CUTSCENE_INTRO: StringName = &"fable_intro"
 

@@ -411,7 +411,7 @@ func _build_raider_victory_event() -> EventData:
 
 ## The treasure payoff, armed. The dead campers' map led here: the barrow the warden came out
 ## of, and the cache they hid before they ran. Reaching for the gold rouses him. Victory routes
-## to the reward beat. Fight-only, like the raider ambush -- the player armed this knowingly and
+## to the reward beat. Fight-only, like the raider ambush: the player armed this knowingly and
 ## pathed to it, so there's no back-out at the cache.
 func _build_campfire_ambush_event() -> EventData:
 	var e = EventData.new()
@@ -474,10 +474,10 @@ func _arm_campfire_treasure() -> void:
 	RunManager.arm_quest(&"campfire")
 
 
-## The Room That Isn't -- introduces Cass (Anomalies). Scheduled as the player's 2nd event
+## The Room That Isn't: introduces Cass (Anomalies). Scheduled as the player's 2nd event
 ## (RunManager.scripted_event_schedule, set in start_run). A space that's wrong in a way that
 ## ISN'T the usual rot: a corridor longer inside than out, a window on a sky that isn't
-## Camelot's. Stepping through is Proposal A -- a deterministic trade, seen going in: a glimpse
+## Camelot's. Stepping through is Proposal A: a deterministic trade, seen going in: a glimpse
 ## of a lost home (the memory card "The House That Was") for a cut of HP that the seeing takes.
 ## Cass names Anomalies and Fable without explaining what an anomaly is, and the lost home is
 ## only glimpsed. Her voice: flat, unimpressed, already tired of you being here.
@@ -512,7 +512,7 @@ func _build_room_that_isnt_event() -> EventData:
 	step.granted_card_id = &"house_that_was"
 	e.choices.append(step)
 
-	# Look, don't cross: a smaller taste -- the longing without the wound. A Passion nudge, no card.
+	# Look, don't cross: a smaller taste: the longing without the wound. A Passion nudge, no card.
 	var look = EventData.EventChoice.new()
 	look.text = "Stand at the threshold and only look."
 	look.result_text = ("You stop at the edge of it and let yourself look and no further. It's "
@@ -551,7 +551,7 @@ func _build_reliquary_struck_event() -> EventData:
 		+ "exactly. You can feel how much of her is left, and how fast, and that if you do nothing "
 		+ "there will shortly have been no one there at all.")
 
-	# Hold and leave: keep the memory, abandon the chapel, apologize. No fight, no title -- a
+	# Hold and leave: keep the memory, abandon the chapel, apologize. No fight, no title, a
 	# quiet, dignified out. You keep what matters to you; you just don't fight for more.
 	var hold = EventData.EventChoice.new()
 	hold.text = "Hold the feeling. Let the chapel keep the rest, and go."
@@ -970,7 +970,7 @@ func _on_choice_selected(index: int) -> void:
 	if choice.starts_combat != &"":
 		# A pre-fight HP cost (The Reliquary: staying in contact wounds you before the
 		# beast reforms). Applied here since the combat launch skips _apply_effects, and
-		# clamped to leave 1 HP -- the fight is the real threat, not the reach.
+		# clamped to leave 1 HP; the fight is the real threat, not the reach.
 		if choice.hp_change < 0:
 			RunManager.current_hp = maxi(1, RunManager.current_hp + choice.hp_change)
 		# A quest item delivered at the fight (the chalice left for the raiders) is spent
@@ -1007,7 +1007,7 @@ func _on_choice_selected(index: int) -> void:
 
 	# A liaison relic grant rolls one unowned relic from the named liaison's dedicated pool
 	# (Bram = Records, Neve = Dispatch) and routes it through granted_relic_id, the same way
-	# the generic find does -- so the grant and the summary reuse the normal relic path.
+	# the generic find does, so the grant and the summary reuse the normal relic path.
 	if choice.grants_liaison_relic != &"" and choice.granted_relic_id == &"":
 		var liaison_picks := RelicPool.get_liaison_relic_choices(
 			choice.grants_liaison_relic, RngManager.loot_rng, 1,
@@ -1092,7 +1092,7 @@ func _exit_tree() -> void:
 
 
 ## Player-facing label for a queued next-combat boon (RunManager.pending_combat_boon). Mirror
-## of the effect catalogue in CombatEngine._apply_pending_combat_boon -- keep the ids in sync.
+## of the effect catalogue in CombatEngine._apply_pending_combat_boon: keep the ids in sync.
 func _combat_boon_label(boon: StringName) -> String:
 	match boon:
 		&"wandering_vigor":
@@ -1228,7 +1228,7 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 		if relic and not RunManager.has_relic(relic.relic_name):
 			RunManager.add_relic(relic)
 
-	# A memory ("remembrance") card granted straight to the deck -- the one-off reward from
+	# A memory ("remembrance") card granted straight to the deck: the one-off reward from
 	# a memory event. add_card_to_deck duplicates it, so the deck owns a fresh instance.
 	if choice.granted_card_id != &"":
 		var mem = CardPool.get_memory_card(choice.granted_card_id)
@@ -1272,7 +1272,7 @@ func _apply_effects(choice: EventData.EventChoice) -> void:
 		RunManager.wake_relic_by_name(String(choice.wakes_relic))
 
 	# A refusal's curse (the higher tier of consequence): a permanent unplayable card wedged
-	# into the run deck -- the spurned party's parting gift, dead weight for the rest of the run.
+	# into the run deck: the spurned party's parting gift, dead weight for the rest of the run.
 	if choice.grants_curse != &"":
 		var curse = CardPool.get_curse_card(choice.grants_curse)
 		if curse:

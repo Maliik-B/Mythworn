@@ -1,15 +1,15 @@
 extends Node
 ## The gamebreak hunt (the loop pass): looks for the builds, loops and stacks that break the game,
-## and puts a number on each. It RECORDS, it does not fix: the fixes are part 5's, except a crash.
+## and puts a number on each. It RECORDS, it does not fix: the fixes belong to the balance pass, except a crash.
 ##
 ## Run headless (arguments after `--`):
-##   godot --headless --path D:\Applications\Fable res://tools/gamebreak_hunt.tscn --quit-after 100000
+##   godot --headless --path . res://tools/gamebreak_hunt.tscn --quit-after 100000
 ##   --seed=N      base seed (default: today's daily seed, so a day's hunt is the same for everyone)
 ##   --iters=N     hill-climb steps per restart (default 150)
 ##   --restarts=N  random restarts per objective (default 8)
 ##   --only=a,b    candidates | cards | search | loops
 ##
-## Four parts. (1) The sheet's gamebreak candidates, each built by hand on the real engine and
+## Four parts. (1) The known gamebreak candidates, each built by hand on the real engine and
 ## given a number and a verdict: CONFIRMED (a real break by the bar below), BOUNDED (it exists, and
 ## something caps it under the bar), NOT A BREAK. (2) Per-card ceilings: every card's face-value
 ## damage on the real engine, and its ceiling under the amplifier kit. (3) A seeded best-build
@@ -59,7 +59,7 @@ func _ready() -> void:
 	_bar_first_lifebar = caedmon.phase_hps[0] if caedmon.phase_hps.size() > 0 else caedmon.max_health
 	Events.card_played.connect(_on_card_played)
 	print("\n===============================================================")
-	print(" Fable gamebreak hunt: REAL engine, seed %d, bar: one turn > %d (Caedmon's first bar)" % [
+	print(" Mythworn gamebreak hunt: REAL engine, seed %d, bar: one turn > %d (Caedmon's first bar)" % [
 		_seed_base, _bar_first_lifebar])
 	print("===============================================================")
 	if _only.is_empty() or _only.has("candidates"):
@@ -194,7 +194,7 @@ func _row(n: int, name: String, number: String, verdict: String, note: String) -
 # ============================================================
 
 func _candidates() -> void:
-	print("\n(1) THE SHEET'S CANDIDATES: each built by hand on the real engine")
+	print("\n(1) THE CANDIDATES: each built by hand on the real engine")
 	print("     #   candidate                          number                       verdict      note")
 	var emo_p := CardPool.build_emo_primary_pool()
 	var generic := CardPool._build_generic_pool()
@@ -245,7 +245,7 @@ func _candidates() -> void:
 
 	# 5. Hold stockpile: superseded; the hound's Bay is candidate 12.
 	_row(5, "Hold stockpile (old hound)", "superseded by 12", "NOT A BREAK",
-		"Hold no longer exists; the hound's deck was redesigned in part 3b")
+		"Hold no longer exists; the hound's deck was redesigned")
 
 	# 6. Favour against the biggest telegraphed blow.
 	var biggest := _biggest_blow()
@@ -378,7 +378,7 @@ func _candidates() -> void:
 
 	# 18. A note, not a break.
 	_row(18, "The turn-one Block fix", "4 relics + the militia boon now work", "NOT A BREAK",
-		"moves every baseline; re-baselined in BALANCE_SNAPSHOTS")
+		"moves every baseline; re-baselined after it")
 
 
 ## The largest single DamageEffect value across every enemy this build ships, and who throws it.

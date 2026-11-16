@@ -37,7 +37,7 @@ enum RelicEffect {
 ## it always had and one more). NONE for every other relic.
 @export var effect2: RelicEffect = RelicEffect.NONE
 @export var value2: int = 0
-## Forgotten relics (ROADMAP Phase 1): a dormant form names the woken form it `wakes_into`, and the
+## Forgotten relics: a dormant form names the woken form it `wakes_into`, and the
 ## woken form names the dormant one it was `woken_from`; both empty on an ordinary relic. The
 ## dormant form rolls in rewards and shops at its own rarity; the woken form sits one rarity up and
 ## is reached only by waking at a record site (RunManager.wake_relic). `short_name` is how prose

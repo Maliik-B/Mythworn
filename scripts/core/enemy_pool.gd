@@ -11,7 +11,7 @@ class_name EnemyPool
 ## below answers for the route the run is standing on (RealmRoutes). A row with nothing in it is a
 ## realm whose content has not landed, and asking it for a fight is a loud error and an empty list.
 ##
-## Regular enemies, the two elites, and the Act-1 boss (Sir Caedmon) all live here.
+## Regular enemies, the four elites, and the Act-1 boss (Sir Caedmon) all live here.
 ## map_scene delegates its combat / elite / boss nodes to the get_*_encounter calls.
 
 # The Prophet's centering effect is preloaded (rather than referenced by class_name)
@@ -49,7 +49,7 @@ const _COMBAT_POOL := [
 	["two_squires", 0.7],         # double glass harasser: stacking Vulnerable, low HP
 	# New Oct-2026 compositions (content-furnishing pass): the three new regulars give the
 	# pool a ranged-pierce threat, an escalation engine, and the first Poison body.
-	["pikeman_solo", 0.6],    # the pierce teacher, lone -- block isn't the whole answer
+	["pikeman_solo", 0.6],    # the pierce teacher, lone; block isn't the whole answer
 	["pikeman_knight", 1.0],  # pierce + a bruiser body: split your defense
 	["herald_knight", 0.9],       # banner escalation + bruiser (gated out of the early act)
 	["rotting_solo", 0.7],        # the poison teacher, lone
@@ -119,7 +119,7 @@ static func _row_with(what: String) -> Dictionary:
 
 ## Builds one regular-combat encounter for a map node.
 ## floor_num drives a gentle within-act difficulty ramp and gates the curated
-## opener; difficulty_mult is the injection point for the A2 realm-config knob
+## opener; difficulty_mult is the injection point for the realm-config knob
 ## (court-vs-common-folk), defaulting to neutral so A1 works standalone.
 static func get_combat_encounter(floor_num: int, difficulty_mult: float = 1.0) -> Array[EnemyData]:
 	var row := _row_with("combat")
@@ -251,7 +251,7 @@ static var _elite_bags: Dictionary = {}
 ## One elite for an elite node. The four test different axes: Champion (adaptability /
 ## HP-band phases), False Prophet (the Passion crucible), Iron Verdict (retaliation:
 ## punishes chip/multi-hit, rewards big single hits), Hollow Prelate (a throughput / DPS
-## check: out-damage its heal+shield). difficulty_mult is the A2 hook.
+## check: out-damage its heal+shield). difficulty_mult is the realm-config hook.
 static func get_elite_encounter(difficulty_mult: float = 1.0) -> Array[EnemyData]:
 	var result: Array[EnemyData] = []
 	var row := _row_with("elites")
@@ -286,8 +286,8 @@ static func reset_encounter_state() -> void:
 
 
 ## The raider questline payoff fight: The Boar (a bandit war-chief the countryside calls a
-## beast) and his Weald Raiders. Deliberately scaled by ACT ONLY -- no realm difficulty_mult
-## -- so the quest reward fight plays the same under either pledge (it is pledge-agnostic by
+## beast) and his Weald Raiders. Deliberately scaled by ACT ONLY, with no realm difficulty_mult,
+## so the quest reward fight plays the same under either pledge (it is pledge-agnostic by
 ## design; the pledge shapes the rest of the map, not this).
 static func get_raider_band() -> Array[EnemyData]:
 	var mult := _act_mult()
@@ -489,7 +489,7 @@ static func prophets_acolyte(mult := 1.0) -> EnemyData:
 ## Bannerless Pikeman (Low-Med HP). The company's banner is gone; he holds the line of a
 ## line that no longer exists. The reach-pierce threat: a heavy Pike Thrust that punches
 ## through part of your block, so turtling behind a wall doesn't fully answer it. Its catch
-## is the recovery -- the Thrust is on a cooldown, so the turn after it commits the pikeman
+## is the recovery: the Thrust is on a cooldown, so the turn after it commits the pikeman
 ## can only Brace (a weak hunker) or jab. The punish window lands AFTER the lunge: eat the
 ## thrust, then burst it while it recovers its guard. Fragile, so that window usually closes
 ## the fight.
@@ -499,7 +499,7 @@ static func corrupted_pikeman(mult := 1.0) -> EnemyData:
 		# rhythm, so it can't chain thrusts and the post-lunge punish window is reliable.
 		_move("Pike Thrust", EnemyMove.IntentType.ATTACK,
 			[_dmg_pierce(_scale(11, mult), 5)], 2.2, 2),
-		# The recovery / punish window -- it levels the pike and braces, barely a threat.
+		# The recovery / punish window: it levels the pike and braces, barely a threat.
 		_move("Brace", EnemyMove.IntentType.DEFEND,
 			[_block(_scale(5, mult))], 1.4),
 		# A weak jab so a recovery turn isn't completely free for you.
@@ -667,7 +667,7 @@ static func the_hollow_prelate(mult := 1.0) -> EnemyData:
 ## The Boar (High HP, the anchor). A bandit war-chief the countryside nicknamed for the way
 ## he fights: he gores, he charges, and he will not go down. Gore is the telegraphed beast-
 ## charge to block around; Blood-Howl hands Strength to his whole pack, which makes HIM the
-## priority kill -- leave him up and the raiders' chip turns into real damage.
+## priority kill: leave him up and the raiders' chip turns into real damage.
 static func the_boar(mult := 1.0) -> EnemyData:
 	var moves: Array[EnemyMove] = [
 		_move("Trample", EnemyMove.IntentType.ATTACK,
@@ -704,7 +704,7 @@ static func weald_raider(mult := 1.0) -> EnemyData:
 ## The Shattered Choir (mini-boss). What reforms off the reliquary's walls when you refuse to
 ## let the memory fade: broken stained glass and relic-bone pulling together into a thing that
 ## moves like a beast. A chosen, optional fight (The Reliquary event) with a strong reward, so
-## it's meatier than a regular. No new combat tech -- it layers a block-punishing shard torrent
+## it's meatier than a regular. No new combat tech: it layers a block-punishing shard torrent
 ## (Raining Glass), a memory-eating drain (The Fade = Passion + Weak), and a reform that mends +
 ## shields it (so you must out-throughput the sustain, echoing the Hollow Prelate on a smaller
 ## scale). The reform does nothing at full HP, so it only bites once you've chipped it.
@@ -747,7 +747,7 @@ static func the_barrow_warden(mult := 1.0) -> EnemyData:
 			[_dmg(_scale(21, mult))], 1.3, 2),
 	]
 	# HP sits high enough (above a regular, under the Shattered Choir mini-boss) that the fight
-	# lasts long enough for Barrow Chill -> Hoarder's Wrath to actually cycle -- otherwise a
+	# lasts long enough for Barrow Chill -> Hoarder's Wrath to actually cycle; otherwise a
 	# burst deck ends it before the heavy lands and the "strong, earned treasure" read is lost.
 	return _enemy("The Barrow-Warden", _scale(82, mult), moves)
 
@@ -943,7 +943,7 @@ static func sir_caedmon(mult := 1.0) -> EnemyData:
 	# lash + Enraged retaliation, no matter how fast you burst. So his raw stats stay ~as
 	# they were (a fair boss for a normal deck) and only the burst gets taxed.
 	# phase-0 HP + moves seed the base fields so single-phase code paths still read sane.
-	# Harness-calibration target (docs/BALANCE_SNAPSHOTS.md).
+	# Harness-calibration target.
 	var e := _enemy("Sir Caedmon", _scale(78, mult), phase1)
 	# .assign() (not `=`) for the typed Array[int]/Array[String] exports: a raw literal
 	# is an untyped Array and debug builds break on the assignment (see docs pitfalls).

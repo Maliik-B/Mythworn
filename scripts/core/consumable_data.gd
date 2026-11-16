@@ -1,8 +1,7 @@
 class_name ConsumableData
 extends RefCounted
 ## A held, spent item: the fourth power layer after cards, relics and titles. The thing that
-## sets it apart is that the player picks the moment. It is NOT a title with charges (see
-## TITLE_DESIGN section 4): that is a passive worn in a slot, this is an object you carry and
+## sets it apart is that the player picks the moment. It is NOT a title with charges: that is a passive worn in a slot, this is an object you carry and
 ## use up. The inventory is two slots with no relic that widens it (RunManager.CONSUMABLE_SLOTS).
 
 ## What kind of item it is, for the UI grouping and the shop. QUEST items are carried to a

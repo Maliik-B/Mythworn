@@ -4,7 +4,7 @@ extends CardEffect
 
 ## Run-persistent decay: each time this effect resolves, its draw count drops by this
 ## much (floored at 0). The memory card "The Name I Gave Myself" forgets itself across a
-## run -- `value` mutates on the deck's own card instance, so the decay persists between
+## run: `value` mutates on the deck's own card instance, so the decay persists between
 ## combats and resets only on a fresh run (a new grant builds a fresh instance). 0 = a
 ## normal, non-decaying draw.
 @export var decay_per_play: int = 0

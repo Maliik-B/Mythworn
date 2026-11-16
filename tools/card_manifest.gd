@@ -2,10 +2,10 @@ extends Control
 ## CARD MANIFEST: an interactive QA view of every card face. The Passion TOGGLE at the top drives
 ## the live zone, so you can watch each school sigil empower / grey and the halo coin EBB in/out on
 ## a threshold crossing: the real combat behaviour (it reuses combat_scene._create_card_panel and
-## _fade_coin_transitions, so what you see == what combat shows, with no drift). Cards are pulled
+## the scene's coin transitions, so what you see == what combat shows, with no drift). Cards are pulled
 ## straight from the pools, so new cards appear automatically as content grows.
 ##
-## Run:  godot --path D:\Applications\Fable res://tools/card_manifest.tscn
+## Run:  godot --path . res://tools/card_manifest.tscn
 ## A reference PNG of the initial state is also written to screenshots/card_manifest.png.
 
 const CombatScene = preload("res://scenes/combat/combat_scene.gd")

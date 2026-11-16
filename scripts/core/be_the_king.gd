@@ -7,7 +7,7 @@ extends RefCounted
 ## modifiers if the player takes the crown (Act 1), or feeds into King's
 ## Reputation if the player is already crowned (Act 2+).
 ##
-## Design rules (see docs/REALM_CAMELOT.md "Be the King"):
+## Design rules:
 ##   - Any win gives a decent baseline. The lowest tier still grants 0.6x
 ##     modifier strength; the meter decides leverage, not whether you rule.
 ##   - Score is normalized to the boss fight itself, not the run. The throne

@@ -1,7 +1,7 @@
 class_name ConsumablePool
 ## Builds consumables by id, the way RelicPool builds relics by name. Every value here is
-## PROVISIONAL (part 3 of the demo road): the harness models these in part 4 and the numbers
-## are balanced in part 5. They sit inside the EVENT_GUIDE section 8 bands.
+## PROVISIONAL: the harness models them, and the numbers are still open to the
+## balance pass.
 ##
 ## Two boxes. GENERIC items travel. REALM items belong to a realm, and by default leave the
 ## pack at that realm's border (a chapel's water means nothing under the world-tree); an item

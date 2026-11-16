@@ -17,7 +17,7 @@ static func build_emo_hybrid() -> CharacterData:
 	c.secondary_personality = "Physical"
 	# Innate Water attrition answer: mend when he stills an enemy (lands Weak/Frozen). The
 	# glass pole's non-block sustain, auto-gated to the control build. Magnitude is the
-	# harness's calibration baseline (see docs/BALANCE_SNAPSHOTS.md).
+	# harness's calibration baseline.
 	c.control_heal = 2
 	c.starting_deck.assign(emo_starting_deck())
 	c.primary_cards = CardPool.build_emo_primary_pool()
@@ -37,8 +37,7 @@ static func build_emo_hybrid() -> CharacterData:
 ## The neutral backbone is LEANED (±1 Passion, opposite-pole rule) so tempo plays commit
 ## you instead of centering you, matched to natural usage (glass-Water leans on Defend →
 ## +Water; Physical attacks with Strike → −Physical). Density: 10 cards / 5-card hand fully
-## cycles by turn 2, so copy counts (2 neutral, 1 per pole card) tune opening-hand odds;
-## see GAME_DESIGN "Starting deck: iteration log" and docs/BALANCE_SNAPSHOTS.md.
+## cycles by turn 2, so copy counts (2 neutral, 1 per pole card) tune opening-hand odds.
 static func emo_starting_deck() -> Array[CardData]:
 	var deck: Array[CardData] = []
 

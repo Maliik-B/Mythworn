@@ -49,7 +49,7 @@ import os
 from krita import Krita, InfoObject  # noqa: F401  (provided by Krita runtime)
 
 
-PROJECT_ROOT = r"D:\Applications\Fable"
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.getcwd())  # the project folder; set it if Krita starts elsewhere
 SRC_PATH = os.path.join(PROJECT_ROOT, "art_drafts", "scroll_camelot_vector.png")
 OUT_DIR = os.path.join(PROJECT_ROOT, "art_drafts")
 

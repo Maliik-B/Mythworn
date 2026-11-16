@@ -87,7 +87,7 @@ func _ready() -> void:
 			RunManager.realm_config.elite_frequency_mult,
 			RunManager.realm_config.elite_weaken)
 
-	# Resolve a realm-entry map_boon (A2) the first time the map opens this realm.
+	# Resolve a realm-entry map_boon the first time the map opens this realm.
 	# consume_map_boon clears the pending slot, so the later node-return reloads no-op.
 	RunManager.consume_map_boon()
 
@@ -101,7 +101,7 @@ func _ready() -> void:
 		_prime_pledge_changes(true)
 	# Returning to the map having just armed a questline: reveal the now-armed payoff node
 	# once. (Mutually exclusive with the pledge flourish, which only plays on a fresh map.) At
-	# most one questline is pending a reveal per return -- arming always happens inside an event.
+	# most one questline is pending a reveal per return; arming always happens inside an event.
 	elif RunManager.first_unrevealed_quest() != &"":
 		_prime_quest_reveal(RunManager.first_unrevealed_quest())
 	AudioManager.play_music("map")
@@ -1792,7 +1792,7 @@ func _enter_node(node: MapNode) -> void:
 
 	# A queued "skip the next node" (the Tourney's walk-on shortcut): step onto this node to
 	# advance position, but pass over its content and leave its children available. Consumed
-	# once, and never on the boss -- the act still has to be finished -- nor on a far map's way
+	# once, and never on the boss (the act still has to be finished) nor on a far map's way
 	# back, which has no children to leave available.
 	var way_back := RunManager.is_abroad() and node.crossing_to != &""
 	if RunManager.pending_skip_node and node.node_type != MapNode.NodeType.BOSS and not way_back:
@@ -1919,7 +1919,7 @@ func _prime_pledge_changes(first_showing := false) -> void:
 			continue
 		if map.pledge_changes[id] == &"elite_added":
 			_paint_node(btn, MapNode.TYPE_LOOKS[MapNode.NodeType.COMBAT])  # was a combat node
-		else:  # &"weakened" -- was a normal (un-weakened) elite
+		else:  # &"weakened": was a normal (un-weakened) elite
 			_paint_node(btn, MapNode.TYPE_LOOKS[MapNode.NodeType.ELITE])
 		btn.modulate = Color.WHITE
 	_pledge_anim_active = true
@@ -2167,7 +2167,7 @@ func _combat_encounter(floor_num: int) -> Array[EnemyData]:
 
 
 # Folk's weakened elites keep their rewards but fight at a power nerf (reduced stats via a
-# lower difficulty mult) and start Weak -- a real, felt debuff behind the "weakened" badge.
+# lower difficulty mult) and start Weak: a real, felt debuff behind the "weakened" badge.
 const WEAKENED_ELITE_POWER := 0.7
 const WEAKENED_ELITE_WEAK := 2
 

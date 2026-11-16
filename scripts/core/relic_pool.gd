@@ -38,7 +38,7 @@ static func get_relic_by_name(name: String) -> RelicData:
 # rarity up, the same effect and one more, and lives here outside _build_pool so it is only ever
 # reached by waking (RunManager.wake_relic). The tell is one line of absence in the dormant text
 # and the overlay's dead gold. A relic only ever goes up, once, never by distance. Every value
-# PROVISIONAL (part 3b); the harness models both states in part 4. The dormant names are plain and
+# PROVISIONAL; the harness models both states. The dormant names are plain and
 # unearned; the hart, the oak and Sir Aldric are placeholder names, open to change.
 
 ## The six woken forms. Each names the dormant form it came from.
@@ -148,7 +148,7 @@ static func _build_quest_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.BOSS, RelicData.RelicTrigger.ON_PICKUP,
 		RelicData.RelicEffect.NONE, 0))
 
-	# -- Fable liaison send-off gifts (A2). Granted at run start by apply_liaison_gift;
+	# -- Fable liaison send-off gifts. Granted at run start by apply_liaison_gift;
 	#    quest-only so they never appear in shops or reward rolls. Bram leans info, Neve
 	#    leans supplies. Modest, permanent-run relics; tune magnitudes in balance work.
 	pool.append(_relic("Bram's Briefing",
@@ -160,7 +160,7 @@ static func _build_quest_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.HEAL, 5))
 
-	# -- Realm map_boon relic (A2). Common folk's boon: the town musters a militia to
+	# -- Realm map_boon relic. Common folk's boon: the town musters a militia to
 	#    shield you. Granted by RunManager.consume_map_boon when map_boon == &"militia".
 	pool.append(_relic("The People's Line",
 		"The common folk hold the line at your side. Start each combat with 8 Block.",
@@ -258,7 +258,7 @@ static func _build_neve_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_BLOCK, 10))
 	# A flask whose kick fades: Poise (this game's Dexterity) grants bonus block and sheds 1 each
-	# turn, so the steadiness is real early and gone by the long grind -- a defensive burst, not a
+	# turn, so the steadiness is real early and gone by the long grind: a defensive burst, not a
 	# flat stat. (Replaced the old +1 Strength, a plain Iron Quill clone; and this absorbed the
 	# cut Broken-In Boots, so one Poise relic owns the lane instead of two.)
 	pool.append(_relic("Hobnails",
@@ -359,7 +359,7 @@ static func get_boss_reward_choices(rng: RandomNumberGenerator,
 
 static func _roll_rarity(rng: RandomNumberGenerator) -> RelicData.RelicRarity:
 	# Base weights: common 0.5, uncommon 0.33, rare 0.17. The realm's reward_rarity_mult
-	# (A2) scales the non-common weights; common soaks the remainder. Neutral (1.0)
+	# scales the non-common weights; common soaks the remainder. Neutral (1.0)
 	# reproduces the original 0.5 / 0.83 thresholds.
 	var mult := 1.0
 	if RunManager and RunManager.realm_config:
@@ -401,7 +401,7 @@ static func _build_pool() -> Array[RelicData]:
 
 	# -- COMMON, FORGOTTEN (dormant; the woken forms are in _build_woken_pool) --
 	# Two knightly objects with the device worn off, and the one from elsewhere: a comb cut with
-	# a word no one here can read (LORE_SURFACE §5, the strange elite; nothing explains it).
+	# a word no one here can read (the strange elite; nothing explains it).
 	pool.append(_forgotten("A Plain Shield", "the plain shield",
 		"A knight's shield with the paint gone down to the bare wood, the boss still bright. Something was painted here once. Start each combat with 8 Block.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
@@ -441,7 +441,7 @@ static func _build_pool() -> Array[RelicData]:
 	# -- Swing gear (design pass Sep 2026): dedicated relics that swing Passion HARDER,
 	# so a build-around player commits to a pole in ~1 fight instead of the base ~2,
 	# while the plain deck's ramp is unchanged. One per direction so BOTH poles get gear.
-	# Wellspring also folds in #22: it was a Rare +1/turn that lost to Gilt Spurs'
+	# Wellspring also moved up: it was a Rare +1/turn that lost to Gilt Spurs'
 	# +1 Strength/turn: now Uncommon and +2/turn, a real Blazing accelerant.
 	pool.append(_relic("Wellspring of Resolve", "Ink that wells up faster than the pen can use it. Gain 2 Passion at the start of each turn (surges you toward Blazing).",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_TURN_START,
@@ -484,7 +484,7 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicEffect.GAIN_STRENGTH, 1))
 
 	# Momentum: a within-turn ramp. CombatEngine reads this relic directly (NONE effect, like
-	# Blooded Edge) -- each hit you land on an enemy raises your attack damage by `value` for
+	# Blooded Edge): each hit you land on an enemy raises your attack damage by `value` for
 	# the rest of the turn, reset at the start of your next turn. Rewards multi-hit chains.
 	pool.append(_relic("Momentum",
 		"A pen that runs faster with every stroke, until the line is finished. During your turn, each hit you land on an enemy gives your attacks +1 damage until your turn ends.",

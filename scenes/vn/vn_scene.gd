@@ -2,7 +2,7 @@ extends Control
 ## Renders a VNData segment: dialogue beats advanced by click/Enter, then an optional
 ## choice set whose consequence (a RealmConfig) applies before handing off to the next
 ## scene. Content-agnostic plumbing: the realm-entry VN and the Fable send-off both feed
-## it a VNData via RunManager.pending_vn. See VNData + docs/GAME_DESIGN.md § Realms.
+## it a VNData via RunManager.pending_vn. See VNData.
 
 # The running head: a setting beat's place and time, set above the panel in the card title's face.
 const HEAD_FONT_SIZE := 40

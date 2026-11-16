@@ -107,8 +107,7 @@ func verify_enemy_turn_after(eng: CombatEngine, pred: Dictionary) -> void:
 				_verify_note("enemy turn", "enemy " + k, p[k], r[k])
 
 
-## The day's seed: the UTC date as YYYYMMDD. The same number for everyone running that day, and the
-## one Build 1 plays with. The batch harnesses multiply it by 1000 to give every trial its own seed.
+## The day's seed: the UTC date as YYYYMMDD. The same number for everyone running that day. The batch harnesses multiply it by 1000 to give every trial its own seed.
 static func daily_seed() -> int:
 	var d := Time.get_date_dict_from_system(true)
 	return int(d["year"]) * 10000 + int(d["month"]) * 100 + int(d["day"])
@@ -381,7 +380,8 @@ func _weigh(eng: CombatEngine, ctx: Dictionary, line: Dictionary, plan: Array,
 		if line["php"] <= 0:
 			cost = DEATH_COST + _pool_total(line)
 		else:
-			cost = ctx["start_hp"] - line["php"] + _future_loss(eng, ctx, line) 				+ PROGRESS_EPS * _pool_total(line)
+			cost = ctx["start_hp"] - line["php"] + _future_loss(eng, ctx, line) \
+				+ PROGRESS_EPS * _pool_total(line)
 	if cost < best["any_cost"]:
 		best["any_cost"] = cost
 		best["any"] = plan

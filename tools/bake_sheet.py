@@ -9,8 +9,8 @@ A sheet from a pack, with its strips found by name and its frames taken as squar
     python tools/bake_sheet.py caedmon "D:/somewhere/Ghost Warrior 4" --lapis-auto
 
 Lapis goes on cloth or a shield only, never on skin or eyes, and only one object on a body carries it.
---lapis-auto takes the largest patch of the sheet's strongest colour, and prints what it took: look at
-the result. To name it yourself, give the sheet's own colours:
+--lapis-auto takes the largest patch of the sprite sheet's strongest colour, and prints what it took: look at
+the result. To name it yourself, give the sprite sheet's own colours:
 
     --lapis-blob "#6a6a67,#4f4e46"  the largest patch of them in each frame (a shield in grey armour)
     --lapis-blob "#1f3c88" --lapis-patches 2   the two largest (a tunic the belt cuts in two)
@@ -122,7 +122,7 @@ def sheet_palette(strips):
 
 
 def ramp_index(colours, floor, ceil):
-    """Each of the sheet's colours gets one place on the ramp, the same in every strip."""
+    """Each of the sprite sheet's colours gets one place on the ramp, the same in every strip."""
     ls = np.array([lum(c) for c in colours])
     lo, hi = np.percentile(ls, 4), np.percentile(ls, 98)
     out = {}
@@ -262,13 +262,13 @@ def bake(name, source, cell, named, lapis_all, lapis_blob, patches, lapis_auto, 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("name", nargs="?", help="the sprite set's key, and its folder under assets/sprites/baked/")
-    ap.add_argument("source", nargs="?", help="the folder holding the sheet's PNG strips")
+    ap.add_argument("source", nargs="?", help="the folder holding the sprite sheet's PNG strips")
     ap.add_argument("--cell", help="frame size as WxH, when frames are not square")
     ap.add_argument("--strip", action="append", default=[], help="state=File.png[:frames[:fps]]")
     ap.add_argument("--lapis-all", default="", help="source colours that all become lapis")
     ap.add_argument("--lapis-blob", default="", help="source colours whose largest patch per frame becomes lapis")
     ap.add_argument("--lapis-patches", type=int, default=1, help="how many of the largest patches --lapis-blob takes")
-    ap.add_argument("--lapis-auto", action="store_true", help="take the sheet's strongest colour; check the result")
+    ap.add_argument("--lapis-auto", action="store_true", help="take the sprite sheet's strongest colour; check the result")
     ap.add_argument("--floor", type=int, default=0, help="darkest ramp step to use, 0-6")
     ap.add_argument("--ceil", type=int, default=len(RAMP) - 1, help="lightest ramp step to use, 0-6")
     ap.add_argument("--preview", help="write a large first idle frame on the page colour to this path")

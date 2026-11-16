@@ -29,7 +29,7 @@ class EventChoice extends RefCounted:
 	## Used for one-shot quest events (e.g. Camelot's Sword in the Stone grants Excalibur).
 	var granted_relic_id: StringName = &""
 	## If non-empty, grants this specific MEMORY card (CardPool.get_memory_card) to the deck
-	## when chosen -- the one-off "remembrance" from a memory event (e.g. The Room That Isn't).
+	## when chosen: the one-off "remembrance" from a memory event (e.g. The Room That Isn't).
 	## Distinct from card_reward, which offers a pick-1-of-3 from the normal pool.
 	var granted_card_id: StringName = &""
 	## If non-empty, this choice LAUNCHES A SCRIPTED FIGHT (by key) instead of resolving
@@ -93,7 +93,7 @@ class EventChoice extends RefCounted:
 	## over (RunManager.pending_skip_node). The Tourney's "watch a pass and move on" shortcut.
 	var skips_next_node: bool = false
 	## If non-empty, taking this choice wedges a permanent unplayable CURSE card
-	## (CardPool.get_curse_card) into the run deck -- a refusal's "teeth" at the higher tier
+	## (CardPool.get_curse_card) into the run deck: a refusal's "teeth" at the higher tier
 	## (the spurned/dismissed party's parting gift). Distinct from granted_card_id (a boon):
 	## this is a dead card that clogs the deck for the rest of the run. Used by the Wandering
 	## Spirit's banish option.

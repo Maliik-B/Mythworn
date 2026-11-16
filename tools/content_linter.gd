@@ -21,14 +21,14 @@ const EVENT_SCENE := "res://scenes/event/event_scene.gd"
 const EVENT_POOL := "res://scripts/core/event_pool.gd"
 const MAP_SEEDS := 60
 
-## Findings the linter reports and the sheet records. Key = "<rule>: <finding>", value = why it
-## stands. The two memory cards are authored (docs/CONTENT_AUDIT.md) but their sources, boss
+## Findings the linter reports and records here. Key = "<rule>: <finding>", value = why it
+## stands. The two memory cards are authored but their sources, boss
 ## fights and a shop relic, are not built (memory-cards design: never the normal reward pool).
 const KNOWN := {
 	"memory cards have a source and card ids resolve: memory card 'everything_i_carried_out' is granted by no event choice":
-		"authored, source not built yet; CONTENT_REVIEW_DECISIONS Part 4",
+		"authored, source not built yet",
 	"memory cards have a source and card ids resolve: memory card 'name_i_gave_myself' is granted by no event choice":
-		"authored, source not built yet; CONTENT_REVIEW_DECISIONS Part 4",
+		"authored, source not built yet",
 }
 
 var _findings: Array[String] = []
@@ -50,7 +50,7 @@ func _ready() -> void:
 			_findings.append("%s: %s" % [rule, f])
 	print("-- self-test: each rule must see its seeded bug --")
 	_self_test(world)
-	# Known findings: real, recorded in the sheet, and not this part's to fix. They print, they do
+	# Known findings: real, recorded in KNOWN, and not the linter's to fix. They print, they do
 	# not fail the run, and one that stops occurring fails it as stale so the list cannot rot.
 	var live: Array[String] = []
 	var known_seen := {}

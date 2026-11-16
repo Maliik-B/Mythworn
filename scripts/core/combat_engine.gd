@@ -296,8 +296,8 @@ func _on_enemy_died_mercy(_enemy) -> void:
 
 ## Deterministic teardown. The engine listens on the global Events.passion_tier_changed autoload
 ## for the fight's duration; the per-feature disconnects only fire on a CLEAN battle end. If the
-## engine is freed another way -- the balance harness disposing a trial, or the player leaving a
-## combat mid-fight -- those connections would otherwise dangle on a destroyed Node, and the next
+## engine is freed another way: the balance harness disposing a trial, or the player leaving a
+## combat mid-fight; those connections would otherwise dangle on a destroyed Node, and the next
 ## tier change emitted into a freed receiver is a hard crash (intermittent SIGILL). Disconnecting
 ## in _exit_tree (which free()/scene-change always triggers) guarantees no stale connection
 ## survives this object, no matter how the combat ended. Idempotent via the is_connected guards.
@@ -744,7 +744,7 @@ func deal_damage(target: CombatantStats, base_amount: int,
 
 	# Title damage bonus: damage added to all player attacks (not enemies). Applied before the
 	# zone penalty so the penalty scales the boosted total uniformly.
-	# INTENDED, not a bug: this is per HIT, not per card -- it sits on the same line as
+	# INTENDED, not a bug: this is per HIT, not per card: it sits on the same line as
 	# Strength, so a multi-hit card adds it once per hit. Multi-hit decks are meant to be able
 	# to point themselves at it; that per-hit scaling is the title's whole synergy hook, and it
 	# is why the bonus opens at +1 rather than at +3.
@@ -870,7 +870,7 @@ func self_damage(stats: CombatantStats, amount: int) -> void:
 
 ## Mends a combatant up to its max HP, clamped to the missing HP, and emits the matching
 ## heal signal so the UI refreshes the bar. Used by the Hollow Prelate's self-heal AND by
-## player heal cards (the memory card "The House That Was") -- routing a player heal through
+## player heal cards (the memory card "The House That Was"), routing a player heal through
 ## the live player_stats here, rather than RunManager.heal, is what makes it show in combat
 ## (RunManager.current_hp is only synced from player_stats on victory, so a RunManager heal
 ## mid-fight would be invisible and then overwritten).

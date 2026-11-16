@@ -164,7 +164,7 @@ static func _apply_pledge_transform(map: MapData, rng: RandomNumberGenerator,
 				map.pledge_changes[id] = &"weakened"
 
 
-## Interior combat nodes in the mid/late act -- keep the opening gentle and never touch the
+## Interior combat nodes in the mid/late act: keep the opening gentle and never touch the
 ## boss / Sword / starting rows.
 static func _combat_nodes_for_upgrade(map: MapData) -> Array[int]:
 	var out: Array[int] = []
@@ -281,7 +281,7 @@ static func _place_raider_questline(map: MapData, rng: RandomNumberGenerator) ->
 			continue
 		if _is_reserved_node(map, n):
 			continue
-		# Only overwrite a combat or event node -- never clobber a scarce, path-planned
+		# Only overwrite a combat or event node; never clobber a scarce, path-planned
 		# service (shop/rest) or an elite to seat the plea.
 		if n.node_type != MapNode.NodeType.COMBAT and n.node_type != MapNode.NodeType.EVENT:
 			continue
@@ -477,7 +477,7 @@ static func generate_edge(rng: RandomNumberGenerator, home_realm: StringName, fl
 # A treasure cache a random Campfire exposes mid-run. Unlike the raider payoff (seated at
 # gen with a known giver), the Campfire can fire anywhere, so its payoff is chosen at the
 # moment of investigation from the nodes still AHEAD of where the player is standing. This
-# only re-targets an existing COMBAT node's routing -- it never adds a node or edge -- so the
+# only re-targets an existing COMBAT node's routing (it never adds a node or edge), so the
 # map's planarity and reachability guarantees are untouched. _is_reserved_node already skips
 # nodes tagged for another questline, so a Campfire cache never lands on the raider payoff.
 

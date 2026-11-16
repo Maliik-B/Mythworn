@@ -1,5 +1,5 @@
 class_name TitlePool
-## Builds and returns the canonical TitleData instances for V1.
+## Builds and returns the canonical TitleData instances.
 ## Awarding logic (which title to grant after which event) lives elsewhere;
 ## this class is a content registry, not a decision system.
 
@@ -11,7 +11,7 @@ const RUNIC_ACCENT: Color = Color(0.42, 0.55, 0.78)       # Yggdrasil's cold blu
 
 # --- Public API ---
 
-## Returns every title defined for V1. Cheap to call; no I/O.
+## Returns every title defined. Cheap to call; no I/O.
 static func get_all_titles() -> Array[TitleData]:
 	var titles: Array[TitleData] = []
 	titles.append(_build_king_of_camelot())
@@ -121,7 +121,7 @@ static func _build_camelots_champion() -> TitleData:
 ##
 ## The escalation is ORIGINAL tier only, gated in code, because the one-integer tier schema can
 ## express a smaller number but not a different SHAPE. Degraded and Returning keep a flat bonus
-## at their own values. TITLE_DESIGN 5.4 and 5.12.
+## at their own values.
 static func _build_swords_bearer() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"swords_bearer"
@@ -185,7 +185,7 @@ static func _build_guest_of_the_hall() -> TitleData:
 ## title handed over after the last fight is a line of text. Leaving the sword is the moment
 ## that concept becomes true: the crown needs Excalibur, so a keeper who walks past the stone
 ## leaves no king behind, and the stone sits on every map, so every run can earn it. One refusal
-## in one choice pays a +2 (TITLE_DESIGN 1.4), and the pay is a sellsword's: gold for each fight.
+## in one choice pays a +2, and the pay is a sellsword's: gold for each fight.
 static func _build_outlander_of_camelot() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"outlander_of_camelot"
@@ -210,8 +210,7 @@ static func _build_outlander_of_camelot() -> TitleData:
 ## the death, which makes kill order a real decision: focusing a weak body down early starts
 ## the healing sooner, and that decision is the whole reason to prefer this to a lump at the
 ## end. It pays least where healing matters most, since bosses are single bodies, and that is
-## deliberate -- it keeps the cheapest title from becoming a universal sustain crutch.
-## TITLE_DESIGN 5.10.
+## deliberate: it keeps the cheapest title from becoming a universal sustain crutch.
 static func _build_the_merciful() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"the_merciful"
@@ -231,14 +230,14 @@ static func _build_the_merciful() -> TitleData:
 
 ## A second kindness title, split off from The Merciful so a run's repeat good-acts aren't wasted
 ## on a title you already hold. Where mercy is sparing a life in peril, grace is generosity given
-## freely -- paying a stranger's debt, hearing out the lonely, pardoning a village.
+## freely: paying a stranger's debt, hearing out the lonely, pardoning a village.
 ##
 ## The world puts more in front of you because you put more in front of it. This is the only
 ## title that touches rewards, it carries no combat power at all, and its value depends on how
 ## specific the build is: a focused deck wants the wider net most, which is the latent axis
 ## doing real work. It was +5 max HP, which duplicated Camelot's Champion's lane and was pure
-## immediate power -- and worse, its own grant site paid max HP twice. Personality; never
-## degrades. TITLE_DESIGN 5.6.
+## immediate power, and worse, its own grant site paid max HP twice. Personality; never
+## degrades.
 static func _build_the_gracious() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"the_gracious"
@@ -301,7 +300,7 @@ static func _build_the_compassionate() -> TitleData:
 ## the fight the holding costs. The event's subject is a thing that refuses to fade, and the
 ## mechanical form of that is a card you spend that refuses to be spent: the first card you play
 ## each combat comes back to your hand. The card comes back and the energy does not, so the gain
-## is one paid extra play a fight, which is why it is a +4 and not a +6 (TITLE_DESIGN 5.7a).
+## is one paid extra play a fight, which is why it is a +4 and not a +6.
 ##
 ## Spent things stay spent. A card that exhausts does not come back, which keeps the memory cards
 ## one-shot, and neither does a Power (it is used up into its lasting effect, and one played twice
@@ -339,7 +338,7 @@ static func _build_the_unfading() -> TitleData:
 ## game on an upgrade to a common title. Now it lives where its fiction always was: the people
 ## tend their champion, so the villages host him, and a night under their roof is worth two.
 ## Mended AND seen to his gear, which means a player wearing it needs no sustain title and the
-## other slot goes to a fighting title. TITLE_DESIGN 5.2.
+## other slot goes to a fighting title.
 static func _build_peoples_champion() -> TitleData:
 	var t := TitleData.new()
 	t.title_id = &"peoples_champion"

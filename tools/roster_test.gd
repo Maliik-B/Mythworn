@@ -136,14 +136,14 @@ func _test_elite_and_boss_identity() -> void:
 	var elite_names := ["Champion of the Usurper", "The False Prophet", "The Iron Verdict",
 		"The Hollow Prelate"]
 	var elite := EnemyPool.get_elite_encounter()
-	_check("elite is one of the three Camelot elites",
+	_check("elite is one of the four Camelot elites",
 		elite.size() == 1 and elite[0].enemy_name in elite_names)
 	var boss := EnemyPool.get_boss()
 	_check("act-1 boss is Sir Caedmon",
 		boss.size() == 1 and boss[0].enemy_name == "Sir Caedmon")
 
 
-## The shuffle-bag guarantees a run sees all three elites once before any repeat (a path
+## The shuffle-bag guarantees a run sees three of the four elites before any repeat (a path
 ## can hold up to 3 elite nodes). Iron Verdict is armed with Enraged from turn 1.
 func _test_elite_rotation() -> void:
 	EnemyPool.reset_encounter_state()
@@ -614,8 +614,8 @@ func _test_xcost_maelstrom() -> void:
 	eng.free()
 
 
-## The swing gear (Q2): Wellspring surges Passion + each turn (uncommon after the #22
-## rarity nerf), Leaden Vow settles it − each turn, one relic per pole so a build-around
+## The swing gear: Wellspring surges Passion + each turn (uncommon after the rarity
+## nerf), Leaden Vow settles it − each turn, one relic per pole so a build-around
 ## player can commit fast in either direction.
 func _test_swing_relics() -> void:
 	var well := RelicPool.get_relic_by_name("Wellspring of Resolve")
@@ -749,9 +749,6 @@ func _map_has_crossing(map: MapData) -> bool:
 	return false
 
 
-## The A2 realm-config system: neutral by default, and the wired knobs flow through:
-## enemy difficulty scales encounter HP, and elite frequency biases the map's elite count
-## (without breaking planarity). reward_rarity / map_boon are fielded but not yet wired.
 ## Content is looked up by (realm, config). Camelot's row serves what it always has. A row with
 ## nothing in it refuses loudly and serves nothing, never Camelot's. A realm marked implemented with
 ## an empty row fails here, so the flag cannot go up before the content does.
@@ -799,6 +796,9 @@ func _test_realm_routes() -> void:
 			print("  PENDING %s is not a whole realm yet: its table is empty or only an edge" % realm.realm_id)
 
 
+## The realm-config system: neutral by default, and the knobs flow through: enemy difficulty
+## scales encounter HP, and elite frequency biases the map's elite count (without breaking
+## planarity).
 func _test_realm_config() -> void:
 	var cfg := RealmConfig.new()
 	_check("RealmConfig defaults are neutral",
@@ -1124,7 +1124,7 @@ func _test_scheduled_room() -> void:
 
 
 ## Memory ("Remembrance") cards (Oct 2026): the three Emo/Cairn memory cards and their
-## new mechanics -- a player heal that shows in combat, Passion-distance-scaled damage with
+## new mechanics: a player heal that shows in combat, Passion-distance-scaled damage with
 ## an on-kill energy refund, and a run-persistent decaying draw. Each is flagged is_memory,
 ## RARE, and kept out of the normal reward pools by construction.
 func _test_memory_cards() -> void:
@@ -1446,7 +1446,7 @@ func _test_event_reworks() -> void:
 	_check("The Tourney court ride costs HP and is court-gated with a card reward",
 		ride != null and ride.hp_change < 0 and ride.card_reward)
 	# The Shade at the Cross's power option used to spend its courage for the player at the start of
-	# the next fight (a queued boon). Part 3 made it a HELD consumable, Unspent Courage, that the
+	# the next fight (a queued boon). It is now a HELD consumable, Unspent Courage, that the
 	# player spends: the same +2 Strength, with the moment chosen. See _test_consumables.
 	var lend: EventData.EventChoice = null
 	if spirit:
@@ -1591,7 +1591,7 @@ func _test_liaison_relics() -> void:
 	var picks := RelicPool.get_liaison_relic_choices(&"bram", lrng, 1)
 	_check("get_liaison_relic_choices(bram) returns a Bram-pool relic",
 		picks.size() == 1 and picks[0].relic_name in bram_names)
-	# Exclude all but one -- the roll must return exactly the remaining unowned relic.
+	# Exclude all but one: the roll must return exactly the remaining unowned relic.
 	var owned := PackedStringArray()
 	for i in range(bram.size() - 1):
 		owned.append(bram[i].relic_name)
@@ -1645,9 +1645,9 @@ func _test_liaison_relics() -> void:
 		lib_bram and scriptorium_bram and cart_neve)
 
 
-## Refusals with teeth (Oct 2026): walking away / refusing now carries a cost. Tier 1 -- the
+## Refusals with teeth (Oct 2026): walking away / refusing now carries a cost. Tier 1: the
 ## folk/liaison walk-aways lose standing (or Passion for the factionless Man Off the Field);
-## Tier 2 -- scattering the Shade at the Cross wedges a permanent unplayable curse into the deck.
+## Tier 2: scattering the Shade at the Cross wedges a permanent unplayable curse into the deck.
 func _test_refusals() -> void:
 	var by_name := {}
 	for ev in EventPool._build_pool():
@@ -1750,7 +1750,7 @@ func _test_title_split() -> void:
 		cart_grant != null and cart_grant.standing_change > 0)
 
 
-## The Unfading (TITLE_DESIGN 5.7, title wave 2), through the real engine: the first card played
+## The Unfading, through the real engine: the first card played
 ## each combat comes back to the hand with its energy still spent; only the first card echoes,
 ## and each combat arms it anew; a spent first card (it exhausts, it is a Power, it is a Trick
 ## card) does not come back and uses the echo up; unworn, nothing echoes. And the Reliquary's
@@ -1949,8 +1949,8 @@ func _stone_fight_is_unstaged(stone: EventData) -> bool:
 	return true
 
 
-## Outlander had no award path at all (TITLE_DESIGN 5.9). Its home is the Sword in the Stone's
-## walk-away (title wave 2): leaving the sword grants it, facing the beast does not, and worn
+## Outlander had no award path at all. Its home is the Sword in the Stone's
+## walk-away: leaving the sword grants it, facing the beast does not, and worn
 ## it pays its 5 gold when a combat is won.
 func _test_outlander_home() -> void:
 	var es: Control = load("res://scenes/event/event_scene.gd").new()
@@ -1983,7 +1983,7 @@ func _test_outlander_home() -> void:
 		RunManager.earned_title_ids.erase(&"outlander_of_camelot")
 
 
-## King of Camelot away from Camelot (title wave 2, sheet Q5): the degraded tier is A King
+## King of Camelot away from Camelot : the degraded tier is A King
 ## Abroad, still a crown at a smaller discount, and pairs with the returning tier's Former King.
 func _test_king_abroad() -> void:
 	var king := TitlePool.get_title(&"king_of_camelot")
@@ -2013,7 +2013,7 @@ func _test_event_scheduling() -> void:
 	RunManager.ordinary_event_count = saved_count
 
 
-## The VN plumbing (A2): VNData builds with chainable beats + choices, and a choice's
+## The VN plumbing: VNData builds with chainable beats + choices, and a choice's
 ## RealmConfig is what vn_scene applies to the run: the realm-entry consequence.
 func _test_vn_data() -> void:
 	var cfg := RealmConfig.new()
@@ -2030,7 +2030,7 @@ func _test_vn_data() -> void:
 		RunManager.realm_config.enemy_difficulty_mult == 1.3)
 	RunManager.realm_config = RealmConfig.new()  # restore neutral for later tests
 
-	# Authored A2 content (VNPool): the send-off is dialogue-only; the Camelot entry
+	# Authored content (VNPool): the send-off is dialogue-only; the Camelot entry
 	# offers the Court/Folk choice with asymmetric configs.
 	var sendoff := VNPool.build_sendoff(RunManager.current_character)
 	_check("send-off VN has beats and no terminal choice",
@@ -2109,7 +2109,7 @@ func _test_vn_data() -> void:
 
 	# The People's Champion is a route title now (a rest grants both choices), not a third
 	# post-combat heal, and it is handed over the moment standing crosses the bar rather than
-	# after the boss -- in a one-act demo the post-boss award arrived with no nodes left.
+	# after the boss; in a one-act demo the post-boss award arrived with no nodes left.
 	var pc := TitlePool.get_title(&"peoples_champion")
 	_check("The People's Champion is a route title (a rest grants both choices)",
 		pc != null and pc.category == TitleData.Category.PERSONALITY
@@ -2518,7 +2518,7 @@ func _test_scene_scripts_compile() -> void:
 	# Scene scripts only compile when their scene runs, so the project-load check
 	# never touches them. load() here (autoloads present) forces a full compile,
 	# catching errors in the resonance-sigil edits and the encounter wiring.
-	# load() alone is too lenient -- a cached GDScript resource still returns non-null even
+	# load() alone is too lenient: a cached GDScript resource still returns non-null even
 	# when it has a parse error (this missed an event_scene.gd error once), so reload() the
 	# script and require OK: that re-runs the compiler and reports parse failures as an Error.
 	for path in ["res://scenes/combat/combat_scene.gd", "res://scenes/map/map_scene.gd",
@@ -2880,7 +2880,7 @@ func _test_harness_copy_card_rules() -> void:
 	RunManager.active_title_slots.assign(saved_titles)
 
 
-## Part 4: what the engine gained since the planner was written, each locked to the engine. The
+## What the engine gained since the planner was written, each locked to the engine. The
 ## companion's Stoop (ignores Block, a flag bonus spent once), Bind (strips Block), Wait On (raises
 ## the flag), the oil, the ward, the girdle, the clutch mend, the scabbard, the Merciful's mend and
 ## the Unfading's echo. Enemy-turn rules are compared against a real end_player_turn.
@@ -3172,7 +3172,7 @@ func _neutral_attack(card_name: String, cost: int, dmg: int) -> CardData:
 
 
 # ============================================================
-# CONSUMABLES AND PETS (part 3 of the demo road)
+# CONSUMABLES AND PETS
 # ============================================================
 
 ## Clears the pack and the standing/passion state the consumable tests touch, so each block
@@ -4021,7 +4021,7 @@ func _test_pets() -> void:
 	_reset_consumable_state()
 
 
-## Part 3b: the huntsman's node. The Master of Game is seated once on every Camelot act-1 map in
+## The huntsman's node. The Master of Game is seated once on every Camelot act-1 map in
 ## the mid-act, as a scripted event node on no reserved node; the event sells every animal the
 ## keeper does not have at 75, a new one replaces the old, and leaving costs nothing.
 func _test_master_of_game() -> void:
@@ -4089,7 +4089,7 @@ func _test_master_of_game() -> void:
 	_reset_consumable_state()
 
 
-## Part 3b: the forgotten relics. Six dormant forms roll in the reward pool, each naming a woken
+## The forgotten relics. Six dormant forms roll in the reward pool, each naming a woken
 ## form one rarity up that never rolls; the offer is guaranteed while the keeper carries none; a
 ## record site builds one waking option per dormant relic carried and none otherwise; waking
 ## replaces the relic in place; the engine applies a woken relic's second effect, the girdle's
@@ -5332,7 +5332,7 @@ func _pet_arrivals(id: StringName, turns: int) -> String:
 	return ",".join(seen)
 
 
-## Q4 and the Neve collisions (part 3): the six generic-fantasy relic names are gone, the pool reads as
+## The Neve collisions: the six generic-fantasy relic names are gone, the pool reads as
 ## one family, every reward relic says what it is before it says what it does, and no description
 ## promises a drawback the engine does not apply.
 func _test_relic_names() -> void:

@@ -2,7 +2,6 @@ class_name TitleData
 extends Resource
 ## Defines a title: the player's reputation and identity layer.
 ## Earned through major narrative moments, worn in one of two title slots.
-## See docs/GAME_DESIGN.md § Titles for the design framework.
 
 ## Where a title came from determines whether and how it degrades.
 enum Category {
@@ -42,7 +41,7 @@ enum EffectType {
 ## Scope and period are separate axes. "One shot, N uses, cooldown" conflates them,
 ## which is why the old active_uses_per_combat field could only express one cell of
 ## the grid (scope and period both per-combat) and could not express a node skip that
-## comes back each act. See docs/TITLE_DESIGN.md section 4.1.
+## comes back each act.
 enum ActiveScope {
 	COMBAT,  # spent inside a fight
 	NODE,    # spent on the map, against a node
@@ -100,7 +99,7 @@ enum ActivePeriod {
 ## returns one integer, so a tier can only differ in magnitude, and the interesting
 ## degradation for a charge title is in its PERIOD (refreshes at home, does not refresh
 ## abroad, comes back on reclamation). The schema has no room for that yet, which is the
-## second reason the first consumable is a personality title. See TITLE_DESIGN 6.3.
+## second reason the first consumable is a personality title.
 @export var has_active: bool = false
 @export var active_effect: EffectType = EffectType.NONE
 @export var active_value: int = 0

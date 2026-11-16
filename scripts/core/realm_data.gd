@@ -2,7 +2,6 @@ class_name RealmData
 extends Resource
 ## Defines a realm: a mythological/historical world the player visits during a run.
 ## Realms own their bestiaries, events, bosses, and narrative arc.
-## See docs/GAME_DESIGN.md § Realms for the design framework.
 
 enum VisualStyle {
 	HERALDIC,   # Camelot: gold/red, knight iconography

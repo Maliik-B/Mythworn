@@ -10,7 +10,7 @@ const CARD_REMOVE_COST := 50
 const CARD_COUNT := 5
 const RELIC_COUNT := 2
 const CONSUMABLE_COUNT := 2
-## Stacking cap for shop discounts from titles + future relics. See § Titles in GAME_DESIGN.md.
+## Stacking cap for shop discounts from titles + future relics.
 const SHOP_DISCOUNT_CAP := 50
 
 # Shopkeeper greetings, rotated randomly. One line each: the keeper's column wraps them.
@@ -23,7 +23,7 @@ const SHOPKEEPER_GREETINGS = [
 ]
 const INFO_LINE := "Click a card, relic or provision to purchase"
 
-# The page, as the stall was mocked and picked (packet 2b, mock A): the ground and the page's lower
+# The page, as the stall was mocked and picked: the ground and the page's lower
 # edge, the two shelves and their planks, the keeper's column and the keeper.
 const GROUND_Y := 884.0
 const PAGE_BOTTOM := 990.0  # the desk strip runs from here to the foot of the screen

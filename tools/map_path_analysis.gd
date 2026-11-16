@@ -3,7 +3,7 @@ extends Node
 ## seeds it enumerates every start→boss path and reports the per-path node-type
 ## composition, so we can see whether path CHOICE is meaningful (paths differ in
 ## enemy density / shop / rest / elite counts) or homogeneous (every path ~same).
-## Run: godot --headless --path D:\Applications\Fable res://tools/map_path_analysis.tscn --quit-after 200
+## Run: godot --headless --path . res://tools/map_path_analysis.tscn --quit-after 200
 ## A scene rather than a --script tool because MapGenerator shuffles through the RngManager
 ## autoload, and --script mode loads no autoloads.
 

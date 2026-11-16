@@ -54,7 +54,7 @@ signal vn_choice_made(choice_data)
 # -- Realm events --
 signal realm_configured(realm_data)
 ## Emitted when the player's current realm changes (act transitions, realm switching).
-## Title degradation, UI accent colors, and codex tracking listen here.
+## Nothing connects to it yet.
 signal realm_changed(previous_realm_id: StringName, new_realm_id: StringName)
 ## Emitted when the player switches between staying in or leaving a realm post-boss.
 ## Reserved for Phase C (realm switching UX implementation).

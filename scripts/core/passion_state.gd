@@ -1,8 +1,8 @@
 class_name PassionState
 extends Resource
 ## Runtime state of the Passion meter for the current run.
-## Signed axis: 0 = dispassionate center, +100 = fully primary pole, -100 = fully
-## secondary pole. Tier boundaries are defined per-character in CharacterData.
+## Signed axis: 0 = dispassionate center, +60 = fully primary pole, -60 = fully
+## secondary pole (the clamp below). Tier boundaries are defined per-character in CharacterData.
 
 enum Tier { HOLLOW, WAVERING, STEADY, INSPIRED, BLAZING }
 

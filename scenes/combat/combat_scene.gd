@@ -1,6 +1,6 @@
 extends Control
-## Minimal test combat scene. Builds UI programmatically, wires into the
-## Events bus, creates sample cards/enemies, and runs a full combat loop.
+## The combat screen. Builds its UI in code, listens on the Events bus, and draws the fight
+## that CombatEngine resolves.
 
 # -- UI references (built in _build_ui) --
 var combat_engine: CombatEngine
@@ -53,7 +53,7 @@ var _last_play_ms := -100000  # when a card last played, for the double-click gu
 #
 # Bodies are drawn at one whole-number scale per fight, feet on one ground: a regular at 4, a boss
 # who stands alone at 6, and small things stay small. Where a body sits in its cell is measured
-# from the sheet (see _sheet_body), so a new sheet needs nothing but its entry here.
+# from the sprite sheet (see _sheet_body), so a new sheet needs nothing but its entry here.
 const BODY_SCALE_REGULAR := 4
 const BODY_SCALE_BOSS := 6
 const STAGE_FEET_Y := 556.0  # bodies stand here, a little in front of CombatStage.GROUND_LINE_Y
@@ -180,7 +180,7 @@ const SPRITE_SETS := {
 }
 
 # enemy_name -> sprite set. Shared CC0 stand-ins chosen so no paired composition shows two
-# identical sprites -- e.g. the Pikeman is a goblin so pikeman_knight reads goblin + skeleton,
+# identical sprites, e.g. the Pikeman is a goblin so pikeman_knight reads goblin + skeleton,
 # and the Herald is the robed wizard so herald_knight doesn't double the skeleton. Distinct
 # per-enemy art is the B5 track item.
 const ENEMY_SPRITE_SET := {
@@ -212,7 +212,7 @@ const ENEMY_SPRITE_SET := {
 	# Raider questline band: the Boar reads big (worm sheet) vs the two small goblin raiders.
 	"The Boar": "worm",
 	"Weald Raider": "goblin",
-	# The Reliquary chapel beast -- ethereal/reforming, so the floating-eye sheet.
+	# The Reliquary chapel beast: ethereal/reforming, so the floating-eye sheet.
 	"The Shattered Choir": "flyingeye",
 }
 # Card icon mapping: card_name -> full res:// path

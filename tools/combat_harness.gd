@@ -7,10 +7,10 @@ extends Node
 ## enemy-turn pacing timers so thousands of trials run in seconds instead of real minutes.
 ##
 ## Run headless:
-##   godot --headless --path D:\Applications\Fable res://tools/combat_harness.tscn
+##   godot --headless --path . res://tools/combat_harness.tscn
 ##
 ## Reports win%, turn counts, HP-lost bands, and Passion trajectory for calibration
-## against docs/BALANCE_SNAPSHOTS.md and the sts-balance-targets north star. It is a
+## against its recorded baselines, with Slay the Spire's difficulty as the reference. It is a
 ## MODEL of a competent player (it plans each turn against the rest of the fight), so it sets
 ## bands; playtest finalizes.
 
@@ -25,7 +25,7 @@ const CONFIG := "shipped"
 
 ## Trial seeds are _seed_base + 0..N-1. The default base 0 keeps every number comparable with the
 ## snapshots; --daily derives it from the UTC date (YYYYMMDD x 1000) so a day's run is the same
-## for anyone running it that day, and it is Build 1's seed. --seed=N sets the base by hand,
+## for anyone running it that day. --seed=N sets the base by hand,
 ## --trials=N the count, --only=pets,relics,... the sections.
 var _seed_base := 0
 var _trials := TRIALS
@@ -42,7 +42,7 @@ func _ready() -> void:
 	# No sound: every play() here would be kept until the run ends (see AudioManager.enabled).
 	AudioManager.enabled = false
 	# Failsafe self-destruct. If any report below errors out, _ready returns without reaching
-	# the clean quit() and a headless process would otherwise idle forever -- an orphan that
+	# the clean quit() and a headless process would otherwise idle forever: an orphan that
 	# piles up across runs until it exhausts memory and takes the machine (and other sessions)
 	# down with it. This timer fires once frames resume after such an early return and force-
 	# quits. (Belt-and-suspenders with the recommended CLI --quit-after; the bounded trial loops
@@ -54,8 +54,8 @@ func _ready() -> void:
 
 	_read_args()
 	print("\n===============================================================")
-	print(" Fable combat harness: REAL engine, %d trials/scenario" % _trials)
-	print(" player %d HP / %d energy   Passion axis -100..+100 (Blazing >= +50)" % [
+	print(" Mythworn combat harness: REAL engine, %d trials/scenario" % _trials)
+	print(" player %d HP / %d energy   Passion axis -60..+60 (Blazing >= +50)" % [
 		80, CombatEngine.MAX_ENERGY])
 	print(" realm config: %s   trial seeds: %d..%d%s" % [CONFIG, _seed_base, _seed_base + _trials - 1,
 		"   (daily seed %d)" % _daily_seed if _daily_seed > 0 else ""])
@@ -271,7 +271,7 @@ func _report_regen_check() -> void:
 	_regen_bar("Caedmon, realistic   (+Iron Rations)", boss_reg)
 	_regen_bar("Wasting+Shade        (no Rations)", reg_base)
 	_regen_bar("Wasting+Shade        (+Iron Rations)", reg_reg)
-	print("  read: healthy if +Rations shaves HP-lost modestly and nudges win% -- not if HP-lost")
+	print("  read: healthy if +Rations shaves HP-lost modestly and nudges win%, not if HP-lost")
 	print("        collapses toward 0 or win% jumps from a real risk to a near-certainty.")
 
 
@@ -310,7 +310,7 @@ func _report_swords_bearer() -> void:
 
 
 # ============================================================
-# CONTRIBUTIONS (part 4): one thing added, the same seeds, the difference
+# CONTRIBUTIONS: one thing added, the same seeds, the difference
 # ============================================================
 
 ## The three fights every contribution is read on: a regular on the fresh deck, an elite on the mid
@@ -508,7 +508,7 @@ func _simulate(deck: Array[CardData], enemy_keys: Array, seed_val: int,
 	# Camelot realm title resolves to its Original tier and escalates.
 	if extra_title != &"":
 		RunManager.active_title_slots[0] = extra_title
-	# Part 4 options, a fresh pack and companion every trial so nothing carries over: more relics
+	# Extra options, a fresh pack and companion every trial so nothing carries over: more relics
 	# by name (a dormant or a woken form), a companion by id, the pack by id, a second title.
 	RunManager.pet_id = opts.get("pet", &"")
 	RunManager.consumables.clear()

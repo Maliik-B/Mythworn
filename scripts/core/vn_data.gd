@@ -4,8 +4,7 @@ extends RefCounted
 ## whose consequences shape the run. The realm-entry VN uses a choice to set the realm
 ## STATE before map navigation (Camelot: court vs common folk → RunManager.realm_config);
 ## the Fable send-off uses beats only (the liaison gift is applied separately). Hand-
-## authored and rendered by vn_scene. See docs/GAME_DESIGN.md § Realms and
-## [[demo-liaisons-bram-neve]] for the demo content this plumbing will carry.
+## authored and rendered by vn_scene.
 
 ## One line of dialogue: who speaks, what they say, and an accent colour for the name. A setting
 ## beat names only the place and the time: vn_scene sets it as a running head above the panel, where

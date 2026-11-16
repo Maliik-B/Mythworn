@@ -248,7 +248,7 @@ static func _forgotten_library() -> EventData:
 
 
 ## Camelot liaison event: Bram (Records) turns up at an abbey scriptorium the crown has
-## ordered burned, after one specific charter before it's ash -- institutional interest, not
+## ordered burned, after one specific charter before it's ash: institutional interest, not
 ## a personal file. FOLK-GATED option: a people-trusted keeper can have the town carry the
 ## whole archive out. Bram names Records without explaining Fable. His dry,
 ## tired voice per the liaison brief. (Camelot-flavored; the demo only runs this pool here.)
@@ -279,9 +279,9 @@ static func _scriptorium() -> EventData:
 	c1.passion_change = 3
 
 	# Folk-gated: only a keeper the people already trust can raise the whole town in a night.
-	# The aligned big outcome -- the entire archive saved, not just Bram's one page. Per the
+	# The aligned big outcome: the entire archive saved, not just Bram's one page. Per the
 	# faction-reward principle (folk events pay in relics), Bram's thanks is a Records relic from
-	# his dedicated pool, not a card -- and the prose already reads like an object pressed on you.
+	# his dedicated pool, not a card; and the prose already reads like an object pressed on you.
 	var cf = EventData.EventChoice.new()
 	cf.text = "Wake the town and carry the whole archive out before the torches come."
 	cf.result_text = ("You go door to door, and the people who trust you come out into the cold "
@@ -318,7 +318,7 @@ static func _scriptorium() -> EventData:
 	e.choices.append(c3)
 	# A keeper carrying a forgotten relic may ask the record for it: one option per dormant relic
 	# held, none shown otherwise, so the site does the telling. It costs nothing but the event's
-	# other options (ROADMAP Phase 1, "Forgotten relics").
+	# other options.
 	for relic in RunManager.get_forgotten_relics():
 		var wake = EventData.EventChoice.new()
 		wake.text = "Put %s on the table under the lamp, and ask Bram what the record says of it." % relic.short_name
@@ -517,7 +517,7 @@ static func _shade_at_the_cross() -> EventData:
 		+ "and it does not fade. It waits for you to ask. One hard fight it will carry you. Then it "
 		+ "will be spent, the way he was spent, and you will be on your own with it again.")
 	# Held, not spent for you: the same courage the Shade used to lend at the start of the next
-	# fight, now carried until the player picks the fight. The part 3 migration that proves the layer.
+	# fight, now carried until the player picks the fight. The first event moved onto the consumable layer.
 	c2.grants_consumable = &"unspent_courage"
 
 	# Refusal with teeth (higher tier): scattering him for the gilt leaves a lingering curse, a
@@ -631,7 +631,7 @@ static func _peasants_plea() -> EventData:
 	c1.gold_change = -50
 	c1.passion_change = 5
 	c1.card_reward = true
-	c1.awarded_title_id = &"the_gracious"  # paying their debt from your own purse -- open-handed
+	c1.awarded_title_id = &"the_gracious"  # paying their debt from your own purse: open-handed
 	c1.standing_change = 8  # sparing the folk, the way anyone could
 
 	var c2 = EventData.EventChoice.new()
@@ -655,7 +655,7 @@ static func _peasants_plea() -> EventData:
 
 	# Folk-gated: only a keeper the people already trust can ask them to conspire. Opens for
 	# a Folk-pledged hero (and anyone who has earned the people's favor); locked otherwise with
-	# "Need: Favor of the People". The aligned boon -- Pay's outcome without the gold cost.
+	# "Need: Favor of the People". The aligned boon: Pay's outcome without the gold cost.
 	var cf = EventData.EventChoice.new()
 	cf.text = "Have the village hide its stores before the collector rides in."
 	cf.result_text = ("They don't argue. People who trust you move fast. By the time the gray "
@@ -672,7 +672,7 @@ static func _peasants_plea() -> EventData:
 
 	# Court-gated: only a keeper the crown already backs can wave its own levy aside. Opens for
 	# a Court-pledged hero (and anyone who has earned the court's favor); locked otherwise with
-	# "Need: Favor of the Court". Effortless authority -- no gold, no risk, but no growth either.
+	# "Need: Favor of the Court". Effortless authority: no gold, no risk, but no growth either.
 	var cc = EventData.EventChoice.new()
 	cc.text = "Ride ahead and tell the collector the crown forgives this village's share."
 	cc.result_text = ("You find the collector on the road at first light and tell him, in the "
@@ -695,7 +695,7 @@ static func _peasants_plea() -> EventData:
 	return e
 
 
-## The Reliquary (entry beat) -- the multi-stage memory event. Appears in the random rotation
+## The Reliquary (entry beat): the multi-stage memory event. Appears in the random rotation
 ## like any event, but it unfolds: approaching is struck (the HP cost) and chains to the
 ## fading-memory choice (reliquary_struck), which can launch the chapel-beast fight and pay off
 ## in reliquary_won. Here the player is only warned: the chapel "takes a memory for every one
@@ -735,7 +735,7 @@ static func _reliquary() -> EventData:
 
 
 ## The fire is days cold, but the camp tells a story: these were diggers who broke open an old
-## barrow, got the grave-goods out, and fled whatever was laid in with them -- leaving a journal
+## barrow, got the grave-goods out, and fled whatever was laid in with them, leaving a journal
 ## whose last page maps where they cached the haul. Reading it ARMS a treasure node down the
 ## road (arms_quest = &"campfire"), which reveals on the next map return and pays off a strong
 ## fight (the barrow-warden) for extra gold + a relic. requires_treasure_payoff gates the whole

@@ -241,8 +241,7 @@ static func _build_character_pool(templates: Array[CardData]) -> Array[CardData]
 ##   • AoE / multi≥3 / DoT / Weak-control / block-utility → +Passion (Water's lane)
 ##   • genuinely flexible cards (Bracing Blow, Second Wind) stay 0.
 ## CEILINGS are also trimmed ("soften center") so a committed pole out-spikes the neutral
-## pool. Steady stays a valid low-variance option, not the strictly-best line. See
-## docs/GAME_DESIGN.md § Zone Rewards and docs/BALANCE_SNAPSHOTS.md.
+## pool. Steady stays a valid low-variance option, not the strictly-best line.
 static func _build_generic_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
@@ -405,8 +404,7 @@ static func _inner_fire() -> CardData:
 ## scaling torrents. So committing to Water is a real choice with a real ceiling and a
 ## real floor, not a re-skin of the Physical toolkit. Per the affinity rubric every card
 ## pushes Passion + toward Blazing (the pole's payoff). Magnitudes are the combat
-## harness's calibration baseline. See docs/WATER_REWORK.md, docs/GAME_DESIGN.md
-## § Characters, and docs/BALANCE_SNAPSHOTS.md.
+## harness's calibration baseline.
 static func build_emo_primary_pool() -> Array[CardData]:
 	var pool: Array[CardData] = []
 
@@ -747,7 +745,7 @@ static func _ddraw(amount: int, decay: int) -> DrawEffect:
 # MEMORY ("REMEMBRANCE") CARDS: Emo Hybrid (Cairn)
 # A league of their own: character-specific, overloaded, and sourced ONLY from memory
 # events, boss fights, and a shop relic (never the normal reward pool). Each answers an
-# enemy's intent a different way -- survive it, strike through it, or out-resource it.
+# enemy's intent a different way: survive it, strike through it, or out-resource it.
 # Flavor is first person (the character's own voice): a keeper who lost his home and gave
 # himself a name.
 # ============================================================
@@ -765,7 +763,7 @@ static func get_memory_card(id: StringName) -> CardData:
 	return null
 
 
-## Curse cards -- permanent, unplayable dead cards a run can pick up as a consequence (the
+## Curse cards: permanent, unplayable dead cards a run can pick up as a consequence (the
 ## higher tier of "refusals with teeth": a spurned party's parting gift). Built by id so events
 ## grant a specific, flavored curse. Distinct from the Realm Shade's per-combat Corruption
 ## (EnemyPool._corruption_curse), which never persists; these ride in the run deck for good.
@@ -777,7 +775,7 @@ static func get_curse_card(id: StringName) -> CardData:
 
 
 ## The Shade at the Cross's parting curse: you scattered him with his grief unspoken, and some of
-## it stayed. An unplayable card that just crowds your hand -- the price of the cold dismissal.
+## it stayed. An unplayable card that just crowds your hand, the price of the cold dismissal.
 static func _curse_clinging_grief() -> CardData:
 	var c := CardData.new()
 	c.card_name = "Clinging Grief"
@@ -793,7 +791,7 @@ static func _curse_clinging_grief() -> CardData:
 
 
 ## All memory cards (for the future shop relic that surfaces them, and for tests). Not
-## wired into any reward roll -- the gating is by construction (nothing adds these to a pool).
+## wired into any reward roll; the gating is by construction (nothing adds these to a pool).
 static func build_memory_cards() -> Array[CardData]:
 	return [
 		_memory_house_that_was(),
@@ -804,7 +802,7 @@ static func build_memory_cards() -> Array[CardData]:
 
 ## Bypass the hit: a near-untouchable turn (block + a heal + draw + one turn of Intangible),
 ## then the memory is spent for the fight (Exhaust = forgetting). Always does SOMETHING, even
-## if the block is redundant -- a hearth that takes you in.
+## if the block is redundant: a hearth that takes you in.
 static func _memory_house_that_was() -> CardData:
 	var c := _pcard("The House That Was", 1, CardData.CardType.SKILL,
 		CardData.TargetType.SELF, CardData.CardRarity.RARE,
@@ -817,7 +815,7 @@ static func _memory_house_that_was() -> CardData:
 	return c
 
 
-## Strike through the hit: the whole weight I carry, set down at once -- so it scales with how
+## Strike through the hit: the whole weight I carry, set down at once, so it scales with how
 ## far I've committed to either pole, hardens me (Strength), and gives tempo back on a kill.
 static func _memory_everything_carried_out() -> CardData:
 	var c := _pcard("Everything I Carried Out", 2, CardData.CardType.ATTACK,
@@ -830,7 +828,7 @@ static func _memory_everything_carried_out() -> CardData:
 	return c
 
 
-## Out-resource the hit: free card advantage that forgets itself across the run -- it draws one
+## Out-resource the hit: free card advantage that forgets itself across the run: it draws one
 ## fewer each time I lean on it, but never becomes dead (it still frees energy and steadies me).
 static func _memory_name_i_gave_myself() -> CardData:
 	var c := _pcard("The Name I Gave Myself", 0, CardData.CardType.SKILL,
@@ -854,7 +852,7 @@ static func _memory_name_i_gave_myself() -> CardData:
 # Jab's rate (4), a 1-cost card at a common deck card's full rate, and at most one bankable card
 # per pet, which wants a moment and arrives once a cycle. Pet text is character-agnostic. The
 # cards push no Passion and grant no Block, Poise or Strength, so either pole can run any pet.
-# Every value PROVISIONAL (part 3b).
+# Every value PROVISIONAL.
 # ============================================================
 
 ## The hound's deck: the pack, and the grind. It harries from two sides, holds the quarry at bay,

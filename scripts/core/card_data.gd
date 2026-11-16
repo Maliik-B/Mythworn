@@ -1,7 +1,7 @@
 class_name CardData
 extends Resource
 ## Defines a single card's properties. Cards are composed of CardEffect arrays.
-## Create .tres files from this resource to define individual cards.
+## They are built in code, by CardPool, rather than saved as resource files.
 
 enum CardType { ATTACK, SKILL, POWER }
 enum CardRarity { STARTER, COMMON, UNCOMMON, RARE }
@@ -35,7 +35,7 @@ enum PersonalityType { PRIMARY, SECONDARY, NEUTRAL, NEGATIVE }
 ## "Retain"). The end-turn discard + its fly-to-pile animation both skip these.
 @export var retain: bool = false
 ## Memory ("Remembrance") cards: a league-of-their-own, character-specific card sourced
-## ONLY from memory events, bosses, and a shop relic -- never the normal reward pool. The
+## ONLY from memory events, bosses, and a shop relic; never the normal reward pool. The
 ## flag marks them for that gated sourcing (and future visual treatment); it carries no
 ## combat effect of its own. See CardPool.get_memory_card.
 @export var is_memory: bool = false
@@ -202,7 +202,7 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 	# The zone multiplier is folded into the damage brackets (the real post-zone number the
 	# hit will land for). No "[Zone Penalty/Bonus]" text tag: the zone is read VISUALLY from
 	# the card's school symbol + coin halo + the pole empower/grey treatment, which is the
-	# whole point of that icon work -- a text tag would just restate it and clutter the face.
+	# whole point of that icon work: a text tag would just restate it and clutter the face.
 	var zm := CombatEngine.zone_multiplier(personality)
 	for effect in get_active_effects():
 		var desc = effect.get_modified_description(source, target, zm)

@@ -1,12 +1,11 @@
 class_name RevealAnim
 ## Shared "reveal" motion for a single node/control: it enlarges in (scale up + fade), does
 ## a horizontal "swap" flip (at whose midpoint an optional callback swaps the node's face
-## in), then de-enlarges to rest. Used by the map-reveal flourish (map_scene) AND the dev
-## sandbox (scenes/dev/reveal_test_scene) so both play the exact same motion -- tune it here
-## once and both update. All timings are params so callers can dial the feel.
+## in), then de-enlarges to rest. Used by the map-reveal flourish (map_scene), so every
+## caller plays the exact same motion: tune it here once and they all update. All timings are params so callers can dial the feel.
 
 ## Play the reveal on `ctrl` after `delay` seconds, creating the tween on `host` (any Node in
-## the tree). `swap_cb` (optional) fires at the flip midpoint -- use it to change the node's
+## the tree). `swap_cb` (optional) fires at the flip midpoint; use it to change the node's
 ## visible face (e.g. swap a blank glyph in). Recognized `params` keys (all optional):
 ##   enlarge (peak scale), enlarge_t, swap_t (full flip), hold_t (at peak, after the flip),
 ##   deenlarge_t, start_scale, start_alpha, end_scale.

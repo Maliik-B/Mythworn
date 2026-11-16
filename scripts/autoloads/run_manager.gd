@@ -11,8 +11,8 @@ var perks: Array[PerkData] = []
 ## it, so "which two" means the same thing from the first node to the last. See ConsumableData.
 var consumables: Array[ConsumableData] = []
 ## The companion travelling with the player (PetPool id), or &"" for none. A source with its own
-## card pool: on a chance each player turn one of its cards arrives in hand
-## (CombatEngine._maybe_pet_arrival). One companion per run for now.
+## card pool: each player turn one of its cards arrives in hand
+## (CombatEngine._pet_arrival). One companion per run for now.
 var pet_id: StringName = &""
 var gold: int = 0
 var current_act: int = 0
@@ -80,7 +80,7 @@ var current_realm_id: StringName = &"camelot"
 var visited_realm_ids: Array[StringName] = []
 # The current realm's run-shape config (difficulty / economy / map knobs), set by the
 # realm-entry VN choice (Camelot: court vs common folk). Neutral by default; reset at run
-# start and re-set on entering each realm. See RealmConfig + docs/REALM_CAMELOT.md.
+# start and re-set on entering each realm. See RealmConfig.
 var realm_config := RealmConfig.new()
 
 # --- The crossing ---
@@ -700,7 +700,7 @@ func _clear_crossing() -> void:
 	_home_config = null
 
 
-# --- Realm configuration (A2) ---
+# --- Realm configuration ---
 
 ## Install a realm-shape config (from the realm-entry VN choice: Camelot court vs common
 ## folk). Sets the run's realm_config, queues its map_boon for the next map open, applies
@@ -741,7 +741,7 @@ func consume_map_boon() -> void:
 
 ## Grant a Fable liaison's run-start gift (the send-off boon, separate from realm_config).
 ## Bram (Records) leans info, Neve (Dispatch) leans supplies; each is a bespoke quest-pool
-## relic so it never appears in shops or reward rolls. See docs/REALM_CAMELOT.md § Run-start.
+## relic so it never appears in shops or reward rolls.
 func apply_liaison_gift(liaison: StringName) -> void:
 	var relic_name := ""
 	match liaison:
@@ -1040,7 +1040,7 @@ func _on_act_started_refresh_charges(_act_number: int) -> void:
 ## True if an equipped per-hit damage title is at its full tier, which is the only tier whose
 ## bonus escalates. The schema can give a tier a smaller number but not a different shape, so
 ## this one title's curve is gated in code; a degraded sword keeps a flat bonus at its own
-## value. See TITLE_DESIGN 5.12 and the rider-block note in 6.3.
+## value.
 func title_damage_bonus_escalates() -> bool:
 	for slot in range(TITLE_SLOT_COUNT):
 		var data := get_equipped_title(slot)
