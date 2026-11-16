@@ -2702,9 +2702,7 @@ func _stage_line_seconds(text: String) -> float:
 
 ## For a capture: breaks an enemy's bar through the engine's real path, wherever its HP stands.
 func trigger_boss_break(enemy) -> void:
-	var left: int = enemy.stats.current_hp
-	enemy.stats.current_hp = 0
-	combat_engine._on_damage_dealt(enemy.stats, left)
+	combat_engine.self_damage(enemy.stats, enemy.stats.current_hp)
 
 
 func _on_block_gained(target, amount: int) -> void:
