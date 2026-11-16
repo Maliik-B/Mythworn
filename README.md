@@ -110,7 +110,7 @@ godot --headless --path . res://tools/content_linter.tscn
 godot --headless --path . res://tools/combat_harness.tscn -- --verify
 ```
 
-`roster_test` takes a minute or two and ends on `ALL PASS`. The linter takes a few seconds and ends on `LINT CLEAN`. The harness takes about a minute, prints its count of comparisons and mismatches, and exits 1 while the two known mismatches stand. There is no CI yet: the checks are run by hand before each commit.
+`roster_test` takes a minute or two and ends on `ALL PASS`. The linter takes a few seconds and ends on `LINT CLEAN`. The harness takes about a minute, prints its count of comparisons and mismatches, marks the two known ones, and exits 0 unless a new one appears. There is no CI yet: the checks are run by hand before each commit.
 
 ## Licence
 
