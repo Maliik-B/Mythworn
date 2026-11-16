@@ -87,6 +87,11 @@ var _thurible_swing: int = 0
 ## _current_card like Blooded Edge, so a poison tick or a lash never spends it.
 var _blade_oil_pending: int = 0
 
+## True once this fight's loss has been announced. A lethal blow, a poison tick and the end-of-fight
+## check can each find the player dead, and the screen and the sound both answer combat_lost by
+## ending the run, so it is said once.
+var _loss_announced: bool = false
+
 ## A Champion's Favour (consumable): true while the favour is armed. The next blow that would
 ## land on the player after it is used does not, and the flag clears. Reset every combat.
 var _favour_ward: bool = false
@@ -159,6 +164,7 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 		enemies.append(enemy)
 
 	turn_number = 0
+	_loss_announced = false
 	# Blooded Edge: prime the first-attack bonus from the relic's tunable value (0 if unheld).
 	var blooded := RunManager.get_relic("Blooded Edge")
 	_blooded_edge_pending = blooded.value if blooded else 0
@@ -354,8 +360,7 @@ func start_player_turn() -> void:
 	tick_start_of_turn(player_stats)
 
 	if player_stats.is_dead():
-		phase = Phase.BATTLE_LOST
-		Events.combat_lost.emit()
+		_announce_loss()
 		return
 
 	_process_relics(RelicData.RelicTrigger.ON_TURN_START)
@@ -586,8 +591,7 @@ func start_enemy_turn() -> void:
 			break
 
 	if player_stats.is_dead():
-		phase = Phase.BATTLE_LOST
-		Events.combat_lost.emit()
+		_announce_loss()
 		return
 
 	check_battle_end()
@@ -1037,8 +1041,7 @@ func _on_damage_dealt(target: CombatantStats, amount: int) -> void:
 			Events.player_healed.emit(_girdle_hp, target.current_hp)
 			Events.combat_note.emit("The girdle holds, and nicks you.")
 		if target.is_dead():
-			phase = Phase.BATTLE_LOST
-			Events.combat_lost.emit()
+			_announce_loss()
 	else:
 		for enemy in enemies:
 			if enemy.stats == target:
@@ -1187,12 +1190,22 @@ static func zone_bonus_active(personality: CardData.PersonalityType) -> bool:
 
 # -- Battle End Check --
 
+## Marks the fight lost and says so, once. Every path that finds the player dead comes through
+## here, so a lethal blow that is then seen again by the poison tick or by check_battle_end does
+## not announce a second loss.
+func _announce_loss() -> void:
+	phase = Phase.BATTLE_LOST
+	if _loss_announced:
+		return
+	_loss_announced = true
+	Events.combat_lost.emit()
+
+
 func check_battle_end() -> void:
 	if player_stats.is_dead():
-		phase = Phase.BATTLE_LOST
 		_disconnect_whiplash()
 		_disconnect_mercy()
-		Events.combat_lost.emit()
+		_announce_loss()
 		return
 
 	var all_dead = true

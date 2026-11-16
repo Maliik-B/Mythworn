@@ -80,6 +80,7 @@ func _ready() -> void:
 	_test_boss_reward()
 	await _test_frozen_skips()
 	await _test_chilled_freeze()
+	await _test_combat_lost_once()
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
 	_test_whole_and_hollow()
@@ -2603,6 +2604,66 @@ func _test_swords_bearer_curve() -> void:
 	RunManager.equip_title(0, &"")
 	if not had:
 		RunManager.earned_title_ids.erase(&"swords_bearer")
+
+
+var _losses_seen := 0
+
+
+func _count_loss() -> void:
+	_losses_seen += 1
+
+
+## The screen answers combat_lost by ending the run and the sound answers it with a cue, so a
+## fight's loss must be announced once however many paths find the player dead: the lethal blow,
+## the poison tick at the start of a turn, a cost the player paid themselves, and the end-of-fight
+## check that follows each of them.
+func _test_combat_lost_once() -> void:
+	Events.combat_lost.connect(_count_loss)
+
+	# A lethal hit from an enemy, then the enemy turn's own check, then check_battle_end.
+	_losses_seen = 0
+	var heng := CombatEngine.new()
+	heng.instant = true
+	add_child(heng)
+	heng.start_combat([], 5, 50, [_dummy_attacker()])
+	await heng.start_enemy_turn()
+	heng.check_battle_end()
+	_check("a lethal hit from an enemy emits combat_lost once",
+		heng.phase == CombatEngine.Phase.BATTLE_LOST and _losses_seen == 1)
+	heng.free()
+
+	# A lethal poison tick as the player's turn begins.
+	_losses_seen = 0
+	var peng := CombatEngine.new()
+	add_child(peng)
+	peng.start_combat([], 10, 50, [_dummy_attacker()])
+	peng.apply_status_effect(peng.player_stats, StatusEffects.POISON, 20)
+	peng.start_player_turn()
+	peng.check_battle_end()
+	_check("a lethal poison tick emits combat_lost once",
+		peng.phase == CombatEngine.Phase.BATTLE_LOST and _losses_seen == 1)
+	peng.free()
+
+	# A lethal cost the player pays themselves, then the check a card play ends with.
+	_losses_seen = 0
+	var seng := CombatEngine.new()
+	add_child(seng)
+	seng.start_combat([], 10, 50, [_dummy_attacker()])
+	seng.self_damage(seng.player_stats, 999)
+	seng.check_battle_end()
+	_check("a lethal self-cost emits combat_lost once",
+		seng.phase == CombatEngine.Phase.BATTLE_LOST and _losses_seen == 1)
+
+	# The same engine fighting again announces its next loss, so the guard is per fight.
+	seng.start_combat([], 10, 50, [_dummy_attacker()])
+	seng.self_damage(seng.player_stats, 999)
+	seng.check_battle_end()
+	_check("a second fight on the same engine announces its own loss once",
+		_losses_seen == 2)
+	seng.free()
+
+	Events.combat_lost.disconnect(_count_loss)
+
 
 func _test_cooldown() -> void:
 	# Hollow Blow has cooldown 2: it must not fire on consecutive enemy turns.
