@@ -1,12 +1,10 @@
 extends Node
 ## Manages the lifecycle of a single run.
-## Owns all persistent run state: deck, relics, equipment, gold, passion, act progression.
+## Owns all persistent run state: deck, relics, gold, passion, act progression.
 
 var current_character: CharacterData
 var current_deck: Array[CardData] = []
 var relics: Array[RelicData] = []
-var equipment: Dictionary = {} # EquipmentData.EquipmentSlot -> EquipmentData (deprecated, see Titles)
-var perks: Array[PerkData] = []
 ## Held consumables: the fourth power layer. A hard cap of CONSUMABLE_SLOTS, and no relic widens
 ## it, so "which two" means the same thing from the first node to the last. See ConsumableData.
 var consumables: Array[ConsumableData] = []
@@ -248,8 +246,6 @@ func start_run(character: CharacterData, seed_value: int = -1, starting_realm: S
 	current_act = 1
 	gold = 50  # base starting purse so the first shop isn't empty-handed
 	relics.clear()
-	equipment.clear()
-	perks.clear()
 	consumables.clear()
 	pet_id = &""
 	run_active = true
@@ -466,12 +462,6 @@ func wake_relic_by_name(dormant_name: String) -> RelicData:
 		Events.relic_acquired.emit(woken)
 		return woken
 	return null
-
-
-func equip(item: EquipmentData) -> void:
-	var old = equipment.get(item.slot)
-	equipment[item.slot] = item
-	Events.equipment_changed.emit(item.slot, old, item)
 
 
 func take_damage(amount: int) -> void:

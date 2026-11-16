@@ -66,12 +66,8 @@ signal run_ended(victory: bool)
 signal act_started(act_number: int)
 signal act_ended(act_number: int)
 
-# -- Perk events --
-signal perk_selected(perk: PerkData)
-
 # -- Item events --
 signal relic_acquired(relic: RelicData)
-signal equipment_changed(slot, old_equipment, new_equipment)
 
 # -- Title events --
 ## Emitted when the player earns a new title (added to earned list).
