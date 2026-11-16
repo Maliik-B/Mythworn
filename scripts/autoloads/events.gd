@@ -44,21 +44,11 @@ signal passion_tier_changed(old_tier: int, new_tier: int)
 signal status_applied(target, effect: StatusEffectData, stacks: int)
 signal status_removed(target, effect: StatusEffectData)
 
-# -- Navigation events --
-signal map_node_selected(node_data)
-signal scene_transition_requested(scene_path: String)
-
-# -- Story / VN events --
-signal vn_choice_made(choice_data)
-
 # -- Realm events --
 signal realm_configured(realm_data)
 ## Emitted when the player's current realm changes (act transitions, realm switching).
 ## Nothing connects to it yet.
 signal realm_changed(previous_realm_id: StringName, new_realm_id: StringName)
-## Emitted when the player switches between staying in or leaving a realm post-boss.
-## Reserved for Phase C (realm switching UX implementation).
-signal realm_left(realm_id: StringName)
 
 # -- Run lifecycle events --
 signal run_started(character: CharacterData)
@@ -123,11 +113,6 @@ signal be_the_king_scored(score: float, tier: int)
 ## run; modifier hooks across reward / shop / combat / map all read it via
 ## RunManager helpers.
 signal philosophy_chosen(philosophy_id: StringName, strength_tier: int)
-
-## Emitted when a crowned player gives up the throne at an Act 2/3 transition.
-## fork is one of AbdicationFork.{QUIET, FORCED, FALLEN} resolved from the
-## philosophy × realm_standing matrix in the abdication scene.
-signal abdicated(realm_id: StringName, fork: int)
 
 ## Emitted when the per-realm standing dial moves. Negative deltas are
 ## betrayals; positive deltas are loyalty acts. Content gating (hostile
