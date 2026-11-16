@@ -727,43 +727,12 @@ func _build_emo_hybrid() -> CharacterData:
 	return CharacterPool.build_emo_hybrid()
 
 
-# -- card / effect factories --
-
-func _mk(card_name: String, cost: int, type: CardData.CardType,
-		target: CardData.TargetType, effects: Array) -> CardData:
-	var c := CardData.new()
-	c.card_name = card_name
-	c.energy_cost = cost
-	c.card_type = type
-	c.target_type = target
-	for e in effects:
-		c.effects.append(e)
-	return c
-
+# -- effect factory --
 
 func _dmg(v: int, hits: int = 1) -> DamageEffect:
 	var e := DamageEffect.new()
 	e.value = v
 	e.hits = hits
-	return e
-
-
-func _block(v: int) -> BlockEffect:
-	var e := BlockEffect.new()
-	e.value = v
-	return e
-
-
-func _status(effect: StatusEffectData, stacks: int) -> StatusApplyEffect:
-	var e := StatusApplyEffect.new()
-	e.status_effect = effect
-	e.value = stacks
-	return e
-
-
-func _passion(v: int) -> PassionEffect:
-	var e := PassionEffect.new()
-	e.value = v
 	return e
 
 
