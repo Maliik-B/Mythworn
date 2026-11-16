@@ -181,10 +181,9 @@ Two are gaps in behaviour.
 - **A card's number leaves out flat bonuses.** The card face prints Strength, Weak, the Passion multiplier and Vulnerable, but not what a title or a relic adds to each hit, so a hit can land higher than the card says.
 - **The court's elites are added after the cap** on elites along a route, as The map describes.
 
-The rest are small.
+One more is small.
 
 - `Events` declares more than the game uses. More than a third of its signals are emitted and have no listener yet.
-- `tools/combat_sim.py` is an older Python model of combat. The in-engine harness replaced it, and it has not kept up.
 
 ## Why Godot
 

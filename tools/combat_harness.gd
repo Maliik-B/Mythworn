@@ -1,7 +1,7 @@
 extends Node
-## Instrumented combat balance harness, the drift-proof companion to combat_sim.py.
+## Instrumented combat balance harness, drift-proof because it runs the game's own rules.
 ##
-## Unlike the Python model, this drives the REAL CombatEngine over the REAL EnemyPool
+## It drives the REAL CombatEngine over the REAL EnemyPool
 ## and CardPool with the shared "decent player" policy (tools/harness_combat.gd), so its
 ## numbers cannot drift from the shipped rules. The engine's instant flag skips the
 ## enemy-turn pacing timers so thousands of trials run in seconds instead of real minutes.
