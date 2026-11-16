@@ -1179,23 +1179,18 @@ func _connect_events() -> void:
 # ============================================================
 
 func _start_combat() -> void:
-	# If no run is active, start a test run (direct scene launch for debugging)
-	if not RunManager.run_active:
-		var character = _create_test_character()
-		RunManager.start_run(character)
+	# A fight is entered from the map or an event, which set the run and the encounter first.
+	if not RunManager.run_active or RunManager.pending_enemies.is_empty():
+		push_error("The combat screen was opened with no run or no encounter; enter a fight from the map.")
+		return
 
 	combat_engine = CombatEngine.new()
 	combat_engine.name = "CombatEngine"
 	add_child(combat_engine)
 	consumable_bar.engine = combat_engine
 
-	# Use pending enemies from map, or fall back to test enemies
-	var enemy_datas: Array[EnemyData] = []
-	if RunManager.pending_enemies.size() > 0:
-		enemy_datas = RunManager.pending_enemies.duplicate()
-		RunManager.pending_enemies.clear()
-	else:
-		enemy_datas = [_create_slime(), _create_goblin()]
+	var enemy_datas: Array[EnemyData] = RunManager.pending_enemies.duplicate()
+	RunManager.pending_enemies.clear()
 
 	combat_engine.start_combat(
 		RunManager.current_deck,
@@ -1204,148 +1199,6 @@ func _start_combat() -> void:
 		enemy_datas
 	)
 	_log("[color=gold]Combat begins![/color]")
-
-
-func _create_test_character() -> CharacterData:
-	var c = CharacterData.new()
-	c.character_name = "Emo Hybrid Caster"
-	c.max_health = 80
-	c.passion_volatility = 1.0
-	c.passion_thresholds.assign([50, 18, -18, -50])
-	c.primary_personality = "Water"
-	c.secondary_personality = "Physical"
-
-	var strike = _make_card("Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_make_damage(6)])
-	var defend = _make_card("Defend", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, [_make_block(5)])
-	var bash = _make_card("Stagger", 2, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_make_damage(8), _make_status(StatusEffects.VULNERABLE, 2)])
-	var noxious = _make_card("Noxious Strike", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_make_damage(4), _make_status(StatusEffects.POISON, 3)])
-	var flame_strike = _make_card("Outpouring", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.SINGLE_ENEMY, [_make_damage(9), _make_passion(3)])
-	flame_strike.personality = CardData.PersonalityType.PRIMARY
-	flame_strike.flavor_text = "He lets it pour out of him. For a moment, the ache goes with it."
-	var meditate = _make_card("Meditate", 1, CardData.CardType.SKILL,
-		CardData.TargetType.SELF, [_make_block(4), _make_passion(3)])
-
-	for i in 2:
-		c.starting_deck.append(strike)
-	for i in 2:
-		c.starting_deck.append(defend)
-	var cleave = _make_card("Wide Arc", 1, CardData.CardType.ATTACK,
-		CardData.TargetType.ALL_ENEMIES, [_make_damage(6)])
-	c.starting_deck.append(bash)
-	c.starting_deck.append(noxious)
-	c.starting_deck.append(cleave)
-	c.starting_deck.append(flame_strike)
-	c.starting_deck.append(meditate)
-
-	# Personality card pools for tier-based rewards
-	c.primary_cards = CardPool.build_emo_primary_pool()
-	c.secondary_cards = CardPool.build_emo_secondary_pool()
-
-	return c
-
-
-func _create_slime() -> EnemyData:
-	var e = EnemyData.new()
-	e.enemy_name = "Slime"
-	e.max_health = 42
-
-	var tackle = EnemyMove.new()
-	tackle.move_name = "Tackle"
-	tackle.intent_type = EnemyMove.IntentType.ATTACK
-	tackle.effects.assign([_make_damage(6)])
-	tackle.weight = 2.0
-
-	var harden = EnemyMove.new()
-	harden.move_name = "Harden"
-	harden.intent_type = EnemyMove.IntentType.DEFEND
-	harden.effects.assign([_make_block(5)])
-	harden.weight = 1.0
-
-	var slam = EnemyMove.new()
-	slam.move_name = "Slam"
-	slam.intent_type = EnemyMove.IntentType.ATTACK
-	slam.effects.assign([_make_damage(12)])
-	slam.weight = 0.5
-
-	var spit = EnemyMove.new()
-	spit.move_name = "Spit"
-	spit.intent_type = EnemyMove.IntentType.DEBUFF
-	spit.effects.assign([_make_status(StatusEffects.WEAK, 1)])
-	spit.weight = 1.0
-
-	e.moves.assign([tackle, harden, slam, spit])
-	return e
-
-
-func _create_goblin() -> EnemyData:
-	var e = EnemyData.new()
-	e.enemy_name = "Goblin"
-	e.max_health = 26
-
-	var stab = EnemyMove.new()
-	stab.move_name = "Stab"
-	stab.intent_type = EnemyMove.IntentType.ATTACK
-	stab.effects.assign([_make_damage(4)])
-	stab.weight = 2.0
-
-	var slash = EnemyMove.new()
-	slash.move_name = "Slash"
-	slash.intent_type = EnemyMove.IntentType.ATTACK
-	slash.effects.assign([_make_damage(8)])
-	slash.weight = 1.0
-
-	var poison_dart = EnemyMove.new()
-	poison_dart.move_name = "Poison Dart"
-	poison_dart.intent_type = EnemyMove.IntentType.ATTACK
-	poison_dart.effects.assign([_make_damage(2), _make_status(StatusEffects.POISON, 2)])
-	poison_dart.weight = 0.7
-
-	e.moves.assign([stab, slash, poison_dart])
-	return e
-
-
-# -- Factory helpers --
-
-func _make_card(card_name: String, cost: int, type: CardData.CardType,
-		target: CardData.TargetType, card_effects: Array) -> CardData:
-	var c = CardData.new()
-	c.card_name = card_name
-	c.energy_cost = cost
-	c.card_type = type
-	c.target_type = target
-	for e in card_effects:
-		c.effects.append(e)
-	return c
-
-
-func _make_damage(amount: int) -> DamageEffect:
-	var e = DamageEffect.new()
-	e.value = amount
-	return e
-
-
-func _make_block(amount: int) -> BlockEffect:
-	var e = BlockEffect.new()
-	e.value = amount
-	return e
-
-
-func _make_status(effect: StatusEffectData, stacks: int) -> StatusApplyEffect:
-	var e = StatusApplyEffect.new()
-	e.status_effect = effect
-	e.value = stacks
-	return e
-
-
-func _make_passion(amount: int) -> PassionEffect:
-	var e = PassionEffect.new()
-	e.value = amount
-	return e
 
 
 func _get_personality_label(pers: CardData.PersonalityType) -> String:
