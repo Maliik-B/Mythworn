@@ -177,9 +177,11 @@ func _build_ui() -> void:
 	_abandon_btn.pressed.connect(_on_abandon)
 	_main_buttons_container.add_child(_abandon_btn)
 
-	var quit_btn = _create_button("Quit to Desktop", 18)
-	quit_btn.pressed.connect(_on_quit)
-	_main_buttons_container.add_child(quit_btn)
+	# A page in a browser has no desktop to quit to, and quit() there does nothing, so it has no button.
+	if not OS.has_feature("web"):
+		var quit_btn = _create_button("Quit to Desktop", 18)
+		quit_btn.pressed.connect(_on_quit)
+		_main_buttons_container.add_child(quit_btn)
 
 	# ---- Confirm abandon container (hidden by default) ----
 	_confirm_container = VBoxContainer.new()
