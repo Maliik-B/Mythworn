@@ -44,6 +44,7 @@ const COLD_LAYERS: Array = [
 ]
 const COLD_GROUND_FROM := 178  # the row the flat snow starts on, under the ground layer's own strip
 const COLD_GROUND := Color(0.93, 0.94, 0.94)
+const COLD_SKY := Color(0.80, 0.85, 0.89)  # the plain cold side's sky, for a copy without the pack
 const COLD_PIXEL := 5
 const SUN_AT := Vector2(915, 105)  # the sun like the moon, flat, over the first layer
 const SUN_RADIUS := 13
@@ -399,8 +400,9 @@ func _cold_look(look: Dictionary) -> Dictionary:
 func _build_cold_ground() -> void:
 	var picture: Image = null
 	for i in COLD_LAYERS.size():
-		var layer: Texture2D = load(COLD_DIR + COLD_LAYERS[i][0])
-		var image: Image = layer.get_image()
+		var image := _cold_layer(COLD_LAYERS[i][0])
+		if image == null:
+			continue
 		image.convert(Image.FORMAT_RGBA8)
 		if picture == null:
 			picture = image
@@ -410,6 +412,9 @@ func _build_cold_ground() -> void:
 			var rows := picture.get_height() - COLD_MAP_GROUND_FROM
 			picture.fill_rect(Rect2i(0, COLD_MAP_GROUND_FROM, picture.get_width(), rows), COLD_GROUND)
 		picture.blend_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i(0, -COLD_MAP_LIFTS[i]))
+	if picture == null:
+		push_warning("CrossingStage: the snowy mountain layers are not in this copy, so the cold side is drawn plain.")
+		picture = _plain_cold_picture()
 	_cold_rect = TextureRect.new()
 	_cold_rect.texture = SetPiece.pixel_texture(picture, COLD_PIXEL)
 	_cold_rect.size = SetPiece.VIEW
@@ -660,11 +665,12 @@ func _build_far_side() -> SetPiece:
 	far.visible = false
 	_scene.add_child(far)
 	for i in COLD_LAYERS.size():
-		var layer: Texture2D = load(COLD_DIR + COLD_LAYERS[i][0])
+		var image := _cold_layer(COLD_LAYERS[i][0])
 		var lifted := Vector2(0.0, -COLD_LAYERS[i][1] * COLD_PIXEL)
 		if i == COLD_LAYERS.size() - 1:
 			_add_cold_ground(far)
-		far.add_figure(SetPiece.pixel_texture(layer.get_image(), COLD_PIXEL), lifted)
+		if image != null:
+			far.add_figure(SetPiece.pixel_texture(image, COLD_PIXEL), lifted)
 		if i == 0:
 			far.add_figure(SetPiece.pixel_texture(_sun_image(), COLD_PIXEL), SUN_AT)
 	var snow := _make_snow(FAR_AMOUNT, FAR_LIFETIME, FAR_SPEED, FAR_SCALE)
@@ -683,6 +689,27 @@ func _add_cold_ground(far: SetPiece) -> void:
 	ground.size = Vector2(SetPiece.VIEW.x, SetPiece.VIEW.y - ground.position.y)
 	ground.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	far.world.add_child(ground)
+
+
+## One of the pack's layers, or null when this copy has none. Their licence keeps the layers out of
+## the repository (they ship only inside built games), so a copy run from source draws the cold side
+## plain rather than failing.
+static func _cold_layer(file: String) -> Image:
+	var path := COLD_DIR + file
+	if not ResourceLoader.exists(path):
+		return null
+	return (load(path) as Texture2D).get_image()
+
+
+## The cold side without the pack: a pale sky with the sun, and the flat snow from the ground's row.
+func _plain_cold_picture() -> Image:
+	var size := Vector2i(SetPiece.VIEW / COLD_PIXEL)
+	var picture := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+	picture.fill(COLD_SKY)
+	picture.blend_rect(_sun_image(), Rect2i(Vector2i.ZERO, _sun_image().get_size()), Vector2i(SUN_AT / COLD_PIXEL))
+	var rows := picture.get_height() - COLD_MAP_GROUND_FROM
+	picture.fill_rect(Rect2i(0, COLD_MAP_GROUND_FROM, picture.get_width(), rows), COLD_GROUND)
+	return picture
 
 
 func _sun_image() -> Image:

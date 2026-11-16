@@ -4774,6 +4774,9 @@ func _test_crossing_stage() -> void:
 		and picked.quest_giver_id == &"" and picked.scripted_event_id == &"")
 	_check("it holds the map while it plays", scene._pledge_anim_active)
 	_check("the other map waits for the step", crossing._cold_mat.get_shader_parameter("reach") == 0.0)
+	var sky := CrossingStage._cold_layer(CrossingStage.COLD_LAYERS[0][0])
+	_check("a copy without the pack's layers draws the cold side plain, at the layers' size",
+		sky == null or crossing._plain_cold_picture().get_size() == sky.get_size())
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check("it adds nothing to the legend", _legend_words(scene) == legend_before)
@@ -4804,8 +4807,13 @@ func _test_crossing_stage() -> void:
 		worded = worded or prop is Label
 	_check("nothing on the stage carries a word", not worded)
 	_check("nothing is left to say where you were", crossing._header != null)
-	for layer in CrossingStage.COLD_LAYERS:
-		_check("the other map's layer exists: %s" % layer[0], ResourceLoader.exists(CrossingStage.COLD_DIR + layer[0]))
+	# A clone of the repository has no layer folder at all (the pack's licence keeps the layers out of
+	# it); where the folder is, every layer has to be in it.
+	if DirAccess.dir_exists_absolute(CrossingStage.COLD_DIR):
+		for layer in CrossingStage.COLD_LAYERS:
+			_check("the other map's layer exists: %s" % layer[0], ResourceLoader.exists(CrossingStage.COLD_DIR + layer[0]))
+	else:
+		print("  NOTE the pack's layers are not in this copy, so the other map was drawn plain")
 
 	crossing.close()
 	await get_tree().process_frame
