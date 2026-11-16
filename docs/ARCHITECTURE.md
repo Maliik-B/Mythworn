@@ -184,7 +184,6 @@ Two are gaps in behaviour.
 The rest are small.
 
 - `Events` declares more than the game uses. About half of its signals have no listener, and a few are never emitted.
-- `scripts/core/reveal_anim.gd` is an animation helper filed with the rules. It belongs in `scripts/ui/`.
 - `EquipmentData` and `PerkData` are stubs from an earlier design. Titles replaced equipment.
 - `tools/combat_sim.py` is an older Python model of combat. The in-engine harness replaced it, and it has not kept up.
 
