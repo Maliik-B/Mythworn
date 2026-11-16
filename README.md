@@ -2,15 +2,14 @@
 
 **A narrative roguelike deckbuilder where your Passion, not your morality, decides who you become.**
 
+![One turn of a fight: an attack dragged onto a man-at-arms carries Passion into Blazing, a second attack lands, End Turn, the two foes act, and a new hand is dealt](screenshots/turn.gif)\
+*One turn from a set-up fight: Passion starts at 47 and the hand is chosen. The first card carries the player's Passion into Blazing, and the numbers on the other attacks change with it.*
+
 Camelot has no king, and the devices are fading from its shields. You play a keeper, sent in to preserve what is left. The cards you play move your Passion toward one of the keeper's two selves, and the self you lean into decides which cards hit harder and which you are offered next.
 
-Mythworn is in development at [Oddseed Games](https://oddseedgames.com), a one-person studio, and is built in Godot 4.4 and GDScript. There is no download yet. For now it can only be run from its code, in the Godot editor, as [Run it](#run-it) describes.
+Mythworn is made by me, Maliik Bryan, at [Oddseed Games](https://oddseedgames.com), a one-person studio, in Godot 4.4 and GDScript. The design and the writing are mine, and so is the code, which I build with AI coding tools and check with the tools described under [Engineering](#engineering). There is no download yet. For now it can only be run from its code, in the Godot editor, as [Run it](#run-it) describes.
 
 Follow the game at [mythworn.com](https://mythworn.com) or on [Discord](https://discord.gg/cyk9Q74pYn). How it is built: [the architecture notes](docs/ARCHITECTURE.md).
-
-![Excalibur, drawn from the stone](screenshots/excalibur.png)
-
-*The Sword in the Stone waits at the centre of every Camelot map. Draw it or leave it: the run remembers either.*
 
 ## The game
 
@@ -21,11 +20,21 @@ A run in the current build is one act of Camelot.
 - **Combat.** It is turn-based card play: three energy, a hand of five, and enemies that show what they intend to do.
 - **The story.** Between fights it is written by hand: events that remember what you chose earlier, a questline that crosses the map, and relics that have lost their names until a place that keeps records reads them back.
 
+![Excalibur drawn from the stone, its guardian lying beaten at the foot](screenshots/excalibur.png)\
+*The Sword in the Stone waits at the centre of every Camelot map. Draw it or leave it: the run remembers either.*
+
 ## Engineering
 
 In plain terms: the same starting number, called a seed, always produces the same map and the same encounters, so a result can be reproduced and two versions of the code can be compared. Every change is checked by more than 700 automated tests. A separate checker catches content that points at something that does not exist. More than a quarter of the code in this repository is this testing and checking code.
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) covers the structure, what each decision cost and what is still rough.
+
+### Four files to open first
+
+- [scripts/autoloads/rng_manager.gd](scripts/autoloads/rng_manager.gd): the streams, 57 lines
+- [scripts/core/combat_engine.gd](scripts/core/combat_engine.gd): the rules of a fight
+- [tools/content_linter.gd](tools/content_linter.gd): the rules and their self-test
+- [tools/harness_combat.gd](tools/harness_combat.gd): the planner and its forward model
 
 ### Deterministic runs
 
@@ -47,13 +56,6 @@ Content names other content by id: an event awards a title, a quest names its pa
 
 `tools/roster_test` makes more than 700 assertions against the enemies, cards, relics, titles and maps the game itself builds, with no screen loaded.
 
-### Four files to open first
-
-- [scripts/autoloads/rng_manager.gd](scripts/autoloads/rng_manager.gd): the streams, 57 lines
-- [scripts/core/combat_engine.gd](scripts/core/combat_engine.gd): the rules of a fight
-- [tools/content_linter.gd](tools/content_linter.gd): the rules and their self-test
-- [tools/harness_combat.gd](tools/harness_combat.gd): the planner and its forward model
-
 ## Design
 
 ### Passion, not morality
@@ -65,6 +67,9 @@ Five tiers sit along it: Hollow, Wavering, Steady, Inspired and Blazing. Two thi
 - **Damage.** Attacks from the self you lean into hit harder, by 12% at a leaning tier and 25% at an extreme, and attacks from the other self hit softer by the same amount.
 - **Rewards.** The cards you are offered come from that self's pool: two of three at an extreme, one of three at a leaning tier, none at Steady.
 
+![A hand of four attacks as Passion moves from Steady up to Blazing and down to Hollow; every number changes at each tier](screenshots/passion_tiers.gif)\
+*A chosen hand stepped through each tier. Tidal Strike (Water) grows as the player's Passion climbs toward Blazing, Rampage and Devastating Blow (Physical) as it falls toward Hollow, and Everything I Carried Out either way.*
+
 ### Two selves, one deck
 
 Each keeper has two card pools, one for each self, and shares a generic pool. Neither self is the good one. Each stands for some good and some bad in the keeper. Because Passion decides what you are offered, the deck you finish with is a record of who you were for most of the run.
@@ -72,6 +77,9 @@ Each keeper has two card pools, one for each self, and shares a generic pool. Ne
 ### A realm set before you walk it
 
 A realm's state is decided in a short story scene before its map exists. In Camelot that is the pledge. It produces one `RealmConfig` (enemy strength, the count of elites, shop prices, reward rarity, a starting boon, a Passion shift and your standing with court and folk), which shapes the map and which fights, shops and events read for the rest of the act.
+
+![The Camelot map just after the pledge, two of its nodes ringed where fights have become elites](screenshots/pledge_map.png)\
+*Standing with the court: two fights on the map become elites before the player's first step.*
 
 ### Titles instead of equipment
 
@@ -82,6 +90,9 @@ There is no equipment. A keeper wears up to two titles, and each is earned by so
 The game is in development. This repository holds the demo slice: one act of Camelot and one keeper, playable from the title screen to Sir Caedmon. It has about 60 cards, more than 40 relics, 20 enemies, 11 titles, 11 consumables, three companions, and 11 written events beside the questline and set-piece scenes.
 
 The numbers have not had their balance pass. The sprites and the sound are stand-ins: CC0 art put through the bake tools in `tools/`, and synthesised placeholder audio.
+
+![Sir Caedmon's first health bar breaks: he falls, begs, and gets up again](screenshots/caedmon_break.gif)\
+*Break Sir Caedmon's first bar and he begs. Then he gets up anyway.*
 
 ## Run it
 
