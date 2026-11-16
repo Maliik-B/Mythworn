@@ -154,7 +154,7 @@ There is no CI yet. The checks are scenes in `tools/` that run headless, and the
 | `combat_harness` | Single fights on the real engine with a planning player. | Two known 3 HP mismatches in its model ([below](#the-planner-and-its-forward-model)). |
 | `run_harness` | Whole runs: a fixed act of 16 nodes, real encounters, the real engine, real card drafts. Paired sweeps measure what a companion, a relic or a title adds on the same seeds. | Its fights are the game's. Its events are not ([What is rough](#what-is-rough)). |
 | `gamebreak_hunt` | A search for degenerate builds. It hill-climbs from random starts over cards, relics, titles, held items and companions, and scores each build on its damage to a dummy with 1,000,000 HP. | It flags a turn that outdamages the boss's first bar, plays more than 25 cards or ends with more than 12 energy. |
-| `realm_route_proof` | Same-seed output to diff between two commits: each map, and the encounters and events along a route through it, for 40 seeds under three realm configurations. It plays no fight and takes no reward, so it does not exercise the deck or loot streams. | Its pledge numbers have drifted ([What is rough](#what-is-rough)). |
+| `realm_route_proof` | Same-seed output to diff between two commits: each map, and the encounters and events along a route through it, for 40 seeds under three realm configurations. It plays no fight and takes no reward, so it does not exercise the deck or loot streams. | It reads the two pledges from the realm-entry scene, so a change to a pledge's numbers moves its output. |
 | `crossing_walk` | A walk through the real scenes from one realm's map to another's and back. | The crossing it tests is switched off in the game. |
 
 Two more are for looking, not asserting: `card_manifest` shows every card face on one screen with a Passion toggle, and `map_path_analysis` prints how much the routes up a map differ. `bake_sheet.py` and `bake_prop.py` are the art bakes, which put a sprite sheet or a rendered prop through one value ramp, outline and rim light so packs by different artists look like one set.
@@ -184,7 +184,6 @@ Two are gaps in behaviour.
 The rest are small.
 
 - `Events` declares more than the game uses. About half of its signals have no listener, and a few are never emitted.
-- `tools/realm_route_proof` keeps its own copies of the two pledges' numbers, and they have drifted from the game's. It should read the configurations the game builds.
 - `scripts/core/reveal_anim.gd` is an animation helper filed with the rules. It belongs in `scripts/ui/`.
 - `EquipmentData` and `PerkData` are stubs from an earlier design. Titles replaced equipment.
 - `tools/combat_sim.py` is an older Python model of combat. The in-engine harness replaced it, and it has not kept up.

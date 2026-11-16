@@ -11,11 +11,6 @@ extends Node
 ## `-- --seeds=N` runs the first N seeds, whose output is a prefix of a longer run's.
 
 const SEEDS := 40
-const PLEDGES := [
-	["neutral", 1.0, 1.0, false],
-	["court", 1.15, 1.4, false],
-	["folk", 0.9, 1.0, true],
-]
 
 
 func _ready() -> void:
@@ -26,8 +21,16 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--seeds="):
 			seeds = int(arg.substr(8))
+	# The pledges are the two choices the realm-entry scene offers, so the proof walks the
+	# configurations the game applies; neutral is the run's own default.
+	var entry := VNPool.build_camelot_entry()
+	var pledges := [
+		["neutral", null],
+		["court", entry.choices[0].config],
+		["folk", entry.choices[1].config],
+	]
 	for s in seeds:
-		for pledge in PLEDGES:
+		for pledge in pledges:
 			_prove(character, 7000 + s * 13, pledge)
 	print("== done ==")
 	get_tree().quit()
@@ -35,12 +38,11 @@ func _ready() -> void:
 
 func _prove(character: CharacterData, run_seed: int, pledge: Array) -> void:
 	RunManager.start_run(character, run_seed)
-	var mult: float = pledge[1]
-	RunManager.realm_config.enemy_difficulty_mult = mult
-	RunManager.realm_config.elite_frequency_mult = pledge[2]
-	RunManager.realm_config.elite_weaken = pledge[3]
+	RunManager.apply_realm_config(pledge[1])
+	var config := RunManager.realm_config
+	var mult := config.enemy_difficulty_mult
 	var map := MapGenerator.generate(RngManager.map_rng, RunManager.current_realm_id,
-		RunManager.current_act, pledge[2], pledge[3])
+		RunManager.current_act, config.elite_frequency_mult, config.elite_weaken)
 	RunManager.current_map = map
 	print("# seed %d pledge %s" % [run_seed, pledge[0]])
 
