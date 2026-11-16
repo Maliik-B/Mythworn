@@ -108,6 +108,7 @@ const END_TURN_H := 266.0
 const TARGET_LIT_BODY := Color(1.16, 1.13, 1.06)
 const TARGET_LIGHT_FADE := 0.08
 const DRAG_CARD_CLEARANCE := 8.0
+const DRAG_HINT_GAP := 12.0
 const DOUBLE_CLICK_GUARD_MS := 250
 const CARD_FLIGHT := 0.14
 const END_TURN_W := 140.0
@@ -486,7 +487,7 @@ func _input(event: InputEvent) -> void:
 		_drag_panel.global_position = _drag_card_pos(event.global_position)
 		_update_drag_target_highlight(event.global_position)
 		if _drag_hint:
-			_drag_hint.global_position = event.global_position + Vector2(20, 16)
+			_drag_hint.global_position = _drag_hint_pos()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		_complete_drag(event.global_position)
@@ -1435,6 +1436,7 @@ func _start_drag(card: CardData, event: InputEvent) -> void:
 	_drag_hint.z_index = 41
 	_drag_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_drag_hint)
+	_drag_hint.global_position = _drag_hint_pos()
 
 
 func _complete_drag(drop_pos: Vector2) -> void:
@@ -1468,6 +1470,20 @@ func _clear_drag_visuals() -> void:
 	if _drag_hint:
 		_drag_hint.queue_free()
 		_drag_hint = null
+
+
+## Where the cancel hint sits: beside the dragged card, on the right unless that runs off the screen,
+## in the strip just under the enemies, the highest the card ever rides, so it clears the card's
+## words and the cards still in the hand. The card is held under the cursor, so a hint that followed
+## the cursor sat on the card's own words.
+func _drag_hint_pos() -> Vector2:
+	var half: Vector2 = _drag_panel.size * _drag_panel.scale / 2.0
+	var middle: Vector2 = _drag_panel.global_position + _drag_panel.pivot_offset
+	var hint_size: Vector2 = _drag_hint.get_minimum_size()
+	var x := middle.x + half.x + DRAG_HINT_GAP
+	if x + hint_size.x > get_viewport_rect().size.x:
+		x = middle.x - half.x - DRAG_HINT_GAP - hint_size.x
+	return Vector2(x, _enemies_bottom() + DRAG_CARD_CLEARANCE)
 
 
 ## The dragged card follows the cursor but stops short of the enemies, so it never covers the
