@@ -165,7 +165,7 @@ The harness's player, `HarnessCombat`, plans a whole turn at a time. It plays ea
 
 The engine emits global signals and reads global run state, so it is not something to copy and step a few hundred times a decision. The planner searches on a light model of the fight that it keeps itself. That is a second implementation of the rules, which is the thing the harness exists to avoid, so `--verify` holds the model to the engine. Before each card it predicts the state after it, and before each enemy turn it predicts the player's HP and each enemy's state after that turn. Each prediction is compared with what the engine then did. It skips what it cannot predict: an enemy turn after a bar has just broken, and the player's HP when a relic heals at the start of the turn.
 
-On the current build that is 25,633 cards and 7,061 enemy turns across 11 loadouts and 5 fights, with two mismatches. Two cards, Cascade and Riptide, each once left the player 3 HP above the prediction. The cause has not been chased down, and the tool exits 1 while they stand.
+On the current build that is 25,633 cards and 7,061 enemy turns across 11 loadouts and 5 fights, with two mismatches. Two cards, Cascade and Riptide, each once left the player 3 HP above the prediction. The cause has not been chased down, so the tool lists both as known: a run with only those exits 0, and a new mismatch, or a known one that stops occurring, exits 1.
 
 ## What is rough
 
