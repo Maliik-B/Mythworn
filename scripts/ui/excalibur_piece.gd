@@ -40,7 +40,7 @@ const CHAMPION := {
 	"cell": Vector2i(184, 137),
 	"scale": 6,
 	"flip": true,
-	"slumped": 5,
+	"slumped": 7,
 	"hunched": 4,
 	"settled": 5,
 }
