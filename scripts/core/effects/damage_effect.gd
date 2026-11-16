@@ -118,24 +118,35 @@ func get_description() -> String:
 func get_modified_description(source: CombatantStats, target: CombatantStats = null,
 		zone_mult: float = 1.0) -> String:
 	var modified := modified_value(source, target, zone_mult)
-	if modified != value:
+	# A multi-hit card's later hits can differ from the first (a one-shot bonus is spent by the
+	# first, Momentum climbs with each), so its total is the sum of the hits, not the first times
+	# the count. X-scaled cards do not know their count until they are played.
+	var total := modified_total(source, target, zone_mult)
+	var total_differs := hits > 1 and not x_scaled and total != value * hits
+	if modified != value or total_differs:
 		var riders := _riders()
 		if x_scaled:
 			return "Deal %d [%d] damage X times (X = energy spent).%s" % [value, modified, riders]
 		if hits > 1:
-			return "Deal %d [%d] damage %d times (%d total).%s" % [value, modified, hits, modified * hits, riders]
+			return "Deal %d [%d] damage %d times (%d total).%s" % [value, modified, hits, total, riders]
 		return "Deal %d [%d] damage.%s" % [value, modified, riders]
 	return get_description()
 
 
 ## The number one hit will land for: the rules' bracket and the card's big numeral both read this.
-func modified_value(source: CombatantStats, target: CombatantStats = null, zone_mult: float = 1.0) -> int:
+## `hit_index` picks which hit of a multi-hit card: 0, the default, is the next one to land, which
+## is the number the card shows.
+func modified_value(source: CombatantStats, target: CombatantStats = null, zone_mult: float = 1.0,
+		hit_index: int = 0) -> int:
 	# Start from the effective base so the Passion-distance bonus is already in the bracket.
 	var modified = _effective_value()
 	if source:
 		modified += source.get_status_stacks(StatusEffects.STRENGTH)
 		if source.has_status(StatusEffects.WEAK):
 			modified = int(modified * 0.75)
+		# What a title, Momentum, a pending Blooded Edge or Blade Oil add to this hit: the same sum
+		# deal_damage makes, after Strength and Weak and before the zone, as it does.
+		modified += CombatEngine.flat_bonus_for_preview(source, hit_index)
 	# Passion zone multiplier, folded in at the SAME point CombatEngine.deal_damage applies
 	# it (after Strength/Weak, before Vulnerable) so the bracket equals the real hit. Without
 	# this the preview showed the pre-zone number while a "[Zone Bonus]" tag claimed +25%,
@@ -145,3 +156,12 @@ func modified_value(source: CombatantStats, target: CombatantStats = null, zone_
 	if target and target.has_status(StatusEffects.VULNERABLE):
 		modified = int(modified * 1.5)
 	return maxi(0, modified)
+
+
+## What every hit of the card lands for, added up. The first hit carries the one-shot bonuses and
+## each later one carries more Momentum, so this is not the first hit times the count.
+func modified_total(source: CombatantStats, target: CombatantStats = null, zone_mult: float = 1.0) -> int:
+	var total := 0
+	for i in hits:
+		total += modified_value(source, target, zone_mult, i)
+	return total

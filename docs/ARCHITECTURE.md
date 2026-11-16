@@ -176,9 +176,8 @@ Four of these are structural.
 - **The run harness resolves events itself.** It applies an event's choice in its own code, a second implementation beside the event screen's, and the two have drifted. A wager draws from a different stream than it does in the game, shop stock is drawn in a different order, a story beat pinned to a visit is skipped, and arming a quest is not modelled.
 - **The engine knows some content by name.** A relic or title whose effect does not fit the generic triggers is handled inside `CombatEngine`, as are Camelot's own scoring and one event's boon, so each adds a field and a branch there.
 
-Two are gaps in behaviour.
+One is a gap in behaviour.
 
-- **A card's number leaves out flat bonuses.** The card face prints Strength, Weak, the Passion multiplier and Vulnerable, but not what a title or a relic adds to each hit, so a hit can land higher than the card says.
 - **The court's elites are added after the cap** on elites along a route, as The map describes.
 
 One more is small.

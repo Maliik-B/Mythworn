@@ -92,6 +92,11 @@ var _blade_oil_pending: int = 0
 ## ending the run, so it is said once.
 var _loss_announced: bool = false
 
+## The engine of the fight now being played, set when a fight starts and cleared when that engine
+## leaves the tree. The card face reads the next hit's flat bonus through it
+## (flat_bonus_for_preview); the rules never do.
+static var live: CombatEngine = null
+
 ## A Champion's Favour (consumable): true while the favour is armed. The next blow that would
 ## land on the player after it is used does not, and the flag clears. Reset every combat.
 var _favour_ward: bool = false
@@ -164,6 +169,7 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 		enemies.append(enemy)
 
 	turn_number = 0
+	live = self
 	_loss_announced = false
 	# Blooded Edge: prime the first-attack bonus from the relic's tunable value (0 if unheld).
 	var blooded := RunManager.get_relic("Blooded Edge")
@@ -273,6 +279,32 @@ func sword_bonus() -> int:
 	return _sword_base * (1 << doublings)
 
 
+## The flat damage the player's next hit adds, before the Passion multiplier: the title's bonus,
+## Momentum so far this turn, and, for a hit a played card deals, a pending Blooded Edge and
+## Blade Oil. deal_damage adds exactly this, and flat_bonus_for_preview reads it for the card
+## face, so the number printed on a card is the number the hit lands. `earlier_hits` is for a
+## preview of a later hit of the same card: Momentum has climbed by then, and the one-shot
+## bonuses were spent by the first hit.
+func flat_bonus_now(card_hit: bool, earlier_hits: int = 0) -> int:
+	var bonus := sword_bonus() + _momentum + _momentum_per_hit * earlier_hits
+	if card_hit and earlier_hits == 0:
+		bonus += _blooded_edge_pending + _blade_oil_pending
+	return bonus
+
+
+## What the card face and the card's words ask for: the flat bonus the hit numbered `hit_index`
+## (0 is the next one) of a card played now would add for `source`. Zero when `source` is not the
+## player of the fight on the screen (an enemy's numbers, or no fight at all), so a face drawn
+## outside a fight shows the printed number. Static, like zone_multiplier, so the face needs no
+## engine in its hand.
+static func flat_bonus_for_preview(source: CombatantStats, hit_index: int = 0) -> int:
+	if source == null or live == null or not is_instance_valid(live):
+		return 0
+	if source != live.player_stats:
+		return 0
+	return live.flat_bonus_now(true, hit_index)
+
+
 ## Tell the combat UI where the two escalating per-hit bonuses stand. Called when either can
 ## have moved: the start of a player turn (the sword steps, Momentum resets) and each hit the
 ## player lands (Momentum climbs).
@@ -307,6 +339,8 @@ func _on_enemy_died_mercy(_enemy) -> void:
 ## in _exit_tree (which free()/scene-change always triggers) guarantees no stale connection
 ## survives this object, no matter how the combat ended. Idempotent via the is_connected guards.
 func _exit_tree() -> void:
+	if live == self:
+		live = null
 	_disconnect_whiplash()
 	_disconnect_mercy()
 	if Events.passion_tier_changed.is_connected(_on_passion_tier_changed_btk):
@@ -753,21 +787,17 @@ func deal_damage(target: CombatantStats, base_amount: int,
 	# is why the bonus opens at +1 rather than at +3.
 	# Momentum (relic) rides the same block: the bonus accrued earlier this turn is added here,
 	# so it scales under zones like the title bonus. _momentum is 0 on the turn's first hit.
-	if source == player_stats:
-		amount += sword_bonus()
-		amount += _momentum
-
 	# Blooded Edge: the first attack damage the player lands this combat hits harder. Gated
 	# on _current_card so only a played card's hit spends it (not a poison tick or lash), and
 	# applied alongside the title bonus so all flat player bonuses scale uniformly under zones.
-	if source == player_stats and _current_card != null and _blooded_edge_pending > 0:
-		amount += _blooded_edge_pending
-		_blooded_edge_pending = 0
-
 	# Blade Oil: the same shape, spent by the first card-dealt hit after the player poured it.
-	if source == player_stats and _current_card != null and _blade_oil_pending > 0:
-		amount += _blade_oil_pending
-		_blade_oil_pending = 0
+	# All of it is one sum, flat_bonus_now, which the card face reads too.
+	if source == player_stats:
+		var card_hit := _current_card != null
+		amount += flat_bonus_now(card_hit)
+		if card_hit:
+			_blooded_edge_pending = 0
+			_blade_oil_pending = 0
 
 	# Zone modifier: at a committed extreme, the dominant personality's cards hit
 	# harder (+25%) and the off-type suffers (-25%). Only for player cards, never

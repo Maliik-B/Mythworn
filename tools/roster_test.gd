@@ -81,6 +81,7 @@ func _ready() -> void:
 	await _test_frozen_skips()
 	await _test_chilled_freeze()
 	await _test_combat_lost_once()
+	_test_card_number_counts_flat_bonuses()
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
 	_test_whole_and_hollow()
@@ -2663,6 +2664,130 @@ func _test_combat_lost_once() -> void:
 	seng.free()
 
 	Events.combat_lost.disconnect(_count_loss)
+
+
+## The big number on a card is the number the next hit lands: the title's bonus, Momentum built
+## earlier in the turn, and a pending Blooded Edge or Blade Oil are in it, and it moves as cards
+## are played. The face and the card's words both read DamageEffect.modified_value, which reads
+## the engine's flat_bonus_now, the sum deal_damage adds, so each case plays the card and compares.
+func _face_number(card: CardData, eng: CombatEngine) -> int:
+	var slab: Dictionary = CardFace._slab_value(card, eng.player_stats, eng.enemies[0].stats)
+	return int(slab.get("number", -1))
+
+
+func _landed(card: CardData, eng: CombatEngine) -> int:
+	var enemy := eng.enemies[0].stats
+	var before := enemy.current_hp
+	eng.play_card(card, enemy)
+	return before - enemy.current_hp
+
+
+func _flat_fight(card_name: String, dmg: int, count: int) -> CombatEngine:
+	var cards: Array = []
+	for i in count:
+		cards.append(_neutral_attack(card_name, 0, dmg))
+	return _policy_fight(cards, 50, [_dummy_attacker()])
+
+
+func _test_card_number_counts_flat_bonuses() -> void:
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_realm := RunManager.current_realm_id
+	var had_sword := RunManager.earned_title_ids.has(&"swords_bearer")
+	RunManager.relics.clear()
+	RunManager.consumables.clear()
+	RunManager.current_realm_id = &"camelot"
+
+	# The title: the Sword's Bearer adds +1 a hit on turn 1, so a printed 6 reads 7 and lands 7,
+	# and it sits after Strength and Weak the way the engine puts it (6+2 = 8, x0.75 = 6, +1 = 7).
+	RunManager.award_title(&"swords_bearer")
+	RunManager.equip_title(0, &"swords_bearer")
+	var teng := _flat_fight("Jab", 6, 2)
+	var tcard: CardData = teng.piles.hand[0]
+	var t_face := _face_number(tcard, teng)
+	var t_rules: String = tcard.get_face_text(teng.player_stats, teng.enemies[0].stats)["rules"]
+	_check("a title's bonus is in the card's number and in its words (6 prints 7, shows [7])",
+		t_face == 7 and t_rules.find("[7]") != -1)
+	_check("and the hit lands what the card said", _landed(tcard, teng) == t_face)
+	teng.apply_status_effect(teng.player_stats, StatusEffects.STRENGTH, 2)
+	teng.apply_status_effect(teng.player_stats, StatusEffects.WEAK, 1)
+	var t_face2 := _face_number(teng.piles.hand[0], teng)
+	_check("with Strength and Weak on the player the title's number still equals the hit",
+		t_face2 == _landed(teng.piles.hand[0], teng))
+	teng.free()
+	RunManager.equip_title(0, &"")
+	if not had_sword:
+		RunManager.earned_title_ids.erase(&"swords_bearer")
+
+	# Momentum: the number climbs as the turn's hits land, and each one is what the next hit takes.
+	RunManager.relics.clear()
+	RunManager.add_relic(RelicPool.get_relic_by_name("Momentum"))
+	var meng := _flat_fight("Jab", 6, 3)
+	var m_ok := true
+	var m_seen := ""
+	for expected in [6, 7, 8]:
+		var card: CardData = meng.piles.hand[0]
+		var shown := _face_number(card, meng)
+		var landed := _landed(card, meng)
+		m_seen += " %d/%d" % [shown, landed]
+		m_ok = m_ok and shown == expected and landed == expected
+	_check("Momentum raises a card's number as the turn goes on (6, 7, 8, each landing so)%s" % m_seen, m_ok)
+	meng.free()
+
+	# A pending Blooded Edge reads in the first card's number and is gone from the next one's.
+	RunManager.relics.clear()
+	var edge := RelicPool.get_relic_by_name("Blooded Edge")
+	RunManager.add_relic(edge)
+	var beng := _flat_fight("Jab", 6, 2)
+	var first_face := _face_number(beng.piles.hand[0], beng)
+	var first_landed := _landed(beng.piles.hand[0], beng)
+	var second_face := _face_number(beng.piles.hand[0], beng)
+	var second_landed := _landed(beng.piles.hand[0], beng)
+	_check("a pending Blooded Edge is in the card's number until a hit spends it",
+		first_face == 6 + edge.value and first_landed == first_face
+		and second_face == 6 and second_landed == 6)
+	beng.free()
+
+	# Blade Oil, poured mid-turn, shows at once.
+	RunManager.relics.clear()
+	var oil := ConsumablePool.get_consumable(&"blade_oil")
+	RunManager.add_consumable(oil)
+	var oeng := _flat_fight("Jab", 6, 2)
+	var before_oil := _face_number(oeng.piles.hand[0], oeng)
+	var poured := oeng.use_consumable(oil)
+	var after_oil := _face_number(oeng.piles.hand[0], oeng)
+	_check("Blade Oil poured raises the card's number by its value, and the hit lands it",
+		poured and before_oil == 6 and after_oil == 6 + oil.value
+		and _landed(oeng.piles.hand[0], oeng) == after_oil)
+	oeng.free()
+	RunManager.consumables.clear()
+
+	# A multi-hit card shows the NEXT hit's number: a first-hit-only bonus is in it, Momentum is
+	# the climb of the later hits, and the "(N total)" in the words is the sum of what lands.
+	RunManager.relics.clear()
+	RunManager.add_relic(edge)
+	RunManager.add_relic(RelicPool.get_relic_by_name("Momentum"))
+	var xeng := _flat_fight("Triple", 3, 2)
+	var tri: CardData = xeng.piles.hand[0]
+	(tri.effects[0] as DamageEffect).hits = 3
+	var x_face := _face_number(tri, xeng)
+	var x_rules: String = tri.get_face_text(xeng.player_stats, xeng.enemies[0].stats)["rules"]
+	var x_landed := _landed(tri, xeng)
+	var x_want := 3 + edge.value + 4 + 5
+	_check("a multi-hit card's number is its first hit (a spent-once bonus included)",
+		x_face == 3 + edge.value)
+	_check("and its total is every hit as it lands (Blooded Edge once, Momentum climbing)",
+		x_landed == x_want and x_rules.find("(%d total)" % x_want) != -1)
+	xeng.free()
+
+	# Outside a fight, or for anyone but the fight's player, a card shows its printed number.
+	var plain := _neutral_attack("Jab", 0, 6)
+	var stranger := CombatantStats.new(10, 10)
+	_check("a card drawn outside a fight, or for another combatant, shows its printed number",
+		int(CardFace._slab_value(plain, null, null).get("number", -1)) == 6
+		and int(CardFace._slab_value(plain, stranger, null).get("number", -1)) == 6)
+
+	RunManager.relics.assign(saved_relics)
+	RunManager.current_realm_id = saved_realm
 
 
 func _test_cooldown() -> void:
