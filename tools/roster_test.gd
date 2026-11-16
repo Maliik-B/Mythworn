@@ -5177,7 +5177,8 @@ func _test_forgotten_relics() -> void:
 	eng = CombatEngine.new()
 	add_child(eng)
 	eng.start_combat(deck, 40, 50, [_dummy_attacker()])
-	eng.process_combat_end_relics()
+	eng.deal_damage(eng.enemies[0].stats, 999, eng.player_stats)
+	eng.check_battle_end()
 	_check("The Brass of Sir Aldric pays 15 gold and mends 6 when a fight ends",
 		RunManager.gold == 15 and RunManager.current_hp == 46)
 	eng.free()

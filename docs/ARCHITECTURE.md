@@ -103,7 +103,7 @@ A card is a `CardData` holding an array of `CardEffect` resources, whose classes
    4. Vulnerable on the target.
    5. What the target takes off, then its Block.
 5. The engine emits `Events.card_played` and files the card: exhausted, discarded, returned to the hand, or nowhere for a power or a companion's card.
-6. `check_battle_end` looks for a win or a loss.
+6. `check_battle_end` looks for a win or a loss. On a win it carries the fight's HP into the run and pays the combat-end relics before it announces the win.
 
 The combat screen never works out a result. It calls step 1, then redraws from the signals and the engine's state.
 

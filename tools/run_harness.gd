@@ -344,9 +344,8 @@ func _run_combat(enemies: Array[EnemyData], node_index: int = -1) -> Dictionary:
 		eng.end_player_turn()
 
 	var won := eng.phase == CombatEngine.Phase.BATTLE_WON
-	RunManager.current_hp = maxi(0, eng.player_stats.current_hp)
-	if won:
-		eng.process_combat_end_relics()  # combat-end heals/gold apply to the post-fight HP
+	if not won:  # a win has already carried its HP and combat-end relics into the run
+		RunManager.current_hp = maxi(0, eng.player_stats.current_hp)
 	var turns := eng.turn_number
 	eng.free()
 	if not _cbt.within_memory_ceiling("run %d, after a combat" % RngManager.run_seed):

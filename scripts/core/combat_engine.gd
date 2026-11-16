@@ -871,7 +871,7 @@ func self_damage(stats: CombatantStats, amount: int) -> void:
 ## heal signal so the UI refreshes the bar. Used by the Hollow Prelate's self-heal AND by
 ## player heal cards (the memory card "The House That Was"), routing a player heal through
 ## the live player_stats here, rather than RunManager.heal, is what makes it show in combat
-## (RunManager.current_hp is only synced from player_stats on victory, so a RunManager heal
+## (RunManager.current_hp is only synced from player_stats when the fight is won, so a RunManager heal
 ## mid-fight would be invisible and then overwritten).
 func heal_combatant(target: CombatantStats, amount: int) -> void:
 	if amount <= 0 or target.is_dead():
@@ -1081,7 +1081,7 @@ func _process_relics(trigger: RelicData.RelicTrigger) -> void:
 		_apply_relic_effect(relic)
 
 
-func process_combat_end_relics() -> void:
+func _process_combat_end_relics() -> void:
 	for relic in RunManager.relics:
 		if relic.trigger != RelicData.RelicTrigger.ON_COMBAT_END:
 			continue
@@ -1211,4 +1211,8 @@ func check_battle_end() -> void:
 		# after card_reward_scene routes there, but eager listeners benefit
 		# from the strict ordering.
 		_resolve_be_the_king()
+		# The run keeps the fight's HP, then the combat-end relics pay out on top of it, so the
+		# screen and the harnesses read a finished result and work nothing out themselves.
+		RunManager.current_hp = player_stats.current_hp
+		_process_combat_end_relics()
 		Events.combat_won.emit()

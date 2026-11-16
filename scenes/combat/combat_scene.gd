@@ -3135,10 +3135,7 @@ func _on_combat_won() -> void:
 	AudioManager.play_sfx("gold_gain")
 	end_turn_btn.disabled = true
 	_spawn_victory_particles()
-	# Sync HP back to RunManager
-	RunManager.current_hp = combat_engine.player_stats.current_hp
-	# Process end-of-combat relics
-	combat_engine.process_combat_end_relics()
+	# The engine has already carried the HP into the run and paid the combat-end relics; this logs them.
 	for relic in RunManager.relics:
 		if relic.trigger == RelicData.RelicTrigger.ON_COMBAT_END:
 			_log("[color=cyan]%s: %s[/color]" % [relic.relic_name, relic.description])
