@@ -1,16 +1,16 @@
 extends Control
 ## CARD MANIFEST: an interactive QA view of every card face. The Passion TOGGLE at the top drives
-## the live zone, so you can watch each school sigil empower / grey and the halo coin EBB in/out on
-## a threshold crossing: the real combat behaviour (it reuses combat_scene._create_card_panel and
-## the scene's coin transitions, so what you see == what combat shows, with no drift). Cards are pulled
-## straight from the pools, so new cards appear automatically as content grows.
+## the live zone, so you can watch each school sigil empower / grey and the halo coin light or go
+## dark across a threshold (it reuses combat_scene._create_card_panel, so what you see == what
+## combat shows, with no drift; the coin's fade tween needs a combat engine and is not played here).
+## Cards are pulled straight from the pools, so new cards appear automatically as content grows.
 ##
 ## Run:  godot --path . res://tools/card_manifest.tscn
 ## A reference PNG of the initial state is also written to screenshots/card_manifest.png.
 
 const CombatScene = preload("res://scenes/combat/combat_scene.gd")
 const COLUMNS := 6
-const PNG_PATH := "D:/Applications/Fable/screenshots/card_manifest.png"
+const PNG_PATH := "res://screenshots/card_manifest.png"
 
 # Passion presets for the toggle, one value comfortably inside each tier.
 const TIERS := [[-55, "HOLLOW"], [-30, "WAVERING"], [0, "STEADY"], [30, "INSPIRED"], [55, "BLAZING"]]
@@ -45,7 +45,7 @@ func _ready() -> void:
 	add_child(root)
 
 	var title := Label.new()
-	title.text = "CARD MANIFEST: toggle Passion to watch the school sigils empower/grey and the halo coin EBB in/out (the real combat behaviour)"
+	title.text = "CARD MANIFEST: toggle Passion to watch the school sigils empower/grey and the halo coin light up or go dark"
 	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
 	root.add_child(title)
@@ -62,16 +62,17 @@ func _ready() -> void:
 	_grid.add_theme_constant_override("v_separation", 10)
 	scroll.add_child(_grid)
 
-	_rebuild(false)
+	_rebuild()
 
 	# A reference PNG of the initial (Steady) state, so the layout can be eyeballed headlessly too.
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
-	DirAccess.make_dir_recursive_absolute("D:/Applications/Fable/screenshots")
-	var err := img.save_png(PNG_PATH)
-	print("MANIFEST PNG (%dx%d) -> %s  [err %d]" % [img.get_width(), img.get_height(), PNG_PATH, err])
+	var path := ProjectSettings.globalize_path(PNG_PATH)
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var err := img.save_png(path)
+	print("MANIFEST PNG (%dx%d) -> %s  [err %d]" % [img.get_width(), img.get_height(), path, err])
 
 
 func _build_toggle_bar() -> HBoxContainer:
@@ -106,26 +107,22 @@ func _build_toggle_bar() -> HBoxContainer:
 	return bar
 
 
-## Set the live Passion and re-render, animating the halo-coin fade across the crossing.
+## Set the live Passion and re-render the faces at it.
 func _set_passion(value: int) -> void:
 	if value == _passion:
 		return
-	var old := _passion
 	_passion = value
 	RunManager.passion.current_value = value
-	_rebuild(true, old)
+	_rebuild()
 
 
-func _rebuild(animate: bool, old_value: int = 0) -> void:
+func _rebuild() -> void:
 	for c in _grid.get_children():
 		c.queue_free()
 	_render_host._hand_coins.clear()
 	for card in _cards:
 		_grid.add_child(_render_host._create_card_panel(card.duplicate_card()))
 	_update_readout()
-	if animate:
-		# Panels (and their coin discs) are now in-tree, so the fade tweens run.
-		_render_host._fade_coin_transitions(old_value, _passion)
 
 
 func _update_readout() -> void:
