@@ -284,7 +284,7 @@ func _refresh_legend() -> void:
 		glyph.text = look["glyph"]
 		glyph.custom_minimum_size = Vector2(20, 0)
 		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		glyph.add_theme_font_size_override("font_size", 16)
+		glyph.add_theme_font_size_override("font_size", 18)
 		glyph.add_theme_color_override("font_color", look["color"])
 		row.add_child(glyph)
 		var kind := Label.new()
@@ -1691,6 +1691,14 @@ func _paint_node(btn: Button, look: Dictionary) -> void:
 	btn.add_theme_font_size_override("font_size", look.get("font", 20))
 
 	var base_col: Color = look["color"]
+	# The glyph near white with a hint of its kind's colour, edged dark so it reads against the
+	# circle's colour and the dimming of a node out of reach. A look marked `bold` is edged in its own
+	# ink instead, which thickens a mark DejaVu Sans draws in fine lines (the swords, the steam).
+	var ink := Color.WHITE.lerp(base_col, 0.2)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color", "font_focus_color"]:
+		btn.add_theme_color_override(state, ink)
+	btn.add_theme_color_override("font_outline_color", ink if look.get("bold", false) else base_col.darkened(0.8))
+	btn.add_theme_constant_override("outline_size", 2)
 
 	var style := StyleBoxFlat.new()
 	style.set_corner_radius_all(NODE_SIZE / 2)
@@ -1748,7 +1756,8 @@ func _update_node_states() -> void:
 			# Landmark nodes (boss, the Sword, an armed quest payoff) stay bright even when
 			# locked so they survive the map's darkening effects and always read; ordinary
 			# future nodes dim to show they're out of reach.
-			if node.look(_is_quest_payoff_armed(node)).get("landmark", false):
+			var far_look: Dictionary = node.look(_is_quest_payoff_armed(node))
+			if far_look.get("landmark", false) or far_look.get("lit", false):
 				btn.modulate = Color(0.9, 0.9, 0.9, 1.0)
 			else:
 				btn.modulate = Color(0.42, 0.42, 0.42, 0.85)

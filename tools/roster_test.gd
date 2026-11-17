@@ -4748,11 +4748,17 @@ func _test_map_node_looks() -> void:
 	var huntsman := MapNode.new()
 	huntsman.node_type = MapNode.NodeType.EVENT
 	huntsman.scripted_event_id = MapGenerator.MASTER_OF_GAME_ID
-	_check("the Master of Game shows as itself", huntsman.look()["glyph"] == "♘")
+	_check("the Master of Game shows as itself", huntsman.look()["glyph"] == "♞")
 	var elite := MapNode.new()
 	elite.node_type = MapNode.NodeType.ELITE
 	elite.weakened = true
 	_check("a weakened elite has its own drained look", elite.look() == MapNode.WEAKENED_ELITE_LOOK)
+	var elite_look: Dictionary = MapNode.TYPE_LOOKS[MapNode.NodeType.ELITE]
+	var huntsman_look := huntsman.look()
+	_check("elites and the Master of Game stay lit while out of reach, drawn larger than an ordinary mark",
+		elite_look.get("lit", false) and huntsman_look.get("lit", false)
+		and elite_look.get("font", 20) > 20 and huntsman_look.get("font", 20) > 20
+		and not elite_look.get("landmark", false) and not huntsman_look.get("landmark", false))
 	for id in MapGenerator.RECORD_SITE_IDS:
 		_check("record site %s has a look" % id, MapNode.SCRIPTED_LOOKS.has(id))
 	var crossing := MapNode.new()

@@ -57,7 +57,7 @@ static func prime(box: Vector2) -> void:
 		wanted.append([look["glyph"], look.get("font", DEFAULT_FONT)])
 	for look in MapNode.SCRIPTED_LOOKS.values():
 		wanted.append([look["glyph"], look.get("font", DEFAULT_FONT)])
-	wanted.append([MapNode.WEAKENED_ELITE_LOOK["glyph"], DEFAULT_FONT])
+	wanted.append([MapNode.WEAKENED_ELITE_LOOK["glyph"], MapNode.WEAKENED_ELITE_LOOK.get("font", DEFAULT_FONT)])
 	wanted.append([MapNode.QUEST_MARK_LOOK["glyph"], MapNode.QUEST_MARK_LOOK.get("font", DEFAULT_FONT)])
 	for look in CrossingStage.CROSSING_LOOKS.values():
 		wanted.append([look["glyph"], CROSSING_FONT])

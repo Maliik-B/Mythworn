@@ -43,13 +43,20 @@ var y_jitter: float = 0.0
 # What the map shows for a node: its glyph, colour and name, in one place. The node painter, the map
 # peek and the legend all go through look(), so a kind added here is painted and joins the legend by
 # itself; the content linter fails a kind with no name. `order` is its place in the legend. A
-# `landmark` stays bright while locked. `loud` is a bigger ring: [fill darkened, ring lightened,
-# hover fill darkened, hover ring lightened].
+# `landmark` stays bright while locked. `lit` only keeps it bright on the map, for a kind worth seeing
+# from far off when choosing a route; it is not a landmark anywhere else. `loud` is a bigger ring:
+# [fill darkened, ring lightened, hover fill darkened, hover ring lightened]. `font` is the glyph's
+# size, 20 when it has none: DejaVu Sans draws most of these marks finer than a letter, so the
+# fighting kinds and the Master of Game are drawn larger to read at a glance. `bold` thickens a mark
+# drawn in fine lines.
 const EVENT_COLOR := Color(0.8, 0.55, 0.9)
 const TYPE_LOOKS := {
-	NodeType.COMBAT: {"glyph": "⚔", "name": "Combat", "color": Color(0.9, 0.25, 0.2), "order": 10},
-	NodeType.ELITE: {"glyph": "☠", "name": "Elite", "color": Color(0.95, 0.65, 0.1), "order": 20},
-	NodeType.REST: {"glyph": "♨", "name": "Rest", "color": Color(0.3, 0.8, 0.4), "order": 30},
+	NodeType.COMBAT: {"glyph": "⚔", "name": "Combat", "color": Color(0.9, 0.25, 0.2), "order": 10, "font": 26,
+		"bold": true},
+	NodeType.ELITE: {"glyph": "☠", "name": "Elite", "color": Color(0.95, 0.65, 0.1), "order": 20, "font": 30,
+		"lit": true},
+	NodeType.REST: {"glyph": "♨", "name": "Rest", "color": Color(0.3, 0.8, 0.4), "order": 30, "font": 28,
+		"bold": true},
 	NodeType.SHOP: {"glyph": "$", "name": "Shop", "color": Color(0.3, 0.7, 0.9), "order": 40},
 	NodeType.EVENT: {"glyph": "!", "name": "Event", "color": EVENT_COLOR, "order": 50},
 	NodeType.MYSTERY: {"glyph": "?", "name": "Mystery", "color": Color(0.55, 0.55, 0.55), "order": 60},
@@ -70,13 +77,15 @@ const CROSSING_LOOKS := {
 		"order": 95, "font": 26, "landmark": true},
 }
 # Drained: the elite is still there, with the fight gone out of it.
-const WEAKENED_ELITE_LOOK := {"glyph": "☠", "name": "Weakened Elite", "color": Color(0.5, 0.56, 0.62), "order": 25}
+const WEAKENED_ELITE_LOOK := {"glyph": "☠", "name": "Weakened Elite", "color": Color(0.5, 0.56, 0.62), "order": 25,
+	"font": 30}
 # Seated scripted events, meant to be found and routed to, so each shows what it is.
 const SCRIPTED_LOOKS := {
-	&"master_of_game": {"glyph": "♘", "name": "The Master of Game", "color": EVENT_COLOR, "order": 80},
-	&"scriptorium": {"glyph": "✎", "name": "The Scriptorium", "color": EVENT_COLOR, "order": 85},
-	&"tourney": {"glyph": "✎", "name": "The Tourney", "color": EVENT_COLOR, "order": 85},
-	&"reliquary": {"glyph": "✎", "name": "The Reliquary", "color": EVENT_COLOR, "order": 85},
+	&"master_of_game": {"glyph": "♞", "name": "The Master of Game", "color": EVENT_COLOR, "order": 80, "font": 30,
+		"lit": true},
+	&"scriptorium": {"glyph": "✎", "name": "The Scriptorium", "color": EVENT_COLOR, "order": 85, "font": 24, "bold": true},
+	&"tourney": {"glyph": "✎", "name": "The Tourney", "color": EVENT_COLOR, "order": 85, "font": 24, "bold": true},
+	&"reliquary": {"glyph": "✎", "name": "The Reliquary", "color": EVENT_COLOR, "order": 85, "font": 24, "bold": true},
 }
 # An armed questline payoff, in hunt gold. It overrides the ordinary look of the node it sits on,
 # and only once armed: before that the node must read as whatever it was.
