@@ -146,11 +146,22 @@ func trick_reminder() -> String:
 	return "Trick. Unplayed, it leaves at end of turn."
 
 
+## One effect's words for this card. An all-enemies card's Passion counts once for every enemy it
+## hits, so its Passion effect reads "per enemy"; every other effect speaks for itself.
+func _effect_words(effect: CardEffect, source: CombatantStats, target: CombatantStats, zone_mult: float,
+		in_combat: bool) -> String:
+	if effect is PassionEffect and target_type == TargetType.ALL_ENEMIES:
+		return effect.get_per_enemy_description()
+	if in_combat:
+		return effect.get_modified_description(source, target, zone_mult)
+	return effect.get_description()
+
+
 ## Generates a description string from the card's effects.
 func get_generated_description() -> String:
 	var parts: PackedStringArray = []
 	for effect in get_active_effects():
-		var desc = effect.get_description()
+		var desc = _effect_words(effect, null, null, 1.0, false)
 		if desc != "":
 			parts.append(desc)
 	var text = " ".join(parts)
@@ -174,7 +185,7 @@ func get_face_text(source: CombatantStats = null, target: CombatantStats = null)
 	var passion: PackedStringArray = []
 	var passion_total := 0
 	for effect in get_active_effects():
-		var desc: String = effect.get_modified_description(source, target, zm) if source else effect.get_description()
+		var desc: String = _effect_words(effect, source, target, zm, source != null)
 		if desc == "":
 			continue
 		if effect is PassionEffect:
@@ -205,7 +216,7 @@ func get_modified_description(source: CombatantStats, target: CombatantStats = n
 	# whole point of that icon work: a text tag would just restate it and clutter the face.
 	var zm := CombatEngine.zone_multiplier(personality)
 	for effect in get_active_effects():
-		var desc = effect.get_modified_description(source, target, zm)
+		var desc = _effect_words(effect, source, target, zm, true)
 		if desc != "":
 			parts.append(desc)
 	var text = " ".join(parts)

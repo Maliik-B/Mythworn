@@ -5399,6 +5399,42 @@ func _test_card_face_words() -> void:
 	hit.value = 5
 	_check("the numeral is the bracket's number", hit.modified_value(stats) == 7 \
 		and hit.get_modified_description(stats).begins_with("Deal 5 [7] damage"))
+	# An all-enemies card's Passion counts once for every enemy it hits, so its foot says so with
+	# the card's own number; a single-target card's foot is as it was, and the rules keep their line.
+	var generic: Array[CardData] = CardPool._build_generic_pool()
+	var area: Dictionary = {"Sweep": 2, "Whirlwind": 2, "Ripple": 3}
+	var area_ok := true
+	for area_name in area:
+		var area_card: CardData = _card_by_name(generic, area_name)
+		if area_card == null:
+			area_card = _card_by_name(CardPool.build_emo_primary_pool(), area_name)
+		var want := "+%d Passion per enemy." % area[area_name]
+		var face_printed: Dictionary = area_card.get_face_text()
+		var face_combat: Dictionary = area_card.get_face_text(stats)
+		if face_printed["passion"] != want or face_combat["passion"] != want \
+				or area_card.get_generated_description().find(want) == -1 \
+				or area_card.get_modified_description(stats).find(want) == -1 \
+				or face_printed["rules"].find("Hits all enemies.") == -1 \
+				or face_printed["passion_total"] != area[area_name]:
+			area_ok = false
+			print("   area foot wrong: %s -> '%s'" % [area_name, face_printed["passion"]])
+	_check("Sweep, Whirlwind and Ripple read +N Passion per enemy. with their own numbers", area_ok)
+	var single_ok := 0
+	var single_total := 0
+	for pile in sets:
+		for card in pile:
+			if card.target_type == CardData.TargetType.ALL_ENEMIES:
+				continue
+			for effect in card.get_active_effects():
+				if effect is PassionEffect:
+					single_total += 1
+					if card.get_face_text()["passion"].find(effect.get_description()) != -1 \
+							and card.get_face_text()["passion"].find("per enemy") == -1:
+						single_ok += 1
+	_check("a single-target card's Passion foot is unchanged (%d cards)" % single_total,
+		single_total > 10 and single_ok == single_total)
+	var shield_wall: CardData = _card_by_name(generic, "Shield Wall")
+	_check("Shield Wall's foot still reads +2 Passion.", shield_wall.get_face_text()["passion"] == "+2 Passion.")
 
 
 func _same_words(face: Dictionary, whole: String) -> bool:
