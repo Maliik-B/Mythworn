@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_map_node_looks()
 	_test_card_face_words()
 	_test_end_screen_follow()
+	_test_title_says_early_build()
 	_test_crossing_switch()
 	# The crossing is off in the game until the door's design says how it shows; its tests turn it on.
 	MapGenerator.crossing_enabled = true
@@ -5263,6 +5264,18 @@ func _test_end_screen_follow() -> void:
 		script.SITE_URL == "https://mythworn.com" and script.DISCORD_URL.begins_with("https://discord.gg/"))
 	scene.queue_free()
 	RunManager.earned_title_ids.assign(saved_titles)
+
+
+## The title's version label says the build is an early one.
+func _test_title_says_early_build() -> void:
+	var scene: Node = load("res://scenes/title/title_screen.tscn").instantiate()
+	add_child(scene)
+	var found := false
+	for n in scene.find_children("*", "Label", true, false):
+		if n.text == "The Camelot Demo · Early build · v0.1":
+			found = true
+	_check("the title's version label says early build", found)
+	scene.queue_free()
 
 
 func _test_card_face_words() -> void:

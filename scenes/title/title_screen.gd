@@ -149,7 +149,7 @@ func _build_ui() -> void:
 
 	# Version / credit
 	var version_lbl = Label.new()
-	version_lbl.text = "The Camelot Demo · v0.1"
+	version_lbl.text = "The Camelot Demo · Early build · v0.1"
 	version_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	version_lbl.add_theme_font_size_override("font_size", 13)
 	version_lbl.add_theme_color_override("font_color", Color(0.35, 0.3, 0.45))
