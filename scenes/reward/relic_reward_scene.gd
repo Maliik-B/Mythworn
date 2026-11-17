@@ -182,7 +182,6 @@ func _create_relic_panel(relic: RelicData) -> PanelContainer:
 
 
 func _pick_relic(relic: RelicData) -> void:
-	AudioManager.play_sfx("relic_acquire")
 	RunManager.add_relic(relic)
 	_go_to_card_reward()
 
