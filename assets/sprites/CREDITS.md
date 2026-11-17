@@ -54,12 +54,13 @@ The sword in the Excalibur set piece (`assets/sprites/set_pieces/excalibur_sword
 
 ## Fonts
 
-All under the SIL Open Font License 1.1; the licence text sits beside each font in `assets/fonts/`.
+All but DejaVu Sans are under the SIL Open Font License 1.1; DejaVu Sans is under the Bitstream Vera licence, its own changes in the public domain. Each licence text sits beside its font in `assets/fonts/`.
 
 - **Grenze Gotisch** (names and card titles), Copyright 2020 The Grenze Gotisch Project Authors. https://github.com/Omnibus-Type/Grenze-Gotisch
 - **Castoro Titling** (numerals), by Tiro Typeworks. https://github.com/TiroTypeworks/Castoro
 - **Marcellus SC** (kept for trying against the others, not in use), Copyright (c) 2012 Brian J. Bonislawsky DBA Astigmatic (AOETI). https://fonts.google.com/specimen/Marcellus+SC
 - **EB Garamond** (card rules), Copyright 2017 The EB Garamond Project Authors. https://github.com/octaviopardo/EBGaramond12
+- **DejaVu Sans** (the map's and the fight's symbols, as a fallback for the fonts above), by the DejaVu fonts team, based on Bitstream Vera. https://github.com/dejavu-fonts/dejavu-fonts
 
 ## Backgrounds
 

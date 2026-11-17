@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_card_face_words()
 	_test_end_screen_follow()
 	_test_title_says_early_build()
+	_test_every_drawn_symbol_has_a_font()
 	_test_crossing_switch()
 	# The crossing is off in the game until the door's design says how it shows; its tests turn it on.
 	MapGenerator.crossing_enabled = true
@@ -5264,6 +5265,90 @@ func _test_end_screen_follow() -> void:
 		script.SITE_URL == "https://mythworn.com" and script.DISCORD_URL.begins_with("https://discord.gg/"))
 	scene.queue_free()
 	RunManager.earned_title_ids.assign(saved_titles)
+
+
+## Every character outside ASCII that the game's scripts write into a string can be drawn by every
+## font the game draws words with: each holds it itself or through the symbol font set under it at
+## startup. A browser build has no system fonts to borrow from, so a character none of them holds is
+## an empty box there; this keeps a new symbol from shipping that way.
+func _test_every_drawn_symbol_has_a_font() -> void:
+	var symbol_font = load("res://scripts/autoloads/symbol_font.gd")
+	var fonts := {"Godot's default font": ThemeDB.fallback_font}
+	for path in symbol_font.DRAWING_FONT_PATHS:
+		fonts[path.get_file()] = load(path)
+	var symbols: Font = load(symbol_font.SYMBOL_FONT_PATH)
+	var wired := true
+	for key in fonts:
+		wired = wired and fonts[key] != null and fonts[key].fallbacks.has(symbols)
+	_check("the symbol font sits under Godot's default font and every bundled face but the numerals'", wired)
+
+	var found := {}  # character -> the first "file:line" that writes it
+	for root in ["res://scripts", "res://scenes"]:
+		_collect_string_chars(root, found)
+	var missing: PackedStringArray = []
+	for c in found:
+		for key in fonts:
+			if not _font_draws(fonts[key], c.unicode_at(0)):
+				missing.append("U+%04X in %s, not drawn by %s" % [c.unicode_at(0), found[c], key])
+	_check("every one of the %d characters outside ASCII in the game's strings has a font that draws it%s"
+		% [found.size(), "" if missing.is_empty() else ": " + "; ".join(missing)], missing.is_empty() and found.size() > 20)
+	var numerals: Font = load(CardFace.NUMERAL_FONT_PATH)
+	var held := true
+	for c in "0123456789X×":
+		held = held and numerals.has_char(c.unicode_at(0))
+	_check("Castoro, which has no symbol font under it, holds every numeral it prints, × included", held)
+
+
+func _font_draws(font: Font, code: int) -> bool:
+	if font.has_char(code):
+		return true
+	for fb in font.fallbacks:
+		if fb and fb.has_char(code):
+			return true
+	return false
+
+
+## The characters outside ASCII inside the string literals of every .gd file under `dir`, comments
+## skipped.
+func _collect_string_chars(dir: String, found: Dictionary) -> void:
+	for sub in DirAccess.get_directories_at(dir):
+		_collect_string_chars(dir.path_join(sub), found)
+	for file in DirAccess.get_files_at(dir):
+		if file.get_extension() != "gd":
+			continue
+		var path := dir.path_join(file)
+		var text := FileAccess.get_file_as_string(path)
+		var quote := ""  # the open string's delimiter, "" outside a string
+		var line := 1
+		var i := 0
+		while i < text.length():
+			var c := text[i]
+			if c == "\n":
+				line += 1
+				if quote.length() == 1:
+					quote = ""
+				i += 1
+				continue
+			if quote == "":
+				if c == "#":
+					while i < text.length() and text[i] != "\n":
+						i += 1
+					continue
+				if c == "\"" or c == "'":
+					quote = c.repeat(3) if text.substr(i, 3) == c.repeat(3) else c
+					i += quote.length()
+					continue
+			else:
+				if c == "\\":
+					i += 2
+					continue
+				if text.substr(i, quote.length()) == quote:
+					i += quote.length()
+					quote = ""
+					continue
+				if c.unicode_at(0) > 127 and not found.has(c):
+					found[c] = "%s:%d" % [path.trim_prefix("res://"), line]
+			i += 1
 
 
 ## The title's version label says the build is an early one.

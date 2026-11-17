@@ -18,6 +18,7 @@ config/features=PackedStringArray("4.4")
 config/icon="res://assets/icon/mythworn_icon.png"
 
 [autoload]
+SymbolFont="*res://scripts/autoloads/symbol_font.gd"
 Events="*res://scripts/autoloads/events.gd"
 RngManager="*res://scripts/autoloads/rng_manager.gd"
 RealmRegistry="*res://scripts/autoloads/realm_registry.gd"

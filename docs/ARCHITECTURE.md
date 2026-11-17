@@ -32,13 +32,13 @@ check content and run fights headless
 
 **Rules and content** are in `scripts/core/`: the data classes (`CardData`, `EnemyData`, `RelicData`, `TitleData` and the rest), the registries that build every piece of content, the map generator and the combat engine.
 
-**Run state and services** are nine autoloads in `scripts/autoloads/`. An autoload is a Godot singleton: it is loaded once at startup, and any script can reach it. Three of them carry the weight:
+**Run state and services** are ten autoloads in `scripts/autoloads/`. An autoload is a Godot singleton: it is loaded once at startup, and any script can reach it. Three of them carry the weight:
 
 - `RunManager` owns the run: deck, relics, titles, held consumables, companion, gold, HP, Passion, the map, the realm's configuration, and the hand-offs between screens.
 - `RngManager` owns the run seed and its random streams.
 - `Events` is the signal bus. Every signal that crosses a system boundary is declared there, grouped by domain.
 
-The other six are small: `RealmRegistry` (the realms and what each looks like), `ProfileManager` (settings and seen cutscenes, in `user://profile.cfg`), `SceneTransition`, `AudioManager`, `PauseMenu` and `TitleEarnedPopup`.
+The other seven are small: `RealmRegistry` (the realms and what each looks like), `ProfileManager` (settings and seen cutscenes, in `user://profile.cfg`), `SceneTransition`, `AudioManager`, `PauseMenu`, `TitleEarnedPopup` and `SymbolFont` (which sets DejaVu Sans as the fallback of every font the game draws words with, so the symbols those fonts lack are drawn the same on every platform, a browser included).
 
 **Screens** are in `scenes/`, one folder each. Drawing that more than one screen shares is in `scripts/ui/`: the card face, the Passion gauge, the combat stage, and the set pieces that stage a moment such as drawing the sword. Screens also read and write `RunManager` directly, which is how one hands off to the next.
 
