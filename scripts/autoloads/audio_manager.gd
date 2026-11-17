@@ -1,7 +1,7 @@
 extends Node
 ## Manages all game audio: SFX and music playback.
 ## Connects to Events signals and plays appropriate sounds.
-## Audio files go in res://audio/sfx/ and res://audio/music/.
+## Audio files go in res://audio/sfx/ and res://audio/music/; any that are missing play nothing.
 
 # -- Music player --
 var music_player: AudioStreamPlayer
@@ -12,7 +12,7 @@ var sfx_players: Array[AudioStreamPlayer] = []
 var sfx_index: int = 0
 
 # -- Preloaded sound streams --
-# Populated in _ready() once audio files exist.
+# Populated in _ready() from whichever audio files exist.
 # Keys are sound names, values are AudioStream resources.
 var sounds: Dictionary = {}
 
@@ -48,32 +48,40 @@ func _ready() -> void:
 	_connect_signals()
 
 
-func _load_sounds() -> void:
-	sounds["card_play"] = preload("res://audio/sfx/card_play.wav")
-	sounds["card_draw"] = preload("res://audio/sfx/card_draw.wav")
-	sounds["hit"] = preload("res://audio/sfx/hit.wav")
-	sounds["block"] = preload("res://audio/sfx/block.wav")
-	sounds["enemy_die"] = preload("res://audio/sfx/enemy_die.wav")
-	sounds["player_hurt"] = preload("res://audio/sfx/player_hurt.wav")
-	sounds["combat_win"] = preload("res://audio/sfx/combat_win.wav")
-	sounds["combat_lose"] = preload("res://audio/sfx/combat_lose.wav")
-	sounds["button_click"] = preload("res://audio/sfx/button_click.wav")
-	sounds["gold_gain"] = preload("res://audio/sfx/gold_gain.wav")
-	sounds["relic_acquire"] = preload("res://audio/sfx/relic_acquire.wav")
-	sounds["heal"] = preload("res://audio/sfx/heal.wav")
-	sounds["status_apply"] = preload("res://audio/sfx/status_apply.wav")
-	sounds["passion_shift"] = preload("res://audio/sfx/passion_shift.wav")
-	sounds["tier_change"] = preload("res://audio/sfx/tier_change.wav")
-	sounds["card_exhaust"] = preload("res://audio/sfx/card_exhaust.wav")
-	sounds["card_upgrade"] = preload("res://audio/sfx/card_upgrade.wav")
-	sounds["shop_buy"] = preload("res://audio/sfx/shop_buy.wav")
+## The sound effects, by name. A name with no file in res://audio/sfx/ simply plays nothing, and a
+## file of that name added later plays with no code change.
+const SOUND_NAMES: Array[String] = [
+	"card_play", "card_draw", "hit", "block", "enemy_die", "player_hurt", "combat_win",
+	"combat_lose", "button_click", "gold_gain", "relic_acquire", "heal", "status_apply",
+	"passion_shift", "tier_change", "card_exhaust", "card_upgrade", "shop_buy",
+]
 
-	music_tracks["map"] = preload("res://audio/music/map_theme.wav")
-	music_tracks["combat"] = preload("res://audio/music/combat_theme.wav")
-	music_tracks["boss"] = preload("res://audio/music/boss_theme.wav")
-	music_tracks["shop"] = preload("res://audio/music/shop_theme.wav")
-	music_tracks["rest"] = preload("res://audio/music/rest_theme.wav")
-	music_tracks["victory"] = preload("res://audio/music/victory_theme.wav")
+## The music tracks, by name, each looked up as res://audio/music/<name>_theme with one of the
+## extensions below. There is no music yet, so none loads and every music call does nothing.
+const MUSIC_NAMES: Array[String] = ["map", "combat", "boss", "shop", "rest", "victory"]
+const MUSIC_EXTENSIONS: Array[String] = ["ogg", "wav", "mp3"]
+
+
+func _load_sounds() -> void:
+	for sound_name in SOUND_NAMES:
+		var stream := _load_stream("res://audio/sfx/%s.wav" % sound_name)
+		if stream != null:
+			sounds[sound_name] = stream
+
+	for track_name in MUSIC_NAMES:
+		for ext in MUSIC_EXTENSIONS:
+			var stream := _load_stream("res://audio/music/%s_theme.%s" % [track_name, ext])
+			if stream != null:
+				music_tracks[track_name] = stream
+				break
+
+
+## Loads an audio file if it exists, else returns null without a word, so a missing file is
+## not an error.
+func _load_stream(path: String) -> AudioStream:
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as AudioStream
 
 
 func _connect_signals() -> void:
