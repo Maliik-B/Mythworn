@@ -46,7 +46,7 @@ Two commits can only be compared if the same seed gives the same rolls, and Godo
 
 A separate model of the rules, in Python, fell out of step with the game. The harness that replaced it drives the real `CombatEngine` with no screen loaded, so its fights run on the game's own rules.
 
-The harness's player plans each turn on a forward model of the fight, a second and lighter copy of the rules. `--verify` checks that copy against the engine, before each card and before each enemy turn it can predict: about 33,000 comparisons across 11 loadouts and 5 fights. Two of them are known to disagree, each by 3 HP on a player with 80: a small gap, not yet traced to its cause.
+The harness's player plans each turn on a forward model of the fight, a second and lighter copy of the rules. `--verify` checks that copy against the engine, before each card and before each enemy turn it can predict: about 33,000 comparisons across 11 loadouts and 5 fights. None of them disagree.
 
 ### A content linter with mutation tests
 
@@ -110,7 +110,7 @@ godot --headless --path . res://tools/content_linter.tscn
 godot --headless --path . res://tools/combat_harness.tscn -- --verify
 ```
 
-`roster_test` takes a minute or two and ends on `ALL PASS`. The linter takes a few seconds and ends on `LINT CLEAN`. The harness takes about a minute, prints its count of comparisons and mismatches, marks the two known ones, and exits 0 unless a new one appears. There is no CI yet: the checks are run by hand before each commit.
+`roster_test` takes a minute or two and ends on `ALL PASS`. The linter takes a few seconds and ends on `LINT CLEAN`. The harness takes about a minute, prints its count of comparisons and mismatches, and exits 0 when it finds none. There is no CI yet: the checks are run by hand before each commit.
 
 ## Licence
 
