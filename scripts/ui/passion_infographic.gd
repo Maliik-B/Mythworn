@@ -248,7 +248,7 @@ func _populate_cards(tier: int) -> void:
 	elif pole == CardData.PersonalityType.SECONDARY:
 		pole_name = "%s (Secondary)" % _ctx.sec
 	var suffix := ("  +%d%% damage" % roundi((mult - 1.0) * 100.0)) if mult > 1.0 else ""
-	var pin_tag := "  📌" if tier == _pinned_tier else ""
+	var pin_tag := "  (pinned)" if tier == _pinned_tier else ""
 	_right_title.text = "%s: %s cards%s%s" % [PassionState.tier_name(tier), pole_name, suffix, pin_tag]
 
 	var deck: Array = RunManager.current_deck if RunManager.current_deck else []
