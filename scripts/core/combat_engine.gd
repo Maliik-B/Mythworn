@@ -92,6 +92,11 @@ var _blade_oil_pending: int = 0
 ## ending the run, so it is said once.
 var _loss_announced: bool = false
 
+## The enemies whose death this fight has announced. A poison tick that kills is seen by the damage
+## handler and again by the enemy turn, and the screen, the sound and The Merciful all answer
+## enemy_died, so each enemy is announced once (see _announce_death).
+var _deaths_announced: Array[EnemyCombatState] = []
+
 ## The engine of the fight now being played, set when a fight starts and cleared when that engine
 ## leaves the tree. The card face reads the next hit's flat bonus through it
 ## (flat_bonus_for_preview); the rules never do.
@@ -171,6 +176,7 @@ func start_combat(deck: Array[CardData], player_hp: int, player_max_hp: int,
 	turn_number = 0
 	live = self
 	_loss_announced = false
+	_deaths_announced.clear()
 	# Blooded Edge: prime the first-attack bonus from the relic's tunable value (0 if unheld).
 	var blooded := RunManager.get_relic("Blooded Edge")
 	_blooded_edge_pending = blooded.value if blooded else 0
@@ -604,7 +610,7 @@ func start_enemy_turn() -> void:
 		tick_start_of_turn(enemy.stats)
 		await _until_released()  # a tick can break a boss's bar, and he gets up before anyone acts
 		if enemy.stats.is_dead():
-			Events.enemy_died.emit(enemy)
+			_announce_death(enemy)
 			continue
 		# Frozen enemies forfeit their action this turn. Poison still ticked above;
 		# other end-of-turn statuses still count down below. One stack = one turn.
@@ -1094,7 +1100,7 @@ func _on_damage_dealt(target: CombatantStats, amount: int) -> void:
 						_apply_phase_enter(enemy)
 						Events.enemy_phase_changed.emit(enemy, enemy.phase_index, line)
 					else:
-						Events.enemy_died.emit(enemy)
+						_announce_death(enemy)
 				break
 
 
@@ -1238,6 +1244,16 @@ func _announce_loss() -> void:
 		return
 	_loss_announced = true
 	Events.combat_lost.emit()
+
+
+## Says an enemy has died, once. Every path that finds it dead comes through here, so a lethal
+## tick the damage handler already announced, or more damage landing on the body, does not
+## announce it again.
+func _announce_death(enemy: EnemyCombatState) -> void:
+	if _deaths_announced.has(enemy):
+		return
+	_deaths_announced.append(enemy)
+	Events.enemy_died.emit(enemy)
 
 
 func check_battle_end() -> void:

@@ -84,6 +84,7 @@ func _ready() -> void:
 	await _test_frozen_skips()
 	await _test_chilled_freeze()
 	await _test_combat_lost_once()
+	await _test_enemy_died_once()
 	_test_card_number_counts_flat_bonuses()
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
@@ -2668,6 +2669,83 @@ func _test_combat_lost_once() -> void:
 	seng.free()
 
 	Events.combat_lost.disconnect(_count_loss)
+
+
+var _deaths_seen := 0
+var _mends_seen := 0
+var _phases_seen := 0
+
+
+func _count_death(_enemy) -> void:
+	_deaths_seen += 1
+
+
+func _count_mend(_amount: int, _hp: int) -> void:
+	_mends_seen += 1
+
+
+func _count_phase(_enemy, _index: int, _line: String) -> void:
+	_phases_seen += 1
+
+
+## An enemy's death is announced once however many paths find it dead. The combat screen plays the
+## death, the audio manager the sound, and The Merciful mends the player, all off enemy_died, so a
+## poison tick that kills at the start of the enemy's turn, which the damage handler announces and
+## the enemy turn's own check saw again, must not say it twice. A boss whose bar breaks changes
+## phase and is not dead.
+func _test_enemy_died_once() -> void:
+	Events.enemy_died.connect(_count_death)
+	Events.player_healed.connect(_count_mend)
+	Events.enemy_phase_changed.connect(_count_phase)
+
+	# Poison kills one of two enemies as its turn begins; The Merciful (3) is armed.
+	_deaths_seen = 0
+	_mends_seen = 0
+	var peng := CombatEngine.new()
+	peng.instant = true
+	add_child(peng)
+	peng.start_combat([], 40, 50, [_dummy_attacker(), _dummy_attacker()])
+	peng._mercy_heal = 3
+	Events.enemy_died.connect(peng._on_enemy_died_mercy)
+	peng.enemies[0].stats.current_hp = 3
+	peng.apply_status_effect(peng.enemies[0].stats, StatusEffects.POISON, 10)
+	await peng.start_enemy_turn()
+	_check("a poison kill at the start of an enemy's turn emits enemy_died once (%d)" % _deaths_seen,
+		peng.enemies[0].stats.is_dead() and _deaths_seen == 1)
+	_check("The Merciful mends once for that kill (%d)" % _mends_seen, _mends_seen == 1)
+	peng.free()
+
+	# An ordinary killing hit, then more damage on the corpse and the end-of-fight check.
+	_deaths_seen = 0
+	var heng := CombatEngine.new()
+	heng.instant = true
+	add_child(heng)
+	heng.start_combat([], 40, 50, [_dummy_attacker(), _dummy_attacker()])
+	heng.deal_damage(heng.enemies[0].stats, 999, heng.player_stats)
+	_check("a killing hit emits enemy_died once (%d)" % _deaths_seen, _deaths_seen == 1)
+	heng.deal_damage(heng.enemies[0].stats, 5, heng.player_stats)
+	heng.check_battle_end()
+	_check("damage on the dead and the end-of-fight check say nothing more (%d)" % _deaths_seen,
+		_deaths_seen == 1)
+	heng.free()
+
+	# A boss whose bar breaks to a poison tick changes phase and does not die.
+	_deaths_seen = 0
+	_phases_seen = 0
+	var beng := CombatEngine.new()
+	beng.instant = true
+	add_child(beng)
+	beng.start_combat([], 400, 400, [EnemyPool.sir_caedmon()])
+	var boss: EnemyCombatState = beng.enemies[0]
+	beng.apply_status_effect(boss.stats, StatusEffects.POISON, boss.stats.current_hp)
+	await beng.start_enemy_turn()
+	_check("a bar broken by poison changes phase once and does not die (%d, %d)" % [_phases_seen, _deaths_seen],
+		_phases_seen == 1 and _deaths_seen == 0 and boss.phase_index == 1 and not boss.stats.is_dead())
+	beng.free()
+
+	Events.enemy_died.disconnect(_count_death)
+	Events.player_healed.disconnect(_count_mend)
+	Events.enemy_phase_changed.disconnect(_count_phase)
 
 
 ## The big number on a card is the number the next hit lands: the title's bonus, Momentum built

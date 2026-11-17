@@ -151,7 +151,7 @@ There is no CI yet. The checks are scenes in `tools/` that run headless, and the
 |---|---|---|
 | `roster_test` | Assertions against the real enemies, cards, relics, titles and maps: when a move is legal, the bosses' phases, Passion's rules, each relic and title, what the map guarantees across seeds. | 736 checks, all passing. |
 | `content_linter` | 20 rules over the registries and the references between them. Each rule is a pure function, and a self-test hands it a copy of the data with one bug planted in it. | Clean, with two known findings listed in the tool: two cards that nothing grants yet. |
-| `combat_harness` | Single fights on the real engine with a planning player. | Two known 3 HP mismatches in its model ([below](#the-planner-and-its-forward-model)). |
+| `combat_harness` | Single fights on the real engine with a planning player. | Its forward model agrees with the engine on every comparison it makes ([below](#the-planner-and-its-forward-model)). |
 | `run_harness` | Whole runs: a fixed act of 16 nodes, real encounters, the real engine, real card drafts. Paired sweeps measure what a companion, a relic or a title adds on the same seeds. | Its fights are the game's. Its events are not ([What is rough](#what-is-rough)). |
 | `gamebreak_hunt` | A search for degenerate builds. It hill-climbs from random starts over cards, relics, titles, held items and companions, and scores each build on its damage to a dummy with 1,000,000 HP. | It flags a turn that outdamages the boss's first bar, plays more than 25 cards or ends with more than 12 energy. |
 | `realm_route_proof` | Same-seed output to diff between two commits: each map, and the encounters and events along a route through it, for 40 seeds under three realm configurations. It plays no fight and takes no reward, so it does not exercise the deck or loot streams. | It reads the two pledges from the realm-entry scene, so a change to a pledge's numbers moves its output. |
@@ -165,8 +165,7 @@ The harness's player, `HarnessCombat`, plans a whole turn at a time. It plays ea
 
 The engine emits global signals and reads global run state, so it is not something to copy and step a few hundred times a decision. The planner searches on a light model of the fight that it keeps itself. That is a second implementation of the rules, which is the thing the harness exists to avoid, so `--verify` holds the model to the engine. Before each card it predicts the state after it, and before each enemy turn it predicts the player's HP and each enemy's state after that turn. Each prediction is compared with what the engine then did. It skips what it cannot predict: an enemy turn after a bar has just broken, and the player's HP when a relic heals at the start of the turn.
 
-On the current build that is 25,633 cards and 7,061 enemy turns across 11 loadouts and 5 fights, with two mismatches. Two cards, Cascade and Riptide, each once left the player 3 HP above the prediction. The cause has not been chased down, so the tool lists both as known: a run with only those exits 0, and a new mismatch, or a known one that stops occurring, exits 1.
-
+On the current build that is 25,633 cards and 7,061 enemy turns across 11 loadouts and 5 fights, with no mismatches. The tool keeps a list of known ones, empty at present: a run exits 0 only when every mismatch is on the list, and a new mismatch, or a listed one that stops occurring, exits 1.
 ## What is rough
 
 Four of these are structural.

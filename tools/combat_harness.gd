@@ -26,10 +26,7 @@ const CONFIG := "shipped"
 ## Mismatches --verify reports and records here, in the content linter's shape. Key = "<card>:
 ## <field>" as printed, value = why it stands. They print and do not fail the run; a new one fails
 ## it, and so does one that stops occurring, so the list cannot rot.
-const KNOWN_MISMATCHES := {
-	"Cascade: php": "once in 25,633 cards the engine leaves the player 3 HP above the copy's prediction; the cause is not found",
-	"Riptide: php": "the same 3 HP, once; the cause is not found",
-}
+const KNOWN_MISMATCHES := {}
 
 ## Trial seeds are _seed_base + 0..N-1. The default base 0 keeps every number comparable with the
 ## snapshots; --daily derives it from the UTC date (YYYYMMDD x 1000) so a day's run is the same
