@@ -721,14 +721,23 @@ func play_card(card: CardData, target: CombatantStats) -> bool:
 	# Track current card for zone penalty in deal_damage
 	_current_card = card
 
+	# An area card hits every enemy standing when it is played. Its Passion shift counts once for
+	# each of them, the ones its own hit kills included; every other effect lands only on those
+	# still standing when it resolves.
+	var struck: Array = []
+	if card.target_type == CardData.TargetType.ALL_ENEMIES:
+		for enemy in enemies:
+			if not enemy.stats.is_dead():
+				struck.append(enemy)
+
 	# Resolve effects: route to correct targets based on card targeting
 	for effect in card.get_active_effects():
 		match card.target_type:
 			CardData.TargetType.SELF, CardData.TargetType.NONE:
 				effect.apply(player_stats, player_stats, self)
 			CardData.TargetType.ALL_ENEMIES:
-				for enemy in enemies:
-					if not enemy.stats.is_dead():
+				for enemy in struck:
+					if effect is PassionEffect or not enemy.stats.is_dead():
 						effect.apply(player_stats, enemy.stats, self)
 			CardData.TargetType.SINGLE_ENEMY:
 				effect.apply(player_stats, target, self)

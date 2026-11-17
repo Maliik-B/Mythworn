@@ -90,6 +90,7 @@ func _ready() -> void:
 	_test_harness_copy_matches_engine()
 	_test_harness_copy_card_rules()
 	_test_harness_copy_new_rules()
+	_test_area_passion_counts_every_enemy_struck()
 	_test_harness_policy_decides()
 	await _test_map_flourish()
 	await _test_restage_holds()
@@ -3275,6 +3276,52 @@ func _test_harness_policy_decides() -> void:
 
 ## A real combat for the policy checks: the given cards as the whole deck (five or fewer are all
 ## in hand), each enemy telegraphing its first move and no next move rolled.
+## An area card's Passion counts once for every enemy it struck, the ones its hit kills included;
+## its other effects land only on the enemies still standing. Sweep (9 damage, 1 Weak, +2 Passion)
+## is played on three enemies that all fall, some fall and none fall, and the harness's copy of the
+## rules is held to the same Passion.
+func _test_area_passion_counts_every_enemy_struck() -> void:
+	var saved_passion: int = RunManager.passion.current_value
+	var saved_relics := RunManager.relics.duplicate()
+	var saved_titles := RunManager.active_title_slots.duplicate()
+	RunManager.relics.clear()
+	RunManager.active_title_slots.assign([&"", &""])
+	var sweep := _card_by_name(CardPool._build_generic_pool(), "Sweep")
+	var vol: float = RunManager.current_character.passion_volatility if RunManager.current_character else 1.0
+	var each := int(2 * vol)
+	var policy := HarnessCombat.new()
+	for case in [["kills every enemy", [5, 5, 5], 0], ["kills some", [5, 5, 50], 1], ["kills none", [50, 50, 50], 3]]:
+		RunManager.passion.current_value = 0
+		var foes: Array = []
+		for hp in case[1]:
+			foes.append(_one_move_enemy("Foe", hp, 0))
+		var eng := _policy_fight([], 80, foes)
+		var line := policy._line_copy(eng)
+		policy._sim_card(eng, policy._context(eng, false, 0), sweep, line)
+		var card := sweep.duplicate_card()
+		eng.piles.hand.append(card)
+		eng.energy = 3
+		eng.play_card(card, null)
+		var standing := 0
+		var weak_on_standing := true
+		var weak_on_fallen := false
+		for en in eng.enemies:
+			if en.stats.is_dead():
+				weak_on_fallen = weak_on_fallen or en.stats.has_status(StatusEffects.WEAK)
+			else:
+				standing += 1
+				weak_on_standing = weak_on_standing and en.stats.has_status(StatusEffects.WEAK)
+		_check("Sweep %s: the Passion counts all three struck (%d), Weak lands on the %d left standing and on no fallen one"
+			% [case[0], 3 * each, case[2]],
+			RunManager.passion.current_value == 3 * each and standing == case[2] and weak_on_standing and not weak_on_fallen)
+		_check("Sweep %s: the harness's copy shifts the same Passion as the engine" % case[0],
+			line["passion"] == RunManager.passion.current_value)
+		eng.free()
+	RunManager.passion.current_value = saved_passion
+	RunManager.relics.assign(saved_relics)
+	RunManager.active_title_slots.assign(saved_titles)
+
+
 func _policy_fight(cards: Array, hp: int, foes: Array) -> CombatEngine:
 	var eng := CombatEngine.new()
 	eng.instant = true

@@ -96,7 +96,7 @@ A card is a `CardData` holding an array of `CardEffect` resources, whose classes
 1. The combat screen calls `CombatEngine.play_card(card, target)`.
 2. `can_play_card` refuses unless it is the player's turn, nothing is holding the fight, the card is in the hand and playable, and the energy covers its cost.
 3. The engine pays the cost and takes the card out of the hand. An X-cost card spends all the energy that is left.
-4. Each effect is applied in order to the player, to the target or to every living enemy, as the card's target type says. An area card applies every one of its effects once for each living enemy, a Passion shift included, so its Passion grows with the size of the fight. A damage or Block effect changes nothing itself. It calls back into the engine (`deal_damage`, `apply_block`), which applies the modifiers in one fixed order and emits the signals for what happened. For damage the order is:
+4. Each effect is applied in order to the player, to the target or to every living enemy, as the card's target type says. An area card applies each of its effects once for every enemy still standing when that effect resolves, with one exception: its Passion shift counts once for every enemy the card struck, the ones its own hit kills included, so its Passion grows with the size of the fight and a killing blow does not shrink it. A damage or Block effect changes nothing itself. It calls back into the engine (`deal_damage`, `apply_block`), which applies the modifiers in one fixed order and emits the signals for what happened. For damage the order is:
    1. Strength, then Weak, on the attacker.
    2. The flat bonuses a title or a relic adds.
    3. The Passion multiplier.

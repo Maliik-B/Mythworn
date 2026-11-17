@@ -498,7 +498,8 @@ func _copy_line(line: Dictionary) -> Dictionary:
 ## by effect: damage hit by hit through deal_damage's order (with lifebars, overkill, hits on a
 ## fallen enemy, Enraged lash, Momentum and Blooded Edge), block, statuses (and Water's control-
 ## heal), healing, Passion, energy, draws and powers. A single-target card strikes the focus
-## enemy; an area card every enemy still standing when each of its effects resolves. Returns true
+## enemy; an area card every enemy still standing when each of its effects resolves, except its
+## Passion, which counts once for every enemy standing when the card was played. Returns true
 ## when the card goes back to the hand (the Unfading's echo on the first card of the combat), which
 ## the plan search then offers once more.
 func _sim_card(eng: CombatEngine, ctx: Dictionary, card: CardData, line: Dictionary) -> bool:
@@ -514,6 +515,11 @@ func _sim_card(eng: CombatEngine, ctx: Dictionary, card: CardData, line: Diction
 	var single := -1
 	if card.target_type == CardData.TargetType.SINGLE_ENEMY:
 		single = _focus_index(line)
+	var struck: Array = []  # an area card's foes standing when it is played
+	if card.target_type == CardData.TargetType.ALL_ENEMIES:
+		for i in foes.size():
+			if not foes[i]["dead"]:
+				struck.append(i)
 	for e in card.get_active_effects():
 		var targets: Array = []  # foe indices; -1 is the player
 		match card.target_type:
@@ -523,8 +529,8 @@ func _sim_card(eng: CombatEngine, ctx: Dictionary, card: CardData, line: Diction
 				if single >= 0:
 					targets = [single]
 			CardData.TargetType.ALL_ENEMIES:
-				for i in foes.size():
-					if not foes[i]["dead"]:
+				for i in struck:
+					if e is PassionEffect or not foes[i]["dead"]:
 						targets.append(i)
 		for t in targets:
 			_sim_effect(eng, ctx, card, e, t, x, line)
