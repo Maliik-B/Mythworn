@@ -149,7 +149,7 @@ There is no CI yet. The checks are scenes in `tools/` that run headless, and the
 
 | Tool | What it does | Where it stands |
 |---|---|---|
-| `roster_test` | Assertions against the real enemies, cards, relics, titles and maps: when a move is legal, the bosses' phases, Passion's rules, each relic and title, what the map guarantees across seeds. | 772 checks, all passing. |
+| `roster_test` | Assertions against the real enemies, cards, relics, titles and maps: when a move is legal, the bosses' phases, Passion's rules, each relic and title, what the map guarantees across seeds. | 777 checks, all passing. |
 | `content_linter` | 20 rules over the registries and the references between them. Each rule is a pure function, and a self-test hands it a copy of the data with one bug planted in it. | Clean, with two known findings listed in the tool: two cards that nothing grants yet. |
 | `combat_harness` | Single fights on the real engine with a planning player. | Its forward model agrees with the engine on every comparison it makes ([below](#the-planner-and-its-forward-model)). |
 | `run_harness` | Whole runs: a fixed act of 16 nodes, real encounters, the real engine, real card drafts. Paired sweeps measure what a companion, a relic or a title adds on the same seeds. | Its fights are the game's. Its events are not ([What is rough](#what-is-rough)). |
