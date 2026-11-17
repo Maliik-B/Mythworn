@@ -85,6 +85,7 @@ func _ready() -> void:
 	await _test_chilled_freeze()
 	await _test_combat_lost_once()
 	await _test_enemy_died_once()
+	_test_draw_sound_spacing()
 	_test_card_number_counts_flat_bonuses()
 	_test_inner_fire_copies_itself()
 	_test_combat_retains_nothing()
@@ -2693,6 +2694,31 @@ func _count_phase(_enemy, _index: int, _line: String) -> void:
 ## poison tick that kills at the start of the enemy's turn, which the damage handler announces and
 ## the enemy turn's own check saw again, must not say it twice. A boss whose bar breaks changes
 ## phase and is not dead.
+## A hand's five draw sounds are spaced 80 ms apart, a burst stops at six, and a draw after
+## a pause plays at once. The scheduling is a pure function, so no audio needs to be on.
+func _test_draw_sound_spacing() -> void:
+	var slot := -10.0
+	var now := 100.0
+	var delays: Array[float] = []
+	for i in 7:
+		var d: float = AudioManager.draw_delay(now, slot)
+		delays.append(d)
+		if d >= 0.0:
+			slot = now + d
+	var ms: Array[int] = []
+	for d in delays:
+		ms.append(roundi(d * 1000.0))
+	_check("five draws in one frame play at 0, 80, 160, 240 and 320 ms", ms.slice(0, 5) == [0, 80, 160, 240, 320])
+	_check("a sixth still plays at 400 ms and a seventh is skipped", ms[5] == 400 and delays[6] < 0.0)
+	_check("a draw after a long pause plays at once", AudioManager.draw_delay(now + 5.0, slot) == 0.0)
+	_check("a draw 30 ms after the last slot waits for the next one", roundi(AudioManager.draw_delay(slot + 0.03, slot) * 1000.0) == 50)
+
+	# With audio off nothing is scheduled, so no timer is made for either delayed sound.
+	AudioManager._on_card_drawn(null)
+	AudioManager._on_enemy_died(null)
+	_check("with audio off a draw or a death schedules nothing", AudioManager._last_draw_slot == -10.0)
+
+
 func _test_enemy_died_once() -> void:
 	Events.enemy_died.connect(_count_death)
 	Events.player_healed.connect(_count_mend)

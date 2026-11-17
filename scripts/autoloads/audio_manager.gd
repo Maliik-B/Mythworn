@@ -127,6 +127,40 @@ func play_sfx(sound_name: String, volume_db: float = 0.0) -> void:
 	sfx_index = (sfx_index + 1) % SFX_POOL_SIZE
 
 
+## Play a named sound effect after a delay in seconds. Nothing is scheduled while audio is
+## off or the sound is not loaded, and play_sfx checks again when the timer fires. The timer
+## belongs to this autoload, which lives for the whole game, so it outlasts any scene.
+func play_sfx_after(delay: float, sound_name: String, volume_db: float = 0.0) -> void:
+	if not enabled or sound_name not in sounds:
+		return
+	if delay <= 0.0:
+		play_sfx(sound_name, volume_db)
+		return
+	get_tree().create_timer(delay).timeout.connect(play_sfx.bind(sound_name, volume_db))
+
+
+## A hand is dealt as five card_drawn signals in one frame, which would play as one stacked
+## sound. Each draw sound starts DRAW_SPACING after the last one's slot, and a burst plays at
+## most MAX_DRAWS_PER_BURST so a large draw does not trail on.
+const DRAW_SPACING := 0.08
+const MAX_DRAWS_PER_BURST := 6
+## The enemy_die sound follows the blow that killed, instead of landing on it.
+const DEATH_DELAY := 0.15
+
+## The time (seconds) the last draw sound was set to start; a long way back so the first
+## draw plays at once.
+var _last_draw_slot := -10.0
+
+
+## How long from `now` the next draw sound should wait, given the slot of the previous one,
+## or -1.0 if this draw is past the burst limit and is skipped.
+static func draw_delay(now: float, last_slot: float) -> float:
+	var delay := maxf(now, last_slot + DRAW_SPACING) - now
+	if delay > DRAW_SPACING * (MAX_DRAWS_PER_BURST - 1) + 0.001:
+		return -1.0
+	return delay
+
+
 # ============================================================
 # MUSIC PLAYBACK
 # ============================================================
@@ -161,7 +195,14 @@ func _on_card_played(_card: CardData, _target) -> void:
 	play_sfx("card_play")
 
 func _on_card_drawn(_card: CardData) -> void:
-	play_sfx("card_draw", -4.0)
+	if not enabled:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	var delay := draw_delay(now, _last_draw_slot)
+	if delay < 0.0:
+		return
+	_last_draw_slot = now + delay
+	play_sfx_after(delay, "card_draw", -4.0)
 
 func _on_card_exhausted(_card: CardData) -> void:
 	play_sfx("card_exhaust")
@@ -186,7 +227,7 @@ func _on_enemy_damaged(_enemy, _amount: int, _new_hp: int) -> void:
 	play_sfx("hit")
 
 func _on_enemy_died(_enemy) -> void:
-	play_sfx("enemy_die")
+	play_sfx_after(DEATH_DELAY, "enemy_die")
 
 func _on_block_gained(_target, amount: int) -> void:
 	# A negative amount is Block being taken away, which is not a gain.
