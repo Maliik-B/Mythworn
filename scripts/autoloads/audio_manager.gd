@@ -188,7 +188,10 @@ func _on_enemy_damaged(_enemy, _amount: int, _new_hp: int) -> void:
 func _on_enemy_died(_enemy) -> void:
 	play_sfx("enemy_die")
 
-func _on_block_gained(_target, _amount: int) -> void:
+func _on_block_gained(_target, amount: int) -> void:
+	# A negative amount is Block being taken away, which is not a gain.
+	if amount <= 0:
+		return
 	play_sfx("block")
 
 func _on_status_applied(_target, _effect: StatusEffectData, _stacks: int) -> void:
