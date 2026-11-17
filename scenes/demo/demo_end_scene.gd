@@ -1,15 +1,18 @@
 extends Control
 ## The demo boundary. Shown after the Act-1 Camelot boss (Sir Caedmon) instead of letting
 ## the player continue into the stubbed Act 2. The keeper's part in this telling is played
-## out: a send-off that reflects their crown choice, a run summary, a wishlist call-to-action,
-## and a clean Play Again / Return to Title. Act 2+ stays intact behind the gate for post-demo.
+## out: a send-off that reflects their crown choice, a run summary, a call to follow the game
+## (the wishlist once a Steam page exists), and a clean Play Again / Return to Title. Act 2+ stays intact behind the gate for post-demo.
 ##
 ## Visually a sibling of act_transition_scene (the beat this replaces): golden rising
 ## particles, the same stat panel, the same procedural chrome.
 
-## The Steam store-page URL. Empty = the wishlist button ships as a "coming soon" placeholder;
-## fill this in when the Steam page is live and the button opens it via OS.shell_open.
+## The Steam store-page URL. Empty = the follow block shows instead of the wishlist block;
+## fill this in when the Steam page is live and the wishlist button opens it via OS.shell_open.
 const WISHLIST_URL := ""
+## Where the follow block sends a player while there is no Steam page to wishlist.
+const SITE_URL := "https://mythworn.com"
+const DISCORD_URL := "https://discord.gg/cyk9Q74pYn"
 
 var _particles: Array[ColorRect] = []
 var _time := 0.0
@@ -95,7 +98,10 @@ void fragment() {
 	vbox.add_child(desc)
 
 	_build_summary(vbox)
-	_build_wishlist(vbox)
+	if WISHLIST_URL != "":
+		_build_wishlist(vbox)
+	else:
+		_build_follow(vbox)
 	_build_nav(vbox)
 
 
@@ -250,6 +256,30 @@ func _build_wishlist(vbox: VBoxContainer) -> void:
 		vbox.add_child(note)
 
 
+## Shown in place of the wishlist block until a Steam page exists: the game's site and its
+## Discord, each opened in the browser (a new tab in the browser build).
+func _build_follow(vbox: VBoxContainer) -> void:
+	var header = Label.new()
+	header.text = "Follow Mythworn as it grows"
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_theme_font_size_override("font_size", 24)
+	header.add_theme_color_override("font_color", Color(0.95, 0.82, 0.4))
+	vbox.add_child(header)
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 20)
+	vbox.add_child(row)
+
+	var site := _make_button("mythworn.com", Vector2(260, 52))
+	site.pressed.connect(_on_link_pressed.bind(SITE_URL))
+	row.add_child(site)
+
+	var discord := _make_button("Join the Discord", Vector2(260, 52))
+	discord.pressed.connect(_on_link_pressed.bind(DISCORD_URL))
+	row.add_child(discord)
+
+
 func _build_nav(vbox: VBoxContainer) -> void:
 	var row = HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -337,6 +367,11 @@ func _on_wishlist_pressed() -> void:
 	AudioManager.play_sfx("button_click")
 	if WISHLIST_URL != "":
 		OS.shell_open(WISHLIST_URL)
+
+
+func _on_link_pressed(url: String) -> void:
+	AudioManager.play_sfx("button_click")
+	OS.shell_open(url)
 
 
 func _on_play_again() -> void:

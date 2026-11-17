@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_master_of_game()
 	_test_map_node_looks()
 	_test_card_face_words()
+	_test_end_screen_follow()
 	_test_crossing_switch()
 	# The crossing is off in the game until the door's design says how it shows; its tests turn it on.
 	MapGenerator.crossing_enabled = true
@@ -5242,6 +5243,28 @@ func _test_map_key() -> void:
 
 ## The card face moves sentences between zones and must never lose or change one: for every shipped
 ## card, its zones hold exactly the words of its description, printed and in combat.
+## The end screen, with no Steam page yet, asks the player to follow the game: a heading and two
+## buttons to the site and the Discord, and no wishlist block.
+func _test_end_screen_follow() -> void:
+	var saved_titles := RunManager.earned_title_ids.duplicate()
+	var script = load("res://scenes/demo/demo_end_scene.gd")
+	var scene: Node = load("res://scenes/demo/demo_end_scene.tscn").instantiate()
+	add_child(scene)
+	var texts: Array = []
+	for n in scene.find_children("*", "", true, false):
+		if n is Label or n is Button:
+			texts.append(n.text)
+	_check("the end screen with no Steam page shows the follow block: its heading and both links",
+		script.WISHLIST_URL == "" and texts.has("Follow Mythworn as it grows")
+		and texts.has("mythworn.com") and texts.has("Join the Discord"))
+	_check("the end screen shows no wishlist words while there is no Steam page",
+		not texts.has("Wishlist Mythworn on Steam") and not texts.has("Wishlist: coming soon"))
+	_check("the follow links point at the site and the Discord invite",
+		script.SITE_URL == "https://mythworn.com" and script.DISCORD_URL.begins_with("https://discord.gg/"))
+	scene.queue_free()
+	RunManager.earned_title_ids.assign(saved_titles)
+
+
 func _test_card_face_words() -> void:
 	print("-- Card face words --")
 	var sets: Array = [CharacterPool.emo_starting_deck(), CardPool._build_generic_pool(),
