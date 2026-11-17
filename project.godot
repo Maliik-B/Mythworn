@@ -15,6 +15,7 @@ run/main_scene="res://scenes/splash/splash_scene.tscn"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="Mythworn"
 config/features=PackedStringArray("4.4")
+config/icon="res://assets/icon/mythworn_icon.png"
 
 [autoload]
 Events="*res://scripts/autoloads/events.gd"
