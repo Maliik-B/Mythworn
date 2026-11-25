@@ -45,6 +45,9 @@ void fragment() {
 	vignette.material = mat
 	add_child(vignette)
 
+	# What a keyword in a relic's words means, on hover.
+	add_child(HoverNote.new())
+
 	var margin = MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 60)
@@ -160,6 +163,7 @@ func _create_relic_panel(relic: RelicData) -> PanelContainer:
 	vbox.add_child(desc_lbl)
 
 	_ignore_mouse_recursive(vbox)
+	RelicKeywords.mark(panel, relic)
 
 	panel.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:

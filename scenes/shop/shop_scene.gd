@@ -204,8 +204,12 @@ func _build_ui() -> void:
 	_hover_note = HoverNote.new()
 	_hover_note.blocked = func() -> bool:
 		var hovered := get_viewport().gui_get_hovered_control()
-		return consumable_bar.is_menu_open() or is_instance_valid(_inspect) or is_instance_valid(_removal) \
-			or hovered == null or not (hovered == consumable_bar or consumable_bar.is_ancestor_of(hovered))
+		if hovered == null or consumable_bar.is_menu_open() or is_instance_valid(_inspect) \
+				or is_instance_valid(_removal):
+			return true
+		# Over the pack, or over a relic on the shelf.
+		var over_pack := hovered == consumable_bar or consumable_bar.is_ancestor_of(hovered)
+		return not (over_pack or slip_shelf.is_ancestor_of(hovered))
 	add_child(_hover_note)
 
 	_refresh_wares()
@@ -307,8 +311,10 @@ func _refresh_wares() -> void:
 		ware.position = Vector2(card_centre(_slot[card], _card_slots) - card_w / 2.0, CARD_TOP)
 		card_shelf.add_child(ware)
 	for relic in shop_relics:
-		slip_shelf.add_child(_create_slip(_slip_rect(_slot[relic]), relic.relic_name, _rarity_colour(relic.rarity),
-			_rarity_name(relic.rarity), relic.description, relic_prices[relic], _on_shop_relic_input.bind(relic)))
+		var slip := _create_slip(_slip_rect(_slot[relic]), relic.relic_name, _rarity_colour(relic.rarity),
+			_rarity_name(relic.rarity), relic.description, relic_prices[relic], _on_shop_relic_input.bind(relic))
+		RelicKeywords.mark(slip, relic)
+		slip_shelf.add_child(slip)
 	for item in shop_consumables:
 		slip_shelf.add_child(_create_slip(_slip_rect(_slot[item]), item.display_name, StageSkin.c("ink"),
 			item.use_context_label().trim_prefix("Use: "), item.description, consumable_prices[item],

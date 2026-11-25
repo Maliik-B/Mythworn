@@ -90,6 +90,7 @@ func _build() -> void:
 
 	_build_relics_section(content)
 	_build_titles_section(content)
+	add_child(HoverNote.new())  # a relic's keywords, on hover
 
 	var close := Button.new()
 	close.text = "Close"
@@ -164,6 +165,7 @@ func _relic_card(relic: RelicData) -> PanelContainer:
 	desc_lbl.add_theme_color_override("font_color", Color(0.72, 0.72, 0.72))
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(desc_lbl)
+	RelicKeywords.mark(panel, relic)
 	return panel
 
 

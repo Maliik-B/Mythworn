@@ -986,8 +986,12 @@ func _populate_bottom_bar(panel: PanelContainer) -> void:
 	var note := HoverNote.new()
 	note.blocked = func() -> bool:
 		var hovered := get_viewport().gui_get_hovered_control()
-		return consumable_bar.is_menu_open() or hovered == null \
-			or not (hovered == consumable_bar or consumable_bar.is_ancestor_of(hovered))
+		if hovered == null or consumable_bar.is_menu_open():
+			return true
+		# Over the pack, or over a relic in the relics view.
+		var over_pack := hovered == consumable_bar or consumable_bar.is_ancestor_of(hovered)
+		var over_relic: bool = is_instance_valid(popup_overlay) and popup_overlay.is_ancestor_of(hovered)
+		return not (over_pack or over_relic)
 	add_child(note)
 
 	# The companion, if one travels with the player. Hidden until an event grants one.
@@ -1347,6 +1351,7 @@ func _show_relic_popup() -> void:
 			rdesc.autowrap_mode = TextServer.AUTOWRAP_WORD
 			rvbox.add_child(rdesc)
 
+			RelicKeywords.mark(relic_panel, relic)
 			current_row.add_child(relic_panel)
 			col_count += 1
 
