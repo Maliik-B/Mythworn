@@ -146,6 +146,9 @@ const DRAW_SPACING := 0.08
 const MAX_DRAWS_PER_BURST := 6
 ## The enemy_die sound follows the blow that killed, instead of landing on it.
 const DEATH_DELAY := 0.15
+## The card_exhaust sound follows the card_play of the card it burns, which fires in the same
+## call, instead of landing on it. The shop's card removal plays it at once.
+const EXHAUST_DELAY := 0.175
 
 ## The time (seconds) the last draw sound was set to start; a long way back so the first
 ## draw plays at once.
@@ -205,7 +208,7 @@ func _on_card_drawn(_card: CardData) -> void:
 	play_sfx_after(delay, "card_draw", -4.0)
 
 func _on_card_exhausted(_card: CardData) -> void:
-	play_sfx("card_exhaust")
+	play_sfx_after(EXHAUST_DELAY, "card_exhaust")
 
 func _on_combat_started() -> void:
 	if RunManager.pending_act_complete:
