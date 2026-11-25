@@ -1431,8 +1431,17 @@ func _start_drag(card: CardData, event: InputEvent) -> void:
 	_drag_hint.text = "⊘ right-click to cancel"
 	_drag_hint.add_theme_font_size_override("font_size", 14)
 	_drag_hint.add_theme_color_override("font_color", Color(0.95, 0.72, 0.72))
-	_drag_hint.add_theme_constant_override("outline_size", 4)
-	_drag_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	# A box with a border of its own, so the words have clear edges wherever they land.
+	var hint_box := StyleBoxFlat.new()
+	hint_box.bg_color = Color(0.1, 0.07, 0.07, 0.94)
+	hint_box.border_color = Color(0.95, 0.72, 0.72, 0.9)
+	hint_box.set_border_width_all(2)
+	hint_box.set_corner_radius_all(0 if StageSkin.is_page() else 6)
+	hint_box.content_margin_left = 12
+	hint_box.content_margin_right = 12
+	hint_box.content_margin_top = 5
+	hint_box.content_margin_bottom = 5
+	_drag_hint.add_theme_stylebox_override("normal", hint_box)
 	_drag_hint.z_index = 41
 	_drag_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_drag_hint)
@@ -1472,18 +1481,19 @@ func _clear_drag_visuals() -> void:
 		_drag_hint = null
 
 
-## Where the cancel hint sits: beside the dragged card, on the right unless that runs off the screen,
-## in the strip just under the enemies, the highest the card ever rides, so it clears the card's
-## words and the cards still in the hand. The card is held under the cursor, so a hint that followed
-## the cursor sat on the card's own words.
+## Where the cancel hint sits: centred under the dragged card, on a box of its own so it never mixes
+## with the card's words, and above the card only when the card is too low for it to fit beneath. The card is held under the cursor, so a hint that
+## followed the cursor sat on the card's own words.
 func _drag_hint_pos() -> Vector2:
 	var half: Vector2 = _drag_panel.size * _drag_panel.scale / 2.0
-	var middle: Vector2 = _drag_panel.global_position + _drag_panel.pivot_offset
+	var centre: Vector2 = _drag_panel.global_position + _drag_panel.size / 2.0
 	var hint_size: Vector2 = _drag_hint.get_minimum_size()
-	var x := middle.x + half.x + DRAG_HINT_GAP
-	if x + hint_size.x > get_viewport_rect().size.x:
-		x = middle.x - half.x - DRAG_HINT_GAP - hint_size.x
-	return Vector2(x, _enemies_bottom() + DRAG_CARD_CLEARANCE)
+	var screen := get_viewport_rect().size
+	var x := clampf(centre.x - hint_size.x / 2.0, DRAG_HINT_GAP, screen.x - hint_size.x - DRAG_HINT_GAP)
+	var y := centre.y + half.y + DRAG_HINT_GAP
+	if y + hint_size.y > screen.y - DRAG_HINT_GAP:
+		y = centre.y - half.y - DRAG_HINT_GAP - hint_size.y  # no room underneath: over the card's top edge
+	return Vector2(x, y)
 
 
 ## The dragged card follows the cursor but stops short of the enemies, so it never covers the

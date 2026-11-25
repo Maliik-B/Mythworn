@@ -34,13 +34,15 @@ var _left_msec := -1  # when the pointer left the control the panel describes; -
 ## Marks `control` as described by the panel. `kind` is a short line under the title (a status's
 ## kind, an item's use); `aside` is set dim at the foot (a flavor line, how a status fades). With
 ## `pins`, a click on it keeps the panel up and is used up, so it cannot also land on what is behind;
-## leave it off for a button, whose click must still press it.
+## leave it off for a button, whose click must still press it. With `below`, the panel sits under the
+## control (above it only when there is no room), for a card that is read from its top.
 static func mark(control: Control, title: String, body: String, kind := "", aside := "",
-		pins := false) -> void:
+		pins := false, below := false) -> void:
 	control.tooltip_text = ""
 	control.add_to_group(GROUP)
 	control.set_meta("note", {"title": title, "kind": kind, "body": body, "aside": aside})
 	control.set_meta("note_pins", pins)
+	control.set_meta("note_below", below)
 
 
 func _init() -> void:
@@ -130,7 +132,7 @@ func _show_for(source: Control) -> void:
 		_shown_key = key
 		_panel = _build(note)
 		add_child(_panel)
-	_place(source.get_global_rect())
+	_place(source.get_global_rect(), source.get_meta("note_below", false))
 
 
 func _close() -> void:
@@ -186,12 +188,14 @@ func _label(text: String, font_path: String, font_size: int, colour: Color) -> L
 
 
 ## Above the thing it describes, its left edges lined up; below it when there is no room above.
-func _place(around: Rect2) -> void:
+func _place(around: Rect2, below := false) -> void:
 	var screen := get_viewport().get_visible_rect().size
 	var size := _panel.get_combined_minimum_size()
 	_panel.size = size
-	var y := around.position.y - size.y - GAP
-	if y < EDGE:
+	var y := around.end.y + GAP if below else around.position.y - size.y - GAP
+	if below and y + size.y > screen.y - EDGE:
+		y = around.position.y - size.y - GAP  # no room underneath
+	elif y < EDGE:
 		y = around.end.y + GAP
 	var x := clampf(around.position.x, EDGE, screen.x - size.x - EDGE)
 	_panel.position = Vector2(x, minf(y, screen.y - size.y - EDGE))

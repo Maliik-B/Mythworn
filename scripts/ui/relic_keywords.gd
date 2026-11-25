@@ -52,4 +52,4 @@ static func mark(control: Control, relic: RelicData) -> void:
 	var body := body_for(relic)
 	if body == "":
 		return
-	HoverNote.mark(control, relic.relic_name, body, "Keywords")
+	HoverNote.mark(control, relic.relic_name, body, "Keywords", "", false, true)

@@ -5043,6 +5043,17 @@ func _test_r5b_fixes() -> void:
 		scene._on_card_input(press, card)
 		_check("%s: the press lifts a single-target card and plays nothing" % label,
 			scene._dragging_card == card and card in eng.piles.hand)
+		var hint: Label = scene._drag_hint
+		var low_rect: Rect2 = scene._drag_panel.get_global_rect()
+		var low_hint := Rect2(scene._drag_hint_pos(), hint.get_minimum_size())
+		_check("%s: held low in the hand, the hint still clears the card" % label, not low_hint.intersects(low_rect))
+		scene._drag_panel.global_position = scene._drag_card_pos(centre)  # as the pointer rides it up to the stage
+		var held_rect: Rect2 = scene._drag_panel.get_global_rect()
+		var hint_rect := Rect2(scene._drag_hint_pos(), hint.get_minimum_size())
+		_check("%s: the cancel hint sits under the held card, clear of it, on a box of its own" % label,
+			hint_rect.position.y >= held_rect.end.y and not hint_rect.intersects(held_rect)
+			and hint.get_theme_stylebox("normal") is StyleBoxFlat
+			and absf(hint_rect.get_center().x - held_rect.get_center().x) < 1.0)
 		scene._complete_drag(centre)
 		_check("%s: the release over an enemy plays it" % label,
 			not (card in eng.piles.hand) and scene._dragging_card == null)
@@ -5117,6 +5128,15 @@ func _test_r5b_fixes() -> void:
 	HoverNote.mark(chip, "Weak 2", "Deal 25% less attack damage.")
 	note._show_for(chip)
 	_check("a hover note is up", note.shown_title() == "Weak 2")
+	var chip_below := PanelContainer.new()
+	chip_below.position = Vector2(400, 300)
+	chip_below.size = Vector2(200, 120)
+	host.add_child(chip_below)
+	HoverNote.mark(chip_below, "Iron Quill", "Strength: Deal additional damage equal to stacks.", "Keywords", "", false, true)
+	note._show_for(chip_below)
+	_check("a note marked to sit below goes under its control, not over it",
+		note._panel.position.y >= chip_below.get_global_rect().end.y)
+	note._show_for(chip)
 	var away := InputEventMouseButton.new()
 	away.button_index = MOUSE_BUTTON_LEFT
 	away.pressed = true
