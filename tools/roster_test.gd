@@ -99,6 +99,7 @@ func _ready() -> void:
 	_test_harness_policy_decides()
 	await _test_map_flourish()
 	await _test_restage_holds()
+	await _test_r5b_fixes()
 	await _test_map_key()
 	await _test_crossing_stage()
 	await _test_event_page()
@@ -4992,6 +4993,186 @@ func _test_map_flourish() -> void:
 	scene.queue_free()
 	await get_tree().process_frame
 	RunManager.current_map = null
+
+
+## R5b: a single-target card plays on the release, a hover note lingers, a relic's keywords have notes,
+## and the Realm Shade's Unwrite says what it does and shows the card landing.
+func _test_r5b_fixes() -> void:
+	print("-- R5b: release to play, linger, relic keywords, Unwrite --")
+	RunManager.start_run(CharacterPool.build_emo_hybrid(), 515151)
+	RunManager.pending_enemies.clear()
+	RunManager.pending_enemies.append(EnemyPool.realm_shade())
+	RunManager.pending_enemies.append(EnemyPool.realm_shade())
+	var scene = load("res://scenes/combat/combat_scene.tscn").instantiate()
+	get_tree().root.add_child(scene)
+	for i in 4:
+		await get_tree().process_frame
+	var eng: CombatEngine = scene.combat_engine
+	var single := _neutral_attack("Probe", 0, 6)
+	var sweep := _neutral_attack("Sweep Probe", 0, 4)
+	sweep.target_type = CardData.TargetType.ALL_ENEMIES
+	var shield := CardData.new()
+	shield.card_name = "Shield Probe"
+	shield.energy_cost = 0
+	shield.card_type = CardData.CardType.SKILL
+	shield.target_type = CardData.TargetType.SELF
+	var block := BlockEffect.new()
+	block.value = 3
+	shield.effects.append(block)
+
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = Vector2(500, 700)
+	press.global_position = press.position
+	var off_stage := Vector2(300.0, scene._player_bar.global_position.y + 40.0)
+
+	# Two enemies standing, then one: the press only lifts the card.
+	for stand in 2:
+		var label := "two enemies" if stand == 0 else "one enemy"
+		if stand == 1:
+			eng.enemies[1].stats.current_hp = 0
+		eng.piles.hand.clear()
+		var card := single.duplicate_card()
+		var other := single.duplicate_card()
+		eng.piles.hand.append(card)
+		eng.piles.hand.append(other)
+		scene._refresh_ui()
+		var target: EnemyCombatState = eng.enemies[0]
+		var centre: Vector2 = scene.enemy_nodes[target].get_global_rect().get_center()
+		scene._on_card_input(press, card)
+		_check("%s: the press lifts a single-target card and plays nothing" % label,
+			scene._dragging_card == card and card in eng.piles.hand)
+		scene._complete_drag(centre)
+		_check("%s: the release over an enemy plays it" % label,
+			not (card in eng.piles.hand) and scene._dragging_card == null)
+		scene._on_card_input(press, other)
+		scene._complete_drag(off_stage)
+		_check("%s: a release away from the enemies puts it back" % label,
+			other in eng.piles.hand and scene._dragging_card == null)
+		scene._on_card_input(press, other)
+		var right := InputEventMouseButton.new()
+		right.button_index = MOUSE_BUTTON_RIGHT
+		right.pressed = true
+		scene._input(right)
+		_check("%s: a right-click puts it back" % label,
+			other in eng.piles.hand and scene._dragging_card == null)
+
+	# A card that hits everything, and one that needs no target, play on the press as before.
+	var all_card := sweep.duplicate_card()
+	var self_card := shield.duplicate_card()
+	eng.piles.hand.clear()
+	eng.piles.hand.append(all_card)
+	eng.piles.hand.append(self_card)
+	scene._refresh_ui()
+	scene._on_card_input(press, all_card)
+	_check("an all-enemies card still plays on the press",
+		not (all_card in eng.piles.hand) and scene._dragging_card == null)
+	scene._on_card_input(press, self_card)
+	_check("a card with no target still plays on the press",
+		not (self_card in eng.piles.hand) and scene._dragging_card == null)
+
+	# The Shade's Unwrite says what it does, and the blank card's landing is announced.
+	var unwrite: EnemyMove = null
+	var strike: EnemyMove = null
+	for move in EnemyPool.realm_shade().moves:
+		if move.move_name == "Unwrite":
+			unwrite = move
+		elif move.move_name == "Fade Strike":
+			strike = move
+	var combat_script: GDScript = load("res://scenes/combat/combat_scene.gd")
+	var tip: String = combat_script.added_card_tooltip(unwrite)
+	_check("the Unwrite note names the card and the pile", tip.find("Unwritten") != -1 and tip.find("draw pile") != -1)
+	_check("it says the blank card cannot be played and takes a place in the hand",
+		tip.find("cannot be played") != -1 and tip.find("place in your hand") != -1)
+	_check("a move that adds no card has no such note", combat_script.added_card_tooltip(strike) == "")
+	var added: CardData = combat_script.added_card_of(unwrite)
+	_check("the intent reads the card's name beside the skull", added != null and added.card_name == "Unwritten")
+	var seen: Array = []
+	var on_added := func(c: CardData, to_discard: bool) -> void: seen.append([c.card_name, to_discard])
+	Events.card_added.connect(on_added)
+	var draw_before: int = eng.piles.draw_pile.size()
+	unwrite.effects[0].apply(eng.enemies[0].stats, eng.player_stats, eng)
+	Events.card_added.disconnect(on_added)
+	_check("the card landing is announced once, into the draw pile",
+		seen.size() == 1 and seen[0][0] == "Unwritten" and seen[0][1] == false
+		and eng.piles.draw_pile.size() == draw_before + 1)
+	scene.queue_free()
+	await get_tree().process_frame
+
+	# The hover linger is a pure function of the time since the pointer left.
+	_check("a note holds just after the pointer leaves", HoverNote.linger_holds(0.0) and HoverNote.linger_holds(1.9))
+	_check("and goes once the linger has passed",
+		not HoverNote.linger_holds(HoverNote.LINGER_SEC) and not HoverNote.linger_holds(30.0))
+	_check("the linger is about two seconds", HoverNote.LINGER_SEC >= 1.5 and HoverNote.LINGER_SEC <= 2.5)
+	var host := Control.new()
+	host.size = Vector2(1920, 1080)
+	add_child(host)
+	var note := HoverNote.new()
+	host.add_child(note)
+	var chip := PanelContainer.new()
+	chip.position = Vector2(100, 100)
+	chip.size = Vector2(80, 30)
+	host.add_child(chip)
+	HoverNote.mark(chip, "Weak 2", "Deal 25% less attack damage.")
+	note._show_for(chip)
+	_check("a hover note is up", note.shown_title() == "Weak 2")
+	var away := InputEventMouseButton.new()
+	away.button_index = MOUSE_BUTTON_LEFT
+	away.pressed = true
+	away.position = Vector2(900, 900)
+	note._input(away)
+	_check("a click elsewhere ends a lingering note at once", note.shown_title() == "")
+	note._show_for(chip)
+	note.dismiss()
+	_check("a scene's dismiss ends it at once", note.shown_title() == "")
+	host.free()
+
+	# Every keyword a relic's words name has a note, and a relic naming none is left unmarked.
+	var pools: Array = [RelicPool._build_pool(), RelicPool._build_woken_pool(), RelicPool._build_quest_pool(),
+		RelicPool._build_bram_pool(), RelicPool._build_neve_pool()]
+	var missing: Array = []
+	var relics_seen := 0
+	var with_keywords := 0
+	var vocab: Array = RelicKeywords.vocabulary()
+	for pool in pools:
+		for relic in pool:
+			relics_seen += 1
+			var words := PackedStringArray()
+			for word in relic.description.split(" ", false):
+				words.append(word.strip_edges().trim_suffix(".").trim_suffix(",").trim_suffix(";"))
+			var noted: Array = []
+			for entry in RelicKeywords.for_relic(relic):
+				noted.append(entry["name"])
+			if not noted.is_empty():
+				with_keywords += 1
+			for entry in vocab:
+				if entry["name"] in words and not (entry["name"] in noted):
+					missing.append("%s: %s" % [relic.relic_name, entry["name"]])
+	if not missing.is_empty():
+		print("    missing: ", missing)
+	_check("every keyword named in a relic's description has a note (%d relics, %d with keywords)" % [relics_seen, with_keywords],
+		missing.is_empty() and relics_seen > 40 and with_keywords > 5)
+	var margin: RelicData = RelicPool.get_relic_by_name("Ruled Margin")
+	var margin_words: Array = []
+	for entry in RelicKeywords.for_relic(margin):
+		margin_words.append(entry["name"])
+	_check("Ruled Margin's hover explains Poise", "Poise" in margin_words
+		and RelicKeywords.body_for(margin).find("Gain additional block") != -1)
+	var plain := RelicData.new()
+	plain.relic_name = "Plain"
+	plain.description = "Heal 6 HP after each combat. Weakness is not a keyword."
+	var unmarked := Control.new()
+	RelicKeywords.mark(unmarked, plain)
+	_check("a relic naming no keyword is left unmarked, and Weakness is not Weak",
+		not unmarked.is_in_group(HoverNote.GROUP) and RelicKeywords.for_relic(plain).is_empty())
+	unmarked.free()
+	var marked := Control.new()
+	RelicKeywords.mark(marked, margin)
+	_check("a relic that names one is marked with its keywords", marked.is_in_group(HoverNote.GROUP))
+	marked.free()
+	_check("the empty pack slot's note is one sentence",
+		not FileAccess.get_file_as_string("res://scripts/ui/consumable_bar.gd").contains("nothing widens"))
 
 
 ## Caedmon's phase change is restaged, and the fight is held for it (decided 10 Nov): from
