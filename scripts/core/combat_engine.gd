@@ -704,6 +704,7 @@ func add_card_to_pile(card: CardData, to_discard: bool = false) -> void:
 		piles.add_card_to_discard(card)
 	else:
 		piles.add_card_to_draw(card)
+	Events.card_added.emit(card, to_discard)
 
 
 func play_card(card: CardData, target: CombatantStats) -> bool:

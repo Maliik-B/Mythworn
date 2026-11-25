@@ -98,6 +98,8 @@ const NUMBER_STAGGER := 0.09  # the hits of one multi-hit card come up one after
 const NUMBER_STEP := Vector2(46.0, -34.0)
 const DEATH_HOLD := 0.55  # a felled body plays out its fall before it starts to go
 const DEATH_FADE := 0.4
+const PILE_FLASH := Color(2.2, 1.9, 1.2)  # the pile a card was shuffled into, bright for a moment
+const PILE_FLASH_SEC := 0.7
 const KEEPER_TINT_TIME := 0.5
 const CARD_HELD_DARK := Color(1.3, 1.3, 1.0, 0.9)
 const CARD_HELD_PAGE := Color(1.05, 1.05, 1.0, 0.96)
@@ -1158,6 +1160,7 @@ func _connect_events() -> void:
 	Events.combat_lost.connect(_on_combat_lost)
 	Events.card_played.connect(_on_card_played)
 	Events.card_exhausted.connect(_on_card_exhausted)
+	Events.card_added.connect(_on_card_added)
 	Events.player_turn_started.connect(_on_player_turn_started)
 	Events.enemy_turn_started.connect(_on_enemy_turn_started)
 	Events.enemy_action_started.connect(_on_enemy_action_started)
@@ -1339,15 +1342,12 @@ func _on_card_input(event: InputEvent, card: CardData) -> void:
 		CardData.TargetType.ALL_ENEMIES:
 			_play_selected_card(null)
 		CardData.TargetType.SINGLE_ENEMY:
-			var living := _living_enemies()
-			if living.size() == 1:
-				# Only one possible target; no need to aim. Play it straight away.
-				_play_selected_card(living[0].stats)
-			else:
-				# Multiple targets: drag onto one; right-click cancels.
-				_start_drag(card, event)
-				_update_card_highlights()
-				_log("Drag onto an enemy, or right-click to cancel...")
+			# The press lifts the card and the release plays it, so a card can be held over an
+			# enemy to read the real damage first, with one enemy or several. A release away from
+			# the enemies, or a right-click, puts it back.
+			_start_drag(card, event)
+			_update_card_highlights()
+			_log("Release over an enemy to play it, or right-click to cancel...")
 
 
 ## The effect lands on the click and the card's flight is only a flourish behind it, so nothing
@@ -1839,6 +1839,36 @@ func _self_cost_tooltip(move: EnemyMove, cost: int) -> String:
 		move.move_name, to_you, SELF_COST_GLYPH, cost]
 
 
+## The card a move puts into your piles (the Realm Shade's Unwrite), or null.
+static func added_card_of(move: EnemyMove) -> CardData:
+	for e in move.effects:
+		if e is AddCardEffect:
+			var card: CardData = e.card_to_add
+			if card == null and e.card_id != &"":
+				card = CardPool.build_card(e.card_id)
+			return card
+	return null
+
+
+## The intent tooltip for a move that adds a card: which card, which pile, and what the card does
+## once drawn. "" for any other move.
+static func added_card_tooltip(move: EnemyMove) -> String:
+	var card := added_card_of(move)
+	if card == null:
+		return ""
+	var to_discard := false
+	for e in move.effects:
+		if e is AddCardEffect:
+			to_discard = e.to_discard
+			break
+	var line := "Shuffles a card called %s into your draw pile." % card.card_name
+	if to_discard:
+		line = "Adds a card called %s to your discard pile." % card.card_name
+	if card.unplayable:
+		line += " It cannot be played, and it takes up a place in your hand whenever you draw it."
+	return "%s\n%s" % [move.move_name, line]
+
+
 ## The swords and skull come from a system emoji font, in colours of their own. The page goes without
 ## them: the threat's colour and its words say the same.
 func _stage_glyph(icon: String) -> String:
@@ -2021,6 +2051,11 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 					if effect is StatusApplyEffect:
 						value_str = " %s" % effect.status_effect.effect_name
 						break
+				# A move that adds a card names the card, so the skull is not left bare.
+				if value_str == "":
+					var added := added_card_of(enemy.current_intent)
+					if added != null:
+						value_str = " %s" % added.card_name
 			EnemyMove.IntentType.BUFF:
 				icon = "★"
 				intent_color = StageSkin.c("intent_buff")
@@ -2046,7 +2081,10 @@ func _update_enemy_panel(enemy: EnemyCombatState) -> void:
 			intent_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
 			intent_name_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
 		else:
-			intent_lbl.tooltip_text = ""
+			intent_lbl.tooltip_text = added_card_tooltip(enemy.current_intent)
+			if intent_lbl.tooltip_text != "":
+				intent_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
+				intent_name_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
 		intent_name_lbl.tooltip_text = intent_lbl.tooltip_text
 		# A self-heal intent (the Hollow Prelate) carries no status, so the BUFF branch
 		# leaves the readout blank; fill in the heal here so it's telegraphed.
@@ -2337,6 +2375,19 @@ func _on_combat_note(text: String) -> void:
 
 func _on_card_exhausted(card: CardData) -> void:
 	_log("[color=gray]%s exhausted.[/color]" % card.card_name)
+
+
+## A card lands in a pile from outside the deck: a line in the log and a flash on the pile it fell into.
+func _on_card_added(card: CardData, to_discard: bool) -> void:
+	var pile_name := "discard" if to_discard else "draw"
+	_log("[color=gray]%s is %s your %s pile.[/color]" % [
+		card.card_name, "added to" if to_discard else "shuffled into", pile_name])
+	var pile: Button = discard_label if to_discard else draw_label
+	if pile == null or not is_instance_valid(pile):
+		return
+	pile.modulate = PILE_FLASH
+	var t := pile.create_tween()
+	t.tween_property(pile, "modulate", Color.WHITE, PILE_FLASH_SEC)
 
 
 func _on_player_turn_started() -> void:
@@ -3380,7 +3431,7 @@ func _animate_enemy_death(enemy: EnemyCombatState) -> void:
 		if child.name != &"Place":
 			create_tween().tween_property(child, "modulate:a", 0.0, 0.15)
 	enemy_nodes.erase(enemy)
-	var t = create_tween()
+	var t = panel.create_tween()  # owned by the body, so one freed during the hold ends it quietly
 	t.tween_interval(DEATH_HOLD)
 	t.tween_property(panel, "modulate:a", 0.0, DEATH_FADE)
 	t.tween_callback(_leave_empty_column.bind(panel))
@@ -3406,7 +3457,9 @@ func _animate_card_draw() -> void:
 		panel.pivot_offset = panel.custom_minimum_size / 2.0
 		panel.scale = Vector2(0.0, 0.0)
 		panel.modulate.a = 0.0
-		var t = create_tween().set_parallel(true)
+		# Owned by the panel, not the scene: a refresh inside the stagger frees these panels before a
+		# later card's tween begins, and a tween owned by the scene then aborts on a freed target.
+		var t = panel.create_tween().set_parallel(true)
 		# from(): the hand's sort resets scale before a delayed tween starts, and without it every
 		# card but the first would skip the pop.
 		t.tween_property(panel, "scale", Vector2.ONE, 0.18).from(Vector2.ZERO).set_delay(delay) \

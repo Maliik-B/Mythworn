@@ -7,6 +7,8 @@ signal card_played(card_data: CardData, target)
 signal card_drawn(card_data: CardData)
 signal card_discarded(card_data: CardData)
 signal card_exhausted(card_data: CardData)
+## A card from outside the deck landed in a pile mid-fight (an enemy's Unwrite, Inner Fire's copy).
+signal card_added(card_data: CardData, to_discard: bool)
 
 # -- Combat events --
 signal combat_started()
