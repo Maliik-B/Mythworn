@@ -5798,6 +5798,15 @@ func _test_forgotten_relics() -> void:
 	_check("each dormant text carries one line of absence, and each has a short name and a wake line",
 		tells and lines)
 	_check("the dormant names are known in a stable order", RelicPool.dormant_names().size() == 6)
+	var brass := RelicPool.get_relic_by_name("A Rubbed Brass")
+	var aldric := RelicPool.get_relic_by_name("The Brass of Sir Aldric")
+	var bookmark := RelicPool.get_relic_by_name("Gilded Bookmark")
+	_check("the rubbed brass rolls at Common under the Gilded Bookmark, and wakes at the Bookmark's rarity",
+		brass != null and aldric != null and bookmark != null
+		and brass.rarity == RelicData.RelicRarity.COMMON
+		and bookmark.rarity == RelicData.RelicRarity.UNCOMMON
+		and aldric.rarity == bookmark.rarity
+		and brass.value < bookmark.value and aldric.value >= bookmark.value)
 
 	# --- Carrying and waking: in place, once, only the one named.
 	var shield := RelicPool.get_relic_by_name("A Plain Shield")

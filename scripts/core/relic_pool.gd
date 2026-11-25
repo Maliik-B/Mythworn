@@ -54,7 +54,7 @@ static func _build_woken_pool() -> Array[RelicData]:
 		RelicData.RelicEffect.GAIN_STRENGTH, 1, RelicData.RelicEffect.DRAW_CARDS, 1))
 	pool.append(_woken("The Brass of Sir Aldric", &"A Rubbed Brass",
 		"The inscription read back, and with it the rents of a dead man's lands. Gain 15 bonus Gold and heal 6 HP after each combat.",
-		RelicData.RelicRarity.RARE, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_END,
 		RelicData.RelicEffect.GAIN_GOLD, 15, RelicData.RelicEffect.HEAL, 6))
 	# The girdle's ward and the scabbard's guard are read by CombatEngine by name (effect2 NONE,
 	# value2 the number), like Blooded Edge: once a combat a blow that would fell you leaves you at
@@ -400,8 +400,10 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicEffect.APPLY_WEAK_ALL, 1))
 
 	# -- COMMON, FORGOTTEN (dormant; the woken forms are in _build_woken_pool) --
-	# Two knightly objects with the device worn off, and the one from elsewhere: a comb cut with
-	# a word no one here can read (the strange elite; nothing explains it).
+	# Two knightly objects with the device worn off, a memorial brass with its inscription rubbed
+	# away, and the one from elsewhere: a comb cut with a word no one here can read (the strange
+	# elite; nothing explains it). The brass sits under the Gilded Bookmark, which pays more gold
+	# at Uncommon, and wakes into the better of the two at the Bookmark's own rarity.
 	pool.append(_forgotten("A Plain Shield", "the plain shield",
 		"A knight's shield with the paint gone down to the bare wood, the boss still bright. Something was painted here once. Start each combat with 8 Block.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
@@ -412,6 +414,11 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
 		RelicData.RelicEffect.GAIN_STRENGTH, 1, &"The Oak Banner",
 		"The holes in the cloth fill with thread, gold on red: an oak with its roots showing."))
+	pool.append(_forgotten("A Rubbed Brass", "the rubbed brass",
+		"A small memorial brass off a tomb slab, the inscription rubbed to nothing by a century of hands. Something was written here once. Gain 10 bonus Gold after each combat.",
+		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_END,
+		RelicData.RelicEffect.GAIN_GOLD, 10, &"The Brass of Sir Aldric",
+		"The letters stand up out of the brass one at a time, and the last of them is a name."))
 	pool.append(_forgotten("A Bone Comb", "the bone comb",
 		"A comb of antler, five teeth gone, with a word cut along the back that no one here can read. Draw 1 additional card at the start of combat.",
 		RelicData.RelicRarity.COMMON, RelicData.RelicTrigger.ON_COMBAT_START,
@@ -452,13 +459,8 @@ static func _build_pool() -> Array[RelicData]:
 		RelicData.RelicEffect.GAIN_PASSION, -2))
 
 	# -- UNCOMMON, FORGOTTEN (dormant) --
-	# A memorial brass with its inscription rubbed away, and two of the romances' own named
-	# objects, the girdle and the scabbard, each with its colour or its tooling gone.
-	pool.append(_forgotten("A Rubbed Brass", "the rubbed brass",
-		"A small memorial brass off a tomb slab, the inscription rubbed to nothing by a century of hands. Something was written here once. Gain 10 bonus Gold after each combat.",
-		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_END,
-		RelicData.RelicEffect.GAIN_GOLD, 10, &"The Brass of Sir Aldric",
-		"The letters stand up out of the brass one at a time, and the last of them is a name."))
+	# Two of the romances' own named objects, the girdle and the scabbard, each with its colour
+	# or its tooling gone.
 	pool.append(_forgotten("A Faded Girdle", "the faded girdle",
 		"A lace of silk to go about the waist, the green gone to grey and the gold thread still in it. Something was worked into it once. Heal 8 HP after each combat.",
 		RelicData.RelicRarity.UNCOMMON, RelicData.RelicTrigger.ON_COMBAT_END,
