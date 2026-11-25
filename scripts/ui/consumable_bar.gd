@@ -86,7 +86,7 @@ func refresh() -> void:
 			empty.add_theme_font_size_override("font_size", 18)
 			empty.add_theme_color_override("font_color", COLOR_EMPTY)
 			empty.mouse_filter = Control.MOUSE_FILTER_STOP
-			HoverNote.mark(empty, "Empty slot", "You can carry two consumables, and nothing widens that.")
+			HoverNote.mark(empty, "Empty slot", "You can carry two consumables.")
 			add_child(empty)
 
 

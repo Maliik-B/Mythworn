@@ -17,6 +17,9 @@ const EDGE := 10.0  # the closest the panel comes to the screen's edge
 const TITLE_SIZE := 22
 const BODY_SIZE := 18
 const ASIDE_SIZE := 17
+## How long a note stays up after the pointer leaves the control it describes, so it can be read
+## while the pointer drifts off.
+const LINGER_SEC := 2.0
 
 ## Returns true while the host wants no panel at all (a card being dragged, a view open over the
 ## scene). Optional.
@@ -25,6 +28,7 @@ var blocked: Callable = Callable()
 var _panel: PanelContainer = null
 var _shown_key := ""
 var _pinned := false
+var _left_msec := -1  # when the pointer left the control the panel describes; -1 while it is on one
 
 
 ## Marks `control` as described by the panel. `kind` is a short line under the title (a status's
@@ -51,10 +55,15 @@ func _process(_delta: float) -> void:
 	if _pinned:
 		return
 	var source := _source_at(get_viewport().get_mouse_position())
-	if source == null:
-		_close()
-	else:
+	if source != null:
+		_left_msec = -1
 		_show_for(source)
+	elif _panel != null:
+		var now := Time.get_ticks_msec()
+		if _left_msec < 0:
+			_left_msec = now
+		if not linger_holds(float(now - _left_msec) / 1000.0):
+			_close()
 
 
 func _input(event: InputEvent) -> void:
@@ -71,6 +80,13 @@ func _input(event: InputEvent) -> void:
 	elif _pinned:
 		_pinned = false
 		_close()
+	elif source == null:
+		_close()  # a click anywhere else ends a lingering note at once
+
+
+## Whether a note whose pointer left `seconds` ago is still up. Pure, so a test can read the rule.
+static func linger_holds(seconds: float) -> bool:
+	return seconds < LINGER_SEC
 
 
 ## True while the panel is pinned. For the host's own clicks and for tests.
@@ -118,6 +134,7 @@ func _show_for(source: Control) -> void:
 
 
 func _close() -> void:
+	_left_msec = -1
 	if _panel != null:
 		remove_child(_panel)
 		_panel.queue_free()
